@@ -1,5 +1,4 @@
-# aiportal
-Kumpulan alat bantu berbasis HTML5-JS seperti aiTools, aiGames, MiniTools, MiniGames, dan MiniSys (Python)
+# aiPortal
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![HTML5](https://img.shields.io/badge/Frontend-HTML5%20%7C%20Tailwind%20JS-E34F26?logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
@@ -58,23 +57,23 @@ Halaman utama proyek yang memiliki fitur navigasi tab, mode Gelap/Terang (*Dark/
 
 ---
 
-### 1. Kategori Kecerdasan Buatan (`aitools/` — 14 Tools)
+### 1. Kategori Kecerdasan Buatan (`aitools/`)
 | Nama File | Penjelasan Singkat |
 | :--- | :--- |
-| `aiExpertEngine.html` | Mesin sistem pakar berbasis aturan dan AI untuk konsultasi/analisis topik spesifik. |
-| `aiGis.html` | Pemetaan cerdas dan analisis data geografis/spasial berbantuan AI. |
-| `aiKaraoke.html` | Pemutar karaoke interaktif dengan sinkronisasi lirik atau pemrosesan vokal/audio cerdas. |
-| `aiLab.html` | Ruang eksperimen terpadu untuk menguji pembelajaran mesin dengan Python dan AI. |
-| `aiLookup.html` | Alat pencarian informasi cepat dan ringkasan fakta berbasis AI. |
-| `aiMediaGen.html` | Antarmuka generator media (gambar/audio/visual) berbasis kecerdasan buatan. |
-| `aiQuiz.html` | Pembuat dan simulator kuis otomatis dari materi atau topik yang diberikan. |
-| `aiRef.html` | Asisten pencarian referensi, sitasi, dan manajemen literatur cerdas. |
-| `MyAI.html` | Asisten AI personal serbaguna untuk kebutuhan harian. |
-| `MyAIBuild.html` | Pembangun prototipe aplikasi, kode, atau komponen web berbasis perintah AI. |
-| `MyAIChat.html` | Antarmuka percakapan (*chatbot*) interaktif yang bersih dan responsif. |
-| `MyAIFlow.html` | Perancang alur kerja (*workflow*) otomatis dan *chaining* perintah AI. |
-| `MyAILive.html` | Asisten AI mode *real-time* / interaktif langsung (suara/teks). |
-| `MyAIMeme.html` | Generator meme otomatis lengkap dengan ide teks/caption dari AI. |
+| `aiExpertEngine.html` | Mesin sistem pakar berbasis AI LLM (Gemini) untuk konsultasi/analisis topik spesifik. |
+| `aiGis.html` | Pemetaan cerdas dan analisis data geografis/spasial berbantuan AI (Gemini). |
+| `aiKaraoke.html` | Pemutar karaoke interaktif dengan sinkronisasi lirik yang dilengkapi tools AI (Gemini). |
+| `aiLab.html` | Ruang eksperimen terpadu untuk menguji pembelajaran mesin dengan Python dan AI (Gemini). |
+| `aiLookup.html` | Alat pencarian informasi berbasis AI (Gemini) dengan Web Search Grounding. |
+| `aiMediaGen.html` | Alat pembuatan prompt generator media (gambar/audio/visual) berbasis AI (Gemini). |
+| `aiQuiz.html` | Pembuat dan simulator kuis berbasis AI (Gemini) dari materi atau topik yang diberikan. |
+| `aiRef.html` | Asisten pencarian referensi, koding, edit teks, dan pengenalan file berbasis AI (Gemini). |
+| `MyAI.html` | Asisten AI personal serbaguna untuk kebutuhan harian, OpenAI Standard Compatible. |
+| `MyAIBuild.html` | Pembangun prototipe aplikasi, kode, atau komponen web berbasis perintah AI, OpenAI Standard Compatible. |
+| `MyAIChat.html` | Antarmuka percakapan (*chatbot*) interaktif yang bersih dan responsif, OpenAI Standard Compatible. |
+| `MyAIFlow.html` | Perancang alur kerja (*workflow*) dan simulasi agentik multi model AI, OpenAI Standard Compatible. |
+| `MyAILive.html` | Asisten AI mode *real-time* / interaktif langsung (suara/teks), OpenAI Standard Compatible. |
+| `MyAIMeme.html` | Editor meme, komik, dan grafis yang memiliki fitur caption dan penerjemah AI, OpenAI Standard Compatible. |
 
 ---
 
@@ -89,27 +88,26 @@ Halaman utama proyek yang memiliki fitur navigasi tab, mode Gelap/Terang (*Dark/
 | Nama File | Penjelasan Singkat |
 | :--- | :--- |
 | `Aksara.html` | Alat konversi, pembelajaran, atau pengetikan aksara Nusantara/khusus. |
-| `BackOffice.html` | Dasbor manajemen operasional dan administrasi bisnis internal. |
+| `BackOffice.html` | Tool CRUD untuk membantu manajemen operasional dan administrasi bisnis internal. |
 | `DocEdit.html` | Pengolah kata (*rich text editor*) ringan berbasis web. |
 | `DocuWiki.html` | Sistem dokumentasi pribadi dan basis pengetahuan bergaya Wiki. |
-| `Draftr.html` | Aplikasi penulisan draf artikel atau cerita bebas gangguan (*distraction-free*). |
-| `FrontDesk.html` | Sistem pencatatan buku tamu, resepsionis, dan antrean layanan depan. |
+| `Draftr.html` | Alat untuk membuat dokumen batch berdasarkan data yang diunggah (Mail Merge). |
+| `FrontDesk.html` | Sistem POS sederhana untuk kebutuhan sektor jasa, ritel skala UMKM, dan layanan publik. |
 | `MyDiary.html` | Jurnal harian pribadi dengan pencatatan suasana hati dan pencarian arsip. |
 | `PDFEdit.html` | Alat bantu manipulasi dokumen PDF (gabung, pisah, atau anotasi dasar). |
 | `RecPPAT.html` | Alat bantu pencatatan/administrasi dokumen akta atau administrasi pertanahan (PPAT). |
 | `Teleprompt.html` | Layar *teleprompter* otomatis dengan pengaturan kecepatan gulir teks untuk presentasi/video. |
-| `Textr.html` | Utilitas manipulasi teks massal (ubah kapitalisasi, hapus duplikat, hitung kata, dll.). |
+| `Textr.html` | Utilitas manipulasi teks, format legal (naskah dinas), dan Text To Speech. |
 | `WorkSpace.html` | Ruang kerja terpadu untuk mengelola tugas, catatan, dan tautan harian. |
 
 #### C. Data, Keuangan & Analisis (`minitools/`)
 | Nama File | Penjelasan Singkat |
 | :--- | :--- |
-| `CalFit.html` | Kalkulator kalori, indeks massa tubuh (BMI), dan pelacak kebugaran harian. |
 | `Cell.html` | Aplikasi lembar kerja (*spreadsheet*) ringan dengan dukungan rumus dasar. |
 | `ChartMaker.html` | Pembuat grafik dan visualisasi data instan (batang, garis, lingkaran). |
-| `CoreVert.html` | Konverter serbaguna untuk satuan ukuran, mata uang, dan format data. |
+| `CoreVert.html` | Konverter untuk format XML CoreTax. |
 | `Fin.html` | Aplikasi pencatatan keuangan pribadi, pemasukan, pengeluaran, dan anggaran. |
-| `Matcher.html` | Alat pencocokan dan perbandingan dua daftar data untuk mencari kesamaan/perbedaan. |
+| `Matcher.html` | Alat pencocokan data, foto, dan dokumen dengan interface mirip Tinder. |
 | `SmartGraph.html` | Pembuat diagram relasi, *mind map*, dan grafik jaringan cerdas. |
 | `SQLGen.html` | Generator kueri SQL visual untuk mempermudah pembuatan perintah basis data. |
 | `XMLSX.html` | Alat konversi dan pembaca struktur data antara XML, Excel/CSV, dan JSON. |
@@ -117,70 +115,72 @@ Halaman utama proyek yang memiliki fitur navigasi tab, mode Gelap/Terang (*Dark/
 #### D. Desain, Media & Visual (`minitools/`)
 | Nama File | Penjelasan Singkat |
 | :--- | :--- |
-| `DMG.html` | Alat bantu pembuatan/pengelolaan aset grafis atau materi digital. |
 | `EasyStudio.html` | Studio desain mini untuk membuat poster, kartu, atau konten media sosial. |
-| `Fontr.html` | Pratinjau, pembanding, dan pengelola tipografi/font web. |
+| `Fontr.html` | Pembuat tipografi/font web. |
 | `Galeri.html` | Penampil dan pengelola galeri foto lokal dengan mode *slideshow*. |
-| `Harmoni.html` | Generator palet warna harmonis untuk kebutuhan desain UI/UX dan grafis. |
-| `Kanvas.html` | Papan gambar digital bebas (*freehand drawing*) dengan berbagai pilihan kuas. |
-| `Komposer.html` | Alat penyusun komposisi tata letak visual atau musik sederhana. |
-| `Origami.html` | Panduan interaktif atau simulator lipatan kertas origami. |
+| `Harmoni.html` | Pemutar audio dan video berbasis web, dengan fitur MultiPlay dan MixPlay. |
+| `Kanvas.html` | Kanvas (*freehand drawing*), editor foto, dan pembuat kolase. |
+| `Komposer.html` | Alat pembuat musik sederhana dengan fitur Sequencer, Live Play, dan Multi Track Editor. |
+| `Origami.html` | Penyusun kemasan dengan tampilan interaktif 3D. |
+| `Parti.html` | Alat pembuat partitur dan notasi musik. |
+| `PasaDena.html` | Sistem pembuatan denah 3D dan 2D berbasis web. |
 | `Slider.html` | Pembuat presentasi *slide* sederhana langsung dari *browser*. |
 | `Vect.html` | Editor grafis vektor (SVG) ringan untuk membuat ilustrasi dan ikon. |
 | `VidEdit.html` | Pemotong dan editor video dasar langsung di sisi klien (*browser*). |
 
-#### E. Utilitas Web, Pemetaan & Sistem (`minitools/`)
+#### E. ALat Lainnya (`minitools/`)
 | Nama File | Penjelasan Singkat |
 | :--- | :--- |
+| `CalFit.html` | Kalender pelacak kebugaran, medis, kehamilan, kewanitaan, dan anak. |
 | `Diag.html` | Pembuat diagram alir (*flowchart*), UML, dan arsitektur sistem. |
+| `DMG.html` | GIS untuk pemantauan kondisi meteorologi dan geofisika di wilayah Indonesia. |
 | `EasyGen.html` | Generator serbaguna (QR Code, password acak, UUID, kode *dummy*, dll.). |
-| `FastHand.html` | Aplikasi tes dan latihan kecepatan mengetik 10 jari (WPM). |
+| `FastHand.html` | Aplikasi simulasi stenografi digital dan pengetikan prediktif. |
 | `Fidget.html` | Kumpulan mainan virtual pelepas stres (*fidget toys*) interaktif. |
-| `FileDrop.html` | Utilitas berbagi atau memproses file lokal secara cepat dengan *drag-and-drop*. |
-| `FormBuild.html` | Pembuat formulir survei dan isian web secara visual. |
-| `GeoTag.html` | Alat melihat, menyunting, atau menyematkan koordinat GPS (EXIF) pada foto/data. |
-| `Hajatan.html` | Aplikasi manajemen acara/hajatan (daftar tamu, anggaran, susunan acara). |
-| `Ikhlas.html` | Aplikasi utilitas ibadah/islami (jadwal salat, tasbih digital, atau catatan amal). |
-| `Impress.html` | Pembuat halaman profil portofolio atau kartu nama digital yang menarik. |
+| `FileDrop.html` | Alat berbagi file offline dengan kode QR. |
+| `FormBuild.html` | Pembuat formulir web. |
+| `GeoTag.html` | GIS untuk menggambar, membuat poligon, dan melihat file geografis seperti GeoJSON. |
+| `Hajatan.html` | Aplikasi pembuat undangan acara/hajatan web dan cetak. |
+| `Ikhlas.html` | Aplikasi utilitas ibadah/islami (jadwal salat, tasbih digital, dan tautan ke Quran.com). |
+| `Impress.html` | Alat untuk presentasi foto dan video dengan layar terpisah, cocok untuk event langsung. |
 | `InFeeds.html` | Pembaca berita/umpan RSS terpadu dalam satu halaman bersih. |
 | `InfoPage.html` | Pembuat halaman informasi/pengumuman satu layar siap tampil. |
-| `InfoPost.html` | Pembuat kartu infografis atau pengumuman ringkas siap bagikan. |
+| `InfoPost.html` | Pembuat kartu infografis berformat medsos. |
 | `LensOCR.html` | Ekstraktor teks dari gambar (*Optical Character Recognition*) berbasis *browser*. |
 | `OffGrid.html` | Kumpulan utilitas darurat dan alat bantu yang dirancang bekerja penuh saat *offline*. |
 | `Page.html` | Pembuat halaman web statis (*landing page*) sederhana secara visual. |
-| `Parti.html` | Alat perencanaan pesta/acara dan pembagian tugas atau patungan biaya. |
-| `PasaDena.html` | Sistem manajemen data/katalog khusus terstruktur. |
-| `QuickBoard.html` | Papan klip (*clipboard*) sementara dan papan catatan tempel cepat. |
+| `QuickBoard.html` | Papan antrean, papan skor, dan papan tulisan bergerak. |
 | `Quizr.html` | Pembuat dan pemutar kuis interaktif untuk keperluan edukasi atau acara. |
-| `RandNamer.html` | Generator nama acak (nama orang, merek, karakter, atau proyek). |
+| `RandNamer.html` | Generator nama acak untuk undian. |
 | `Undian.html` | Aplikasi pengacak nama/nomor undian (*doorprize*) dengan animasi menarik. |
-| `VizGis.html` | Penampil dan visualisasi data geografis/peta interaktif berbasis GeoJSON/KML. |
+| `VizGis.html` | GIS pembuat dan penampil histori rute berbasis GeoJSON/KML. |
 
 ---
 
-### 3. Kategori Gim & Simulasi Interaktif (`minigames/` — 55 Tools)
+### 3. Kategori Gim & Simulasi Interaktif (`minigames/`)
 
 #### A. Gim Klasik & Arcade
 | Nama File | Penjelasan Singkat |
 | :--- | :--- |
-| `BallOn.html` | Gim arkade pantulan bola melewati rintangan. |
-| `Block.html` / `BlockBlast.html` | Gim menyusun dan menghancurkan balok bergaya *puzzle* papan. |
+| `BallOn.html` | Gim arkade pantulan balon melewati rintangan. |
+| `Block.html` | Gim menyusun dan menghancurkan balok bergaya *puzzle* papan. |
+| `BlockBlast.html` | Gim dengan konsep seperti *BlockBlast*. |
 | `Bomber.html` | Gim aksi klasik meletakkan bom untuk menghancurkan rintangan dan musuh. |
 | `BrickBreaker.html` | Gim klasik memantulkan bola untuk memecahkan susunan batu bata. |
-| `Destroyer.html` | Gim aksi menembak dan menghancurkan target atau armada musuh. |
+| `Destroyer.html` | Gim antistres menghancurkan gambar yang diunggah, mirip Desktop Destroyer. |
 | `DinoOnline.html` | Gim lari tanpa akhir (*endless runner*) melompati rintangan ala Dino Chrome. |
 | `DuckHunt.html` | Gim menembak target bebek terbang klasik. |
-| `Force.html` | Gim aksi/fisika berbasis gaya dorong dan gravitasi. |
-| `GoBlock.html` | Gim teka-teki menggeser atau mengarahkan balok ke titik tujuan. |
+| `Force.html` | Gim aksi menembak musuh dengan tank, jet, atau kapal. |
+| `GoBlock.html` | Gim teka-teki untuk mencegah karakter mencapai ujung arena dan menjebaknya. |
 | `GulaGula.html` | Gim *match-3* bertema permen warna-warni. |
 | `Labirin.html` | Gim mencari jalan keluar dari labirin yang menantang. |
 | `Pacman.html` | Gim arkade klasik memakan titik di labirin sambil menghindari hantu. |
-| `Pinball.html` | Simulasi mesin *pinball* klasik dengan fisika pantulan bola. |
+| `Pinball.html` | Simulasi mesin *pinball* 3D dengan fisika pantulan bola. |
 | `PingPong.html` | Gim tenis meja/Pong klasik pemain tunggal maupun ganda. |
 | `RetroSport.html` | Kumpulan gim olahraga bergaya retro piksel. |
 | `Snake.html` | Gim ular klasik memakan umpan agar tumbuh semakin panjang. |
 | `SpaceStecu.html` | Gim tembak-menembak pesawat luar angkasa (*space shooter*). |
-| `Tetris.html` | Gim menyusun balok jatuh (*tetromino*) klasik. |
+| `Tetris.html` | Gim menyusun balok jatuh (*tetris*) klasik. |
 | `WhackdBol.html` | Gim ketangkasan memukul objek yang muncul cepat (*whack-a-mole*). |
 | `YaBalapan.html` | Gim balapan kendaraan berkecepatan tinggi. |
 | `Zuma.html` | Gim menembak bola warna untuk memutus rantai bola yang berjalan. |
@@ -191,13 +191,13 @@ Halaman utama proyek yang memiliki fitur navigasi tab, mode Gelap/Terang (*Dark/
 | `BrainGame.html` | Kumpulan mini-gim untuk melatih daya ingat, logika, dan fokus otak. |
 | `Catur.html` | Gim papan catur klasik lengkap dengan aturan langkah standar. |
 | `Congklak.html` | Gim tradisional congklak/dakon digital. |
-| `Duo.html` | Gim kartu mencocokkan warna dan angka (ala UNO). |
-| `Merge.html` | Gim menggabungkan angka atau objek serupa untuk mencapai level tertinggi (ala 2048). |
-| `Minesweeper.html` | Gim deduksi logika klasik menyapu ranjau di papan kotak. |
-| `Nono.html` | Gim teka-teki logika gambar *Nonogram / Picross*. |
+| `Duo.html` | Gim untuk mengarahkan dua karakter di dua layar ke titik akhir. |
+| `Merge.html` | Gim menggabungkan angka atau objek serupa hingga berukuran besar. |
+| `Minesweeper.html` | Gim menyapu ranjau di papan kotak. |
+| `Nono.html` | Gim crossover *Nonogram / Picross* dengan RPG 2D. |
 | `Onet.html` | Gim mencocokkan dua ikon identik dengan jalur penghubung maksimal tiga garis. |
 | `PushPull.html` | Gim teka-teki mendorong dan menarik kotak (*Sokoban-style*). |
-| `Puzzle.html` | Gim menyusun potongan gambar (*jigsaw/sliding puzzle*). |
+| `Puzzle.html` | Gim menyusun potongan gambar (*jigsaw/sliding puzzle*) dengan fitur kustomisasi gambar. |
 | `Reversi.html` | Gim papan strategi membalik keping hitam-putih (Othello). |
 | `Solitaire.html` | Gim kartu klasik Klondike Solitaire. |
 | `Spider.html` | Gim kartu Spider Solitaire dengan tingkat kesulitan bervariasi. |
@@ -210,21 +210,21 @@ Halaman utama proyek yang memiliki fitur navigasi tab, mode Gelap/Terang (*Dark/
 | `DelSim.html` | Simulasi logistik dan pengantaran paket/kurir. |
 | `Effector.html` | Alat/gim eksperimen efek visual dan partikel interaktif. |
 | `FoneSim.html` | Simulasi antarmuka ponsel pintar lengkap dengan aplikasi mini di dalamnya. |
-| `KDKMP.html` | Gim/simulasi bertema lokal atau tantangan khusus interaktif. |
+| `KDKMP.html` | Gim/simulasi satir-horor bertemakan Koperasi Merah Putih. |
 | `LoketRush.html` | Gim manajemen waktu melayani antrean loket dengan cepat. |
 | `Nambang.html` | Gim simulasi menambang sumber daya alam dan meningkatkan peralatan. |
-| `OnFire.html` | Gim aksi/simulasi pemadaman kebakaran atau bertahan dari rintangan api. |
-| `Sawit.html` | Simulasi manajemen perkebunan kelapa sawit dan panen. |
-| `ShopSim.html` | Simulasi mengelola toko, stok barang, dan melayani pembeli. |
-| `SimCraft.html` | Simulasi merakit (*crafting*) dan membangun dunia berbasis blok. |
-| `SimTok.html` | Simulasi membuat konten dan mengelola akun media sosial video pendek. |
-| `SkillJump.html` | Gim ketangkasan melompati platform vertikal setinggi mungkin. |
-| `SkillSpace.html` | Gim ketangkasan navigasi di ruang angkasa dengan presisi tinggi. |
+| `OnFire.html` | Gim balapan dan sandbox dengan kendaraan dan arena 3D. |
+| `Sawit.html` | Gim/Simulasi manajemen perkebunan sawit. |
+| `ShopSim.html` | Simulasi antarmuka toko online. |
+| `SimCraft.html` | Simulasi merakit (*crafting*) dan membangun dunia berbasis blok mirip Minecraft. |
+| `SimTok.html` | Simulasi aplikasi media sosial video pendek. |
+| `SkillJump.html` | Gim platformer klasik endless. |
+| `SkillSpace.html` | Gim mirip Flappy Birds dengan tema ruang angkasa. |
 | `SkillTower.html` | Gim ketangkasan menumpuk menara blok secara presisi. |
 | `SoundLab.html` | Laboratorium sintesis suara, *beatmaker*, dan eksperimen audio interaktif. |
 | `WhatSim.html` | Simulasi aplikasi perpesanan instan untuk skenario cerita atau dialog. |
-| `WindOS.html` | Simulasi sistem operasi desktop klasik berbasis web lengkap dengan jendela aplikasi. |
-| `Wireng777.html` | Simulasi mesin ketangkasan/putaran angka hiburan. |
+| `WindOS.html` | Simulasi OS Klasik dengan crossover Hack n Slash RPG. |
+| `Wireng777.html` | Simulasi sistem gambling untuk mengedukasi bahaya perjudian daring. |
 
 ---
 
@@ -282,7 +282,7 @@ Seluruh kode sumber dalam proyek **aiPortal** beserta kumpulan modul dan perangk
 ```text
 MIT License
 
-Copyright (c) 2026 aiPortal Project
+Copyright (c) 2026 aiPortal
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
