@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyAIChat</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS (XLSX parsing) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- PapaParse (CSV parsing) -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.05); }
+        ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.3); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.5); }
+        
+        /* Typing dot animation */
+        @keyframes blink {
+            0%, 100% { opacity: 0.2; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-3px); }
+        }
+        .dot-1 { animation: blink 1.2s infinite 0.1s; }
+        .dot-2 { animation: blink 1.2s infinite 0.3s; }
+        .dot-3 { animation: blink 1.2s infinite 0.5s; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
+
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-4 lg:px-8 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-black text-xl">
+                ⚡
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-bold text-lg text-white tracking-tight">MyAIChat</h1>
+                </div>
+                <p class="text-xs text-slate-400">Knowledge Base & Rule-Based Chatbot Builder</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-3">
+            <button onclick="downloadSampleFile('faq')" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-xs font-medium text-slate-300 transition">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Contoh CSV (FAQ)
+            </button>
+            <button onclick="downloadSampleFile('tree')" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-xs font-medium text-slate-300 transition">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Contoh CSV (Rule Tree)
+            </button>
+            <button onclick="exportChatbotHTML()" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-xs shadow-lg shadow-emerald-600/25 transition-all transform active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                Ekspor Chatbot HTML
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- LEFT PANEL: Configuration & KB Management (7 cols) -->
+        <div class="lg:col-span-7 space-y-6">
+            
+            <!-- Navigation Tabs -->
+            <div class="flex items-center gap-2 p-1.5 bg-slate-800/90 rounded-2xl border border-slate-700/80">
+                <button onclick="switchTab('tab-kb')" id="btn-tab-kb" class="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all bg-indigo-600 text-white shadow-md">
+                    📂 Knowledge Base
+                </button>
+                <button onclick="switchTab('tab-ai')" id="btn-tab-ai" class="flex-1 py-2 px-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all">
+                    🤖 AI Integration (OpenAI API)
+                </button>
+                <button onclick="switchTab('tab-appearance')" id="btn-tab-appearance" class="flex-1 py-2 px-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all">
+                    🎨 Tampilan & Opsi
+                </button>
+            </div>
+
+            <!-- TAB 1: KNOWLEDGE BASE -->
+            <div id="tab-kb" class="space-y-4">
+                
+                <!-- Upload Box -->
+                <div class="p-6 rounded-2xl border-2 border-dashed border-slate-700 hover:border-indigo-500/70 bg-slate-800/40 transition text-center group cursor-pointer relative" onclick="document.getElementById('file-upload').click()">
+                    <input type="file" id="file-upload" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
+                    <div class="h-12 w-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    </div>
+                    <p class="text-sm font-medium text-slate-200">Unggah File Excel (.xlsx) atau CSV Knowledge Base</p>
+                    <p class="text-xs text-slate-400 mt-1">Dukung mode FAQ Kata Kunci atau Decision Tree (Nomor Urut, True/False)</p>
+                    <div class="mt-4 flex flex-wrap justify-center gap-2">
+                        <span class="text-[11px] px-2.5 py-1 bg-slate-800 text-slate-300 rounded-lg border border-slate-700">Otomatis deteksi format</span>
+                        <button type="button" onclick="event.stopPropagation(); loadPresetData('faq')" class="text-[11px] px-2.5 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg border border-indigo-500/40 hover:bg-indigo-500/30">Gunakan Data Contoh FAQ</button>
+                        <button type="button" onclick="event.stopPropagation(); loadPresetData('tree')" class="text-[11px] px-2.5 py-1 bg-sky-500/20 text-sky-300 rounded-lg border border-sky-500/40 hover:bg-sky-500/30">Gunakan Data Contoh Rule Tree</button>
+                    </div>
+                </div>
+
+                <!-- Mode & Dataset Summary Card -->
+                <div class="p-4 rounded-2xl bg-slate-800/60 border border-slate-700 flex items-center justify-between flex-wrap gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <div>
+                            <span class="text-xs font-semibold text-slate-200" id="kb-summary-title">Data Aktif: 4 Data FAQ Siap</span>
+                            <p class="text-[11px] text-slate-400" id="kb-summary-mode">Mode deteksi: Kata Kunci (Keywords Match)</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="clearKnowledgeBase()" class="px-2.5 py-1 text-xs text-rose-400 hover:text-rose-300 rounded-lg border border-rose-900/40 bg-rose-950/20">
+                            Hapus Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Knowledge Base Table Preview -->
+                <div class="rounded-2xl border border-slate-700/80 bg-slate-800/40 overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Tinjauan Data Knowledge Base</span>
+                        <span class="text-[11px] text-slate-400" id="kb-item-count">Total item: 4</span>
+                    </div>
+                    <div class="overflow-x-auto max-h-80">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-800/90 text-slate-400 border-b border-slate-700 sticky top-0">
+                                <tr id="table-header-row">
+                                    <th class="py-2.5 px-3">Tipe/ID</th>
+                                    <th class="py-2.5 px-3">Kategori</th>
+                                    <th class="py-2.5 px-3">Trigger / Pertanyaan</th>
+                                    <th class="py-2.5 px-3">Jawaban / Opsi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="kb-table-body" class="divide-y divide-slate-800/70">
+                                <!-- Dynamic rows rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: AI INTEGRATION (OPENAI COMPATIBLE) -->
+            <div id="tab-ai" class="space-y-4 hidden">
+                <div class="p-5 rounded-2xl bg-slate-800/60 border border-slate-700 space-y-4">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                                <span>Koneksi AI (OpenAI-Compatible)</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">/v1/chat/completions</span>
+                            </h2>
+                            <p class="text-xs text-slate-400 mt-1">Dukung OpenAI GPT, Google Gemini, Grok, Ollama lokal, Qwen, DeepSeek, OpenRouter, dll.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="ai-enable-toggle" class="sr-only peer" onchange="toggleAiEnable(this.checked)">
+                            <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+
+                    <div id="ai-settings-container" class="space-y-4 pt-2 border-t border-slate-700/80 opacity-50 pointer-events-none transition-all">
+                        <!-- Provider Presets -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pilih Preset Cepat</label>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <button type="button" onclick="applyAiPreset('openai')" class="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200">OpenAI</button>
+                                <button type="button" onclick="applyAiPreset('openrouter')" class="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200">OpenRouter</button>
+                                <button type="button" onclick="applyAiPreset('deepseek')" class="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200">DeepSeek</button>
+                                <button type="button" onclick="applyAiPreset('ollama')" class="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200">Ollama Lokal</button>
+                            </div>
+                        </div>
+
+                        <!-- API URL -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">API Base URL</label>
+                            <input type="text" id="ai-base-url" value="https://api.openai.com/v1" placeholder="https://api.openai.com/v1" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono">
+                            <span class="text-[10px] text-slate-500">Contoh: https://openrouter.ai/api/v1 atau http://localhost:11434/v1</span>
+                        </div>
+
+                        <!-- Model Name & API Key -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Model</label>
+                                <input type="text" id="ai-model-name" value="gpt-4o-mini" placeholder="gpt-4o-mini, deepseek-chat, mistral..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">API Key (Testing Studio)</label>
+                                <div class="relative">
+                                    <input type="password" id="ai-api-key" placeholder="sk-..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono pr-8">
+                                    <button type="button" onclick="togglePasswordVisibility('ai-api-key')" class="absolute right-2 top-2 text-slate-400 hover:text-slate-200 text-xs">👁️</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Persona System Prompt -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Persona & Instruksi Sistem (System Prompt)</label>
+                            <textarea id="ai-persona" rows="3" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-sans" placeholder="Kamu adalah asisten virtual resmi MyAIChat yang ramah, ringkas, dan berbahasa Indonesia sopan.">Kamu adalah asisten virtual resmi yang ramah, sopan, dan berwawasan luas. Bantu jawab pertanyaan pengguna dengan ringkas dan jelas.</textarea>
+                        </div>
+
+                        <!-- Security Note -->
+                        <div class="p-3 bg-amber-950/30 border border-amber-800/40 rounded-xl flex items-start gap-2 text-[11px] text-amber-300/90">
+                            <span class="text-sm">🔒</span>
+                            <span><strong>Keamanan Ekspor:</strong> Kunci API yang Anda ketik di atas <em>hanya</em> dipakai untuk simulasi pengujian di halaman ini. Kunci API tidak akan disimpan ke dalam file HTML hasil ekspor demi privasi. Pengguna akhir dapat memasukkan kuncinya sendiri lewat tombol pengaturan pada chatbot hasil ekspor.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: APPEARANCE & OPTIONS -->
+            <div id="tab-appearance" class="space-y-4 hidden">
+                <div class="p-5 rounded-2xl bg-slate-800/60 border border-slate-700 space-y-4">
+                    <h2 class="text-sm font-bold text-white">Konfigurasi Tampilan & Perilaku Bot</h2>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Bot</label>
+                            <input type="text" id="bot-name" value="Asisten Virtual" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Warna Tema Utama</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="bot-accent-color" value="#4f46e5" class="h-8 w-12 rounded cursor-pointer bg-transparent border-0">
+                                <span class="text-xs text-slate-400 font-mono" id="bot-color-text">#4f46e5</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Pesan Pembuka (Greeting Message)</label>
+                        <textarea id="bot-greeting" rows="2" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 focus:border-indigo-500">Halo! 👋 Saya adalah asisten virtual. Ada yang bisa saya bantu hari ini? Ketik pertanyaan Anda atau pilih topik di bawah.</textarea>
+                    </div>
+
+                    <div class="border-t border-slate-700 pt-3 space-y-2">
+                        <label class="block text-xs font-semibold text-slate-300">Opsi Fallback Pencarian (Jika tidak ada jawaban)</label>
+                        <div class="flex items-center gap-4 text-xs text-slate-300">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="opt-fallback-google" checked class="rounded border-slate-700 bg-slate-900 text-indigo-600">
+                                <span>Tampilkan Opsi Google Search</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="opt-fallback-chatgpt" checked class="rounded border-slate-700 bg-slate-900 text-indigo-600">
+                                <span>Tampilkan Opsi Tanya ChatGPT</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT PANEL: Live Chatbot Preview (5 cols) -->
+        <div class="lg:col-span-5">
+            <div class="sticky top-20">
+                <!-- Preview Header Controls -->
+                <div class="flex items-center justify-between mb-3 px-1">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span class="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
+                            Live Preview Chatbot
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="resetChat()" title="Reset Percakapan" class="p-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white transition text-xs">
+                            🔄 Reset Chat
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Phone Frame Container -->
+                <div class="w-full max-w-[420px] mx-auto h-[620px] bg-slate-950 border-4 border-slate-800 rounded-[36px] shadow-2xl flex flex-col overflow-hidden relative">
+                    
+                    <!-- Chat Header Bar -->
+                    <div id="preview-header" class="p-3.5 bg-gradient-to-r from-indigo-700 to-indigo-600 text-white flex items-center justify-between shrink-0 shadow-md">
+                        <div class="flex items-center gap-3">
+                            <div class="relative">
+                                <div id="preview-avatar" class="h-9 w-9 rounded-full bg-white/20 backdrop-blur flex items-center justify-center font-bold text-sm text-white">
+                                    🤖
+                                </div>
+                                <span class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-slate-900"></span>
+                            </div>
+                            <div>
+                                <h3 id="preview-bot-name" class="font-bold text-sm leading-tight text-white">Asisten Virtual</h3>
+                                <p class="text-[10px] text-indigo-100 flex items-center gap-1">
+                                    <span>Online</span> • <span id="preview-mode-tag">Knowledge Base</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-xs px-2 py-0.5 rounded bg-black/20 text-white/90 text-[10px] font-mono">Preview</span>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages List -->
+                    <div id="preview-messages" class="flex-1 p-3.5 overflow-y-auto space-y-3 bg-slate-900/90 text-xs">
+                        <!-- Message bubbles injected by JS -->
+                    </div>
+
+                    <!-- Quick Suggestions Bar -->
+                    <div id="preview-quick-chips" class="px-3 py-1.5 bg-slate-950/70 border-t border-slate-800 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[11px]">
+                        <!-- Chips injected by JS -->
+                    </div>
+
+                    <!-- Typing Indicator -->
+                    <div id="preview-typing" class="px-4 py-1.5 bg-slate-900/90 text-[11px] text-slate-400 hidden items-center gap-2">
+                        <span>Bot sedang mengetik</span>
+                        <span class="inline-flex gap-1">
+                            <span class="h-1.5 w-1.5 rounded-full bg-indigo-400 dot-1"></span>
+                            <span class="h-1.5 w-1.5 rounded-full bg-indigo-400 dot-2"></span>
+                            <span class="h-1.5 w-1.5 rounded-full bg-indigo-400 dot-3"></span>
+                        </span>
+                    </div>
+
+                    <!-- Chat Input Bar -->
+                    <form onsubmit="handleUserSendMessage(event)" class="p-2.5 bg-slate-950 border-t border-slate-800 flex items-center gap-2 shrink-0">
+                        <input type="text" id="preview-input" placeholder="Tulis pesan atau pilih opsi..." class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                        <button type="submit" id="preview-send-btn" class="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition active:scale-95">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- JAVASCRIPT LOGIC ENGINE -->
+    <script>
+        // Preset sample data
+        const PRESET_FAQ = [
+            {
+                type: 'faq',
+                category: 'Layanan & Jam',
+                keywords: ['jam', 'buka', 'operasional', 'waktu kerja', 'libur'],
+                response: 'Layanan kami beroperasi dari hari Senin hingga Jumat pukul 08.00 - 17.00 WIB. Hari Sabtu, Minggu, dan Libur Nasional tutup.'
+            },
+            {
+                type: 'faq',
+                category: 'Harga & Paket',
+                keywords: ['harga', 'biaya', 'tarif', 'paket', 'berlangganan'],
+                response: 'Kami menyediakan Paket Basic (Rp50.000/bln), Pro (Rp120.000/bln), dan Enterprise kustom. Semua paket sudah termasuk fitur integrasi AI.'
+            },
+            {
+                type: 'faq',
+                category: 'Teknis & Dukungan',
+                keywords: ['bantuan', 'cs', 'hubungi', 'whatsapp', 'kontak'],
+                response: 'Anda dapat menghubungi Customer Care kami melalui WhatsApp di nomor 0812-3456-7890 atau email ke support@myaichat.local.'
+            },
+            {
+                type: 'faq',
+                category: 'Alamat',
+                keywords: ['alamat', 'kantor', 'lokasi', 'tempat'],
+                response: 'Kantor pusat kami berada di Gedung Cyber Tower Lt. 12, Jl. Sudirman Kav. 21, Jakarta Selatan.'
+            }
+        ];
+
+        const PRESET_RULE_TREE = [
+            {
+                type: 'tree',
+                id: 1,
+                category: 'Troubleshooting Internet',
+                prompt: 'Apakah lampu indikator PON / Internet di modem Anda menyala hijau stabil?',
+                keywords: ['modem', 'internet', 'gangguan', 'wifi', 'troubleshoot'],
+                trueAction: { type: 'jump', target: 2, label: 'Ya, Hijau Stabil' },
+                falseAction: { type: 'jump', target: 3, label: 'Tidak, Merah / Mati' }
+            },
+            {
+                type: 'tree',
+                id: 2,
+                category: 'Troubleshooting Internet',
+                prompt: 'Koneksi optik modem Anda normal. Apakah perangkat Anda (HP/Laptop) sudah terhubung ke WiFi?',
+                keywords: ['wifi terhubung'],
+                trueAction: { type: 'text', response: 'Silakan coba restart browser Anda atau gunakan mode incognito. Jika tetap tidak bisa, lakukan flush DNS di perangkat Anda.' },
+                falseAction: { type: 'text', response: 'Silakan masuk ke menu WiFi di HP/Laptop, pilih nama WiFi Anda, lalu masukkan password dengan benar.' }
+            },
+            {
+                type: 'tree',
+                id: 3,
+                category: 'Troubleshooting Internet',
+                prompt: 'Lampu merah/mati menandakan sinyal optik terputus. Apakah Anda sudah mencoba mencabut kabel adaptor daya selama 30 detik lalu menyalakannya kembali?',
+                keywords: ['restart modem'],
+                trueAction: { type: 'text', response: 'Jika sudah di-restart namun lampu PON tetap merah, kabel fiber kemungkinan tertekuk/putus. Tim teknisi akan segera dihubungi melalui CS di 0812-3456-7890.' },
+                falseAction: { type: 'text', response: 'Silakan cabut adaptor modem dari colokan listrik, tunggu 30 detik, lalu tancapkan kembali dan amati lampu indikator selama 2 menit.' }
+            }
+        ];
+
+        // Active Application State
+        let knowledgeBase = [...PRESET_FAQ];
+        let currentMode = 'faq'; // 'faq' | 'tree' | 'hybrid'
+        let currentRuleStep = null; // null or rule object when navigating decision tree
+
+        let botConfig = {
+            name: "Asisten Virtual",
+            greeting: "Halo! 👋 Saya adalah asisten virtual. Ada yang bisa saya bantu hari ini? Ketik pertanyaan Anda atau pilih topik di bawah.",
+            accentColor: "#4f46e5",
+            fallbackGoogle: true,
+            fallbackChatGPT: true,
+            aiEnabled: false,
+            aiBaseUrl: "https://api.openai.com/v1",
+            aiModel: "gpt-4o-mini",
+            aiPersona: "Kamu adalah asisten virtual resmi yang ramah, sopan, dan berwawasan luas. Bantu jawab pertanyaan pengguna dengan ringkas dan jelas.",
+            aiApiKey: "" // not exported
+        };
+
+        let chatMessages = [];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderKnowledgeBaseTable();
+            bindConfigEvents();
+            resetChat();
+        });
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bg = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-indigo-600';
+            toast.className = `${bg} text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 transform transition-all duration-300 opacity-0 translate-y-2 pointer-events-auto`;
+            toast.innerHTML = `<span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('opacity-0', 'translate-y-2');
+            }, 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function bindConfigEvents() {
+            document.getElementById('bot-name').addEventListener('input', (e) => {
+                botConfig.name = e.target.value.trim() || 'Asisten Virtual';
+                document.getElementById('preview-bot-name').textContent = botConfig.name;
+            });
+
+            document.getElementById('bot-accent-color').addEventListener('input', (e) => {
+                botConfig.accentColor = e.target.value;
+                document.getElementById('bot-color-text').textContent = e.target.value;
+                document.getElementById('preview-header').style.backgroundColor = e.target.value;
+                document.getElementById('preview-send-btn').style.backgroundColor = e.target.value;
+            });
+
+            document.getElementById('bot-greeting').addEventListener('input', (e) => {
+                botConfig.greeting = e.target.value;
+            });
+
+            document.getElementById('opt-fallback-google').addEventListener('change', (e) => {
+                botConfig.fallbackGoogle = e.target.checked;
+            });
+
+            document.getElementById('opt-fallback-chatgpt').addEventListener('change', (e) => {
+                botConfig.fallbackChatGPT = e.target.checked;
+            });
+
+            document.getElementById('ai-base-url').addEventListener('input', (e) => {
+                botConfig.aiBaseUrl = e.target.value.trim();
+            });
+
+            document.getElementById('ai-model-name').addEventListener('input', (e) => {
+                botConfig.aiModel = e.target.value.trim();
+            });
+
+            document.getElementById('ai-api-key').addEventListener('input', (e) => {
+                botConfig.aiApiKey = e.target.value.trim();
+            });
+
+            document.getElementById('ai-persona').addEventListener('input', (e) => {
+                botConfig.aiPersona = e.target.value;
+            });
+        }
+
+        function switchTab(tabId) {
+            ['tab-kb', 'tab-ai', 'tab-appearance'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+                document.getElementById('btn-' + id).className = "flex-1 py-2 px-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all";
+            });
+            document.getElementById(tabId).classList.remove('hidden');
+            document.getElementById('btn-' + tabId).className = "flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-all bg-indigo-600 text-white shadow-md";
+        }
+
+        function toggleAiEnable(enabled) {
+            botConfig.aiEnabled = enabled;
+            const container = document.getElementById('ai-settings-container');
+            const modeTag = document.getElementById('preview-mode-tag');
+            if (enabled) {
+                container.classList.remove('opacity-50', 'pointer-events-none');
+                modeTag.textContent = "KB + AI Fallback";
+                showToast("Integrasi AI diaktifkan", "info");
+            } else {
+                container.classList.add('opacity-50', 'pointer-events-none');
+                modeTag.textContent = "Knowledge Base";
+                showToast("Integrasi AI dinonaktifkan", "info");
+            }
+        }
+
+        function applyAiPreset(provider) {
+            const urlInput = document.getElementById('ai-base-url');
+            const modelInput = document.getElementById('ai-model-name');
+            if (provider === 'openai') {
+                urlInput.value = 'https://api.openai.com/v1';
+                modelInput.value = 'gpt-4o-mini';
+            } else if (provider === 'openrouter') {
+                urlInput.value = 'https://openrouter.ai/api/v1';
+                modelInput.value = 'meta-llama/llama-3-8b-instruct:free';
+            } else if (provider === 'deepseek') {
+                urlInput.value = 'https://api.deepseek.com/v1';
+                modelInput.value = 'deepseek-chat';
+            } else if (provider === 'ollama') {
+                urlInput.value = 'http://localhost:11434/v1';
+                modelInput.value = 'llama3';
+            }
+            botConfig.aiBaseUrl = urlInput.value;
+            botConfig.aiModel = modelInput.value;
+            showToast(`Preset ${provider.toUpperCase()} diterapkan`, "success");
+        }
+
+        function togglePasswordVisibility(elementId) {
+            const el = document.getElementById(elementId);
+            el.type = el.type === 'password' ? 'text' : 'password';
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            const reader = new FileReader();
+
+            if (ext === 'csv') {
+                reader.onload = (e) => {
+                    Papa.parse(e.target.result, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            processImportedRows(results.data);
+                        },
+                        error: () => {
+                            showToast("Gagal membaca file CSV", "error");
+                        }
+                    });
+                };
+                reader.readAsText(file);
+            } else if (ext === 'xlsx' || ext === 'xls') {
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+                        processImportedRows(json);
+                    } catch (err) {
+                        showToast("Gagal membaca file Excel", "error");
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                showToast("Format file tidak didukung. Gunakan .xlsx atau .csv", "error");
+            }
+            event.target.value = '';
+        }
+
+        function processImportedRows(rows) {
+            if (!rows || rows.length === 0) {
+                showToast("Data file kosong", "error");
+                return;
+            }
+
+            const first = rows[0];
+            const keys = Object.keys(first).map(k => k.toLowerCase().trim());
+            
+            // Detection: Rule-based tree format if contains 'id' or 'no' or 'nomor' AND ('true' or 'benar' or 'opsi')
+            const isTree = keys.some(k => k.includes('id') || k.includes('nomor') || k.includes('no')) &&
+                           keys.some(k => k.includes('true') || k.includes('benar') || k.includes('ya'));
+
+            const parsedData = [];
+
+            if (isTree) {
+                currentMode = 'tree';
+                rows.forEach((row) => {
+                    const rowKeys = Object.keys(row);
+                    const findVal = (terms) => {
+                        const matchedKey = rowKeys.find(k => terms.some(t => k.toLowerCase().includes(t)));
+                        return matchedKey ? String(row[matchedKey]).trim() : '';
+                    };
+
+                    const idVal = parseInt(findVal(['id', 'no', 'nomor'])) || (parsedData.length + 1);
+                    const category = findVal(['kategori', 'category']) || 'Umum';
+                    const prompt = findVal(['pertanyaan', 'prompt', 'trigger', 'keyword', 'kata kunci']) || 'Pertanyaan';
+                    const rawTrue = findVal(['true', 'benar', 'ya', 'yes']);
+                    const rawFalse = findVal(['false', 'salah', 'tidak', 'no']);
+
+                    // Parse True Action
+                    let trueAction = { type: 'text', response: rawTrue || 'Benar' };
+                    if (!isNaN(parseInt(rawTrue)) && parseInt(rawTrue) > 0) {
+                        trueAction = { type: 'jump', target: parseInt(rawTrue), label: 'Ya / Benar' };
+                    }
+
+                    // Parse False Action
+                    let falseAction = { type: 'text', response: rawFalse || 'Salah' };
+                    if (!isNaN(parseInt(rawFalse)) && parseInt(rawFalse) > 0) {
+                        falseAction = { type: 'jump', target: parseInt(rawFalse), label: 'Tidak / Salah' };
+                    }
+
+                    parsedData.push({
+                        type: 'tree',
+                        id: idVal,
+                        category: category,
+                        prompt: prompt,
+                        keywords: [prompt.toLowerCase(), category.toLowerCase()],
+                        trueAction: trueAction,
+                        falseAction: falseAction
+                    });
+                });
+            } else {
+                currentMode = 'faq';
+                rows.forEach((row) => {
+                    const rowKeys = Object.keys(row);
+                    const findVal = (terms) => {
+                        const matchedKey = rowKeys.find(k => terms.some(t => k.toLowerCase().includes(t)));
+                        return matchedKey ? String(row[matchedKey]).trim() : '';
+                    };
+
+                    const category = findVal(['kategori', 'category', 'topik']) || 'Umum';
+                    const rawKeywords = findVal(['trigger', 'keyword', 'kata kunci', 'pertanyaan']) || '';
+                    const response = findVal(['respons', 'response', 'jawaban', 'answer']) || '';
+
+                    if (rawKeywords || response) {
+                        const kwList = rawKeywords.split(/[,|;]+/).map(k => k.trim().toLowerCase()).filter(Boolean);
+                        parsedData.push({
+                            type: 'faq',
+                            category: category,
+                            keywords: kwList.length ? kwList : [category.toLowerCase()],
+                            response: response
+                        });
+                    }
+                });
+            }
+
+            if (parsedData.length > 0) {
+                knowledgeBase = parsedData;
+                renderKnowledgeBaseTable();
+                resetChat();
+                showToast(`Berhasil mengimpor ${parsedData.length} data (${currentMode.toUpperCase()})`, "success");
+            } else {
+                showToast("Tidak ada baris yang valid ditemukan di file", "error");
+            }
+        }
+
+        function renderKnowledgeBaseTable() {
+            const tbody = document.getElementById('kb-table-body');
+            const countEl = document.getElementById('kb-item-count');
+            const summaryTitle = document.getElementById('kb-summary-title');
+            const summaryMode = document.getElementById('kb-summary-mode');
+
+            tbody.innerHTML = '';
+            countEl.textContent = `Total item: ${knowledgeBase.length}`;
+
+            if (knowledgeBase.length === 0) {
+                summaryTitle.textContent = "Data Kosong";
+                summaryMode.textContent = "Silakan unggah berkas atau gunakan preset";
+                tbody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-slate-500">Belum ada data Knowledge Base. Unggah file Excel/CSV atau klik tombol contoh data di atas.</td></tr>`;
+                renderQuickChips([]);
+                return;
+            }
+
+            const isTree = knowledgeBase.some(item => item.type === 'tree');
+            currentMode = isTree ? 'tree' : 'faq';
+
+            summaryTitle.textContent = `Data Aktif: ${knowledgeBase.length} Item Siap`;
+            summaryMode.textContent = isTree ? 'Mode deteksi: Decision Tree (Alur Bertingkat)' : 'Mode deteksi: FAQ Kata Kunci (Keywords Match)';
+
+            knowledgeBase.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/60 transition";
+
+                if (item.type === 'tree') {
+                    const trueDesc = item.trueAction.type === 'jump' ? `➔ Lompat ke #${item.trueAction.target}` : `Teks: ${item.trueAction.response.substring(0, 25)}...`;
+                    const falseDesc = item.falseAction.type === 'jump' ? `➔ Lompat ke #${item.falseAction.target}` : `Teks: ${item.falseAction.response.substring(0, 25)}...`;
+
+                    tr.innerHTML = `
+                        <td class="py-2.5 px-3 font-mono text-indigo-400">#${item.id}</td>
+                        <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium text-[11px]">${escapeHtml(item.category)}</span></td>
+                        <td class="py-2.5 px-3 font-medium text-slate-200">${escapeHtml(item.prompt)}</td>
+                        <td class="py-2.5 px-3 text-[11px] text-slate-400">
+                            <div><strong class="text-emerald-400">T:</strong> ${escapeHtml(trueDesc)}</div>
+                            <div><strong class="text-rose-400">F:</strong> ${escapeHtml(falseDesc)}</div>
+                        </td>
+                    `;
+                } else {
+                    const kwBadges = item.keywords.map(k => `<span class="inline-block px-1.5 py-0.5 mr-1 mb-1 rounded bg-slate-800 text-slate-300 text-[10px] font-mono">${escapeHtml(k)}</span>`).join('');
+                    tr.innerHTML = `
+                        <td class="py-2.5 px-3 font-mono text-slate-400">${index + 1}</td>
+                        <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium text-[11px]">${escapeHtml(item.category)}</span></td>
+                        <td class="py-2.5 px-3">${kwBadges}</td>
+                        <td class="py-2.5 px-3 text-slate-300">${escapeHtml(item.response)}</td>
+                    `;
+                }
+                tbody.appendChild(tr);
+            });
+
+            // Update Quick Reply Chips in simulator
+            updateQuickChipsFromKB();
+        }
+
+        function loadPresetData(type) {
+            if (type === 'faq') {
+                knowledgeBase = JSON.parse(JSON.stringify(PRESET_FAQ));
+                currentMode = 'faq';
+            } else {
+                knowledgeBase = JSON.parse(JSON.stringify(PRESET_RULE_TREE));
+                currentMode = 'tree';
+            }
+            renderKnowledgeBaseTable();
+            resetChat();
+            showToast(`Data contoh ${type.toUpperCase()} dimuat`, "success");
+        }
+
+        function clearKnowledgeBase() {
+            knowledgeBase = [];
+            currentRuleStep = null;
+            renderKnowledgeBaseTable();
+            resetChat();
+            showToast("Knowledge Base dikosongkan", "info");
+        }
+
+        function updateQuickChipsFromKB() {
+            const chips = [];
+            if (currentMode === 'tree') {
+                knowledgeBase.forEach(item => {
+                    chips.push({ label: `Mulai: ${item.category}`, value: item.prompt });
+                });
+            } else {
+                // Take top 4 categories or keywords
+                knowledgeBase.slice(0, 5).forEach(item => {
+                    const label = item.keywords[0] || item.category;
+                    chips.push({ label: label, value: label });
+                });
+            }
+            renderQuickChips(chips);
+        }
+
+        function renderQuickChips(chips) {
+            const container = document.getElementById('preview-quick-chips');
+            container.innerHTML = '';
+            if (!chips || chips.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            container.classList.remove('hidden');
+            chips.forEach(chip => {
+                const btn = document.createElement('button');
+                btn.className = "px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] border border-slate-700 transition shrink-0";
+                btn.textContent = chip.label;
+                btn.onclick = () => {
+                    document.getElementById('preview-input').value = chip.value;
+                    handleUserSendMessage(new Event('submit'));
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function resetChat() {
+            currentRuleStep = null;
+            chatMessages = [];
+            const container = document.getElementById('preview-messages');
+            container.innerHTML = '';
+
+            // Greeting Message
+            appendMessage('bot', botConfig.greeting);
+
+            // If rule tree, offer starting rule prompt
+            if (currentMode === 'tree' && knowledgeBase.length > 0) {
+                const firstRule = knowledgeBase[0];
+                setTimeout(() => {
+                    startRuleStep(firstRule);
+                }, 400);
+            }
+        }
+
+        function appendMessage(sender, text, options = null, fallbackQuery = null) {
+            chatMessages.push({ sender, text, options, fallbackQuery });
+            const container = document.getElementById('preview-messages');
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex flex-col ${sender === 'user' ? 'items-end' : 'items-start'} space-y-1.5`;
+
+            const bubble = document.createElement('div');
+            if (sender === 'user') {
+                bubble.className = "max-w-[82%] px-3.5 py-2.5 rounded-2xl rounded-tr-sm bg-indigo-600 text-white shadow-md text-xs leading-relaxed break-words";
+                bubble.textContent = text;
+            } else {
+                bubble.className = "max-w-[88%] px-3.5 py-2.5 rounded-2xl rounded-tl-sm bg-slate-800 text-slate-200 border border-slate-700/80 shadow-md text-xs leading-relaxed break-words";
+                bubble.innerHTML = formatMessageText(text);
+            }
+            wrapper.appendChild(bubble);
+
+            // Options Buttons (e.g. True / False branches)
+            if (options && options.length > 0) {
+                const optWrapper = document.createElement('div');
+                optWrapper.className = "flex flex-wrap gap-1.5 pt-1 max-w-[88%]";
+                options.forEach(opt => {
+                    const optBtn = document.createElement('button');
+                    optBtn.className = "px-3 py-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/30 text-indigo-300 hover:text-white font-medium text-xs transition active:scale-95";
+                    optBtn.textContent = opt.label;
+                    optBtn.onclick = () => {
+                        handleOptionSelect(opt);
+                    };
+                    optWrapper.appendChild(optBtn);
+                });
+                wrapper.appendChild(optWrapper);
+            }
+
+            // Fallback Search Buttons
+            if (fallbackQuery) {
+                const fallbackContainer = document.createElement('div');
+                fallbackContainer.className = "flex flex-wrap gap-1.5 pt-1.5 max-w-[88%]";
+
+                if (botConfig.fallbackGoogle) {
+                    const googleLink = document.createElement('a');
+                    googleLink.href = `https://www.google.com/search?q=${encodeURIComponent(fallbackQuery)}`;
+                    googleLink.target = "_blank";
+                    googleLink.rel = "noopener noreferrer";
+                    googleLink.className = "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-[11px] text-sky-400 transition";
+                    googleLink.innerHTML = `<span>🔍</span> Cari di Google`;
+                    fallbackContainer.appendChild(googleLink);
+                }
+
+                if (botConfig.fallbackChatGPT) {
+                    const gptLink = document.createElement('a');
+                    gptLink.href = `https://chatgpt.com/?q=${encodeURIComponent(fallbackQuery)}`;
+                    gptLink.target = "_blank";
+                    gptLink.rel = "noopener noreferrer";
+                    gptLink.className = "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-[11px] text-emerald-400 transition";
+                    gptLink.innerHTML = `<span>🤖</span> Tanya di ChatGPT`;
+                    fallbackContainer.appendChild(gptLink);
+                }
+
+                wrapper.appendChild(fallbackContainer);
+            }
+
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function setTyping(visible) {
+            const el = document.getElementById('preview-typing');
+            if (visible) {
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+            } else {
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+            }
+            const container = document.getElementById('preview-messages');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function handleUserSendMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('preview-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            input.value = '';
+            appendMessage('user', text);
+
+            setTyping(true);
+
+            // 1. If we are currently at a Decision Tree Step
+            if (currentRuleStep) {
+                const lower = text.toLowerCase();
+                const isTrue = lower.includes('ya') || lower.includes('benar') || lower.includes('true') || lower === '1';
+                const isFalse = lower.includes('tidak') || lower.includes('salah') || lower.includes('false') || lower === '2';
+
+                if (isTrue) {
+                    executeAction(currentRuleStep.trueAction);
+                    setTyping(false);
+                    return;
+                } else if (isFalse) {
+                    executeAction(currentRuleStep.falseAction);
+                    setTyping(false);
+                    return;
+                }
+            }
+
+            // 2. Normal Mode: Search Knowledge Base
+            const match = findAnswerInKB(text);
+
+            if (match) {
+                setTimeout(() => {
+                    setTyping(false);
+                    if (match.type === 'tree') {
+                        startRuleStep(match);
+                    } else {
+                        appendMessage('bot', match.response);
+                    }
+                }, 400);
+                return;
+            }
+
+            // 3. Fallback: Check if AI is enabled
+            if (botConfig.aiEnabled) {
+                const aiSuccess = await queryAiFallback(text);
+                if (aiSuccess) {
+                    setTyping(false);
+                    return;
+                }
+            }
+
+            // 4. Default Fallback: No answer found
+            setTimeout(() => {
+                setTyping(false);
+                appendMessage(
+                    'bot', 
+                    'Maaf, saya belum menemukan jawaban yang sesuai di Knowledge Base.', 
+                    null, 
+                    text
+                );
+            }, 500);
+        }
+
+        function handleOptionSelect(opt) {
+            appendMessage('user', opt.label);
+            setTyping(true);
+            setTimeout(() => {
+                setTyping(false);
+                executeAction(opt.action);
+            }, 300);
+        }
+
+        function startRuleStep(rule) {
+            currentRuleStep = rule;
+            const options = [
+                { label: rule.trueAction.label || '✓ Benar / Ya', action: rule.trueAction },
+                { label: rule.falseAction.label || '✕ Salah / Tidak', action: rule.falseAction }
+            ];
+            appendMessage('bot', `[Langkah #${rule.id} - ${rule.category}]\n${rule.prompt}`, options);
+        }
+
+        function executeAction(action) {
+            if (!action) {
+                currentRuleStep = null;
+                return;
+            }
+
+            if (action.type === 'jump') {
+                const targetId = parseInt(action.target);
+                const nextRule = knowledgeBase.find(r => r.type === 'tree' && r.id === targetId);
+                if (nextRule) {
+                    startRuleStep(nextRule);
+                } else {
+                    currentRuleStep = null;
+                    appendMessage('bot', `Langkah #${targetId} tidak ditemukan.`);
+                }
+            } else {
+                currentRuleStep = null;
+                appendMessage('bot', action.response || 'Alur selesai.');
+            }
+        }
+
+        function findAnswerInKB(query) {
+            if (!knowledgeBase || knowledgeBase.length === 0) return null;
+
+            const cleanQuery = query.toLowerCase().replace(/[^\w\s]/gi, ' ');
+            const queryWords = cleanQuery.split(/\s+/).filter(w => w.length > 1);
+
+            let bestMatch = null;
+            let highestScore = 0;
+
+            for (const item of knowledgeBase) {
+                let score = 0;
+
+                if (item.type === 'tree') {
+                    // Check triggers in tree
+                    const keywords = item.keywords || [item.prompt.toLowerCase(), item.category.toLowerCase()];
+                    keywords.forEach(kw => {
+                        if (cleanQuery.includes(kw.toLowerCase())) score += 5;
+                    });
+                } else {
+                    // Check FAQ keywords
+                    item.keywords.forEach(kw => {
+                        const cleanKw = kw.toLowerCase().trim();
+                        if (cleanQuery.includes(cleanKw)) {
+                            score += 4;
+                        } else {
+                            // Check individual tokens
+                            queryWords.forEach(word => {
+                                if (cleanKw.includes(word)) score += 1;
+                            });
+                        }
+                    });
+                }
+
+                if (score > highestScore && score >= 2) {
+                    highestScore = score;
+                    bestMatch = item;
+                }
+            }
+
+            return bestMatch;
+        }
+
+        async function queryAiFallback(userPrompt) {
+            if (!botConfig.aiApiKey && !botConfig.aiBaseUrl.includes('localhost')) {
+                // If API Key is missing and it's not a local Ollama instance
+                return false;
+            }
+
+            try {
+                let endpoint = botConfig.aiBaseUrl.replace(/\/+$/, '');
+                if (!endpoint.endsWith('/chat/completions')) {
+                    endpoint += '/chat/completions';
+                }
+
+                // Build context from KB for light RAG
+                const kbContext = knowledgeBase.slice(0, 10).map((k, i) => {
+                    if (k.type === 'tree') {
+                        return `Rule ${k.id} (${k.category}): ${k.prompt}`;
+                    } else {
+                        return `FAQ ${i+1} (${k.category}) [Kata Kunci: ${k.keywords.join(', ')}]: ${k.response}`;
+                    }
+                }).join('\n');
+
+                const systemMessage = `${botConfig.aiPersona}\n\nBerikut referensi data Knowledge Base yang dapat digunakan jika relevan:\n${kbContext}`;
+
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                if (botConfig.aiApiKey) {
+                    headers['Authorization'] = `Bearer ${botConfig.aiApiKey}`;
+                }
+
+                const payload = {
+                    model: botConfig.aiModel || 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: systemMessage },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    temperature: 0.6
+                };
+
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    console.error("AI API Error:", errData);
+                    return false;
+                }
+
+                const data = await res.json();
+                const aiReply = data.choices?.[0]?.message?.content;
+                if (aiReply) {
+                    appendMessage('bot', `🤖 <em>[AI Respon]</em>\n\n${aiReply}`);
+                    return true;
+                }
+            } catch (err) {
+                console.error("Fetch AI error:", err);
+                return false;
+            }
+
+            return false;
+        }
+
+        function formatMessageText(text) {
+            return escapeHtml(text)
+                .replace(/\n/g, '<br>')
+                .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+                .replace(/_(.*?)_/g, '<em>$1</em>');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function downloadSampleFile(type) {
+            let csvContent = "";
+            let filename = "";
+
+            if (type === 'faq') {
+                filename = "template_faq_myaichat.csv";
+                csvContent = "Kategori,Kata Kunci,Respons\n" +
+                    '"Jam Operasional","jam, buka, tutup, jadwal, operasional","Kami buka setiap hari Senin - Jumat pukul 08:00 - 17:00 WIB."\n' +
+                    '"Harga Paket","harga, biaya, paket, tarif, beli","Paket Basic Rp50.000/bln dan Pro Rp120.000/bln."\n' +
+                    '"Lokasi Kantor","lokasi, alamat, kantor, cabang","Gedung Cyber Tower Lt. 12, Jl. Sudirman, Jakarta."\n' +
+                    '"Bantuan CS","cs, kontak, nomor wa, hubungi","Hubungi WhatsApp CS kami di 0812-3456-7890."\n';
+            } else {
+                filename = "template_rule_tree_myaichat.csv";
+                csvContent = "ID,Kategori,Pertanyaan,Pilihan True,Pilihan False\n" +
+                    '1,"Registrasi Akun","Apakah Anda sudah memiliki akun pendaftaran?","2","Silakan buka link registrasi: https://example.com/daftar lalu isi data diri."\n' +
+                    '2,"Registrasi Akun","Apakah nomor WhatsApp Anda sudah terverifikasi dengan OTP?","Selamat! Akun Anda siap digunakan untuk login.","3"\n' +
+                    '3,"Bantuan OTP","Apakah Anda menerima kode OTP dalam kurun waktu 2 menit?","Masukkan kode tersebut di form verifikasi.","Silakan klik tombol Kirim Ulang OTP atau hubungi CS kami."\n';
+            }
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast(`Contoh file ${filename} berhasil diunduh`, "success");
+        }
+
+        function exportChatbotHTML() {
+            if (knowledgeBase.length === 0) {
+                showToast("Knowledge Base masih kosong. Muat atau unggah data terlebih dahulu!", "error");
+                return;
+            }
+
+            // Clone botConfig without testing API key
+            const exportConfig = { ...botConfig };
+            exportConfig.aiApiKey = ""; // Sanitized: Never export developer API key!
+
+            const exportedHTML = `<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(exportConfig.name)}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 9999px; }
+        @keyframes blink {
+            0%, 100% { opacity: 0.2; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-3px); }
+        }
+        .dot-1 { animation: blink 1.2s infinite 0.1s; }
+        .dot-2 { animation: blink 1.2s infinite 0.3s; }
+        .dot-3 { animation: blink 1.2s infinite 0.5s; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-0 sm:p-4">
+
+    <!-- Standalone Chatbot Container -->
+    <div class="w-full sm:max-w-md h-screen sm:h-[680px] bg-slate-950 sm:border border-slate-800 sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative">
+        
+        <!-- Header -->
+        <div class="p-3.5 text-white flex items-center justify-between shrink-0 shadow-md" style="background-color: ${exportConfig.accentColor}">
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <div class="h-9 w-9 rounded-full bg-white/20 backdrop-blur flex items-center justify-center font-bold text-base text-white">
+                        🤖
+                    </div>
+                    <span class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-slate-900"></span>
+                </div>
+                <div>
+                    <h1 class="font-bold text-sm leading-tight">${escapeHtml(exportConfig.name)}</h1>
+                    <p class="text-[10px] text-white/80">Online • Layanan Otomatis</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="toggleSettingsModal(true)" title="Pengaturan AI" class="p-1.5 rounded-lg bg-black/20 hover:bg-black/40 text-white/90 transition text-xs">
+                    ⚙️
+                </button>
+                <button onclick="resetChat()" title="Mulai Ulang" class="p-1.5 rounded-lg bg-black/20 hover:bg-black/40 text-white/90 transition text-xs">
+                    🔄
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div id="messages-container" class="flex-1 p-3.5 overflow-y-auto space-y-3 bg-slate-900/90 text-xs"></div>
+
+        <!-- Quick Chips Bar -->
+        <div id="quick-chips" class="px-3 py-1.5 bg-slate-950/70 border-t border-slate-800 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-[11px]"></div>
+
+        <!-- Typing Indicator -->
+        <div id="typing-indicator" class="px-4 py-1.5 bg-slate-900/90 text-[11px] text-slate-400 hidden items-center gap-2">
+            <span>Mengetik</span>
+            <span class="inline-flex gap-1">
+                <span class="h-1.5 w-1.5 rounded-full bg-indigo-400 dot-1"></span>
+                <span class="h-1.5 w-1.5 rounded-full bg-indigo-400 dot-2"></span>
+                <span class="h-1.5 w-1.5 rounded-full bg-indigo-400 dot-3"></span>
+            </span>
+        </div>
+
+        <!-- Input Bar -->
+        <form onsubmit="handleSend(event)" class="p-2.5 bg-slate-950 border-t border-slate-800 flex items-center gap-2 shrink-0">
+            <input type="text" id="user-input" placeholder="Tulis pesan..." class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            <button type="submit" class="p-2 rounded-xl text-white transition active:scale-95" style="background-color: ${exportConfig.accentColor}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            </button>
+        </form>
+
+        <!-- End-User AI Settings Modal -->
+        <div id="settings-modal" class="absolute inset-0 bg-slate-950/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl text-xs">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h3 class="font-bold text-white text-sm">Pengaturan AI (End-User)</h3>
+                    <button onclick="toggleSettingsModal(false)" class="text-slate-400 hover:text-white">✕</button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-slate-300 font-medium mb-1">API Base URL</label>
+                        <input type="text" id="cfg-url" value="${escapeHtml(exportConfig.aiBaseUrl)}" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-medium mb-1">Model Name</label>
+                        <input type="text" id="cfg-model" value="${escapeHtml(exportConfig.aiModel)}" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-medium mb-1">API Key Pribadi</label>
+                        <input type="password" id="cfg-key" placeholder="sk-..." class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 font-mono">
+                        <span class="text-[10px] text-slate-500">Tersimpan di sesi browser lokal Anda.</span>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button onclick="toggleSettingsModal(false)" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white">Batal</button>
+                    <button onclick="saveEndUserSettings()" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium">Simpan</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Runtime Engine Script -->
+    <script>
+        const KNOWLEDGE_BASE = ${JSON.stringify(knowledgeBase)};
+        const CONFIG = ${JSON.stringify(exportConfig)};
+        
+        let currentRuleStep = null;
+        let userApiKey = sessionStorage.getItem('myaichat_api_key') || "";
+
+        window.onload = () => {
+            if (userApiKey) {
+                document.getElementById('cfg-key').value = userApiKey;
+            }
+            renderQuickChips();
+            resetChat();
+        };
+
+        function toggleSettingsModal(open) {
+            document.getElementById('settings-modal').classList.toggle('hidden', !open);
+        }
+
+        function saveEndUserSettings() {
+            CONFIG.aiBaseUrl = document.getElementById('cfg-url').value.trim();
+            CONFIG.aiModel = document.getElementById('cfg-model').value.trim();
+            userApiKey = document.getElementById('cfg-key').value.trim();
+            sessionStorage.setItem('myaichat_api_key', userApiKey);
+            toggleSettingsModal(false);
+        }
+
+        function resetChat() {
+            currentRuleStep = null;
+            document.getElementById('messages-container').innerHTML = '';
+            appendMsg('bot', CONFIG.greeting);
+
+            const isTree = KNOWLEDGE_BASE.some(item => item.type === 'tree');
+            if (isTree && KNOWLEDGE_BASE.length > 0) {
+                setTimeout(() => startRule(KNOWLEDGE_BASE[0]), 300);
+            }
+        }
+
+        function appendMsg(sender, text, options = null, fallbackQuery = null) {
+            const container = document.getElementById('messages-container');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex flex-col ' + (sender === 'user' ? 'items-end' : 'items-start') + ' space-y-1.5';
+
+            const bubble = document.createElement('div');
+            if (sender === 'user') {
+                bubble.className = "max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-tr-sm text-white shadow-md leading-relaxed break-words";
+                bubble.style.backgroundColor = CONFIG.accentColor;
+                bubble.textContent = text;
+            } else {
+                bubble.className = "max-w-[88%] px-3.5 py-2.5 rounded-2xl rounded-tl-sm bg-slate-800 text-slate-200 border border-slate-700/80 shadow-md leading-relaxed break-words";
+                bubble.innerHTML = text.replace(/\\n/g, '<br>');
+            }
+            wrapper.appendChild(bubble);
+
+            if (options && options.length > 0) {
+                const optWrapper = document.createElement('div');
+                optWrapper.className = "flex flex-wrap gap-1.5 pt-1 max-w-[88%]";
+                options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = "px-3 py-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/30 text-indigo-300 text-xs font-medium transition active:scale-95";
+                    btn.textContent = opt.label;
+                    btn.onclick = () => handleOption(opt);
+                    optWrapper.appendChild(btn);
+                });
+                wrapper.appendChild(optWrapper);
+            }
+
+            if (fallbackQuery) {
+                const fbWrap = document.createElement('div');
+                fbWrap.className = "flex flex-wrap gap-1.5 pt-1.5";
+                if (CONFIG.fallbackGoogle) {
+                    fbWrap.innerHTML += '<a href="https://www.google.com/search?q=' + encodeURIComponent(fallbackQuery) + '" target="_blank" class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[11px] text-sky-400">🔍 Cari di Google</a>';
+                }
+                if (CONFIG.fallbackChatGPT) {
+                    fbWrap.innerHTML += '<a href="https://chatgpt.com/?q=' + encodeURIComponent(fallbackQuery) + '" target="_blank" class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[11px] text-emerald-400">🤖 Tanya ChatGPT</a>';
+                }
+                wrapper.appendChild(fbWrap);
+            }
+
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function setTyping(val) {
+            const el = document.getElementById('typing-indicator');
+            el.className = val ? 'px-4 py-1.5 bg-slate-900/90 text-[11px] text-slate-400 flex items-center gap-2' : 'hidden';
+            document.getElementById('messages-container').scrollTop = document.getElementById('messages-container').scrollHeight;
+        }
+
+        async function handleSend(e) {
+            e.preventDefault();
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+
+            appendMsg('user', text);
+            setTyping(true);
+
+            if (currentRuleStep) {
+                const lower = text.toLowerCase();
+                const isTrue = lower.includes('ya') || lower.includes('benar') || lower.includes('true') || lower === '1';
+                const isFalse = lower.includes('tidak') || lower.includes('salah') || lower.includes('false') || lower === '2';
+                if (isTrue) {
+                    executeStep(currentRuleStep.trueAction);
+                    setTyping(false);
+                    return;
+                } else if (isFalse) {
+                    executeStep(currentRuleStep.falseAction);
+                    setTyping(false);
+                    return;
+                }
+            }
+
+            // Search Knowledge Base
+            const match = findMatch(text);
+            if (match) {
+                setTimeout(() => {
+                    setTyping(false);
+                    if (match.type === 'tree') startRule(match);
+                    else appendMsg('bot', match.response);
+                }, 350);
+                return;
+            }
+
+            // AI Fallback
+            if (CONFIG.aiEnabled && userApiKey) {
+                const ok = await callAi(text);
+                if (ok) {
+                    setTyping(false);
+                    return;
+                }
+            }
+
+            setTimeout(() => {
+                setTyping(false);
+                appendMsg('bot', 'Maaf, saya tidak menemukan jawaban terkait pertanyaan tersebut di Knowledge Base.', null, text);
+            }, 400);
+        }
+
+        function handleOption(opt) {
+            appendMsg('user', opt.label);
+            setTyping(true);
+            setTimeout(() => {
+                setTyping(false);
+                executeStep(opt.action);
+            }, 300);
+        }
+
+        function startRule(rule) {
+            currentRuleStep = rule;
+            const options = [
+                { label: rule.trueAction.label || '✓ Ya / Benar', action: rule.trueAction },
+                { label: rule.falseAction.label || '✕ Tidak / Salah', action: rule.falseAction }
+            ];
+            appendMsg('bot', '[' + rule.category + '] ' + rule.prompt, options);
+        }
+
+        function executeStep(action) {
+            if (!action) { currentRuleStep = null; return; }
+            if (action.type === 'jump') {
+                const next = KNOWLEDGE_BASE.find(r => r.type === 'tree' && r.id === parseInt(action.target));
+                if (next) startRule(next);
+                else { currentRuleStep = null; appendMsg('bot', 'Langkah selesai.'); }
+            } else {
+                currentRuleStep = null;
+                appendMsg('bot', action.response || 'Alur selesai.');
+            }
+        }
+
+        function findMatch(query) {
+            const clean = query.toLowerCase().replace(/[^\\w\\s]/gi, ' ');
+            const words = clean.split(/\\s+/).filter(w => w.length > 1);
+            let best = null;
+            let maxScore = 0;
+
+            for (const item of KNOWLEDGE_BASE) {
+                let score = 0;
+                if (item.type === 'tree') {
+                    const kws = item.keywords || [item.prompt.toLowerCase()];
+                    kws.forEach(k => { if (clean.includes(k.toLowerCase())) score += 5; });
+                } else {
+                    item.keywords.forEach(k => {
+                        const kw = k.toLowerCase().trim();
+                        if (clean.includes(kw)) score += 4;
+                        else {
+                            words.forEach(w => { if (kw.includes(w)) score += 1; });
+                        }
+                    });
+                }
+                if (score > maxScore && score >= 2) {
+                    maxScore = score;
+                    best = item;
+                }
+            }
+            return best;
+        }
+
+        async function callAi(prompt) {
+            try {
+                let url = CONFIG.aiBaseUrl.replace(/\\/+$/, '');
+                if (!url.endsWith('/chat/completions')) url += '/chat/completions';
+                
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + userApiKey
+                    },
+                    body: JSON.stringify({
+                        model: CONFIG.aiModel || 'gpt-4o-mini',
+                        messages: [
+                            { role: 'system', content: CONFIG.aiPersona },
+                            { role: 'user', content: prompt }
+                        ]
+                    })
+                });
+                const data = await res.json();
+                const reply = data.choices?.[0]?.message?.content;
+                if (reply) {
+                    appendMsg('bot', reply);
+                    return true;
+                }
+            } catch(e) {
+                console.error(e);
+            }
+            return false;
+        }
+
+        function renderQuickChips() {
+            const bar = document.getElementById('quick-chips');
+            bar.innerHTML = '';
+            KNOWLEDGE_BASE.slice(0, 4).forEach(item => {
+                const label = item.type === 'tree' ? item.category : (item.keywords[0] || item.category);
+                const val = item.type === 'tree' ? item.prompt : label;
+                const b = document.createElement('button');
+                b.className = "px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-[11px] border border-slate-700 hover:bg-slate-700 shrink-0";
+                b.textContent = label;
+                b.onclick = () => {
+                    document.getElementById('user-input').value = val;
+                    handleSend(new Event('submit'));
+                };
+                bar.appendChild(b);
+            });
+        }
+    <\/script>
+</body>
+</html>`;
+
+            const blob = new Blob([exportedHTML], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${botConfig.name.toLowerCase().replace(/\s+/g, '_')}_chatbot.html`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("Chatbot mandiri berhasil diekspor sebagai file HTML!", "success");
+        }
+    </script>
+</body>
+</html>

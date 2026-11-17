@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>aiGis</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Turf.js for Spatial Analysis -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+  <!-- Marked.js & DOMPurify for Safe Markdown Rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    /* Map Container & Custom Crosshair */
+    #map {
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    .drawing-cursor {
+      cursor: crosshair !important;
+    }
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .markdown-body {
+      font-size: 0.875rem;
+      line-height: 1.65;
+      color: #1e293b;
+    }
+    .markdown-body h1,
+    .markdown-body h2,
+    .markdown-body h3,
+    .markdown-body h4 {
+      font-weight: 600;
+      color: #0f172a;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+      line-height: 1.3;
+    }
+    .markdown-body h1 { font-size: 1.15rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25rem; }
+    .markdown-body h2 { font-size: 1.05rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.2rem; }
+    .markdown-body h3 { font-size: 0.95rem; }
+    .markdown-body p { margin-bottom: 0.75rem; }
+    .markdown-body ul, .markdown-body ol {
+      margin-bottom: 0.75rem;
+      padding-left: 1.25rem;
+    }
+    .markdown-body ul { list-style-type: disc; }
+    .markdown-body ol { list-style-type: decimal; }
+    .markdown-body li { margin-bottom: 0.25rem; }
+    .markdown-body code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: #f1f5f9;
+      padding: 0.1rem 0.3rem;
+      border-radius: 0.25rem;
+      font-size: 0.8rem;
+    }
+    .markdown-body pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 0.75rem;
+      border-radius: 0.375rem;
+      overflow-x: auto;
+      margin-bottom: 0.75rem;
+    }
+    .markdown-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 0.75rem;
+      font-size: 0.8rem;
+    }
+    .markdown-body th, .markdown-body td {
+      border: 1px solid #cbd5e1;
+      padding: 0.4rem 0.6rem;
+      text-align: left;
+    }
+    .markdown-body th {
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 0.375rem;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    }
+  </style>
+</head>
+
+<body class="h-screen w-screen flex flex-col select-none">
+
+  <!-- Top Header -->
+  <header class="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 z-30">
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+        </svg>
+        <span class="font-bold text-base tracking-tight text-slate-900">aiGis</span>
+      </div>
+      <span class="text-slate-300">|</span>
+      <div id="headerCoords" class="text-xs font-mono text-slate-600 hidden sm:block">
+        Lat: -2.54890, Lng: 118.01490
+      </div>
+    </div>
+
+    <!-- Header Controls -->
+    <div class="flex items-center gap-2">
+      <!-- Basemap Quick Switcher -->
+      <div class="flex items-center gap-1.5">
+        <label for="basemapSelect" class="text-xs font-medium text-slate-600 hidden md:inline">Peta Dasar:</label>
+        <select id="basemapSelect" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white text-slate-800 focus:outline-none focus:border-slate-600">
+          <option value="esri_topo" selected>Esri Topografi</option>
+          <option value="esri_sat">Esri Satelit</option>
+          <option value="osm">OpenStreetMaps</option>
+          <option value="carto_light">Carto Positron</option>
+          <option value="carto_dark">Carto Dark</option>
+        </select>
+      </div>
+
+      <!-- History Toggle Button -->
+      <button id="btnToggleHistory" type="button" class="text-xs border border-slate-300 hover:bg-slate-100 text-slate-700 px-2.5 py-1 rounded flex items-center gap-1.5 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>Riwayat</span>
+        <span id="historyCountBadge" class="bg-slate-200 text-slate-700 px-1 rounded text-[10px] font-mono">0</span>
+      </button>
+
+      <!-- API Settings Button -->
+      <button id="btnToggleApiModal" type="button" class="text-xs border border-slate-300 hover:bg-slate-100 text-slate-700 px-2.5 py-1 rounded flex items-center gap-1.5 transition">
+        <span id="apiStatusDot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+        <span> Pengaturan API</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+    <!-- LEFT/MAIN AREA: Map Workspace -->
+    <div class="relative flex-1 h-[50vh] lg:h-full w-full">
+      <div id="map"></div>
+
+      <!-- Floating Search Bar & Drawing Toolbar (Top Left of Map) -->
+      <div class="absolute top-3 left-12 right-3 sm:right-auto sm:w-96 z-20 flex flex-col gap-2 pointer-events-none">
+        <!-- Search Box -->
+        <div class="bg-white/95 backdrop-blur border border-slate-300 rounded shadow-sm p-1.5 pointer-events-auto">
+          <form id="searchForm" class="flex items-center gap-1">
+            <input
+              id="searchInput"
+              type="text"
+              placeholder="Cari lokasi atau koordinat (-0.026, 109.342)..."
+              class="w-full text-xs px-2 py-1.5 text-slate-800 bg-transparent focus:outline-none"
+              autocomplete="off"
+            />
+            <button type="submit" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-2.5 py-1.5 rounded shrink-0 transition">
+              Cari
+            </button>
+          </form>
+          <!-- Search Results Dropdown -->
+          <div id="searchResults" class="hidden mt-1 max-h-48 overflow-y-auto border-t border-slate-200 divide-y divide-slate-100 text-xs"></div>
+        </div>
+
+        <!-- Drawing Mode Toolbar -->
+        <div class="bg-white/95 backdrop-blur border border-slate-300 rounded shadow-sm p-1.5 flex items-center justify-between gap-1 pointer-events-auto">
+          <div class="flex items-center gap-1">
+            <button type="button" data-draw="point" class="draw-btn text-xs px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 flex items-center gap-1 font-medium transition">
+              <svg class="w-3.5 h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+              </svg>
+              <span>Titik</span>
+            </button>
+            <button type="button" data-draw="circle" class="draw-btn text-xs px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 flex items-center gap-1 font-medium transition">
+              <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+              <span>Lingkaran</span>
+            </button>
+            <button type="button" data-draw="polygon" class="draw-btn text-xs px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700 flex items-center gap-1 font-medium transition">
+              <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6l6-3 8 4 2 9-9 5-7-6 0-9z" />
+              </svg>
+              <span>Poligon</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1">
+            <button id="btnFinishPolygon" type="button" class="hidden text-xs px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition">
+              Selesai
+            </button>
+            <button id="btnClearGeometry" type="button" title="Bersihkan Penanda" class="text-xs px-2 py-1 rounded border border-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-600 transition">
+              Hapus
+            </button>
+          </div>
+        </div>
+
+        <!-- Circle Radius Slider (Shown only when Circle is active or selected) -->
+        <div id="circleRadiusControl" class="hidden bg-white/95 backdrop-blur border border-slate-300 rounded shadow-sm p-2 pointer-events-auto flex flex-col gap-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-medium text-slate-700">Radius Lingkaran:</span>
+            <div class="flex items-center gap-1">
+              <input id="circleRadiusInput" type="number" min="50" max="100000" step="50" value="1000" class="w-20 text-right font-mono text-xs border border-slate-300 rounded px-1 py-0.5" />
+              <span class="text-slate-500">m</span>
+            </div>
+          </div>
+          <input id="circleRadiusSlider" type="range" min="100" max="25000" step="100" value="1000" class="w-full accent-slate-800 h-1.5 bg-slate-200 rounded-lg cursor-pointer" />
+        </div>
+
+        <!-- Drawing Helper Banner -->
+        <div id="drawingInstruction" class="hidden bg-slate-900/90 text-white text-xs px-3 py-1.5 rounded shadow pointer-events-auto flex items-center justify-between">
+          <span id="drawingInstructionText">Klik pada peta untuk menandai titik.</span>
+          <button id="btnCancelDraw" type="button" class="text-slate-300 hover:text-white underline ml-2">Batal</button>
+        </div>
+      </div>
+
+      <!-- Floating AI GeoJSON Layer Badge (Bottom Left of Map) -->
+      <div id="aiLayerControl" class="hidden absolute bottom-5 left-3 z-20 bg-white/95 backdrop-blur border border-slate-300 rounded shadow-sm px-3 py-2 flex items-center gap-3">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block"></span>
+          <span class="font-medium text-slate-800">Layer AI GeoJSON (<span id="aiFeatureCount">0</span> objek)</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="btnZoomAiLayer" type="button" class="text-xs px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded">Fokus</button>
+          <button id="btnClearAiLayer" type="button" class="text-xs px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-700 rounded">Tutup</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="w-full lg:w-[450px] xl:w-[500px] h-[50vh] lg:h-full bg-white border-t lg:border-t-0 lg:border-l border-slate-200 flex flex-col shrink-0 z-20 select-text">
+
+      <!-- Scrollable Content Container -->
+      <div class="flex-1 overflow-y-auto divide-y divide-slate-200">
+
+        <!-- SECTION 1: Spatial Reference Data (Titik / Area JSON) -->
+        <section class="p-3.5 bg-slate-50/60">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-700">A. Referensi Spasial</span>
+              <span id="geomTypeBadge" class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">Belum Ditandai</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button id="btnMyLocation" type="button" title="Gunakan Lokasi Saat Ini" class="text-[11px] px-2 py-0.5 border border-slate-300 rounded bg-white hover:bg-slate-100 text-slate-700 transition">
+                Lokasi Saya
+              </button>
+              <button id="btnToggleJsonView" type="button" class="text-[11px] px-2 py-0.5 border border-slate-300 rounded bg-white hover:bg-slate-100 text-slate-700 transition">
+                Lihat JSON
+              </button>
+            </div>
+          </div>
+
+          <!-- Summary Metrics Box -->
+          <div id="spatialSummaryBox" class="bg-white border border-slate-200 rounded p-2.5 text-xs space-y-1">
+            <div id="spatialEmptyState" class="text-slate-500 py-1">
+              Pilih alat <strong>Titik</strong>, <strong>Lingkaran</strong>, atau <strong>Poligon</strong> di atas peta, lalu klik pada peta untuk menentukan referensi lokasi/area.
+            </div>
+            <div id="spatialMetricsContent" class="hidden space-y-1">
+              <div class="flex justify-between gap-2">
+                <span class="text-slate-500 shrink-0">Koordinat Pusat:</span>
+                <span id="metricCoords" class="font-mono font-medium text-slate-800 text-right">-</span>
+              </div>
+              <div id="metricAreaRow" class="hidden flex justify-between gap-2">
+                <span class="text-slate-500 shrink-0">Dimensi Area:</span>
+                <span id="metricArea" class="font-mono font-medium text-slate-800 text-right">-</span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-slate-500 shrink-0">Lokasi Administratif:</span>
+                <span id="metricAddress" class="text-slate-800 text-right line-clamp-2">-</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Collapsible Raw JSON / GeoJSON Statement Box -->
+          <div id="spatialJsonContainer" class="hidden mt-2">
+            <div class="flex items-center justify-between bg-slate-800 text-slate-200 px-2.5 py-1 rounded-t text-[11px]">
+              <span class="font-mono">Pernyataan JSON Geometri</span>
+              <div class="flex items-center gap-2">
+                <button id="btnCopySpatialJson" type="button" class="hover:text-white underline">Salin JSON</button>
+                <button id="btnDownloadRefGeojson" type="button" class="hover:text-white underline">Unduh .geojson</button>
+              </div>
+            </div>
+            <pre id="spatialJsonOutput" class="bg-slate-900 text-emerald-400 font-mono text-[11px] p-2.5 rounded-b max-h-36 overflow-y-auto whitespace-pre-wrap break-all m-0">null</pre>
+          </div>
+        </section>
+
+        <!-- SECTION 2: AI & Topic Configuration -->
+        <section class="p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-700">B. Konfigurasi AI & Topik</span>
+            <span id="activeModelIndicator" class="text-[11px] font-mono text-slate-500">gemini-3.5-flash-lite</span>
+          </div>
+
+          <!-- Model Tier Selector -->
+          <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded border border-slate-200">
+            <button type="button" data-model-mode="default" class="model-mode-btn text-xs py-1.5 px-2 rounded bg-white shadow-sm font-medium text-slate-900 transition text-center">
+              Default <span class="block text-[10px] font-mono text-slate-500">gemini-3.5-flash-lite</span>
+            </button>
+            <button type="button" data-model-mode="advanced" class="model-mode-btn text-xs py-1.5 px-2 rounded text-slate-600 hover:text-slate-900 font-medium transition text-center">
+              Advanced <span class="block text-[10px] font-mono text-slate-500">gemini-3.8-flash</span>
+            </button>
+          </div>
+
+          <!-- Grounding & GeoJSON Checkboxes -->
+          <div class="grid grid-cols-3 gap-1.5 pt-0.5">
+            <label class="flex items-center gap-1.5 border border-slate-200 rounded px-2 py-1.5 cursor-pointer hover:bg-slate-50 transition">
+              <input id="chkSearchRef" type="checkbox" class="rounded border-slate-300 text-slate-800 focus:ring-0" checked />
+              <span class="text-xs text-slate-700 font-medium">Search Ref</span>
+            </label>
+            <label class="flex items-center gap-1.5 border border-slate-200 rounded px-2 py-1.5 cursor-pointer hover:bg-slate-50 transition">
+              <input id="chkMapsRef" type="checkbox" class="rounded border-slate-300 text-slate-800 focus:ring-0" checked />
+              <span class="text-xs text-slate-700 font-medium">Maps Ref</span>
+            </label>
+            <label class="flex items-center gap-1.5 border border-slate-200 rounded px-2 py-1.5 cursor-pointer hover:bg-slate-50 transition">
+              <input id="chkGeojsonResp" type="checkbox" class="rounded border-slate-300 text-slate-800 focus:ring-0" checked />
+              <span class="text-xs text-slate-700 font-medium">GeoJSON</span>
+            </label>
+          </div>
+
+          <!-- Topic Dropdown (C. Topik) -->
+          <div>
+            <label for="topicSelect" class="block text-xs font-medium text-slate-700 mb-1">C. Pilih Topik Analisis:</label>
+            <select id="topicSelect" class="w-full text-xs border border-slate-300 rounded px-2.5 py-2 bg-white text-slate-800 focus:outline-none focus:border-slate-700">
+              <option value="ikhtisar">1. Ikhtisar Lokasi Sekitar</option>
+              <option value="wisata">2. Petunjuk Wisata Sekitar</option>
+              <option value="poi">3. Titik Menarik dan Tempat Penting Sekitar</option>
+              <option value="sejarah">4. Sejarah Lokasi Sekitar</option>
+              <option value="populasi">5. Populasi dan Antropologi Sekitar</option>
+              <option value="meteorologi">6. Meteorologi dan Klimatologi Sekitar</option>
+              <option value="geofisika">7. Geofisika Sekitar</option>
+              <option value="bencana">8. Riwayat Bencana dan Risiko Sekitar</option>
+              <option value="geologi">9. Geologi Sekitar</option>
+              <option value="perairan">10. Perairan Sekitar</option>
+              <option value="kehutanan">11. Hutan, Lahan, Konservasi, dan Vegetasi Sekitar</option>
+              <option value="pertanian">12. Pertanian dan Hasil Bumi Sekitar</option>
+              <option value="transportasi">13. Transportasi Sekitar</option>
+              <option value="ekonomi">14. Ekonomi dan Sosial Sekitar</option>
+              <option value="kesehatan">15. Kesehatan Sekitar</option>
+              <option value="pendidikan">16. Pendidikan Sekitar</option>
+              <option value="batas">17. Batas Wilayah Sekitar</option>
+              <option value="infrastruktur">18. Infrastruktur dan Pembangunan Sekitar</option>
+              <option value="biaya_hidup">19. Biaya Hidup Sekitar</option>
+              <option value="bahasa">20. Bahasa dan Aksara Sekitar</option>
+              <option value="adat">21. Adat dan Budaya Sekitar</option>
+              <option value="kustom">22. Pertanyaan Khusus / Kustom</option>
+            </select>
+          </div>
+
+          <!-- User Question Input -->
+          <div>
+            <label for="questionInput" class="block text-xs font-medium text-slate-700 mb-1">
+              Pertanyaan / Instruksi Tambahan (Opsional):
+            </label>
+            <textarea
+              id="questionInput"
+              rows="2"
+              placeholder="Tulis fokus pertanyaan spesifik mengenai lokasi atau area yang ditandai..."
+              class="w-full text-xs border border-slate-300 rounded p-2 text-slate-800 focus:outline-none focus:border-slate-700 resize-y"
+            ></textarea>
+          </div>
+
+          <!-- Execute AI Analysis Button -->
+          <button
+            id="btnAnalyze"
+            type="button"
+            class="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white text-xs font-semibold py-2.5 px-4 rounded transition flex items-center justify-center gap-2"
+          >
+            <svg id="analyzeSpinner" class="hidden w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span id="analyzeBtnText">Analisis Geospasial dengan AI</span>
+          </button>
+        </section>
+
+        <!-- SECTION 3: AI Output & Export -->
+        <section class="p-3.5 flex-1 flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-700">Hasil Analisis</span>
+            <!-- Export Actions -->
+            <div id="exportToolbar" class="hidden items-center gap-1">
+              <button id="btnCopyOutput" type="button" class="text-[11px] px-2 py-0.5 border border-slate-300 rounded hover:bg-slate-100 text-slate-700">
+                Salin
+              </button>
+              <button id="btnSaveMd" type="button" class="text-[11px] px-2 py-0.5 border border-slate-300 rounded hover:bg-slate-100 text-slate-700">
+                Simpan .md
+              </button>
+              <button id="btnSaveTxt" type="button" class="text-[11px] px-2 py-0.5 border border-slate-300 rounded hover:bg-slate-100 text-slate-700">
+                Simpan .txt
+              </button>
+              <button id="btnDownloadAiGeojson" type="button" class="hidden text-[11px] px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded font-medium">
+                Unduh GeoJSON
+              </button>
+            </div>
+          </div>
+
+          <!-- Status / Grounding Context Indicator -->
+          <div id="analysisStatusBanner" class="hidden mb-2 px-2.5 py-1.5 rounded bg-slate-100 border border-slate-200 text-[11px] text-slate-600 font-mono"></div>
+
+          <!-- AI Response Container -->
+          <div id="aiResponseContainer" class="bg-white border border-slate-200 rounded p-3 min-h-[180px]">
+            <div id="aiEmptyState" class="text-xs text-slate-400 text-center py-8">
+              Tandai titik atau area di peta, pilih topik, lalu klik <strong>Analisis Geospasial dengan AI</strong>.
+            </div>
+            <div id="aiMarkdownOutput" class="markdown-body hidden"></div>
+
+            <!-- Grounding References Section -->
+            <div id="groundingSourcesBox" class="hidden mt-4 pt-3 border-t border-slate-200">
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Referensi Grounding (Search & Maps)</div>
+              <ul id="groundingSourcesList" class="text-xs space-y-1 list-disc pl-4 text-slate-700"></ul>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </aside>
+  </div>
+
+  <!-- API Configuration Modal -->
+  <div id="apiModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-lg shadow-xl max-w-md w-full p-4 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-2.5">
+        <h3 class="text-sm font-semibold text-slate-900">Pengaturan API Gemini & Model</h3>
+        <button id="btnCloseApiModal" type="button" class="text-slate-400 hover:text-slate-600 text-sm font-bold px-1">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label for="apiKeyInput" class="block font-medium text-slate-700 mb-1">Custom Gemini API Key:</label>
+          <input
+            id="apiKeyInput"
+            type="password"
+            placeholder="AIzaSy..."
+            class="w-full border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs focus:outline-none focus:border-slate-800"
+          />
+          <p class="text-[11px] text-slate-500 mt-1">
+            Jika dikosongkan, aplikasi menggunakan variabel <code>EMBEDDED_API_KEY</code> di dalam kode sumber (untuk penggunaan lokal).
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label for="defaultModelInput" class="block font-medium text-slate-700 mb-1">ID Model Default:</label>
+            <input
+              id="defaultModelInput"
+              type="text"
+              value="gemini-3.5-flash-lite"
+              class="w-full border border-slate-300 rounded px-2 py-1 font-mono text-xs"
+            />
+          </div>
+          <div>
+            <label for="advancedModelInput" class="block font-medium text-slate-700 mb-1">ID Model Advanced:</label>
+            <input
+              id="advancedModelInput"
+              type="text"
+              value="gemini-3.8-flash"
+              class="w-full border border-slate-300 rounded px-2 py-1 font-mono text-xs"
+            />
+          </div>
+        </div>
+
+        <label class="flex items-start gap-2 pt-1 cursor-pointer">
+          <input id="chkAutoFallbackModel" type="checkbox" class="mt-0.5 rounded border-slate-300" checked />
+          <span class="text-[11px] text-slate-600">
+            Aktifkan <strong>Auto-Fallback</strong> ke model aktif (<code>gemini-2.5-flash-lite</code> / <code>gemini-2.5-flash</code>) apabila endpoint API mengembalikan status 404 pada nama model di atas.
+          </span>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+        <button id="btnClearApiKey" type="button" class="text-xs px-3 py-1.5 border border-slate-300 rounded hover:bg-slate-100 text-slate-700">
+          Reset Default
+        </button>
+        <button id="btnSaveApiSettings" type="button" class="text-xs px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded font-medium">
+          Simpan Pengaturan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session History Modal -->
+  <div id="historyModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-lg shadow-xl max-w-lg w-full p-4 flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-2.5 mb-2">
+        <h3 class="text-sm font-semibold text-slate-900">Riwayat Analisis Sesi Ini</h3>
+        <button id="btnCloseHistoryModal" type="button" class="text-slate-400 hover:text-slate-600 text-sm font-bold px-1">✕</button>
+      </div>
+      <div id="historyListContainer" class="flex-1 overflow-y-auto divide-y divide-slate-200 text-xs">
+        <div class="text-slate-400 text-center py-6">Belum ada riwayat analisis pada sesi ini.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Non-blocking Toast Notification -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <script>
+    /**
+     * ============================================================================
+     * KONFIGURASI KUNCI API INTERNAL (UNTUK PENGGUNAAN FILE LOKAL)
+     * Isi konstanta EMBEDDED_API_KEY di bawah ini jika ingin menggunakan aplikasi
+     * secara langsung dari file lokal tanpa memasukkan kunci di antarmuka UI.
+     * ============================================================================
+     */
+    const EMBEDDED_API_KEY = ""; // Contoh: "AIzaSy..."
+
+    /**
+     * Daftar 22 Topik Analisis Geospasial beserta instruksi fokus teknisnya
+     */
+    const TOPIC_PROMPTS = {
+      ikhtisar: {
+        label: "Ikhtisar Lokasi Sekitar",
+        instruction: "Berikan ikhtisar geospasial menyeluruh mengenai lokasi/area ini: posisi geografis, karakter wilayah, tata guna lahan dominan, aksesibilitas, lanskap fisik, serta ciri utama kawasan sekitarnya."
+      },
+      wisata: {
+        label: "Petunjuk Wisata Sekitar",
+        instruction: "Identifikasi potensi dan destinasi wisata di dalam dan sekitar area ini, rute pencapaian, daya tarik alam/budaya/kuliner, fasilitas pendukung, waktu kunjungan terbaik, serta panduan praktis bagi pengunjung."
+      },
+      poi: {
+        label: "Titik Menarik dan Tempat Penting Sekitar",
+        instruction: "Petakan dan jelaskan Titik Menarik (Points of Interest/POI) serta fasilitas vital di sekitar lokasi ini: kantor pemerintahan, pusat perbelanjaan, rumah ibadah, taman, monumen, stasiun/terminal, dan fasilitas publik utama beserta perkiraan koordinatnya."
+      },
+      sejarah: {
+        label: "Sejarah Lokasi Sekitar",
+        instruction: "Jelaskan perkembangan sejarah lokasi/wilayah ini: asal-usul penamaan tempat (toponimi), peristiwa sejarah penting, peninggalan kolonial atau kerajaan/tradisional, situs cagar budaya, serta transformasi wilayah dari masa ke masa."
+      },
+      populasi: {
+        label: "Populasi dan Antropologi Sekitar",
+        instruction: "Analisis karakteristik demografi, kepadatan penduduk, distribusi pemukiman, komposisi etnis/suku bangsa, pola migrasi, struktur sosial, dan dinamika antropologi masyarakat di sekitar wilayah ini."
+      },
+      meteorologi: {
+        label: "Meteorologi dan Klimatologi Sekitar",
+        instruction: "Analisis kondisi atmosfer, tipe iklim (Köppen/Schmidt-Ferguson), pola curah hujan tahunan, rentang suhu udara, kelembaban, arah angin dominan, serta pengaruh topografi lokal terhadap cuaca mikro di wilayah ini."
+      },
+      geofisika: {
+        label: "Geofisika Sekitar",
+        instruction: "Analisis karakteristik geofisika wilayah ini: aktivitas seismik/kegempaan, tatanan tektonik lempeng atau sesar aktif terdekat, anomali gravitasi/magnetik regional, serta potensi panas bumi atau dinamika bawah permukaan."
+      },
+      bencana: {
+        label: "Riwayat Bencana dan Risiko Sekitar",
+        instruction: "Analisis profil risiko multi-bencana (banjir, tanah longsor, gempa bumi, tsunami, kebakaran hutan/lahan, kekeringan, atau abrasi) berdasarkan morfologi dan riwayat kejadian bencana di sekitar area ini, serta rekomendasi mitigasinya."
+      },
+      geologi: {
+        label: "Geologi Sekitar",
+        instruction: "Jelaskan kondisi geologi dan geomorfologi wilayah ini: formasi batuan penyusun (litologi), umur geologi, jenis tanah (pedologi), kemiringan lereng, struktur geologi, serta potensi sumber daya mineral/bahan galian."
+      },
+      perairan: {
+        label: "Perairan Sekitar",
+        instruction: "Analisis kondisi hidrologi dan perairan di sekitar lokasi: Daerah Aliran Sungai (DAS), sungai utama/anak sungai, danau/waduk, kondisi air tanah (akuifer), drainase permukaan, atau karakteristik pesisir/kelautan jika berada di dekat pantai."
+      },
+      kehutanan: {
+        label: "Hutan, Lahan, Konservasi, dan Vegetasi Sekitar",
+        instruction: "Analisis tutupan lahan (land cover), tipe ekosistem dan vegetasi alami, status kawasan hutan atau area konservasi terdekat, keanekaragaman hayati (flora/fauna), serta isu perubahan lahan di sekitar lokasi ini."
+      },
+      pertanian: {
+        label: "Pertanian dan Hasil Bumi Sekitar",
+        instruction: "Analisis potensi agrikultur dan agraria di wilayah ini: komoditas tanaman pangan, hortikultura, perkebunan, perikanan/peternakan unggulan, kesesuaian lahan pertanian, pola tanam, serta sistem irigasi sekitar."
+      },
+      transportasi: {
+        label: "Transportasi Sekitar",
+        instruction: "Analisis jaringan transportasi dan konektivitas wilayah: hierarki jalan raya, angkutan umum, terminal/stasiun/pelabuhan/bandara terdekat, pola pergerakan lalu lintas, serta keterhubungan antar-wilayah."
+      },
+      ekonomi: {
+        label: "Ekonomi dan Sosial Sekitar",
+        instruction: "Analisis struktur perekonomian lokal dan kondisi sosial masyarakat: mata pencaharian utama, pusat perdagangan/industri/UMKM, aktivitas pasar, serta indikator kesejahteraan sosial di sekitar wilayah ini."
+      },
+      kesehatan: {
+        label: "Kesehatan Sekitar",
+        instruction: "Identifikasi fasilitas dan layanan kesehatan di sekitar area ini (Rumah Sakit, Puskesmas, Klinik, Apotek), keterjangkauan akses darurat medis, serta profil kesehatan lingkungan wilayah sekitar."
+      },
+      pendidikan: {
+        label: "Pendidikan Sekitar",
+        instruction: "Identifikasi sebaran fasilitas pendidikan di sekitar lokasi (SD, SMP, SMA/SMK, Perguruan Tinggi, Pesantren/Lembaga Pelatihan), aksesibilitas zona pendidikan, serta ekosistem akademik di wilayah tersebut."
+      },
+      batas: {
+        label: "Batas Wilayah Sekitar",
+        instruction: "Jelaskan hierarki dan batas-batas administratif wilayah pada koordinat/area ini: kelurahan/desa, kecamatan, kabupaten/kota, provinsi, kode pos, serta wilayah yang berbatasan langsung di sebelah Utara, Selatan, Timur, dan Barat."
+      },
+      infrastruktur: {
+        label: "Infrastruktur dan Pembangunan Sekitar",
+        instruction: "Analisis ketersediaan infrastruktur dasar dan tata ruang: jaringan listrik, telekomunikasi, air bersih, sanitasi, proyek pembangunan strategis, serta arah perkembangan tata ruang wilayah sekitar."
+      },
+      biaya_hidup: {
+        label: "Biaya Hidup Sekitar",
+        instruction: "Analisis estimasi biaya hidup di sekitar wilayah ini: kisaran UMK/UMR daerah, harga sewa tempat tinggal/properti, harga kebutuhan pokok dan pangan lokal, biaya transportasi harian, serta perbandingan indeks biaya hidupnya."
+      },
+      bahasa: {
+        label: "Bahasa dan Aksara Sekitar",
+        instruction: "Jelaskan lanskap linguistik di wilayah ini: bahasa daerah dan dialek lokal yang dituturkan masyarakat sehari-hari, bahasa pengantar, ciri khas kosakata lokal, serta aksara tradisional/historis yang terkait dengan wilayah ini."
+      },
+      adat: {
+        label: "Adat dan Budaya Sekitar",
+        instruction: "Jelaskan kekayaan adat istiadat dan budaya lokal di wilayah ini: tradisi masyarakat, upacara adat, kesenian daerah, arsitektur tradisional, kearifan lokal dalam menjaga lingkungan, serta kuliner khas daerah."
+      },
+      kustom: {
+        label: "Pertanyaan Khusus / Kustom",
+        instruction: "Jawab pertanyaan pengguna secara mendalam dengan mengacu secara ketat pada konteks koordinat geografis, geometri area, dan kondisi faktual di sekitar lokasi yang ditandai."
+      }
+    };
+
+    const state = {
+      map: null,
+      basemaps: {},
+      drawMode: null, // 'point' | 'circle' | 'polygon' | null
+      drawnLayerGroup: null,
+      aiGeoJsonLayerGroup: null,
+      tempPolygonPoints: [],
+      tempPolygonMarkers: [],
+      tempPolyline: null,
+      spatialData: null, // Structured spatial reference object
+      localContext: {
+        address: null,
+        displayName: null,
+        nearbyFeatures: []
+      },
+      modelMode: "default", // 'default' | 'advanced'
+      defaultModelId: localStorage.getItem("aigis_default_model") || "gemini-3.5-flash-lite",
+      advancedModelId: localStorage.getItem("aigis_advanced_model") || "gemini-3.8-flash",
+      autoFallbackModel: localStorage.getItem("aigis_auto_fallback") !== "false",
+      customApiKey: localStorage.getItem("aigis_api_key") || "",
+      lastMarkdownResult: "",
+      lastPlainTextResult: "",
+      lastAiGeoJson: null,
+      sessionHistory: []
+    };
+
+    /**
+     * Helper: Tampilkan notifikasi Toast non-blocking (menggantikan alert)
+     */
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      const colorClasses = {
+        info: "bg-slate-900 text-white border-slate-700",
+        success: "bg-emerald-800 text-white border-emerald-600",
+        warn: "bg-amber-700 text-white border-amber-500",
+        error: "bg-red-800 text-white border-red-600"
+      };
+      toast.className = `pointer-events-auto border px-3 py-2 rounded shadow-lg text-xs flex items-center justify-between gap-2 transition-opacity duration-300 ${colorClasses[type] || colorClasses.info}`;
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+      }, 3800);
+    }
+
+    function initMap() {
+      // Definisi Tile Layers sesuai spesifikasi: Default Esri Topografi, Esri Satelit, OSM, Carto
+      state.basemaps = {
+        esri_topo: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", {
+          maxZoom: 19,
+          attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI"
+        }),
+        esri_sat: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+          maxZoom: 19,
+          attribution: "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+        }),
+        osm: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap contributors"
+        }),
+        carto_light: L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+          maxZoom: 20,
+          attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
+        }),
+        carto_dark: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+          maxZoom: 20,
+          attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
+        })
+      };
+
+      // Inisialisasi Peta dengan default Esri Topografi
+      state.map = L.map("map", {
+        center: [-2.5489, 118.0149], // Pusat Indonesia
+        zoom: 5,
+        layers: [state.basemaps.esri_topo],
+        zoomControl: true
+      });
+
+      // Layer Groups untuk Geometri Pengguna & Output GeoJSON AI
+      state.drawnLayerGroup = L.featureGroup().addTo(state.map);
+      state.aiGeoJsonLayerGroup = L.featureGroup().addTo(state.map);
+
+      // Skala Peta
+      L.control.scale({ metric: true, imperial: false, position: "bottomright" }).addTo(state.map);
+
+      // Pembaruan koordinat kursor di Header
+      state.map.on("mousemove", (e) => {
+        const headerCoords = document.getElementById("headerCoords");
+        headerCoords.textContent = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`;
+      });
+
+      // Klik pada Peta untuk Penandaan Titik / Lingkaran / Poligon
+      state.map.on("click", handleMapClick);
+    }
+
+    function setDrawMode(mode) {
+      // Bersihkan poligon sementara jika sedang menggambar
+      clearTempPolygon();
+      state.drawMode = mode;
+
+      const mapContainer = document.getElementById("map");
+      const instructionBox = document.getElementById("drawingInstruction");
+      const instructionText = document.getElementById("drawingInstructionText");
+      const finishPolyBtn = document.getElementById("btnFinishPolygon");
+      const circleControl = document.getElementById("circleRadiusControl");
+
+      // Update highlight tombol
+      document.querySelectorAll(".draw-btn").forEach((btn) => {
+        if (btn.dataset.draw === mode) {
+          btn.classList.add("bg-slate-900", "text-white", "border-slate-900");
+          btn.classList.remove("text-slate-700", "hover:bg-slate-100");
+        } else {
+          btn.classList.remove("bg-slate-900", "text-white", "border-slate-900");
+          btn.classList.add("text-slate-700", "hover:bg-slate-100");
+        }
+      });
+
+      if (!mode) {
+        mapContainer.classList.remove("drawing-cursor");
+        instructionBox.classList.add("hidden");
+        finishPolyBtn.classList.add("hidden");
+        if (!state.spatialData || state.spatialData.type !== "circle") {
+          circleControl.classList.add("hidden");
+        }
+        return;
+      }
+
+      mapContainer.classList.add("drawing-cursor");
+      instructionBox.classList.remove("hidden");
+
+      if (mode === "point") {
+        instructionText.textContent = "Klik pada peta untuk menandai titik referensi.";
+        finishPolyBtn.classList.add("hidden");
+        circleControl.classList.add("hidden");
+      } else if (mode === "circle") {
+        instructionText.textContent = "Klik titik pusat lingkaran pada peta, lalu sesuaikan radius.";
+        finishPolyBtn.classList.add("hidden");
+        circleControl.classList.remove("hidden");
+      } else if (mode === "polygon") {
+        instructionText.textContent = "Klik titik-titik sudut area di peta (min. 3 titik), lalu klik Selesai.";
+        finishPolyBtn.classList.remove("hidden");
+        circleControl.classList.add("hidden");
+      }
+    }
+
+    function clearTempPolygon() {
+      state.tempPolygonPoints = [];
+      state.tempPolygonMarkers.forEach((m) => state.map.removeLayer(m));
+      state.tempPolygonMarkers = [];
+      if (state.tempPolyline) {
+        state.map.removeLayer(state.tempPolyline);
+        state.tempPolyline = null;
+      }
+    }
+
+    function handleMapClick(e) {
+      const { lat, lng } = e.latlng;
+
+      // Jika tidak dalam mode gambar eksplisit namun belum ada geometri, klik peta otomatis menandai Titik (gaya GeoTag)
+      if (!state.drawMode && !state.spatialData) {
+        createPointGeometry(lat, lng);
+        return;
+      }
+
+      if (state.drawMode === "point") {
+        createPointGeometry(lat, lng);
+        setDrawMode(null);
+      } else if (state.drawMode === "circle") {
+        const radius = parseFloat(document.getElementById("circleRadiusInput").value) || 1000;
+        createCircleGeometry(lat, lng, radius);
+        setDrawMode(null);
+      } else if (state.drawMode === "polygon") {
+        addPolygonVertex(lat, lng);
+      }
+    }
+
+    function createPointGeometry(lat, lng) {
+      state.drawnLayerGroup.clearLayers();
+      const roundedLat = Number(lat.toFixed(6));
+      const roundedLng = Number(lng.toFixed(6));
+
+      const marker = L.marker([roundedLat, roundedLng], { draggable: true }).addTo(state.drawnLayerGroup);
+      marker.bindPopup(`<strong>Titik Referensi</strong><br/>Lat: ${roundedLat}<br/>Lng: ${roundedLng}`);
+
+      marker.on("dragend", (ev) => {
+        const pos = ev.target.getLatLng();
+        createPointGeometry(pos.lat, pos.lng);
+      });
+
+      const pointGeoJson = turf.point([roundedLng, roundedLat], {
+        reference_type: "point",
+        latitude: roundedLat,
+        longitude: roundedLng,
+        timestamp: new Date().toISOString()
+      });
+
+      state.spatialData = {
+        type: "point",
+        label: "Titik Koordinat",
+        center: { lat: roundedLat, lng: roundedLng },
+        geojson: pointGeoJson
+      };
+
+      document.getElementById("circleRadiusControl").classList.add("hidden");
+      updateSpatialUI();
+      enrichSpatialContext(roundedLat, roundedLng);
+    }
+
+    function createCircleGeometry(lat, lng, radiusMeters) {
+      state.drawnLayerGroup.clearLayers();
+      const roundedLat = Number(lat.toFixed(6));
+      const roundedLng = Number(lng.toFixed(6));
+      const radius = Math.max(10, Math.round(radiusMeters));
+
+      // Lingkaran visual di Leaflet
+      const circleLayer = L.circle([roundedLat, roundedLng], {
+        radius: radius,
+        color: "#059669",
+        weight: 2,
+        fillColor: "#10b981",
+        fillOpacity: 0.18
+      }).addTo(state.drawnLayerGroup);
+
+      // Titik pusat yang dapat digeser
+      const centerMarker = L.circleMarker([roundedLat, roundedLng], {
+        radius: 5,
+        color: "#065f46",
+        fillColor: "#ffffff",
+        fillOpacity: 1,
+        weight: 2
+      }).addTo(state.drawnLayerGroup);
+      centerMarker.bindPopup(`<strong>Pusat Lingkaran</strong><br/>Lat: ${roundedLat}, Lng: ${roundedLng}<br/>Radius: ${radius} m`);
+
+      // Buat aproksimasi GeoJSON poligon 64-sisi menggunakan Turf.js
+      const circlePoly = turf.circle([roundedLng, roundedLat], radius / 1000, {
+        steps: 64,
+        units: "kilometers",
+        properties: {
+          reference_type: "circle",
+          center_lat: roundedLat,
+          center_lng: roundedLng,
+          radius_meters: radius
+        }
+      });
+
+      const areaSqMeters = turf.area(circlePoly);
+      const bbox = turf.bbox(circlePoly); // [minX, minY, maxX, maxY]
+
+      state.spatialData = {
+        type: "circle",
+        label: "Area Lingkaran",
+        center: { lat: roundedLat, lng: roundedLng },
+        radius_meters: radius,
+        area_sqm: Math.round(areaSqMeters),
+        area_hectares: Number((areaSqMeters / 10000).toFixed(2)),
+        area_sqkm: Number((areaSqMeters / 1e6).toFixed(4)),
+        bbox: {
+          west: Number(bbox[0].toFixed(6)),
+          south: Number(bbox[1].toFixed(6)),
+          east: Number(bbox[2].toFixed(6)),
+          north: Number(bbox[3].toFixed(6))
+        },
+        geojson: circlePoly
+      };
+
+      document.getElementById("circleRadiusControl").classList.remove("hidden");
+      updateSpatialUI();
+      enrichSpatialContext(roundedLat, roundedLng);
+    }
+
+    function addPolygonVertex(lat, lng) {
+      const roundedLat = Number(lat.toFixed(6));
+      const roundedLng = Number(lng.toFixed(6));
+      state.tempPolygonPoints.push([roundedLat, roundedLng]);
+
+      const vertexMarker = L.circleMarker([roundedLat, roundedLng], {
+        radius: 4,
+        color: "#d97706",
+        fillColor: "#fef3c7",
+        fillOpacity: 1,
+        weight: 2
+      }).addTo(state.map);
+      state.tempPolygonMarkers.push(vertexMarker);
+
+      if (state.tempPolyline) {
+        state.map.removeLayer(state.tempPolyline);
+      }
+      state.tempPolyline = L.polyline(state.tempPolygonPoints, {
+        color: "#d97706",
+        weight: 2,
+        dashArray: "4, 4"
+      }).addTo(state.map);
+    }
+
+    function finishPolygonGeometry() {
+      if (state.tempPolygonPoints.length < 3) {
+        showToast("Poligon membutuhkan minimal 3 titik sudut.", "warn");
+        return;
+      }
+
+      const latLngs = [...state.tempPolygonPoints];
+      clearTempPolygon();
+      state.drawnLayerGroup.clearLayers();
+
+      const polyLayer = L.polygon(latLngs, {
+        color: "#d97706",
+        weight: 2,
+        fillColor: "#f59e0b",
+        fillOpacity: 0.2
+      }).addTo(state.drawnLayerGroup);
+
+      // Konversi ke format koordinat GeoJSON [lng, lat] dan tutup cincin poligon
+      const ringCoords = latLngs.map((pt) => [pt[1], pt[0]]);
+      ringCoords.push([latLngs[0][1], latLngs[0][0]]);
+
+      const turfPoly = turf.polygon([ringCoords], {
+        reference_type: "polygon",
+        vertex_count: latLngs.length
+      });
+
+      const centroid = turf.centroid(turfPoly);
+      const centerLng = Number(centroid.geometry.coordinates[0].toFixed(6));
+      const centerLat = Number(centroid.geometry.coordinates[1].toFixed(6));
+      const areaSqMeters = turf.area(turfPoly);
+      const bbox = turf.bbox(turfPoly);
+
+      polyLayer.bindPopup(
+        `<strong>Area Poligon</strong><br/>Titik Sudut: ${latLngs.length}<br/>Luas: ${(areaSqMeters / 10000).toFixed(2)} ha`
+      );
+
+      state.spatialData = {
+        type: "polygon",
+        label: "Area Poligon",
+        center: { lat: centerLat, lng: centerLng },
+        vertex_count: latLngs.length,
+        vertices: latLngs.map((pt) => ({ lat: pt[0], lng: pt[1] })),
+        area_sqm: Math.round(areaSqMeters),
+        area_hectares: Number((areaSqMeters / 10000).toFixed(2)),
+        area_sqkm: Number((areaSqMeters / 1e6).toFixed(4)),
+        bbox: {
+          west: Number(bbox[0].toFixed(6)),
+          south: Number(bbox[1].toFixed(6)),
+          east: Number(bbox[2].toFixed(6)),
+          north: Number(bbox[3].toFixed(6))
+        },
+        geojson: turfPoly
+      };
+
+      setDrawMode(null);
+      updateSpatialUI();
+      enrichSpatialContext(centerLat, centerLng);
+    }
+
+    function updateSpatialUI() {
+      const badge = document.getElementById("geomTypeBadge");
+      const emptyState = document.getElementById("spatialEmptyState");
+      const metricsContent = document.getElementById("spatialMetricsContent");
+      const metricCoords = document.getElementById("metricCoords");
+      const metricAreaRow = document.getElementById("metricAreaRow");
+      const metricArea = document.getElementById("metricArea");
+      const jsonOutput = document.getElementById("spatialJsonOutput");
+
+      if (!state.spatialData) {
+        badge.textContent = "Belum Ditandai";
+        badge.className = "text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-200 text-slate-700";
+        emptyState.classList.remove("hidden");
+        metricsContent.classList.add("hidden");
+        jsonOutput.textContent = "null";
+        return;
+      }
+
+      emptyState.classList.add("hidden");
+      metricsContent.classList.remove("hidden");
+
+      const { type, label, center } = state.spatialData;
+      badge.textContent = label;
+
+      if (type === "point") {
+        badge.className = "text-[11px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-800";
+        metricCoords.textContent = `${center.lat}, ${center.lng}`;
+        metricAreaRow.classList.add("hidden");
+      } else if (type === "circle") {
+        badge.className = "text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800";
+        metricCoords.textContent = `${center.lat}, ${center.lng}`;
+        metricAreaRow.classList.remove("hidden");
+        metricArea.textContent = `R: ${state.spatialData.radius_meters} m | Luas: ${state.spatialData.area_hectares} ha (${state.spatialData.area_sqkm} km²)`;
+      } else if (type === "polygon") {
+        badge.className = "text-[11px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-800";
+        metricCoords.textContent = `${center.lat}, ${center.lng} (Centroid)`;
+        metricAreaRow.classList.remove("hidden");
+        metricArea.textContent = `${state.spatialData.vertex_count} titik | Luas: ${state.spatialData.area_hectares} ha (${state.spatialData.area_sqkm} km²)`;
+      }
+
+      // Format pernyataan JSON yang ringkas & jelas untuk ditampilkan dan dikirim ke AI
+      const statementObj = {
+        spatial_type: state.spatialData.type,
+        center_coordinates: state.spatialData.center,
+        ...(state.spatialData.radius_meters ? { radius_meters: state.spatialData.radius_meters } : {}),
+        ...(state.spatialData.area_hectares ? { area_hectares: state.spatialData.area_hectares, area_sqkm: state.spatialData.area_sqkm } : {}),
+        ...(state.spatialData.bbox ? { bounding_box: state.spatialData.bbox } : {}),
+        ...(state.spatialData.vertices ? { polygon_vertices: state.spatialData.vertices } : {}),
+        administrative_context: state.localContext.address || undefined,
+        geojson_feature: state.spatialData.geojson
+      };
+
+      jsonOutput.textContent = JSON.stringify(statementObj, null, 2);
+    }
+
+    /**
+     * Reverse Geocoding (Nominatim) + Overpass API Context untuk memperkaya fakta spasial
+     */
+    async function enrichSpatialContext(lat, lng) {
+      const addressEl = document.getElementById("metricAddress");
+      addressEl.textContent = "Memuat data administratif...";
+      state.localContext = { address: null, displayName: null, nearbyFeatures: [] };
+
+      try {
+        const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`;
+        const res = await fetch(nomUrl, {
+          headers: { "Accept-Language": "id,en" }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.localContext.displayName = data.display_name || null;
+          state.localContext.address = data.address || null;
+          addressEl.textContent = data.display_name || "Lokasi terdeteksi pada koordinat";
+          updateSpatialUI();
+        } else {
+          addressEl.textContent = "Koordinat terdeteksi";
+        }
+      } catch (err) {
+        addressEl.textContent = "Koordinat siap dianalisis";
+      }
+
+      // Ambil sampel objek nyata sekitar dari Overpass API sebagai jangkar koordinat akurat
+      try {
+        const radius = state.spatialData?.radius_meters
+          ? Math.min(state.spatialData.radius_meters, 5000)
+          : 1500;
+        const overpassQuery = `[out:json][timeout:8];(node["name"](around:${radius},${lat},${lng});way["name"](around:${radius},${lat},${lng}););out center 18;`;
+        const ovRes = await fetch("https://overpass-api.de/api/interpreter", {
+          method: "POST",
+          body: overpassQuery
+        });
+        if (ovRes.ok) {
+          const ovData = await ovRes.json();
+          if (Array.isArray(ovData.elements)) {
+            state.localContext.nearbyFeatures = ovData.elements
+              .map((el) => {
+                const elLat = el.lat || (el.center && el.center.lat);
+                const elLon = el.lon || (el.center && el.center.lon);
+                const tags = el.tags || {};
+                const category =
+                  tags.amenity || tags.tourism || tags.Natural || tags.highway || tags.landuse || tags.place || tags.historic || "objek";
+                return elLat && elLon && tags.name
+                  ? { name: tags.name, category, lat: Number(elLat.toFixed(6)), lng: Number(elLon.toFixed(6)) }
+                  : null;
+              })
+              .filter(Boolean);
+          }
+        }
+      } catch (_) {
+        // Abaikan jika Overpass sibuk
+      }
+    }
+
+    async function handleLocationSearch(e) {
+      e.preventDefault();
+      const query = document.getElementById("searchInput").value.trim();
+      const resultsBox = document.getElementById("searchResults");
+      if (!query) return;
+
+      // 1. Cek apakah input adalah koordinat langsung (contoh: "-0.0263, 109.3425" atau "-0.0263 109.3425")
+      const coordRegex = /^(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)$/;
+      const match = query.match(coordRegex);
+      if (match) {
+        const lat = parseFloat(match[1]);
+        const lng = parseFloat(match[2]);
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          resultsBox.classList.add("hidden");
+          state.map.flyTo([lat, lng], 15, { duration: 1.0 });
+          createPointGeometry(lat, lng);
+          showToast(`Menuju koordinat ${lat.toFixed(5)}, ${lng.toFixed(5)}`, "success");
+          return;
+        }
+      }
+
+      // 2. Jika bukan angka koordinat, cari nama tempat via Nominatim OpenStreetMap
+      resultsBox.innerHTML = `<div class="p-2 text-slate-500">Mencari lokasi...</div>`;
+      resultsBox.classList.remove("hidden");
+
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=6&addressdetails=1`;
+        const res = await fetch(url, { headers: { "Accept-Language": "id,en" } });
+        if (!res.ok) throw new Error("Gagal menghubungi layanan pencarian peta.");
+        const items = await res.json();
+
+        if (!items.length) {
+          resultsBox.innerHTML = `<div class="p-2 text-slate-500">Lokasi tidak ditemukan. Coba kata kunci atau koordinat lain.</div>`;
+          return;
+        }
+
+        resultsBox.innerHTML = "";
+        items.forEach((item) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "w-full text-left px-2.5 py-2 hover:bg-slate-100 transition flex flex-col";
+          btn.innerHTML = `
+            <span class="font-medium text-slate-800 line-clamp-1">${item.name || item.display_name.split(",")[0]}</span>
+            <span class="text-[11px] text-slate-500 line-clamp-1">${item.display_name}</span>
+          `;
+          btn.addEventListener("click", () => {
+            const lat = parseFloat(item.lat);
+            const lng = parseFloat(item.lon);
+            resultsBox.classList.add("hidden");
+            state.map.flyTo([lat, lng], 15, { duration: 1.0 });
+            createPointGeometry(lat, lng);
+          });
+          resultsBox.appendChild(btn);
+        });
+      } catch (err) {
+        resultsBox.innerHTML = `<div class="p-2 text-red-600">${err.message}</div>`;
+      }
+    }
+
+    function getActiveApiKey() {
+      return (state.customApiKey && state.customApiKey.trim()) || EMBEDDED_API_KEY.trim();
+    }
+
+    function getSelectedModelId() {
+      return state.modelMode === "advanced" ? state.advancedModelId : state.defaultModelId;
+    }
+
+    function buildGeospatialPrompt() {
+      const topicKey = document.getElementById("topicSelect").value;
+      const topicObj = TOPIC_PROMPTS[topicKey] || TOPIC_PROMPTS.ikhtisar;
+      const userQuestion = document.getElementById("questionInput").value.trim();
+      const wantGeoJson = document.getElementById("chkGeojsonResp").checked;
+
+      const spatialStatement = {
+        spatial_type: state.spatialData.type,
+        center_coordinates: state.spatialData.center,
+        ...(state.spatialData.radius_meters ? { radius_meters: state.spatialData.radius_meters } : {}),
+        ...(state.spatialData.area_hectares ? { area_hectares: state.spatialData.area_hectares, area_sqkm: state.spatialData.area_sqkm } : {}),
+        ...(state.spatialData.bbox ? { bounding_box: state.spatialData.bbox } : {}),
+        ...(state.spatialData.vertices ? { polygon_vertices: state.spatialData.vertices } : {})
+      };
+
+      let prompt = `Anda adalah analis Sistem Informasi Geografis (GIS) dan geosains. Lakukan analisis mendalam dalam Bahasa Indonesia berdasarkan data referensi spasial berikut:\n\n`;
+      prompt += `### 1. DATA GEOMETRI REFERENSI\n\`\`\`json\n${JSON.stringify(spatialStatement, null, 2)}\n\`\`\`\n\n`;
+
+      if (state.localContext.displayName) {
+        prompt += `### 2. KONTEKS ADMINISTRATIF (REVERSE GEOCODING)\n- Lokasi Terdeteksi: ${state.localContext.displayName}\n`;
+        if (state.localContext.address) {
+          prompt += `- Detail Wilayah: ${JSON.stringify(state.localContext.address)}\n`;
+        }
+        prompt += `\n`;
+      }
+
+      if (state.localContext.nearbyFeatures.length > 0) {
+        prompt += `### 3. OBJEK TERDETEKSI DI SEKITAR LOKASI (REFERENSI OSM)\n`;
+        state.localContext.nearbyFeatures.forEach((f) => {
+          prompt += `- ${f.name} (${f.category}): [${f.lat}, ${f.lng}]\n`;
+        });
+        prompt += `\n`;
+      }
+
+      prompt += `### 4. TOPIK ANALISIS: ${topicObj.label.toUpperCase()}\n`;
+      prompt += `Instruksi Topik: ${topicObj.instruction}\n\n`;
+
+      if (userQuestion) {
+        prompt += `### 5. PERTANYAAN / FOKUS KHUSUS PENGGUNA\n"${userQuestion}"\n\n`;
+      }
+
+      prompt += `### 6. FORMAT LAPORAN\n`;
+      prompt += `- Susun analisis secara terstruktur menggunakan subjudul Markdown, poin-poin teknis yang jelas, dan tabel jika relevan.\n`;
+      prompt += `- Sebutkan nama tempat, formasi, jalan, sungai, atau batas administratif nyata di sekitar koordinat tersebut.\n`;
+
+      if (wantGeoJson) {
+        prompt += `\n### 7. INSTRUKSI WAJIB OUTPUT GEOJSON\n`;
+        prompt += `Di bagian paling akhir respons Anda, sertakan blok kode \`\`\`geojson ... \`\`\` yang berisi objek GeoJSON valid bertipe "FeatureCollection".\n`;
+        prompt += `- Isi dengan 3 hingga 10 titik/objek relevan terkait topik "${topicObj.label}" di sekitar koordinat (${state.spatialData.center.lat}, ${state.spatialData.center.lng}).\n`;
+        prompt += `- Setiap Feature wajib memiliki "geometry" {"type": "Point", "coordinates": [longitude, latitude]} (perhatikan urutan GeoJSON: [lng, lat]) dan "properties" minimal berisi {"name": "Nama Tempat/Objek", "category": "Kategori", "description": "Keterangan singkat"}.\n`;
+        prompt += `- Pastikan blok \`\`\`geojson ditutup dengan benar dan JSON di dalamnya valid tanpa komentar.`;
+      }
+
+      return prompt;
+    }
+
+    async function callGeminiWithFallback(promptText) {
+      const apiKey = getActiveApiKey();
+      const useSearch = document.getElementById("chkSearchRef").checked;
+      const useMaps = document.getElementById("chkMapsRef").checked;
+      const primaryModel = getSelectedModelId();
+
+      // Daftar kandidat model (jika autoFallback aktif dan model 3.5/3.8 belum tersedia di endpoint kunci pengguna)
+      const fallbackMap = {
+        "gemini-3.5-flash-lite": "gemini-2.5-flash-lite",
+        "gemini-3.8-flash": "gemini-2.5-flash"
+      };
+
+      const candidateModels = [primaryModel];
+      if (state.autoFallbackModel && fallbackMap[primaryModel]) {
+        candidateModels.push(fallbackMap[primaryModel]);
+      }
+
+      // Bangun konfigurasi Grounding Tools
+      const tools = [];
+      if (useSearch) tools.push({ google_search: {} });
+      if (useMaps) tools.push({ google_maps: {} });
+
+      let lastError = null;
+
+      for (let i = 0; i < candidateModels.length; i++) {
+        const modelId = candidateModels[i];
+
+        // Percobaan 1: Dengan konfigurasi Grounding penuh sesuai pilihan pengguna
+        // Percobaan 2 (jika API menolak kombinasi google_maps pada tier kunci tertentu): Fallback dengan google_search saja
+        const toolAttempts = [];
+        if (tools.length > 0) {
+          toolAttempts.push({
+            tools,
+            toolConfig: useMaps
+              ? {
+                  retrievalConfig: {
+                    latLng: {
+                      latitude: state.spatialData.center.lat,
+                      longitude: state.spatialData.center.lng
+                    }
+                  }
+                }
+              : undefined
+          });
+          if (useMaps && useSearch) {
+            toolAttempts.push({ tools: [{ google_search: {} }] });
+          }
+        }
+        toolAttempts.push({}); // Tanpa tool jika grounding tidak didukung oleh model/key
+
+        for (const attemptConfig of toolAttempts) {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+          const payload = {
+            contents: [{ role: "user", parts: [{ text: promptText }] }],
+            generationConfig: {
+              temperature: 0.35
+            },
+            ...attemptConfig
+          };
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            return { data, usedModel: modelId };
+          }
+
+          const errJson = await response.json().catch(() => ({}));
+          const errMsg = errJson?.error?.message || `HTTP ${response.status}`;
+          lastError = new Error(`[${modelId}] ${errMsg}`);
+
+          // Jika 404 (Model not found), lanjut ke model fallback berikutnya
+          if (response.status === 404) {
+            break;
+          }
+
+          // Jika 400 karena tool grounding tidak didukung, coba attemptConfig berikutnya
+          if (response.status === 400 && Object.keys(attemptConfig).length > 0) {
+            continue;
+          }
+
+          // Error autentikasi / kuota langsung lempar
+          if (response.status === 401 || response.status === 403 || response.status === 429) {
+            throw lastError;
+          }
+        }
+      }
+
+      throw lastError || new Error("Gagal memperoleh respons dari Gemini API.");
+    }
+
+    function extractGeoJsonAndCleanMarkdown(rawText) {
+      let cleanedMarkdown = rawText;
+      let extractedGeoJson = null;
+
+      // Cari blok ```geojson ... ``` atau ```json ... ``` yang memuat FeatureCollection
+      const geojsonRegex = /```(?:geojson|json)\s*([\s\S]*?)```/gi;
+      let match;
+
+      while ((match = geojsonRegex.exec(rawText)) !== null) {
+        const candidateStr = match[1].trim();
+        try {
+          const parsed = JSON.parse(candidateStr);
+          if (
+            parsed &&
+            (parsed.type === "FeatureCollection" || parsed.type === "Feature")
+          ) {
+            extractedGeoJson =
+              parsed.type === "Feature"
+                ? { type: "FeatureCollection", features: [parsed] }
+                : parsed;
+            // Hapus blok kode GeoJSON mentah dari tampilan artikel agar laporan tetap bersih
+            cleanedMarkdown = cleanedMarkdown.replace(match[0], "").trim();
+            break;
+          }
+        } catch (_) {
+          // Lanjutkan jika blok JSON bukan GeoJSON valid
+        }
+      }
+
+      return { cleanedMarkdown, extractedGeoJson };
+    }
+
+    function renderAiGeoJsonOnMap(geojsonObj) {
+      state.aiGeoJsonLayerGroup.clearLayers();
+      const controlBadge = document.getElementById("aiLayerControl");
+      const countSpan = document.getElementById("aiFeatureCount");
+      const downloadBtn = document.getElementById("btnDownloadAiGeojson");
+
+      if (!geojsonObj || !Array.isArray(geojsonObj.features) || geojsonObj.features.length === 0) {
+        controlBadge.classList.add("hidden");
+        downloadBtn.classList.add("hidden");
+        return;
+      }
+
+      let validCount = 0;
+
+      const geoJsonLayer = L.geoJSON(geojsonObj, {
+        pointToLayer: (feature, latlng) => {
+          validCount++;
+          return L.circleMarker(latlng, {
+            radius: 7,
+            fillColor: "#e11d48",
+            color: "#ffffff",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+          });
+        },
+        style: () => ({
+          color: "#e11d48",
+          weight: 2,
+          fillColor: "#f43f5e",
+          fillOpacity: 0.25
+        }),
+        onEachFeature: (feature, layer) => {
+          if (feature.geometry && feature.geometry.type !== "Point") {
+            validCount++;
+          }
+          const props = feature.properties || {};
+          const title = props.name || props.title || props.nama || "Titik Objek AI";
+          const category = props.category || props.kategori || props.type || "";
+          const desc = props.description || props.deskripsi || props.info || "";
+
+          let popupHtml = `<div class="text-xs space-y-1">`;
+          popupHtml += `<div class="font-bold text-slate-900">${DOMPurify.sanitize(title)}</div>`;
+          if (category) {
+            popupHtml += `<div class="inline-block bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded text-[10px] font-mono">${DOMPurify.sanitize(category)}</div>`;
+          }
+          if (desc) {
+            popupHtml += `<p class="text-slate-600 m-0">${DOMPurify.sanitize(desc)}</p>`;
+          }
+          if (feature.geometry?.type === "Point" && Array.isArray(feature.geometry.coordinates)) {
+            const [lon, lat] = feature.geometry.coordinates;
+            popupHtml += `<div class="text-[10px] font-mono text-slate-400 pt-1">${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}</div>`;
+          }
+          popupHtml += `</div>`;
+          layer.bindPopup(popupHtml);
+        }
+      });
+
+      geoJsonLayer.addTo(state.aiGeoJsonLayerGroup);
+
+      if (validCount > 0) {
+        countSpan.textContent = String(validCount);
+        controlBadge.classList.remove("hidden");
+        downloadBtn.classList.remove("hidden");
+      } else {
+        controlBadge.classList.add("hidden");
+        downloadBtn.classList.add("hidden");
+      }
+    }
+
+    function renderGroundingSources(candidate) {
+      const box = document.getElementById("groundingSourcesBox");
+      const list = document.getElementById("groundingSourcesList");
+      list.innerHTML = "";
+
+      const chunks = candidate?.groundingMetadata?.groundingChunks || [];
+      const links = [];
+
+      chunks.forEach((chunk) => {
+        if (chunk.web && chunk.web.uri) {
+          links.push({
+            title: chunk.web.title || chunk.web.uri,
+            uri: chunk.web.uri,
+            sourceType: "Web"
+          });
+        } else if (chunk.maps && chunk.maps.uri) {
+          links.push({
+            title: chunk.maps.title || "Google Maps",
+            uri: chunk.maps.uri,
+            sourceType: "Maps"
+          });
+        }
+      });
+
+      if (links.length === 0) {
+        box.classList.add("hidden");
+        return;
+      }
+
+      links.forEach((item) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span class="text-[10px] font-mono bg-slate-200 text-slate-700 px-1 rounded mr-1">${item.sourceType}</span> <a href="${encodeURI(item.uri)}" target="_blank" rel="noopener noreferrer" class="text-blue-700 hover:underline break-all">${DOMPurify.sanitize(item.title)}</a>`;
+        list.appendChild(li);
+      });
+
+      box.classList.remove("hidden");
+    }
+
+    async function executeAiAnalysis() {
+      if (!state.spatialData) {
+        showToast("Tandai titik, lingkaran, atau poligon di peta terlebih dahulu.", "warn");
+        return;
+      }
+
+      const apiKey = getActiveApiKey();
+      if (!apiKey) {
+        showToast("Masukkan Gemini API Key terlebih dahulu pada Pengaturan API.", "warn");
+        document.getElementById("apiModal").classList.remove("hidden");
+        return;
+      }
+
+      const btnAnalyze = document.getElementById("btnAnalyze");
+      const spinner = document.getElementById("analyzeSpinner");
+      const btnText = document.getElementById("analyzeBtnText");
+      const statusBanner = document.getElementById("analysisStatusBanner");
+      const emptyState = document.getElementById("aiEmptyState");
+      const markdownOutput = document.getElementById("aiMarkdownOutput");
+      const exportToolbar = document.getElementById("exportToolbar");
+
+      btnAnalyze.disabled = true;
+      spinner.classList.remove("hidden");
+      btnText.textContent = "Menganalisis Geospasial...";
+      statusBanner.classList.remove("hidden");
+      statusBanner.textContent = `Mengirim kueri spasial ke ${getSelectedModelId()}...`;
+
+      try {
+        const promptText = buildGeospatialPrompt();
+        const { data, usedModel } = await callGeminiWithFallback(promptText);
+
+        const candidate = data?.candidates?.[0];
+        const rawText =
+          candidate?.content?.parts?.map((p) => p.text || "").join("\n") || "";
+
+        if (!rawText) {
+          throw new Error("Respons AI kosong atau diblokir oleh filter keamanan.");
+        }
+
+        const { cleanedMarkdown, extractedGeoJson } = extractGeoJsonAndCleanMarkdown(rawText);
+
+        state.lastMarkdownResult = cleanedMarkdown;
+        state.lastPlainTextResult = cleanedMarkdown
+          .replace(/[#*_`~>-]/g, "")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+        state.lastAiGeoJson = extractedGeoJson;
+
+        // Render Markdown dengan aman
+        const rawHtml = marked.parse(cleanedMarkdown);
+        markdownOutput.innerHTML = DOMPurify.sanitize(rawHtml);
+        emptyState.classList.add("hidden");
+        markdownOutput.classList.remove("hidden");
+        exportToolbar.classList.remove("hidden");
+        exportToolbar.classList.add("flex");
+
+        // Render Grounding Chunks jika tersedia
+        renderGroundingSources(candidate);
+
+        // Render GeoJSON pada peta jika tersedia
+        if (extractedGeoJson) {
+          renderAiGeoJsonOnMap(extractedGeoJson);
+        } else {
+          state.aiGeoJsonLayerGroup.clearLayers();
+          document.getElementById("aiLayerControl").classList.add("hidden");
+          document.getElementById("btnDownloadAiGeojson").classList.add("hidden");
+        }
+
+        const topicKey = document.getElementById("topicSelect").value;
+        const topicLabel = TOPIC_PROMPTS[topicKey]?.label || topicKey;
+        statusBanner.textContent = `Selesai | Model: ${usedModel} | Topik: ${topicLabel}`;
+
+        // Simpan ke Riwayat Sesi
+        saveToSessionHistory({
+          timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+          topic: topicLabel,
+          model: usedModel,
+          spatialData: JSON.parse(JSON.stringify(state.spatialData)),
+          markdown: cleanedMarkdown,
+          plainText: state.lastPlainTextResult,
+          aiGeoJson: extractedGeoJson
+        });
+
+        showToast("Analisis geospasial selesai.", "success");
+      } catch (err) {
+        statusBanner.textContent = `Gagal: ${err.message}`;
+        showToast(err.message, "error");
+      } finally {
+        btnAnalyze.disabled = false;
+        spinner.classList.add("hidden");
+        btnText.textContent = "Analisis Geospasial dengan AI";
+      }
+    }
+
+    function saveToSessionHistory(entry) {
+      state.sessionHistory.unshift(entry);
+      document.getElementById("historyCountBadge").textContent = String(state.sessionHistory.length);
+      renderSessionHistoryList();
+    }
+
+    function renderSessionHistoryList() {
+      const container = document.getElementById("historyListContainer");
+      if (state.sessionHistory.length === 0) {
+        container.innerHTML = `<div class="text-slate-400 text-center py-6">Belum ada riwayat analisis pada sesi ini.</div>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      state.sessionHistory.forEach((item, idx) => {
+        const div = document.createElement("div");
+        div.className = "py-2.5 px-2 hover:bg-slate-50 flex items-center justify-between gap-2";
+        div.innerHTML = `
+          <div>
+            <div class="font-semibold text-slate-800">${DOMPurify.sanitize(item.topic)}</div>
+            <div class="text-[11px] font-mono text-slate-500">
+              ${item.timestamp} | ${item.spatialData.label} (${item.spatialData.center.lat}, ${item.spatialData.center.lng}) | ${item.model}
+            </div>
+          </div>
+          <button type="button" class="text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded shrink-0">
+            Muat
+          </button>
+        `;
+        div.querySelector("button").addEventListener("click", () => {
+          loadHistoryEntry(idx);
+          document.getElementById("historyModal").classList.add("hidden");
+        });
+        container.appendChild(div);
+      });
+    }
+
+    function loadHistoryEntry(index) {
+      const item = state.sessionHistory[index];
+      if (!item) return;
+
+      // Kembalikan geometri ke peta
+      const sd = item.spatialData;
+      if (sd.type === "point") {
+        createPointGeometry(sd.center.lat, sd.center.lng);
+      } else if (sd.type === "circle") {
+        createCircleGeometry(sd.center.lat, sd.center.lng, sd.radius_meters);
+      } else if (sd.type === "polygon" && Array.isArray(sd.vertices)) {
+        state.tempPolygonPoints = sd.vertices.map((v) => [v.lat, v.lng]);
+        finishPolygonGeometry();
+      }
+      state.map.flyTo([sd.center.lat, sd.center.lng], 14, { duration: 0.8 });
+
+      // Kembalikan teks & GeoJSON AI
+      state.lastMarkdownResult = item.markdown;
+      state.lastPlainTextResult = item.plainText;
+      state.lastAiGeoJson = item.aiGeoJson;
+
+      const markdownOutput = document.getElementById("aiMarkdownOutput");
+      markdownOutput.innerHTML = DOMPurify.sanitize(marked.parse(item.markdown));
+      document.getElementById("aiEmptyState").classList.add("hidden");
+      markdownOutput.classList.remove("hidden");
+
+      const exportToolbar = document.getElementById("exportToolbar");
+      exportToolbar.classList.remove("hidden");
+      exportToolbar.classList.add("flex");
+
+      if (item.aiGeoJson) {
+        renderAiGeoJsonOnMap(item.aiGeoJson);
+      }
+    }
+
+    function downloadFile(content, filename, mimeType) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function copyTextToClipboard(text, label = "Teks") {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand("copy");
+        showToast(`${label} berhasil disalin ke clipboard.`, "success");
+      } catch (_) {
+        showToast(`Gagal menyalin ${label}.`, "error");
+      }
+      document.body.removeChild(textarea);
+    }
+
+    function updateApiStatusIndicator() {
+      const dot = document.getElementById("apiStatusDot");
+      const activeKey = getActiveApiKey();
+      if (activeKey) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-500";
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-amber-500";
+      }
+      document.getElementById("activeModelIndicator").textContent = getSelectedModelId();
+    }
+
+    function bindEvents() {
+      // Basemap Switcher
+      document.getElementById("basemapSelect").addEventListener("change", (e) => {
+        const key = e.target.value;
+        Object.values(state.basemaps).forEach((layer) => {
+          if (state.map.hasLayer(layer)) state.map.removeLayer(layer);
+        });
+        if (state.basemaps[key]) {
+          state.basemaps[key].addTo(state.map);
+        }
+      });
+
+      // Search Form
+      document.getElementById("searchForm").addEventListener("submit", handleLocationSearch);
+
+      // Tutup dropdown pencarian jika klik di luar
+      document.addEventListener("click", (e) => {
+        const searchForm = document.getElementById("searchForm");
+        const resultsBox = document.getElementById("searchResults");
+        if (!searchForm.contains(e.target) && !resultsBox.contains(e.target)) {
+          resultsBox.classList.add("hidden");
+        }
+      });
+
+      // Tombol Alat Gambar (Titik, Lingkaran, Poligon)
+      document.querySelectorAll(".draw-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const targetMode = btn.dataset.draw;
+          setDrawMode(state.drawMode === targetMode ? null : targetMode);
+        });
+      });
+
+      document.getElementById("btnFinishPolygon").addEventListener("click", finishPolygonGeometry);
+      document.getElementById("btnCancelDraw").addEventListener("click", () => setDrawMode(null));
+
+      // Bersihkan Penanda Geometri
+      document.getElementById("btnClearGeometry").addEventListener("click", () => {
+        setDrawMode(null);
+        state.drawnLayerGroup.clearLayers();
+        state.spatialData = null;
+        state.localContext = { address: null, displayName: null, nearbyFeatures: [] };
+        document.getElementById("circleRadiusControl").classList.add("hidden");
+        updateSpatialUI();
+      });
+
+      // Pengaturan Radius Lingkaran (Slider & Number Input)
+      const radiusSlider = document.getElementById("circleRadiusSlider");
+      const radiusInput = document.getElementById("circleRadiusInput");
+
+      const updateCircleRadius = (newRadius) => {
+        const r = Math.max(10, Number(newRadius) || 1000);
+        radiusSlider.value = String(Math.min(25000, r));
+        radiusInput.value = String(r);
+        if (state.spatialData && state.spatialData.type === "circle") {
+          createCircleGeometry(state.spatialData.center.lat, state.spatialData.center.lng, r);
+        }
+      };
+
+      radiusSlider.addEventListener("input", (e) => updateCircleRadius(e.target.value));
+      radiusInput.addEventListener("change", (e) => updateCircleRadius(e.target.value));
+
+      // Lokasi Saya (HTML5 Geolocation)
+      document.getElementById("btnMyLocation").addEventListener("click", () => {
+        if (!navigator.geolocation) {
+          showToast("Geolokasi tidak didukung oleh browser ini.", "error");
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude } = pos.coords;
+            state.map.flyTo([latitude, longitude], 15, { duration: 1.0 });
+            createPointGeometry(latitude, longitude);
+            showToast("Lokasi saat ini berhasil ditandai.", "success");
+          },
+          () => {
+            showToast("Gagal mendapatkan akses lokasi perangkat.", "warn");
+          }
+        );
+      });
+
+      // Toggle Tampilan JSON Spasial
+      document.getElementById("btnToggleJsonView").addEventListener("click", () => {
+        const box = document.getElementById("spatialJsonContainer");
+        box.classList.toggle("hidden");
+      });
+
+      // Salin & Unduh JSON Spasial Referensi
+      document.getElementById("btnCopySpatialJson").addEventListener("click", () => {
+        const text = document.getElementById("spatialJsonOutput").textContent;
+        copyTextToClipboard(text, "Pernyataan JSON Spasial");
+      });
+
+      document.getElementById("btnDownloadRefGeojson").addEventListener("click", () => {
+        if (!state.spatialData?.geojson) return;
+        const fc = {
+          type: "FeatureCollection",
+          features: [state.spatialData.geojson]
+        };
+        downloadFile(JSON.stringify(fc, null, 2), `referensi-spasial-${Date.now()}.geojson`, "application/geo+json");
+      });
+
+      // Pemilih Mode Model (Default vs Advanced)
+      document.querySelectorAll(".model-mode-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.modelMode = btn.dataset.modelMode;
+          document.querySelectorAll(".model-mode-btn").forEach((b) => {
+            if (b.dataset.modelMode === state.modelMode) {
+              b.classList.add("bg-white", "shadow-sm", "text-slate-900");
+              b.classList.remove("text-slate-600");
+            } else {
+              b.classList.remove("bg-white", "shadow-sm", "text-slate-900");
+              b.classList.add("text-slate-600");
+            }
+          });
+          updateApiStatusIndicator();
+        });
+      });
+
+      // Tombol Analisis AI
+      document.getElementById("btnAnalyze").addEventListener("click", executeAiAnalysis);
+
+      // Ekspor Hasil AI (Salin, Simpan .md, Simpan .txt, Unduh GeoJSON)
+      document.getElementById("btnCopyOutput").addEventListener("click", () => {
+        if (state.lastMarkdownResult) copyTextToClipboard(state.lastMarkdownResult, "Hasil analisis");
+      });
+
+      document.getElementById("btnSaveMd").addEventListener("click", () => {
+        if (!state.lastMarkdownResult) return;
+        const topic = document.getElementById("topicSelect").value;
+        downloadFile(state.lastMarkdownResult, `aigis-${topic}-${Date.now()}.md`, "text/markdown;charset=utf-8");
+      });
+
+      document.getElementById("btnSaveTxt").addEventListener("click", () => {
+        if (!state.lastPlainTextResult) return;
+        const topic = document.getElementById("topicSelect").value;
+        downloadFile(state.lastPlainTextResult, `aigis-${topic}-${Date.now()}.txt`, "text/plain;charset=utf-8");
+      });
+
+      document.getElementById("btnDownloadAiGeojson").addEventListener("click", () => {
+        if (!state.lastAiGeoJson) return;
+        const topic = document.getElementById("topicSelect").value;
+        downloadFile(JSON.stringify(state.lastAiGeoJson, null, 2), `aigis-layer-${topic}-${Date.now()}.geojson`, "application/geo+json");
+      });
+
+      // Kontrol Layer GeoJSON AI di Peta
+      document.getElementById("btnZoomAiLayer").addEventListener("click", () => {
+        const bounds = state.aiGeoJsonLayerGroup.getBounds();
+        if (bounds.isValid()) {
+          state.map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+        }
+      });
+
+      document.getElementById("btnClearAiLayer").addEventListener("click", () => {
+        state.aiGeoJsonLayerGroup.clearLayers();
+        document.getElementById("aiLayerControl").classList.add("hidden");
+      });
+
+      // Modal Pengaturan API
+      const apiModal = document.getElementById("apiModal");
+      document.getElementById("btnToggleApiModal").addEventListener("click", () => {
+        document.getElementById("apiKeyInput").value = state.customApiKey;
+        document.getElementById("defaultModelInput").value = state.defaultModelId;
+        document.getElementById("advancedModelInput").value = state.advancedModelId;
+        document.getElementById("chkAutoFallbackModel").checked = state.autoFallbackModel;
+        apiModal.classList.remove("hidden");
+      });
+
+      document.getElementById("btnCloseApiModal").addEventListener("click", () => {
+        apiModal.classList.add("hidden");
+      });
+
+      document.getElementById("btnSaveApiSettings").addEventListener("click", () => {
+        state.customApiKey = document.getElementById("apiKeyInput").value.trim();
+        state.defaultModelId = document.getElementById("defaultModelInput").value.trim() || "gemini-3.5-flash-lite";
+        state.advancedModelId = document.getElementById("advancedModelInput").value.trim() || "gemini-3.8-flash";
+        state.autoFallbackModel = document.getElementById("chkAutoFallbackModel").checked;
+
+        localStorage.setItem("aigis_api_key", state.customApiKey);
+        localStorage.setItem("aigis_default_model", state.defaultModelId);
+        localStorage.setItem("aigis_advanced_model", state.advancedModelId);
+        localStorage.setItem("aigis_auto_fallback", String(state.autoFallbackModel));
+
+        updateApiStatusIndicator();
+        apiModal.classList.add("hidden");
+        showToast("Pengaturan API dan model berhasil disimpan.", "success");
+      });
+
+      document.getElementById("btnClearApiKey").addEventListener("click", () => {
+        document.getElementById("apiKeyInput").value = "";
+        document.getElementById("defaultModelInput").value = "gemini-3.5-flash-lite";
+        document.getElementById("advancedModelInput").value = "gemini-3.8-flash";
+        document.getElementById("chkAutoFallbackModel").checked = true;
+      });
+
+      // Modal Riwayat Sesi
+      const historyModal = document.getElementById("historyModal");
+      document.getElementById("btnToggleHistory").addEventListener("click", () => {
+        historyModal.classList.remove("hidden");
+      });
+      document.getElementById("btnCloseHistoryModal").addEventListener("click", () => {
+        historyModal.classList.add("hidden");
+      });
+    }
+
+    // Inisialisasi saat halaman selesai dimuat
+    window.addEventListener("DOMContentLoaded", () => {
+      initMap();
+      bindEvents();
+      updateApiStatusIndicator();
+    });
+  </script>
+</body>
+</html>

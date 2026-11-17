@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="id">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>aiRef</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+		
+		<!-- Libraries for Text Processing -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+		
+		<!-- Libraries for File Reading -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+		
+		<style>
+			body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+			}
+			/* Custom Scrollbar */
+			::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+			}
+			::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+			}
+			::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+			}
+			::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+			}
+			
+			/* Animations */
+			.fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+			}
+			@keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+			}
+			
+			.loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid #ffffff;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+			}
+			
+			.loading-spinner-dark {
+            border: 3px solid #e5e7eb;
+            border-radius: 50%;
+            border-top: 3px solid #4f46e5;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+			}
+			
+			@keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+			}
+			
+			/* Syntax Highlighting overrides for code block */
+			pre.code-block {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+			}
+			code {
+            font-family: 'Courier New', Courier, monospace;
+			}
+			
+			/* Drag and Drop Zone */
+			.drop-zone {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+			}
+			.drop-zone:hover, .drop-zone.dragover {
+            border-color: #4f46e5;
+            background-color: #eef2ff;
+			}
+			
+			/* Custom override for plain text pre */
+			pre.plain-text {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+            border-radius: 0;
+            font-family: 'Inter', sans-serif;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+			}
+		</style>
+	</head>
+	<body class="flex flex-col min-h-screen text-slate-800">
+		
+		<!-- Navbar / Header -->
+		<nav class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="flex justify-between h-16">
+					<div class="flex items-center">
+						<div class="flex-shrink-0 flex items-center gap-2">
+							<div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">A</div>
+							<span class="font-bold text-xl tracking-tight text-indigo-900">aiRef</span>
+						</div>
+					</div>
+					<!-- Desktop Tabs -->
+					<div class="hidden sm:flex sm:space-x-8 h-full items-end overflow-x-auto">
+						<button onclick="switchTab('ref')" id="tab-btn-ref" class="tab-btn border-indigo-500 text-indigo-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+							aiRef
+						</button>
+						<button onclick="switchTab('text')" id="tab-btn-text" class="tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+							aiText
+						</button>
+						<button onclick="switchTab('code')" id="tab-btn-code" class="tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+							aiCode
+						</button>
+						<button onclick="switchTab('file')" id="tab-btn-file" class="tab-btn border-transparent text-emerald-600 hover:text-emerald-700 hover:border-emerald-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+							aiFile
+						</button>
+					</div>
+				</div>
+			</div>
+			<!-- Mobile Tabs (Horizontal Scroll) -->
+			<div class="sm:hidden flex overflow-x-auto border-t border-gray-100 px-2 bg-gray-50">
+				<button onclick="switchTab('ref')" id="mob-tab-btn-ref" class="mob-tab-btn flex-1 py-3 px-4 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600 whitespace-nowrap">aiRef</button>
+				<button onclick="switchTab('text')" id="mob-tab-btn-text" class="mob-tab-btn flex-1 py-3 px-4 text-sm font-medium text-gray-500 border-b-2 border-transparent whitespace-nowrap">aiText</button>
+				<button onclick="switchTab('code')" id="mob-tab-btn-code" class="mob-tab-btn flex-1 py-3 px-4 text-sm font-medium text-gray-500 border-b-2 border-transparent whitespace-nowrap">aiCode</button>
+				<button onclick="switchTab('file')" id="mob-tab-btn-file" class="mob-tab-btn flex-1 py-3 px-4 text-sm font-medium text-emerald-600 border-b-2 border-transparent whitespace-nowrap">aiFile</button>
+			</div>
+		</nav>
+		
+		<!-- Main Content -->
+		<main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-5xl">
+			
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="flex flex-col md:flex-row md:items-center gap-4 flex-grow">
+        <div class="flex items-center gap-2 shrink-0">
+            <div class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+            <span class="text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                ⚡ Mode Advanced
+            </span>
+            <label class="relative inline-flex items-center cursor-pointer ml-2">
+                <input type="checkbox" id="advanced-toggle" class="sr-only peer">
+                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+        </div>
+        <div class="w-full flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-gray-50 focus-within:border-indigo-500 focus-within:bg-white transition">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+            <input type="password" id="custom-api-key" placeholder="Masukkan Custom Gemini API Key Anda (Opsional)..." class="w-full bg-transparent text-xs text-gray-700 outline-none placeholder-gray-400">
+        </div>
+    </div>
+</div>
+
+			
+			<!-- ERROR NOTIFICATION -->
+			<div id="global-error" class="hidden mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+				<strong class="font-bold">Error!</strong>
+				<span class="block sm:inline" id="global-error-text"></span>
+				<span class="absolute top-0 bottom-0 right-0 px-4 py-3" onclick="document.getElementById('global-error').classList.add('hidden')">
+					<svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
+				</span>
+			</div>
+			
+			<!-- TAB 1: REFERENSI (aiRef) -->
+			<div id="tab-ref" class="tab-content fade-in space-y-6">
+				<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+					<h2 class="text-2xl font-bold text-gray-800 mb-4">Ensiklopedia & Referensi Pintar</h2>
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+						<div class="md:col-span-2">
+							<label class="block text-sm font-medium text-gray-700 mb-1">Topik atau Pertanyaan</label>
+							<textarea id="ref-input" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" placeholder="Contoh: 'Teori Relativitas', 'Resep Rendang', 'Sejarah Majapahit'"></textarea>
+						</div>
+						<div class="space-y-4">
+							<div>
+								<label class="block text-sm font-medium text-gray-700 mb-1">Fungsi</label>
+								<select id="ref-function" onchange="toggleRefOptions()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+									<option value="ensiklopedia">Ensiklopedia (Penjelasan)</option>
+									<option value="kamus">Kamus (Definisi)</option>
+									<option value="cara">Cara (Tutorial)</option>
+									<option value="penerjemah">Penerjemah</option>
+									<option value="referensi">Riset (Keyword & Tagar)</option>
+									<option value="brand">Ide Branding</option>
+									<option value="padanan">Padanan Kata</option>
+									<option value="tafsir">Tafsir (Perspektif Agama)</option>
+									<option value="sitasi">Sitasi (Situs & Jurnal)</option>
+									<option value="prompt">AI Prompt</option>
+									<option value="devprompt">Dev AI Prompt</option>		
+									<option value="qcprompt">Dev QA AI Prompt (AntiSlop)</option>										
+									<option value="carakilat">Cara Kilat</option>		
+									<option value="drafkilat">Draft Kilat (Surat & Teks)</option>
+									<option value="komposisi">Komposisi</option>			
+									<option value="timeline">Linimasa</option>									
+									<option value="hiburan">Fakta Unik</option>
+								</select>
+							</div>
+							
+							<div id="ref-lang-container" class="hidden">
+								<label class="block text-sm font-medium text-gray-700 mb-1">Ke Bahasa</label>
+								<select id="ref-target-lang" class="w-full p-2 border border-gray-300 rounded-lg">
+									<option value="Inggris">Inggris</option>
+									<option value="Arab">Arab</option>
+									<option value="Jepang">Jepang</option>
+									<option value="Mandarin">Mandarin</option>
+									<option value="Jerman">Jerman</option>
+									<option value="Prancis">Prancis</option>
+									<option value="Spanyol">Spanyol</option>
+									<option value="Portugis">Portugis</option> 
+									<option value="Korea">Korea</option>
+									<option value="Rusia">Rusia</option>
+									<option value="Hindi">Hindi</option>
+									<option value="Thai">Thai</option>
+									<option value="Vietnam">Vietnam</option>
+									<option value="Tagalog">Tagalog</option>
+									<option value="Indonesia">Indonesia</option>
+								</select>
+							</div>
+							
+							<div id="ref-religion-container" class="hidden">
+								<label class="block text-sm font-medium text-gray-700 mb-1">Perspektif</label>
+								<select id="ref-target-religion" class="w-full p-2 border border-gray-300 rounded-lg">
+									<option value="Islam">Islam</option>
+									<option value="Kristen">Kristen</option>
+									<option value="Katholik">Katholik</option>
+									<option value="Hindu">Hindu</option>
+									<option value="Buddha">Buddha</option>
+									<option value="Khong Hu Chu">Khong Hu Chu</option>                               
+								</select>
+							</div>
+						</div>
+					</div>
+					<button onclick="processRef()" id="btn-ref-proc" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition shadow-md flex justify-center items-center gap-2">
+						<span>Proses Referensi</span>
+						<div class="loading-spinner hidden"></div>
+					</button>
+				</div>
+				
+				<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-h-[200px] flex flex-col">
+					<!-- Header Hasil dengan Toggle dan Tombol Unduh -->
+					<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b pb-3 gap-3">
+						<h3 class="text-lg font-semibold text-gray-700">Hasil:</h3>
+						
+						<div class="flex items-center gap-4">
+							<!-- Toggle Markdown -->
+							<label class="inline-flex items-center cursor-pointer" title="Aktifkan untuk hasil yang diformat dengan Markdown">
+								<input type="checkbox" id="ref-markdown-toggle" class="sr-only peer" checked onchange="toggleRefFormat()">
+								<div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+								<span class="ms-2 text-sm font-medium text-gray-600">Format Markdown</span>
+							</label>
+							
+							<!-- Tombol Download -->
+							<button onclick="downloadRefOutput()" class="flex items-center gap-1.5 text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-1.5 px-3 rounded-lg border border-indigo-200 transition">
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+								</svg>
+								Unduh
+							</button>
+						</div>
+					</div>
+					
+					<div id="ref-output" class="prose max-w-none text-gray-700 leading-relaxed flex-grow">
+						<p class="text-gray-400 italic">Hasil akan muncul di sini...</p>
+					</div>
+				</div>
+			</div>
+			
+			<!-- TAB 2: OLAH TEKS (aiText) -->
+			<div id="tab-text" class="tab-content hidden fade-in space-y-6">
+				<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+					<h2 class="text-2xl font-bold text-gray-800 mb-4">Editor & Manipulasi Teks</h2>
+					<textarea id="text-input" rows="8" class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none mb-4 font-sans text-base" placeholder="Tempelkan artikel, email, atau draf tulisan Anda di sini..."></textarea>
+					
+					<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+						<button onclick="processText('summarize')" class="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-medium py-2 px-4 rounded-lg transition flex justify-center items-center gap-2 btn-text-action">
+							<span>Ringkas</span> <div class="loading-spinner-dark hidden"></div>
+						</button>
+						<button onclick="processText('format')" class="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-medium py-2 px-4 rounded-lg transition flex justify-center items-center gap-2 btn-text-action">
+							<span>Poin-Poin</span> <div class="loading-spinner-dark hidden"></div>
+						</button>
+						<button onclick="processText('spellcheck')" class="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-medium py-2 px-4 rounded-lg transition flex justify-center items-center gap-2 btn-text-action">
+							<span>Cek Ejaan</span> <div class="loading-spinner-dark hidden"></div>
+						</button>
+						<button onclick="processText('continue')" class="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-medium py-2 px-4 rounded-lg transition flex justify-center items-center gap-2 btn-text-action">
+							<span>Lanjutkan</span> <div class="loading-spinner-dark hidden"></div>
+						</button>
+						<button onclick="processText('rewrite')" class="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 font-medium py-2 px-4 rounded-lg transition flex justify-center items-center gap-2 btn-text-action">
+							<span>Tulis Ulang</span> <div class="loading-spinner-dark hidden"></div>
+						</button>
+						<button onclick="processText('tone')" class="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 font-medium py-2 px-4 rounded-lg transition flex justify-center items-center gap-2 btn-text-action">
+							<span>Ubah Nada</span> <div class="loading-spinner-dark hidden"></div>
+							<button onclick="processText('analyze_tone')" class="bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 font-medium py-2 px-4 rounded-lg transition flex justify-center items-center gap-2 btn-text-action">
+								<span>Analisis Nada</span> <div class="loading-spinner-dark hidden"></div>
+							</button>
+							<button onclick="processText('table')" class="bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 font-medium py-2 px-4 rounded-lg transition flex justify-center items-center gap-2 btn-text-action">
+								<span>CSV/Tabel</span> <div class="loading-spinner-dark hidden"></div>
+							</button>
+						</div>
+					</div>
+					
+					<div class="bg-blue-50 rounded-xl shadow-inner border border-blue-100 p-6 min-h-[200px]">
+						<div class="flex justify-between items-center mb-3">
+							<h3 class="text-lg font-semibold text-blue-800">Hasil Teks:</h3>
+							<button onclick="copyToClipboard('text-output')" class="text-xs bg-white border border-blue-200 text-blue-600 px-3 py-1 rounded hover:bg-blue-50">Salin</button>
+						</div>
+						<div id="text-output" class="prose max-w-none text-slate-800 whitespace-pre-wrap">
+							<p class="text-slate-400 italic">Hasil manipulasi teks akan muncul di sini.</p>
+						</div>
+					</div>
+				</div>
+				
+				<!-- TAB 3: KODING (aiCode) -->
+				<div id="tab-code" class="tab-content hidden fade-in space-y-6">
+					<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+						<h2 class="text-2xl font-bold text-gray-800 mb-4">Asisten Koding</h2>
+						<div class="flex flex-col md:flex-row gap-4 mb-4">
+							<div class="w-full md:w-1/4">
+								<label class="block text-sm font-medium text-gray-700 mb-1">Bahasa</label>
+								<select id="code-lang" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-gray-500 focus:border-gray-500 bg-white">
+									<option value="Python">Python</option>
+									<option value="JavaScript">JavaScript</option>
+									<option value="HTML/CSS">HTML & CSS</option>
+									<option value="Java">Java</option>
+									<option value="C++">C++</option>
+									<option value="C#">C#</option>
+									<option value="Go">Go</option>
+									<option value="Ruby">Ruby</option>
+									<option value="Kotlin">Kotlin</option>
+									<option value="Swift">Swift</option>
+									<option value="SQL">SQL</option>
+									<option value="R">R</option>
+									<option value="Rust">Rust</option>                                                                
+									<option value="VBA">VBA</option>
+									<option value="Excel">Excel Formula</option>
+									<option value="Terminal / Command Prompt">Terminal / Command Prompt</option>
+									<option value="General">Umum (Bahasa Lainnya)</option>
+								</select>
+							</div>
+							<div class="w-full md:w-3/4">
+								<label class="block text-sm font-medium text-gray-700 mb-1">Instruksi Kode</label>
+								<textarea id="code-prompt" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-gray-500 focus:border-gray-500 outline-none" placeholder="Contoh: 'Buat fungsi fibonacci', 'Query untuk user aktif'"></textarea>
+							</div>
+						</div>
+						<button onclick="processCode()" id="btn-code-proc" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 px-6 rounded-lg transition shadow-md flex justify-center items-center gap-2">
+							<span>Generate Kode</span>
+							<div class="loading-spinner hidden"></div>
+						</button>
+					</div>
+					
+					<div class="bg-[#1e293b] rounded-xl shadow-lg border border-gray-700 p-6 min-h-[300px] text-gray-300 relative group">
+						<div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+							<button onclick="copyToClipboard('code-output')" class="bg-gray-700 hover:bg-gray-600 text-white text-xs py-1 px-3 rounded border border-gray-600">
+								Copy Code
+							</button>
+						</div>
+						<h3 class="text-sm font-mono text-gray-500 mb-4 border-b border-gray-700 pb-2">TERMINAL OUTPUT</h3>
+						<div id="code-output" class="font-mono text-sm overflow-x-auto">
+							<span class="text-green-400">user@airef:~$</span> Menunggu perintah...
+						</div>
+					</div>
+				</div>
+				
+				<!-- TAB 4: FILE (NEW Feature) -->
+				<div id="tab-file" class="tab-content hidden fade-in space-y-6">
+					<div class="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl shadow-sm border border-emerald-200 p-6">
+						<h2 class="text-2xl font-bold text-gray-800 mb-2">Analisis Dokumen Cerdas</h2>
+						<p class="text-sm text-gray-600 mb-4">Unggah file PDF, Word, Excel, Teks, atau JSON untuk dianalisis AI.</p>
+						
+						<!-- File Input Zone -->
+						<div id="drop-zone" class="drop-zone bg-white p-8 rounded-lg text-center cursor-pointer mb-6">
+							<input type="file" id="file-upload" class="hidden" accept=".txt,.csv,.json,.md,.html,.xml,.pdf,.docx,.xlsx,.xls">
+							<div class="flex flex-col items-center justify-center">
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-emerald-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+								</svg>
+								<p class="text-sm font-medium text-gray-600"><span class="text-emerald-600 font-bold hover:underline">Klik untuk upload</span> atau tarik file ke sini</p>
+								<p class="text-xs text-gray-400 mt-1">Mendukung: PDF, Word, Excel, Teks, JSON, Markdown</p>
+							</div>
+						</div>
+						
+						<!-- File Status & Preview -->
+						<div id="file-status" class="hidden mb-4 p-3 bg-white rounded border border-emerald-100 flex items-center justify-between">
+							<div class="flex items-center gap-2 overflow-hidden">
+								<span class="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-0.5 rounded" id="file-type-badge">FILE</span>
+								<span class="text-sm text-gray-700 truncate font-medium" id="file-name-display">filename.txt</span>
+								<span class="text-xs text-gray-400" id="file-size-display">(0 KB)</span>
+							</div>
+							<button onclick="resetFile()" class="text-red-500 hover:text-red-700 text-xs font-medium">Hapus</button>
+						</div>
+						
+						<div id="file-content-container" class="hidden mb-4">
+							<label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Isi Dokumen (Dapat diedit sebelum diproses):</label>
+							<textarea id="file-extracted-text" rows="6" class="w-full p-3 border border-gray-200 rounded-lg text-sm font-mono text-gray-600 bg-gray-50 focus:ring-emerald-500 focus:border-emerald-500"></textarea>
+						</div>
+						
+						<!-- Action Panel -->
+						<div class="flex flex-col md:flex-row gap-3">
+							<select id="file-action" class="flex-grow p-3 border border-gray-300 rounded-lg bg-white focus:ring-emerald-500 focus:border-emerald-500">
+								<option value="" disabled selected>-- Pilih Tindakan AI --</option>
+								<optgroup label="Analisis Referensi">
+									<option value="summarize">Ringkas Dokumen (Summary)</option>
+									<option value="topics">Analisis Topik Utama & Keyword</option>
+									<option value="explain_terms">Jelaskan Istilah Teknis</option>
+									<option value="analyze_tone">Analisis Sentimen & Nada</option>
+								</optgroup>
+								<optgroup label="Olah Teks & Data">
+									<option value="extract_data">Ekstrak Data ke Tabel/CSV</option>
+									<option value="format_bullet">Format Menjadi Poin-Poin</option>
+									<option value="translate_id">Terjemahkan ke Indonesia</option>
+									<option value="fix_grammar">Perbaiki Tata Bahasa</option>
+								</optgroup>
+								<optgroup label="Interaktif">
+									<option value="qa">Tanya Jawab / Chat dengan Dokumen</option>
+								</optgroup>
+							</select>
+							
+							<div id="file-qa-container" class="hidden flex-grow md:flex-grow-[2]">
+								<input type="text" id="file-qa-input" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" placeholder="Tulis pertanyaan Anda tentang dokumen ini...">
+							</div>
+							
+							<button onclick="processFile()" id="btn-file-proc" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-lg transition shadow-md flex justify-center items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+								<span>Proses</span>
+								<div class="loading-spinner hidden"></div>
+							</button>
+						</div>
+					</div>
+					
+					<!-- Output Area -->
+					<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-h-[200px]">
+						<div class="flex justify-between items-center mb-3">
+							<h3 class="text-lg font-semibold text-emerald-800">Hasil Analisis:</h3>
+							<button onclick="copyToClipboard('file-output')" class="text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded hover:bg-emerald-100">Salin Hasil</button>
+						</div>
+						<div id="file-output" class="prose max-w-none text-gray-700 leading-relaxed">
+							<p class="text-gray-400 italic">Upload file dan pilih tindakan untuk melihat hasil...</p>
+						</div>
+					</div>
+				</div>
+				
+			</main>
+			
+			<footer class="bg-white border-t border-gray-200 mt-auto py-6">
+				<div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+					<p>&copy; 2026. Didukung oleh Gemini AI.</p>
+				</div>
+			</footer>
+			
+			<script type="module">
+				// --- KONFIGURASI API ---
+				const embeddedApiKey = ""; // API Key bawaan untuk mode lokal jika diisi
+				const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+				const apiKeyInput = document.getElementById('custom-api-key');
+
+				// Ambil API Key dari localStorage saat halaman pertama kali dimuat
+				if (localStorage.getItem('gemini_custom_api_key')) {
+					apiKeyInput.value = localStorage.getItem('gemini_custom_api_key');
+				}
+
+				// Simpan API Key otomatis ke localStorage setiap kali pengguna mengetik/mengubah nilainya
+				apiKeyInput.addEventListener('input', (e) => {
+					localStorage.setItem('gemini_custom_api_key', e.target.value.trim());
+				});
+				
+				// Set worker PDF.js secara manual karena single file
+				pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+				
+				// Variable global untuk menyimpan teks mentah dari aiRef
+				window.currentRefRawText = "";
+				
+				// --- GLOBAL UTILITIES ---
+				async function callGemini(prompt, systemInstruction = "") {
+					// Gunakan Custom API Key dari input jika ada, jika kosong gunakan embeddedApiKey
+					const currentApiKey = apiKeyInput.value.trim() || embeddedApiKey;
+					
+					if (!currentApiKey) {
+						showError("API Key tidak ditemukan! Harap masukkan Custom API Key terlebih dahulu pada kolom di bagian atas.");
+						throw new Error("Missing API Key");
+					}
+
+					// Ambil status dari toggle Mode Advanced
+					const isAdvanced = document.getElementById('advanced-toggle').checked;
+					const selectedModel = isAdvanced ? 'gemini-3.8-flash' : 'gemini-3.5-flash-lite';
+					
+					const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${currentApiKey}`;
+					const payload = {
+						contents: [{ role: "user", parts: [{ text: prompt }] }],
+						systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
+					};
+					try {
+						const response = await fetch(url, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify(payload)
+						});
+						
+						if (!response.ok) {
+							const err = await response.json();
+							throw new Error(err.error?.message || "Gagal menghubungi AI");
+						}
+						const data = await response.json();
+						return data.candidates[0].content.parts[0].text;
+						} catch (error) {
+						console.error("API Error:", error);
+						showError(error.message);
+						throw error;
+					}
+				}
+				
+				window.showError = (msg) => {
+					const el = document.getElementById('global-error');
+					document.getElementById('global-error-text').textContent = msg;
+					el.classList.remove('hidden');
+					setTimeout(() => el.classList.add('hidden'), 5000);
+				}
+				
+				window.toggleLoading = (btnId, isLoading) => {
+					const btn = document.getElementById(btnId);
+					const spinner = btn.querySelector('.loading-spinner') || btn.querySelector('.loading-spinner-dark');
+					if (isLoading) {
+						if(spinner) spinner.classList.remove('hidden');
+						btn.disabled = true;
+						btn.classList.add('opacity-70', 'cursor-not-allowed');
+						} else {
+						if(spinner) spinner.classList.add('hidden');
+						btn.disabled = false;
+						btn.classList.remove('opacity-70', 'cursor-not-allowed');
+					}
+				}
+				
+				window.copyToClipboard = (elementId) => {
+					const el = document.getElementById(elementId);
+					const text = el.innerText || el.textContent;
+					
+					// Capture the button element immediately
+					const btn = event.target.closest('button') || event.target; 
+					
+					// Helper to show success feedback
+					const showSuccess = () => {
+						if (!btn) return;
+						const originalText = btn.innerText;
+						btn.innerText = "Disalin!";
+						setTimeout(() => btn.innerText = originalText, 2000);
+					};
+					
+					// Try modern API first, then fallback
+					if (navigator.clipboard && navigator.clipboard.writeText) {
+						navigator.clipboard.writeText(text).then(showSuccess).catch(() => fallbackCopy(text));
+						} else {
+						fallbackCopy(text);
+					}
+					
+					function fallbackCopy(textToCopy) {
+						const textArea = document.createElement("textarea");
+						textArea.value = textToCopy;
+						
+						// Ensure it's not visible but part of DOM
+						textArea.style.position = "fixed";
+						textArea.style.left = "-9999px";
+						textArea.style.top = "0";
+						document.body.appendChild(textArea);
+						
+						textArea.focus();
+						textArea.select();
+						
+						try {
+							const successful = document.execCommand('copy');
+							if (successful) showSuccess();
+							else alert("Gagal menyalin manual.");
+							} catch (err) {
+							alert("Gagal menyalin: " + err);
+						}
+						
+						document.body.removeChild(textArea);
+					}
+				}
+				
+				// --- TAB NAVIGATION ---
+				window.switchTab = (tabId) => {
+					document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+					document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+					
+					// Reset styles
+					document.querySelectorAll('.tab-btn').forEach(btn => {
+						btn.className = "tab-btn border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-1";
+					});
+					document.querySelectorAll('.mob-tab-btn').forEach(btn => {
+						btn.className = "mob-tab-btn flex-1 py-3 px-4 text-sm font-medium text-gray-500 border-b-2 border-transparent whitespace-nowrap";
+					});
+					
+					// Set Active Desktop
+					const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+					activeBtn.classList.remove('border-transparent', 'text-gray-500');
+					if(tabId === 'file') activeBtn.classList.add('border-emerald-500', 'text-emerald-600');
+					else activeBtn.classList.add('border-indigo-500', 'text-indigo-600');
+					
+					// Set Active Mobile
+					const activeMob = document.getElementById(`mob-tab-btn-${tabId}`);
+					activeMob.classList.remove('text-gray-500', 'border-transparent');
+					if(tabId === 'file') activeMob.classList.add('text-emerald-600', 'border-emerald-600');
+					else activeMob.classList.add('text-indigo-600', 'border-indigo-600');
+				}
+				
+				// --- aiRef Logic ---
+				window.toggleRefOptions = () => {
+					const func = document.getElementById('ref-function').value;
+					document.getElementById('ref-lang-container').classList.toggle('hidden', func !== 'penerjemah');
+					document.getElementById('ref-religion-container').classList.toggle('hidden', func !== 'tafsir');
+				}
+				
+				// Fungsi mengatur re-render berdasarkan toggle
+				window.toggleRefFormat = () => {
+					if (!window.currentRefRawText) return; // Jangan lakukan apapun jika teks kosong
+					
+					const isMarkdown = document.getElementById('ref-markdown-toggle').checked;
+					const outputDiv = document.getElementById('ref-output');
+					
+					if (isMarkdown) {
+						outputDiv.innerHTML = marked.parse(window.currentRefRawText);
+						outputDiv.className = "prose max-w-none text-gray-700 leading-relaxed flex-grow"; 
+						} else {
+						// Escape text biasa agar aman dan gunakan pre dengan white-space: pre-wrap
+						const escapedText = window.currentRefRawText.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+						outputDiv.innerHTML = `<pre class="plain-text">${escapedText}</pre>`;
+						outputDiv.className = "max-w-none text-gray-700 leading-relaxed flex-grow"; // Hapus class prose
+					}
+				};
+				
+				// Fungsi unduh output aiRef
+				window.downloadRefOutput = () => {
+					if (!window.currentRefRawText) {
+						return alert("Belum ada hasil untuk diunduh. Silakan proses terlebih dahulu.");
+					}
+					
+					const isMarkdown = document.getElementById('ref-markdown-toggle').checked;
+					const textToSave = window.currentRefRawText;
+					const filename = isMarkdown ? 'aiRef-hasil.md' : 'aiRef-hasil.txt';
+					const blobType = isMarkdown ? 'text/markdown' : 'text/plain';
+					
+					const blob = new Blob([textToSave], { type: blobType });
+					const url = URL.createObjectURL(blob);
+					
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = filename;
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					URL.revokeObjectURL(url);
+				};
+				
+				window.processRef = async () => {
+					const query = document.getElementById('ref-input').value.trim();
+					const func = document.getElementById('ref-function').value;
+					const isMarkdown = document.getElementById('ref-markdown-toggle').checked;
+					
+					if (!query && func !== 'hiburan') return alert("Masukkan topik!");
+					
+					toggleLoading('btn-ref-proc', true);
+					let prompt = "";
+					
+					// Hapus hardcode markdown dari switch case
+					switch (func) {
+						case 'ensiklopedia': prompt = `Jelaskan secara rinci dan komprehensif tentang: ${query}.`; break;
+						case 'kamus': prompt = `Definisi jelas dan ringkas untuk: ${query}.`; break;
+						case 'cara': prompt = `Tutorial lengkap langkah demi langkah untuk melakukan atau membuat hal berikut: ${query}.`; break;
+						case 'penerjemah': 
+						const lang = document.getElementById('ref-target-lang').value;
+						prompt = `Terjemahkan ke bahasa ${lang}: "${query}".`; 
+						break;
+						case 'tafsir': 
+						const relig = document.getElementById('ref-target-religion').value;
+						prompt = `Jelaskan "${query}" dalam perspektif agama ${relig}. Sertakan dalil/referensi berupa kitab suci, hukum, dan pendapat tokoh jika ada.`; 
+						break;
+						case 'referensi': prompt = `Berikan daftar kata kunci (keywords) dan tagar (hashtags) populer untuk riset topik: ${query}.`; break;
+						case 'brand': prompt = `Berikan 10 ide nama branding, slogan catchy, dan konsep strategi branding komprehensif untuk: ${query}.`; break;
+						case 'padanan': prompt = `Sinonim, antonim, akronim, homonim, homofon, dan homograf dari: ${query}.`; break;
+						case 'sitasi': prompt = `Sebutkan beberapa daftar referensi sitasi dari buku, jurnal, dan situs web sebagai referensi tentang: ${query}.`; break;
+						case 'prompt': prompt = `Berikan 10 inspirasi prompt AI yang kuat dan efektif untuk: ${query}.`; break;
+						case 'devprompt': prompt = `Buatkan rencana ikhtisar, tech stack, fitur yang dapat diwujudkan, mekanisme teknisnya, fitur yang akan sulit diwujudkan berikut rekomendasi solusinya, dan rekomendasi fitur tambahan untuk sistem/aplikasi/proyek: ${query}.`; break;		
+						case 'qcprompt': prompt = `Buatlah konsep guardrail yang terdiri atas role dan tugas eksekutor, serta poin-poin aturan dengan tujuan menghasilkan hasil akhir yang berkualitas, anti slop (secara kode, desain, dan copywriting), bersih, dan rapi pada proyek/aplikasi/sistem: ${query}.`; break;
+						case 'carakilat': prompt = `Berikan inspirasi berupa tutorial, rencana, atau resep untuk melakukan atau membuat sesuatu dari hal-hal berikut: ${query}.`; break;
+						case 'drafkilat': prompt = `Berikan draft format surat/naskah/teks ringkas untuk hal/situasi berikut: ${query}.`; break;
+						case 'komposisi': prompt = `Jelaskan perkiraan komposisi/isi/susunan dari ${query} dilengkapi dengan indikator kuantitatif misal kadar, persentase, atau jumlah jika ada.`; break;
+						case 'timeline': prompt = `Jelaskan sejarah/proses/kronologi dari ${query} secara runtut dilengkapi dengan parameter waktu, tanggal, dan lokasi jika ada.`; break;
+						case 'hiburan': prompt = query ? `10 fakta unik tentang ${query}` : "10 fakta unik acak dunia."; break;
+					}
+					
+					// Tambahkan instruksi spesifik ke Gemini berdasarkan status toggle
+					if (isMarkdown) {
+						prompt += " Gunakan format tulisan Markdown yang rapi.";
+						} else {
+						prompt += " Berikan jawaban murni dalam bentuk teks biasa (plain text). Jangan pernah menggunakan format Markdown (seperti bintang/asterisk, pagar, tabel, atau teks tebal/miring).";
+					}
+					
+					try {
+						const text = await callGemini(prompt);
+						window.currentRefRawText = text; // Simpan teks mentah dari AI
+						toggleRefFormat(); // Render berdasarkan posisi toggle
+						} catch (e) { 
+						// Error handled by callGemini
+						} finally { 
+						toggleLoading('btn-ref-proc', false); 
+					}
+				}
+				
+				// --- aiText Logic ---
+				window.processText = async (action) => {
+					const text = document.getElementById('text-input').value.trim();
+					if (!text) return alert("Masukkan teks terlebih dahulu!");
+					const buttons = document.querySelectorAll('.btn-text-action');
+					buttons.forEach(b => { b.disabled = true; b.classList.add('opacity-50'); });
+					
+					let prompt = "";
+					switch (action) {
+						case 'summarize': prompt = `Ringkas teks berikut dalam Bahasa Indonesia yang baik:\n\n${text}`; break;
+						case 'format': prompt = `Ubah teks berikut menjadi format poin-poin (bullet points) agar mudah dibaca:\n\n${text}`; break;
+						case 'spellcheck': prompt = `Perbaiki ejaan (typo) dan tata bahasa teks berikut (Bahasa Indonesia):\n\n${text}`; break;
+						case 'continue': prompt = `Lanjutkan penulisan teks berikut ini (tambahkan 2 paragraf relevan):\n\n${text}`; break;
+						case 'rewrite': prompt = `Tulis ulang teks berikut dengan kalimat yang berbeda namun makna sama:\n\n${text}`; break;
+						case 'tone': prompt = `Ubah nada teks berikut dengan 3 pilihan yaitu Profesional, Ramah, dan Gaul:\n\n${text}`; break;
+						case 'analyze_tone': prompt = `Analisis nada (tone) dan sentimen dari tulisan ini. Apakah positif, negatif, formal, atau santai? Berikan buktinya:\n\n${text}`; break;
+						case 'table': prompt = `Ubah data dalam teks berikut menjadi format CSV (Comma Separated Values) dengan header:\n\n${text}`; break;
+					}
+					
+					try {
+						const res = await callGemini(prompt);
+						document.getElementById('text-output').textContent = res;
+						} catch (e) {
+						document.getElementById('text-output').textContent = "Gagal memproses.";
+						} finally {
+						buttons.forEach(b => { b.disabled = false; b.classList.remove('opacity-50'); });
+					}
+				}
+				
+				// --- aiCode Logic ---
+				window.processCode = async () => {
+					const lang = document.getElementById('code-lang').value;
+					const query = document.getElementById('code-prompt').value.trim();
+					if (!query) return alert("Masukkan instruksi kode!");
+					toggleLoading('btn-code-proc', true);
+					const prompt = `Anda adalah ahli coding senior. Bahasa: ${lang}. Tugas: ${query}. Berikan HANYA kode valid dan komentar penjelasan.`;
+					try {
+						let res = await callGemini(prompt);
+						res = res.replace(/```\w*\n/g, "").replace(/```/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+						document.getElementById('code-output').innerHTML = `<pre class="code-block"><code>${res}</code></pre>`;
+					} catch (e) { } finally { toggleLoading('btn-code-proc', false); }
+				}
+				
+				// --- aiFile Logic (NEW) ---
+				const dropZone = document.getElementById('drop-zone');
+				const fileInput = document.getElementById('file-upload');
+				const qaInput = document.getElementById('file-qa-container');
+				const fileAction = document.getElementById('file-action');
+				
+				dropZone.addEventListener('click', () => fileInput.click());
+				dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+				dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+				dropZone.addEventListener('drop', (e) => {
+					e.preventDefault();
+					dropZone.classList.remove('dragover');
+					handleFile(e.dataTransfer.files[0]);
+				});
+				fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+				
+				fileAction.addEventListener('change', (e) => {
+					if(e.target.value === 'qa') {
+						qaInput.classList.remove('hidden');
+						qaInput.classList.add('block');
+						} else {
+						qaInput.classList.add('hidden');
+						qaInput.classList.remove('block');
+					}
+				});
+				
+				async function handleFile(file) {
+					if (!file) return;
+					
+					document.getElementById('drop-zone').classList.add('hidden');
+					document.getElementById('file-status').classList.remove('hidden');
+					document.getElementById('file-status').classList.add('flex');
+					document.getElementById('file-name-display').textContent = file.name;
+					document.getElementById('file-size-display').textContent = `(${Math.ceil(file.size/1024)} KB)`;
+					
+					const ext = file.name.split('.').pop().toLowerCase();
+					document.getElementById('file-type-badge').textContent = ext.toUpperCase();
+					
+					let text = "";
+					try {
+						if (ext === 'pdf') text = await readPdf(file);
+						else if (ext === 'docx') text = await readDocx(file);
+						else if (['xlsx', 'xls', 'csv'].includes(ext)) text = await readExcel(file);
+						else text = await readText(file); // txt, md, json, html
+						
+						document.getElementById('file-extracted-text').value = text;
+						document.getElementById('file-content-container').classList.remove('hidden');
+						document.getElementById('btn-file-proc').disabled = false;
+						} catch (error) {
+						showError("Gagal membaca file: " + error.message);
+						resetFile();
+					}
+				}
+				
+				window.resetFile = () => {
+					document.getElementById('drop-zone').classList.remove('hidden');
+					document.getElementById('file-status').classList.add('hidden');
+					document.getElementById('file-content-container').classList.add('hidden');
+					document.getElementById('file-extracted-text').value = '';
+					document.getElementById('file-upload').value = '';
+					document.getElementById('btn-file-proc').disabled = true;
+					document.getElementById('file-output').innerHTML = '<p class="text-gray-400 italic">Upload file dan pilih tindakan...</p>';
+				}
+				
+				// File Readers
+				function readText(file) {
+					return new Promise((resolve, reject) => {
+						const reader = new FileReader();
+						reader.onload = (e) => resolve(e.target.result);
+						reader.onerror = reject;
+						reader.readAsText(file);
+					});
+				}
+				
+				async function readPdf(file) {
+					const arrayBuffer = await file.arrayBuffer();
+					const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+					let fullText = "";
+					for (let i = 1; i <= pdf.numPages; i++) {
+						const page = await pdf.getPage(i);
+						const textContent = await page.getTextContent();
+						const pageText = textContent.items.map(item => item.str).join(" ");
+						fullText += `[Halaman ${i}]\n${pageText}\n\n`;
+					}
+					return fullText;
+				}
+				
+				async function readDocx(file) {
+					const arrayBuffer = await file.arrayBuffer();
+					const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+					return result.value;
+				}
+				
+				function readExcel(file) {
+					return new Promise((resolve, reject) => {
+						const reader = new FileReader();
+						reader.onload = (e) => {
+							const data = new Uint8Array(e.target.result);
+							const workbook = XLSX.read(data, { type: 'array' });
+							const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+							const csv = XLSX.utils.sheet_to_csv(firstSheet);
+							resolve(csv);
+						};
+						reader.onerror = reject;
+						reader.readAsArrayBuffer(file);
+					});
+				}
+				
+				window.processFile = async () => {
+					const text = document.getElementById('file-extracted-text').value.trim();
+					const action = document.getElementById('file-action').value;
+					const qaQuery = document.getElementById('file-qa-input').value;
+					
+					if (!text) return alert("Konten file kosong!");
+					if (!action) return alert("Pilih tindakan AI!");
+					if (action === 'qa' && !qaQuery) return alert("Tulis pertanyaan Anda!");
+					
+					toggleLoading('btn-file-proc', true);
+					let prompt = "";
+					
+					const context = `Berikut adalah isi dokumen:\n"""\n${text.substring(0, 30000)}...\n"""\n(Catatan: Teks mungkin terpotong jika terlalu panjang)\n\nTugas: `;
+					
+					switch (action) {
+						case 'summarize': prompt = `${context} Buatkan ringkasan eksekutif yang komprehensif dari dokumen ini dalam Bahasa Indonesia.`; break;
+						case 'topics': prompt = `${context} Identifikasi 5 topik utama dan daftar kata kunci (keywords) penting dari dokumen ini.`; break;
+						case 'explain_terms': prompt = `${context} Cari istilah-istilah teknis atau sulit dalam dokumen ini, lalu jelaskan artinya dalam bahasa yang mudah dimengerti.`; break;
+						case 'analyze_tone': prompt = `${context} Analisis nada (tone) dan sentimen dari tulisan ini. Apakah positif, negatif, formal, atau santai? Berikan buktinya.`; break;
+						case 'extract_data': prompt = `${context} Ekstrak data penting dari teks ini dan sajikan dalam format Tabel Markdown atau CSV.`; break;
+						case 'format_bullet': prompt = `${context} Format ulang isi dokumen ini menjadi daftar poin (bullet points) yang terstruktur agar mudah dibaca.`; break;
+						case 'translate_id': prompt = `${context} Terjemahkan isi dokumen ini ke dalam Bahasa Indonesia yang formal dan mengalir.`; break;
+						case 'fix_grammar': prompt = `${context} Perbaiki tata bahasa dan ejaan (typo) dari teks ini tanpa mengubah maknanya.`; break;
+						case 'qa': prompt = `${context} Jawab pertanyaan berikut berdasarkan dokumen di atas: "${qaQuery}"`; break;
+					}
+					
+					try {
+						const res = await callGemini(prompt);
+						document.getElementById('file-output').innerHTML = marked.parse(res);
+						} catch (e) {
+						// handled by callGemini
+						} finally {
+						toggleLoading('btn-file-proc', false);
+					}
+				}
+			</script>
+		</body>
+	</html>		

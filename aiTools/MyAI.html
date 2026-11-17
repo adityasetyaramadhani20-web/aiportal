@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="id">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>MyAI</title>
+		
+		<!-- CSS Framework & Icons -->
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script>
+			tailwind.config = {
+				darkMode: 'class', 
+				theme: {
+					extend: {
+						colors: {
+							gBlue: '#4285F4', gRed: '#EA4335', gYellow: '#FBBC05', gGreen: '#34A853',
+							gDarkBg: '#202124', gDarkSurface: '#303134', gDarkBorder: '#5f6368', gDarkText: '#e8eaed'
+						}
+					}
+				}
+			}
+		</script>
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+		
+		<!-- Libraries -->
+		<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+		
+		<style>
+			body { 
+            font-family: 'Roboto', sans-serif; 
+            transition: background-color 0.3s, color 0.3s;
+			}
+			h1, h2, h3, .logo-text { font-family: 'Google Sans', sans-serif; }
+			
+			/* Custom Scrollbar */
+			::-webkit-scrollbar { width: 8px; }
+			::-webkit-scrollbar-track { background: transparent; }
+			::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 4px; }
+			::-webkit-scrollbar-thumb:hover { background: #bdc1c6; }
+			.dark ::-webkit-scrollbar-thumb { background: #5f6368; }
+			.dark ::-webkit-scrollbar-thumb:hover { background: #9aa0a6; }
+			
+			/* Search Box Styles */
+			.search-box {
+            border: 1px solid #dfe1e5;
+            box-shadow: none;
+            border-radius: 24px;
+            transition: box-shadow 0.2s ease-in-out, border-color 0.2s ease, max-width 0.4s ease;
+			}
+			.search-box:hover, .search-box.focused {
+            box-shadow: 0 1px 6px rgba(32,33,36,.28);
+            border-color: rgba(223,225,229,0);
+			}
+			
+			.dark .search-box {
+            border-color: #5f6368;
+            background-color: #303134;
+			}
+			.dark .search-box:hover, .dark .search-box.focused {
+            box-shadow: 0 1px 6px rgba(23,23,23,.9);
+            border-color: rgba(95,99,104,0);
+			}
+			
+			/* Markdown Render Styles */
+			.prose pre { background-color: #f8f9fa; border: 1px solid #dadce0; padding: 1rem; border-radius: 8px; overflow-x: auto; margin-top: 0.5rem; margin-bottom: 1rem;}
+			.prose code { font-family: monospace; color: #1a73e8; background: #f1f3f4; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.875em; }
+			.prose pre code { color: #202124; background: transparent; padding: 0; }
+			.prose table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+			.prose th, .prose td { border: 1px solid #dadce0; padding: 8px; text-align: left; }
+			.prose th { background-color: #f8f9fa; }
+			.prose p { margin-bottom: 1rem; line-height: 1.6; }
+			.prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+			.prose ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+			
+			/* Dark Mode Markdown */
+			.dark .prose { color: #e8eaed; }
+			.dark .prose pre { background-color: #202124; border-color: #5f6368; }
+			.dark .prose code { color: #8ab4f8; background: #202124; }
+			.dark .prose pre code { color: #e8eaed; }
+			.dark .prose th, .dark .prose td { border-color: #5f6368; }
+			.dark .prose th { background-color: #202124; }
+			.dark .prose strong { color: #ffffff; }
+			
+			/* Transitions & Animations */
+			.layout-transition { transition: all 0.5s ease-in-out; }
+			.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+			@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+			
+			.loader { border: 3px solid #f3f3f3; border-top: 3px solid #4285F4; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+			.dark .loader { border-color: #5f6368; border-top-color: #8ab4f8; }
+			@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+			
+			/* Dropdown custom transition */
+			.dropdown-menu { transition: all 0.2s ease; }
+		</style>
+	</head>
+	<body class="flex flex-col h-screen relative overflow-hidden bg-white text-gray-800 dark:bg-gDarkBg dark:text-gDarkText">
+		
+		<!-- Header Actions (Top Right) -->
+		<header class="absolute top-0 right-0 p-4 z-50 flex items-center gap-3">
+			<!-- Toggle Wide Mode -->
+			<button onclick="toggleWideMode()" class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gDarkSurface" title="Lebar Penelusuran">
+				<i data-lucide="maximize" id="icon-wide" class="w-5 h-5"></i>
+			</button>
+			<!-- Toggle Dark Mode -->
+			<button onclick="toggleDarkMode()" class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gDarkSurface" title="Tema Gelap/Terang">
+				<i data-lucide="moon" id="icon-theme" class="w-5 h-5"></i>
+			</button>
+			<!-- Settings -->
+			<button onclick="openSettings()" class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gDarkSurface" title="Pengaturan AI">
+				<i data-lucide="settings" class="w-5 h-5"></i>
+			</button>
+			<!-- Avatar -->
+			<div class="w-8 h-8 bg-gBlue text-white rounded-full flex items-center justify-center font-bold text-sm shadow-sm ml-1">AI</div>
+		</header>
+		
+		<!-- Main Container -->
+		<main id="main-layout" class="layout-transition flex flex-col items-center justify-center flex-1 w-full px-4 pt-10">
+			
+			<!-- Logo -->
+			<div id="logo-container" class="layout-transition text-center mb-8">
+				<h1 class="logo-text text-6xl md:text-8xl font-bold tracking-tighter">
+					<span class="text-gBlue">m</span><span class="text-gRed">y</span><span class="text-gYellow">A</span><span class="text-gBlue">I</span>
+				</h1>
+			</div>
+			
+			<!-- Search Area -->
+			<div id="search-container" class="w-full max-w-5xl relative z-20 layout-transition mx-auto">
+				<!-- File/Image/Link Preview Chip (Unified Pipeline) -->
+				<div id="file-chip" class="hidden absolute -top-10 left-4 bg-white dark:bg-gDarkSurface border border-gray-200 dark:border-gDarkBorder shadow-sm rounded-full px-4 py-1.5 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 fade-in">
+					<i data-lucide="file-text" id="file-icon" class="w-4 h-4 text-gBlue dark:text-blue-400"></i>
+					<span id="file-name" class="truncate max-w-[150px]">document.pdf</span>
+					<button onclick="removeFile()" class="hover:text-gRed dark:hover:text-red-400 ml-1"><i data-lucide="x" class="w-3 h-3"></i></button>
+				</div>
+				
+				<!-- The Search Box -->
+				<div id="search-box-wrapper" class="search-box bg-white flex items-end px-2 py-1 min-h-[48px]">
+					
+					<!-- Mode Selector Custom UI -->
+					<div class="relative py-2 pl-3 pr-2 flex items-center border-r border-gray-200 dark:border-gDarkBorder cursor-pointer group" id="mode-wrapper" onclick="toggleModeDropdown(event)">
+						<button class="flex items-center gap-1.5 bg-transparent text-gray-600 dark:text-gray-300 group-hover:text-gBlue dark:group-hover:text-blue-400 text-sm font-medium transition outline-none whitespace-nowrap">
+							<span id="mode-label">✨ Tanya Bebas</span>
+							<i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+						</button>
+						<!-- Hidden input to store value -->
+						<input type="hidden" id="mode-selector" value="chat">
+						
+						<!-- Dropdown Menu Mode -->
+						<div id="mode-dropdown" class="dropdown-menu hidden absolute right-full left-0 mt-3 w-48 bg-white dark:bg-gDarkSurface border border-gray-200 dark:border-gDarkBorder rounded-xl shadow-xl z-50 text-left overflow-hidden origin-top opacity-0 scale-95 transition-all">
+							<div class="py-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+								<button onclick="selectMode(event, 'chat', '✨ Tanya Bebas')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">✨ Tanya Bebas</button>
+								<button onclick="selectMode(event, 'search', '🔍 Web Search')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">🔍 Web Search</button>
+								<button onclick="selectMode(event, 'code', '💻 Tulis Kode')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">💻 Tulis Kode</button>
+								<button onclick="selectMode(event, 'summarize', '📝 Ringkas')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">📝 Ringkas</button>
+								<button onclick="selectMode(event, 'refine', '✏ Edit')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">✏ Edit</button>
+								<button onclick="selectMode(event, 'emote', '💌 Cek Emosi')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">💌 Cek Emosi</button>
+								<button onclick="selectMode(event, 'translate', '🌐 Terjemahkan')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">🌐 Terjemahkan</button>
+								<hr class="my-1 border-gray-100 dark:border-gDarkBorder">
+								<button onclick="selectMode(event, 'research', '🧠 Riset')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">🧠 Riset</button>
+								<button onclick="selectMode(event, 'decide', '❓ Putuskan')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">❓ Putuskan</button>
+								<button onclick="selectMode(event, 'creative', '🎨 Kreasikan')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">🎨 Kreasikan</button>
+								<button onclick="selectMode(event, 'debate', '🥊 Sanggah')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">🥊 Sanggah</button>
+								<button onclick="selectMode(event, 'prompt', '🤖 Buat Prompt')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition">🤖 Buat Prompt</button>
+							</div>
+						</div>
+					</div>
+					
+					<!-- Input Area -->
+					<textarea id="main-input" rows="1" class="flex-1 bg-transparent border-none outline-none text-gray-800 dark:text-white px-4 py-3 resize-none max-h-40 overflow-y-auto" placeholder="Tanyakan sesuatu atau beri perintah..."></textarea>
+					
+					<!-- Actions -->
+					<div class="flex items-center gap-1 py-2 pr-2">
+						<!-- Tombol Lampiran Gambar -->
+						<button onclick="document.getElementById('img-upload').click()" class="p-2 text-gray-500 hover:text-gBlue dark:text-gray-400 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition tooltip" title="Lampirkan Gambar">
+							<i data-lucide="image" class="w-5 h-5"></i>
+						</button>
+						<input type="file" id="img-upload" class="hidden" accept="image/*">
+						
+						<!-- Tombol Lampiran Dokumen -->
+						<button onclick="document.getElementById('doc-upload').click()" class="p-2 text-gray-500 hover:text-gBlue dark:text-gray-400 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition tooltip" title="Lampirkan Dokumen">
+							<i data-lucide="file-text" class="w-5 h-5"></i>
+						</button>
+						<input type="file" id="doc-upload" class="hidden" accept=".pdf,.txt,.docx,.csv,.xlsx">
+
+						<!-- Tombol Tambah Link -->
+						<button onclick="openLinkModal()" class="p-2 text-gray-500 hover:text-gBlue dark:text-gray-400 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition tooltip" title="Tambah Link (Web/YouTube)">
+							<i data-lucide="link" class="w-5 h-5"></i>
+						</button>
+						
+						<button onclick="submitQuery()" id="btn-submit" class="p-2 text-white bg-gBlue hover:bg-blue-700 rounded-full transition shadow-sm ml-1" title="Kirim">
+							<i data-lucide="search" class="w-5 h-5"></i>
+						</button>
+					</div>
+				</div>
+				
+				<!-- Suggestion Buttons (Only shown on homepage) -->
+				<div id="home-buttons" class="layout-transition flex justify-center gap-3 mt-8">
+					<!-- Penelusuran Google -->
+					<button onclick="searchGoogle()" class="bg-[#f8f9fa] dark:bg-gDarkSurface border border-[#f8f9fa] dark:border-gDarkSurface hover:border-[#dadce0] dark:hover:border-gDarkBorder hover:shadow-sm text-[#3c4043] dark:text-gray-200 text-sm px-4 py-2 rounded transition">
+						Penelusuran Google
+					</button>
+					
+					<!-- Buat Instan Dropdown -->
+					<div class="relative inline-block text-left" id="instant-wrapper">
+						<button onclick="toggleInstantDropdown(event)" class="bg-[#f8f9fa] dark:bg-gDarkSurface border border-[#f8f9fa] dark:border-gDarkSurface hover:border-[#dadce0] dark:hover:border-gDarkBorder hover:shadow-sm text-[#3c4043] dark:text-gray-200 text-sm px-4 py-2 rounded transition flex items-center gap-1">
+							Buat Instan <i data-lucide="chevron-up" class="w-3 h-3"></i>
+						</button>
+						
+						<!-- Dropdown Menu (Scrollable) -->
+						<div id="instant-dropdown" class="dropdown-menu hidden absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 bg-white dark:bg-gDarkSurface border border-gray-200 dark:border-gDarkBorder rounded-xl shadow-xl z-[60] text-left overflow-y-auto max-h-[55vh] origin-bottom opacity-0 scale-95 transition-all">
+							<div class="py-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+								<button onclick="triggerInstant('txt_summary')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2">
+									<i data-lucide="file-text" class="w-4 h-4 text-blue-500"></i> Ringkasan (TXT)
+								</button>
+								<button onclick="triggerInstant('md_detail')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2">
+									<i data-lucide="list-tree" class="w-4 h-4 text-emerald-500"></i> Rincian Komprehensif (MD)
+								</button>
+								<button onclick="triggerInstant('md_code')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2">
+									<i data-lucide="code-2" class="w-4 h-4 text-purple-500"></i> Kode (MD)
+								</button>
+								<hr class="my-1 border-gray-100 dark:border-gDarkBorder">
+								<button onclick="triggerInstant('html_page')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2">
+									<i data-lucide="layout-template" class="w-4 h-4 text-orange-500"></i> Laman Sederhana (HTML)
+								</button>
+								<button onclick="triggerInstant('html_quiz')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2">
+									<i data-lucide="help-circle" class="w-4 h-4 text-red-500"></i> Kuis 30 Soal (HTML)
+								</button>
+								<button onclick="triggerInstant('html_questionnaire')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2">
+									<i data-lucide="clipboard-list" class="w-4 h-4 text-indigo-500"></i> Kuisioner / Sistem Pakar (HTML)
+								</button>
+								<button onclick="triggerInstant('html_mindmap')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2">
+									<i data-lucide="network" class="w-4 h-4 text-teal-500"></i> Mindmap (HTML)
+								</button>
+								<button onclick="triggerInstant('html_flashcard')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2">
+									<i data-lucide="gallery-horizontal-end" class="w-4 h-4 text-pink-500"></i> Flashcard 20 Kartu (HTML)
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</main>
+		
+		<!-- Results Feed -->
+		<div id="results-container" class="hidden flex-1 w-full max-w-5xl mx-auto px-4 pb-10 overflow-y-auto mt-6 layout-transition">
+			<!-- Chat/Results go here -->
+		</div>
+		
+		<!-- SETTINGS MODAL -->
+		<div id="modal-settings" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity p-4">
+			<div class="bg-white dark:bg-gDarkSurface w-full max-w-2xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col transform scale-95 transition-transform" id="modal-content">
+				<!-- Modal Header -->
+				<div class="px-6 py-4 border-b border-gray-100 dark:border-gDarkBorder flex justify-between items-center bg-gray-50 dark:bg-gDarkBg rounded-t-2xl">
+					<h3 class="font-bold text-gray-800 dark:text-white logo-text text-lg flex items-center gap-2">
+						<i data-lucide="sliders-horizontal" class="w-5 h-5 text-gBlue"></i> Setelan MyAI
+					</h3>
+					<button onclick="closeSettings()" class="text-gray-400 hover:text-gray-800 dark:hover:text-white"><i data-lucide="x"></i></button>
+				</div>
+				
+				<!-- Modal Body (Scrollable) -->
+				<div class="p-6 overflow-y-auto flex-1 space-y-6">
+					
+					<!-- Section: API & Connection -->
+					<div>
+						<h4 class="text-sm font-bold text-gBlue uppercase tracking-wider mb-3">Koneksi & API</h4>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div>
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Provider AI</label>
+								<select id="conf-provider" onchange="toggleCustomUrl()" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue">
+									<option value="gemini">Google Gemini (Default)</option>
+									<option value="custom">Custom Endpoint API</option>
+								</select>
+							</div>
+							<div>
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Model Name</label>
+								<input type="text" id="conf-model" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue" value="gemini-3.1-flash-lite">
+							</div>
+							<div class="md:col-span-2 hidden" id="wrap-custom-url">
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Custom API Base URL</label>
+								<input type="text" id="conf-url" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue" placeholder="https://api.openai.com/v1">
+							</div>
+							<div class="md:col-span-1">
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">API Key</label>
+								<input type="password" id="conf-key" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue" placeholder="Masukkan API Key...">
+							</div>
+							<div class="md:col-span-1">
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Max Token Output</label>
+								<input type="number" id="conf-maxtokens" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue" placeholder="Contoh: 8096">
+							</div>
+						</div>
+					</div>
+					
+					<!-- Section: Personalization -->
+					<div class="border-t border-gray-100 dark:border-gDarkBorder pt-4">
+						<h4 class="text-sm font-bold text-gBlue uppercase tracking-wider mb-3">Personalisasi & Perilaku AI</h4>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div>
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Bahasa Utama</label>
+								<select id="conf-lang" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue">
+									<option value="Indonesia">Indonesia</option>
+									<option value="Inggris">Inggris</option>
+									<option value="Arab">Arab</option>
+									<option value="Jepang">Jepang</option>
+									<option value="Mandarin">Mandarin</option>
+									<option value="Jerman">Jerman</option>
+									<option value="Prancis">Prancis</option>
+									<option value="Spanyol">Spanyol</option>
+									<option value="Portugis">Portugis</option> 
+									<option value="Korea">Korea</option>
+									<option value="Rusia">Rusia</option>
+									<option value="Hindi">Hindi</option>
+									<option value="Thai">Thai</option>
+									<option value="Vietnam">Vietnam</option>
+									<option value="Tagalog">Tagalog</option>
+								</select>
+							</div>
+							<div>
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Persona AI</label>
+								<input type="text" id="conf-persona" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue" placeholder="Contoh: Asisten ramah, Dosen galak...">
+							</div>
+							<div>
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Tema Bahasan (Opsional)</label>
+								<input type="text" id="conf-topic" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue" placeholder="Contoh: Teknologi, Bisnis, Anime...">
+							</div>
+							<div>
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Nada Berbicara</label>
+								<select id="conf-tone" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue">
+									<option value="Netral">Netral / Standar</option>
+									<option value="Formal dan Profesional">Formal & Profesional</option>
+									<option value="Santai dan Gaul">Santai & Gaul</option>
+									<option value="Lucu dan Menghibur">Lucu & Menghibur</option>
+									<option value="Empatik">Empatik</option>
+									<option value="Sedih">Sedih</option>
+									<option value="Persuasif">Persuasif</option>
+									<option value="Ramah">Ramah</option> 
+									<option value="Ceria">Ceria</option> 
+									<option value="Singkat">Singkat</option> 		
+									<option value="Bersemangat">Bersemangat</option> 
+									<option value="Mengharukan">Mengharukan</option>
+									<option value="Penuh Amarah">Penuh Amarah</option> 
+									<option value="Menakutkan">Menakutkan</option> 
+									<option value="Konyol">Konyol</option> 
+									<option value="Iklan">Iklan</option>
+									<option value="Penuh Emoji">Penuh Emoji ✨</option>
+								</select>
+							</div>
+							<div>
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Tingkat Pemahaman</label>
+								<select id="conf-level" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue">
+									<optgroup label="Non-Akademik">
+										<option value="Standar (Umum)">Standar (Umum)</option>
+										<option value="Gen Alpha">Gen Alpha</option>
+										<option value="Sederhana (Pemula dan Anak-Anak)">Pemula</option>
+										<option value="Ringkas">Ringkas</option>    
+										<option value="Remaja">Remaja</option>               
+										<option value="Analitis">Analitis</option>
+										<option value="Ahli">Ahli</option>
+										<option value="Analogis">Analogis</option>
+										<option value="Analogi Komedi">Komedi</option>
+										<option value="Analogi Sarkas">Sarkas</option>
+										<option value="Analogi Kreatif">Kreatif</option>
+									</optgroup>
+									<optgroup label="Tingkat Akademik">
+										<option value="TK">TK (Taman Kanak-kanak)</option>
+										<option value="SD">SD (Sekolah Dasar)</option>
+										<option value="SMP">SMP (Menengah Pertama)</option>
+										<option value="SMA">SMA (Menengah Atas)</option>
+										<option value="Diploma">Diploma / Vokasi</option>
+										<option value="S1">S1 (Sarjana)</option>
+										<option value="S2">S2 (Magister)</option>
+										<option value="S3">S3 (Doktoral)</option>
+									</optgroup>
+								</select>
+							</div>
+							<div>
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Preferensi Respons</label>
+								<select id="conf-length" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue">
+									<option value="Sedang">Sedang (Biasa)</option>
+									<option value="Dalam Poin Ringkas">Terpendek</option>								
+									<option value="Pendek dan To The Point">Pendek</option>
+									<option value="Panjang dan Detail">Panjang</option>
+									<option value="Sangat Panjang dan Komprehensif">Terpanjang</option>
+								</select>
+							</div>
+							<div class="md:col-span-2">
+								<label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Info Tambahan (Konteks User)</label>
+								<textarea id="conf-extra" rows="2" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue resize-none" placeholder="Masukkan info tentang Anda agar AI lebih mengerti konteks..."></textarea>
+							</div>
+							<div class="md:col-span-2">
+								<label class="flex justify-between text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+									<span>Temperature (Kreativitas)</span> <span id="temp-val" class="text-gBlue">0.7</span>
+								</label>
+								<input type="range" id="conf-temp" min="0" max="2" step="0.1" value="0.7" class="w-full accent-gBlue" oninput="document.getElementById('temp-val').innerText = this.value">
+							</div>
+						</div>
+					</div>
+					
+					<!-- Section: Integrations & Grounding -->
+					<div class="border-t border-gray-100 dark:border-gDarkBorder pt-4">
+						<h4 class="text-sm font-bold text-gBlue uppercase tracking-wider mb-3">Grounding & Fitur Ekstra</h4>
+						<div class="flex flex-col gap-3">
+							<label class="flex items-center gap-3 cursor-pointer">
+								<input type="checkbox" id="conf-single" class="w-4 h-4 text-gBlue bg-gray-100 border-gray-300 rounded focus:ring-gBlue">
+								<span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Single Respons <span class="text-xs text-gray-400 font-normal">- Matikan riwayat obrolan (hemat token)</span></span>
+							</label>
+							<label class="flex items-center gap-3 cursor-pointer">
+								<input type="checkbox" id="conf-search" class="w-4 h-4 text-gBlue bg-gray-100 border-gray-300 rounded focus:ring-gBlue">
+								<span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Aktifkan Google Search (Grounding) <span class="text-xs text-gray-400 font-normal">- Cari data internet real-time</span></span>
+							</label>
+							<label class="flex items-center gap-3 cursor-pointer">
+								<input type="checkbox" id="conf-maps" class="w-4 h-4 text-gBlue bg-gray-100 border-gray-300 rounded focus:ring-gBlue">
+								<span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Aktifkan Konteks Maps <span class="text-xs text-gray-400 font-normal">- Prioritas info peta/lokasi akurat</span></span>
+							</label>
+						</div>
+					</div>
+					
+				</div>
+				
+				<!-- Modal Footer -->
+				<div class="px-6 py-4 bg-gray-50 dark:bg-gDarkBg border-t border-gray-100 dark:border-gDarkBorder flex justify-end gap-2 rounded-b-2xl">
+					<button onclick="closeSettings()" class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">Batal</button>
+					<button onclick="saveSettings()" id="btn-save" class="px-5 py-2 text-sm font-medium text-white bg-gBlue hover:bg-blue-700 rounded-lg transition shadow-sm">Simpan Setelan</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- ADD LINK MODAL -->
+		<div id="modal-link" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity p-4">
+			<div class="bg-white dark:bg-gDarkSurface w-full max-w-md rounded-2xl shadow-2xl flex flex-col transform scale-95 transition-transform" id="modal-link-content">
+				<!-- Modal Header -->
+				<div class="px-5 py-4 border-b border-gray-100 dark:border-gDarkBorder flex justify-between items-center bg-gray-50 dark:bg-gDarkBg rounded-t-2xl">
+					<h3 class="font-bold text-gray-800 dark:text-white logo-text text-md flex items-center gap-2">
+						<i data-lucide="link" class="w-5 h-5 text-gBlue animate-pulse"></i> Tambah Link Konteks
+					</h3>
+					<button onclick="closeLinkModal()" class="text-gray-400 hover:text-gray-800 dark:hover:text-white"><i data-lucide="x"></i></button>
+				</div>
+				<!-- Tabs -->
+				<div class="flex border-b border-gray-100 dark:border-gDarkBorder bg-gray-50 dark:bg-gDarkBg/50 p-1">
+					<button onclick="switchLinkTab('url')" id="tab-link-url" class="flex-1 py-2 text-xs font-semibold rounded-lg text-gBlue bg-white dark:bg-gDarkSurface shadow-sm transition">🌐 URL Web</button>
+					<button onclick="switchLinkTab('yt')" id="tab-link-yt" class="flex-1 py-2 text-xs font-semibold rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition">🎥 YouTube</button>
+				</div>
+				<!-- Tab Content -->
+				<div class="p-5 space-y-4">
+					<!-- URL Web Panel -->
+					<div id="panel-link-url" class="space-y-3">
+						<label class="block text-xs font-bold text-gray-500 dark:text-gray-400">Tautan Situs Web Publik</label>
+						<input type="url" id="link-url-input" placeholder="https://example.com/artikel" class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue">
+						
+						<!-- Pemilih Metode Akses URL -->
+						<div class="space-y-2 mt-2">
+							<label class="block text-xs font-bold text-gray-500 dark:text-gray-400">Metode Akses</label>
+							<div class="grid grid-cols-2 gap-2">
+								<label class="flex flex-col p-2.5 border border-gBlue/30 bg-blue-50/20 dark:bg-blue-900/10 rounded-xl cursor-pointer hover:border-gBlue transition" id="lbl-method-native">
+									<div class="flex items-center gap-1.5">
+										<input type="radio" name="url-method" value="native" checked onchange="toggleUrlMethod('native')" class="accent-gBlue">
+										<span class="text-xs font-bold text-gray-700 dark:text-gray-200">Native Gemini</span>
+									</div>
+									<span class="text-[9px] text-gray-400 dark:text-gray-500 mt-1 leading-normal">Gemini membaca langsung via web crawler Google. Stabil & bebas CORS.</span>
+								</label>
+								<label class="flex flex-col p-2.5 border border-gray-200 dark:border-gDarkBorder rounded-xl cursor-pointer hover:border-gBlue transition" id="lbl-method-cors">
+									<div class="flex items-center gap-1.5">
+										<input type="radio" name="url-method" value="cors" onchange="toggleUrlMethod('cors')" class="accent-gBlue">
+										<span class="text-xs font-bold text-gray-700 dark:text-gray-200">Ekstraksi CORS</span>
+									</div>
+									<span class="text-[9px] text-gray-400 dark:text-gray-500 mt-1 leading-normal">Mengekstrak teks halaman mentah ke memori lokal lewat proxy CORS.</span>
+								</label>
+							</div>
+						</div>
+					</div>
+					<!-- YouTube Panel -->
+					<div id="panel-link-yt" class="space-y-3 hidden">
+						<label class="block text-xs font-bold text-gray-500 dark:text-gray-400">Tautan Video YouTube</label>
+						<input type="url" id="link-yt-input" placeholder="https://www.youtube.com/watch?v=..." class="w-full border border-gray-300 dark:border-gDarkBorder bg-white dark:bg-gDarkBg text-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-gBlue">
+						<p class="text-[10px] text-gray-400 dark:text-gray-500">Gemini akan menggunakan Grounding Google Search secara real-time untuk mengeksplorasi transkrip, ringkasan, atau isi video ini.</p>
+					</div>
+				</div>
+				<!-- Modal Footer -->
+				<div class="px-5 py-4 bg-gray-50 dark:bg-gDarkBg border-t border-gray-100 dark:border-gDarkBorder flex justify-end gap-2 rounded-b-2xl">
+					<button onclick="closeLinkModal()" class="px-4 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">Batal</button>
+					<button onclick="processLinkInput()" id="btn-process-link" class="px-5 py-2 text-xs font-medium text-white bg-gBlue hover:bg-blue-700 rounded-lg transition flex items-center justify-center gap-1.5 shadow-sm">
+						<span id="btn-process-text">Hubungkan</span>
+						<svg id="link-spinner" class="animate-spin h-3.5 w-3.5 text-white hidden" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+					</button>
+				</div>
+			</div>
+		</div>
+		
+		<!-- USAGE INDICATOR (RPM, RPD, TPD) -->
+		<div id="usage-indicator" class="fixed bottom-4 left-4 bg-white/90 dark:bg-gDarkSurface/90 backdrop-blur-sm border border-gray-200 dark:border-gDarkBorder text-gray-600 dark:text-gray-300 px-3 py-1.5 rounded-full shadow-sm z-40 text-[10px] font-medium flex items-center gap-2 transition-all cursor-default hover:shadow-md" title="Requests Per Minute | Requests Per Day | Tokens Per Day">
+			<i data-lucide="bar-chart-2" class="w-3.5 h-3.5 text-gBlue"></i>
+			<span id="usage-text">RPM: 0 &bull; RPD: 0 &bull; TPD: 0</span>
+		</div>
+		
+		<!-- TOAST NOTIFICATION -->
+		<div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900 dark:bg-white dark:text-gray-900 text-white px-6 py-3 rounded-full shadow-lg translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-2 text-sm font-medium">
+			<i data-lucide="info" class="w-4 h-4 text-blue-400 dark:text-blue-600"></i> <span id="toast-msg">Pesan</span>
+		</div>
+		
+		<script>
+			// --- GLOBAL STATE ---
+			const App = {
+				config: {
+					provider: localStorage.getItem('myai_l_prov') || 'gemini',
+					url: localStorage.getItem('myai_l_url') || '',
+					apiKey: localStorage.getItem('myai_l_key') || '',
+					model: localStorage.getItem('myai_l_model') || 'gemini-3.1-flash-lite',
+					temp: parseFloat(localStorage.getItem('myai_l_temp') || '0.7'),
+					maxTokens: parseInt(localStorage.getItem('myai_l_maxtokens')) || 8096,
+					lang: localStorage.getItem('myai_l_lang') || 'Indonesia',
+					persona: localStorage.getItem('myai_l_persona') || '',
+					topic: localStorage.getItem('myai_l_topic') || '',
+					tone: localStorage.getItem('myai_l_tone') || 'Netral',
+					level: localStorage.getItem('myai_l_level') || 'Standar (Umum)',
+					length: localStorage.getItem('myai_l_length') || 'Sedang',
+					extra: localStorage.getItem('myai_l_extra') || '',
+					single: localStorage.getItem('myai_l_single') === 'true',
+					search: localStorage.getItem('myai_l_search') === 'true',
+					maps: localStorage.getItem('myai_l_maps') === 'true',
+					darkMode: localStorage.getItem('myai_l_dark') !== null ? localStorage.getItem('myai_l_dark') === 'true' : window.matchMedia('(prefers-color-scheme: dark)').matches,
+					wideMode: localStorage.getItem('myai_l_wide') === 'true'
+					},
+					usage: {
+						requestsQueue: [], 
+						rpd: parseInt(localStorage.getItem('myai_u_rpd')) || 0,
+						tpd: parseInt(localStorage.getItem('myai_u_tpd')) || 0,
+						lastDate: localStorage.getItem('myai_u_date') || new Date().toDateString()
+					},
+					// Pipeline Lampiran Terpadu (Unified Attachment State)
+					attachment: {
+						type: null, // 'file' | 'image' | 'url' | 'yt'
+						name: '',
+						text: '',
+						data: null, // data objek inline (base64)
+						url: '',
+						isNativeGrounding: true
+					},
+					history: [],
+					isHome: true
+				};
+				
+				// --- INIT ---
+				document.addEventListener('DOMContentLoaded', () => {
+					lucide.createIcons();
+					applyThemeAndLayout();
+					
+					// Auto resize textarea
+					const tx = document.getElementById('main-input');
+					tx.addEventListener('input', function() {
+						this.style.height = 'auto';
+						this.style.height = (this.scrollHeight) + 'px';
+					});
+					
+					// Enter key handling
+					tx.addEventListener('keydown', function(e) {
+						if (e.key === 'Enter') {
+							if (App.config.wideMode) {
+								if (e.ctrlKey) { e.preventDefault(); submitQuery(); }
+								return; 
+							}
+							if (!e.shiftKey) { e.preventDefault(); submitQuery(); }
+						}
+					});
+					
+					// Focus Effect
+					tx.addEventListener('focus', () => document.getElementById('search-box-wrapper').classList.add('focused'));
+					tx.addEventListener('blur', () => document.getElementById('search-box-wrapper').classList.remove('focused'));
+					
+					// File Upload Separated
+					document.getElementById('img-upload').addEventListener('change', handleFileUpload);
+					document.getElementById('doc-upload').addEventListener('change', handleFileUpload);
+					
+					// Menutup dropdown klik di luar
+					document.addEventListener('click', function(event) {
+						// Dropdown Instan
+						const instWrapper = document.getElementById('instant-wrapper');
+						const instDropdown = document.getElementById('instant-dropdown');
+						if (instWrapper && !instWrapper.contains(event.target)) {
+							instDropdown.classList.add('opacity-0', 'scale-95');
+							setTimeout(() => instDropdown.classList.add('hidden'), 150);
+						}
+						
+						// Dropdown Mode
+						const modeWrapper = document.getElementById('mode-wrapper');
+						const modeDropdown = document.getElementById('mode-dropdown');
+						if (modeWrapper && !modeWrapper.contains(event.target)) {
+							modeDropdown.classList.add('opacity-0', 'scale-95');
+							setTimeout(() => modeDropdown.classList.add('hidden'), 150);
+						}
+					});
+					
+					// Listener otomatis penggantian OS Light/Dark Mode
+					window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+						if (localStorage.getItem('myai_l_dark') === null) {
+							App.config.darkMode = event.matches;
+							applyThemeAndLayout();
+						}
+					});
+					
+					// Inisialisasi tampilan Usage Tracker
+					renderUsageUI();
+					// Interval untuk refresh RPM otomatis jika waktu berjalan tanpa request baru
+					setInterval(renderUsageUI, 5000);
+				});
+				
+				// --- THEME & LAYOUT LOGIC ---
+				function applyThemeAndLayout() {
+					if (App.config.darkMode) {
+						document.documentElement.classList.add('dark');
+						document.getElementById('icon-theme').setAttribute('data-lucide', 'sun');
+						} else {
+						document.documentElement.classList.remove('dark');
+						document.getElementById('icon-theme').setAttribute('data-lucide', 'moon');
+					}
+					
+					const searchContainer = document.getElementById('search-container');
+					const resultsContainer = document.getElementById('results-container');
+					const inputEl = document.getElementById('main-input');
+					
+					if (App.config.wideMode) {
+						searchContainer.classList.replace('max-w-3xl', 'max-w-6xl');
+						resultsContainer.classList.replace('max-w-3xl', 'max-w-6xl');
+						document.getElementById('icon-wide').setAttribute('data-lucide', 'minimize');
+						inputEl.placeholder = "Ketik sesuatu... (Enter = Baris Baru, Ctrl+Enter = Kirim)";
+						} else {
+						searchContainer.classList.replace('max-w-6xl', 'max-w-3xl');
+						resultsContainer.classList.replace('max-w-6xl', 'max-w-3xl');
+						document.getElementById('icon-wide').setAttribute('data-lucide', 'maximize');
+						inputEl.placeholder = "Tanyakan sesuatu atau beri perintah...";
+					}
+					lucide.createIcons();
+				}
+				
+				function toggleDarkMode() {
+					App.config.darkMode = !App.config.darkMode;
+					// Menyimpan state manual ke local storage agar tidak terganti auto OS lagi
+					localStorage.setItem('myai_l_dark', App.config.darkMode);
+					applyThemeAndLayout();
+				}
+				
+				function toggleWideMode() {
+					App.config.wideMode = !App.config.wideMode;
+					localStorage.setItem('myai_l_wide', App.config.wideMode);
+					applyThemeAndLayout();
+				}
+				
+				// --- SETTINGS LOGIC ---
+				function toggleCustomUrl() {
+					const provider = document.getElementById('conf-provider').value;
+					document.getElementById('wrap-custom-url').classList.toggle('hidden', provider !== 'custom');
+				}
+				
+				function openSettings() {
+					document.getElementById('conf-provider').value = App.config.provider;
+					document.getElementById('conf-url').value = App.config.url;
+					document.getElementById('conf-key').value = App.config.apiKey;
+					document.getElementById('conf-model').value = App.config.model;
+					document.getElementById('conf-maxtokens').value = App.config.maxTokens;
+					document.getElementById('conf-temp').value = App.config.temp;
+					document.getElementById('temp-val').innerText = App.config.temp;
+					
+					document.getElementById('conf-lang').value = App.config.lang;
+					document.getElementById('conf-persona').value = App.config.persona;
+					document.getElementById('conf-topic').value = App.config.topic;
+					document.getElementById('conf-tone').value = App.config.tone;
+					document.getElementById('conf-level').value = App.config.level;
+					document.getElementById('conf-length').value = App.config.length;
+					document.getElementById('conf-extra').value = App.config.extra;
+					
+					document.getElementById('conf-single').checked = App.config.single;
+					document.getElementById('conf-search').checked = App.config.search;
+					document.getElementById('conf-maps').checked = App.config.maps;
+					
+					toggleCustomUrl();
+					
+					const modal = document.getElementById('modal-settings');
+					const content = document.getElementById('modal-content');
+					modal.classList.remove('hidden');
+					setTimeout(() => {
+						modal.classList.remove('opacity-0');
+						content.classList.remove('scale-95');
+					}, 10);
+				}
+				
+				function closeSettings() {
+					const modal = document.getElementById('modal-settings');
+					const content = document.getElementById('modal-content');
+					modal.classList.add('opacity-0');
+					content.classList.add('scale-95');
+					setTimeout(() => modal.classList.add('hidden'), 300);
+				}
+				
+				function saveSettings() {
+					App.config.provider = document.getElementById('conf-provider').value;
+					App.config.url = document.getElementById('conf-url').value.trim();
+					App.config.apiKey = document.getElementById('conf-key').value.trim();
+					App.config.model = document.getElementById('conf-model').value.trim() || 'gemini-3.1-flash-lite';
+					App.config.maxTokens = parseInt(document.getElementById('conf-maxtokens').value) || 8096;
+					App.config.temp = parseFloat(document.getElementById('conf-temp').value);
+					
+					App.config.lang = document.getElementById('conf-lang').value;
+					App.config.persona = document.getElementById('conf-persona').value.trim();
+					App.config.tone = document.getElementById('conf-tone').value;
+					App.config.level = document.getElementById('conf-level').value;
+					App.config.length = document.getElementById('conf-length').value;
+					App.config.extra = document.getElementById('conf-extra').value.trim();
+					
+					App.config.single = document.getElementById('conf-single').checked;
+					App.config.search = document.getElementById('conf-search').checked;
+					App.config.maps = document.getElementById('conf-maps').checked;
+					
+					localStorage.setItem('myai_l_prov', App.config.provider);
+					localStorage.setItem('myai_l_url', App.config.url);
+					localStorage.setItem('myai_l_key', App.config.apiKey);
+					localStorage.setItem('myai_l_model', App.config.model);
+					localStorage.setItem('myai_l_maxtokens', App.config.maxTokens);
+					localStorage.setItem('myai_l_temp', App.config.temp);
+					
+					localStorage.setItem('myai_l_lang', App.config.lang);
+					localStorage.setItem('myai_l_persona', App.config.persona);
+					localStorage.setItem('myai_l_tone', App.config.tone);
+					localStorage.setItem('myai_l_level', App.config.level);
+					localStorage.setItem('myai_l_length', App.config.length);
+					localStorage.setItem('myai_l_extra', App.config.extra);
+					
+					localStorage.setItem('myai_l_single', App.config.single);
+					localStorage.setItem('myai_l_search', App.config.search);
+					localStorage.setItem('myai_l_maps', App.config.maps);
+					
+					closeSettings();
+					showToast("Setelan dan Preferensi disimpan!");
+				}
+				
+				function showToast(msg) {
+					const toast = document.getElementById('toast');
+					document.getElementById('toast-msg').innerText = msg;
+					toast.classList.remove('translate-y-20', 'opacity-0');
+					setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+				}
+				
+				// --- USAGE TRACKER LOGIC ---
+				function renderUsageUI() {
+					if (!App.usage) return;
+					
+					const now = new Date().getTime();
+					
+					// Filter/hapus riwayat request yang lebih dari 60 detik (1 menit) lalu
+					App.usage.requestsQueue = App.usage.requestsQueue.filter(time => now - time < 60000);
+					
+					const rpm = App.usage.requestsQueue.length;
+					const usageText = document.getElementById('usage-text');
+					
+					if (usageText) {
+						usageText.innerHTML = `RPM: ${rpm} &bull; RPD: ${App.usage.rpd} &bull; TPD: ${App.usage.tpd}`;
+					}
+				}
+				
+				function updateUsage(tokens) {
+					const now = new Date();
+					const todayStr = now.toDateString();
+					
+					// Reset RPD dan TPD jika sudah berganti hari
+					if (App.usage.lastDate !== todayStr) {
+						App.usage.rpd = 0;
+						App.usage.tpd = 0;
+						App.usage.lastDate = todayStr;
+					}
+					
+					// Catat waktu request (untuk RPM) dan tambah penggunaan (RPD, TPD)
+					App.usage.requestsQueue.push(now.getTime());
+					App.usage.rpd += 1;
+					App.usage.tpd += tokens;
+					
+					// Simpan ke localStorage agar tidak hilang saat reload
+					localStorage.setItem('myai_u_rpd', App.usage.rpd);
+					localStorage.setItem('myai_u_tpd', App.usage.tpd);
+					localStorage.setItem('myai_u_date', App.usage.lastDate);
+					
+					renderUsageUI();
+				}
+				
+				// --- REUSABLE CHIP CONTROLLER ---
+				function showFileChip(name, iconName) {
+					const chip = document.getElementById('file-chip');
+					const nameEl = document.getElementById('file-name');
+					const iconEl = document.getElementById('file-icon');
+					
+					nameEl.innerText = name;
+					iconEl.setAttribute('data-lucide', iconName);
+					chip.classList.remove('hidden');
+					lucide.createIcons();
+				}
+
+				function removeFile() {
+					App.attachment = { type: null, name: '', text: '', data: null, url: '', isNativeGrounding: true };
+					document.getElementById('img-upload').value = "";
+					document.getElementById('doc-upload').value = "";
+					document.getElementById('file-chip').classList.add('hidden');
+				}
+				
+				// --- FILE & IMAGE HANDLING ---
+				async function handleFileUpload(e) {
+					const file = e.target.files[0];
+					if (!file) return;
+					
+					showFileChip("Membaca " + file.name + "...", "file-text");
+					
+					try {
+						const ext = file.name.split('.').pop().toLowerCase();
+						
+						if (file.type.startsWith('image/')) {
+							const reader = new FileReader();
+							reader.onload = (evt) => {
+								const base64String = evt.target.result.split(',')[1];
+								App.attachment = {
+									type: 'image',
+									name: file.name,
+									data: { mimeType: file.type, data: base64String }
+								};
+								showFileChip(file.name, "image");
+							};
+							reader.readAsDataURL(file);
+							return;
+						}
+						
+						let text = "";
+						if (ext === 'pdf') {
+							if (typeof pdfjsLib === 'undefined') throw new Error("PDF Library belum dimuat");
+							const arrayBuffer = await file.arrayBuffer();
+							const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+							for (let i = 1; i <= pdf.numPages; i++) {
+								const page = await pdf.getPage(i);
+								const content = await page.getTextContent();
+								text += content.items.map(item => item.str).join(" ") + "\n";
+							}
+							} else if (ext === 'docx') {
+							const arrayBuffer = await file.arrayBuffer();
+							const res = await mammoth.extractRawText({ arrayBuffer });
+							text = res.value;
+							} else if (ext === 'xlsx' || ext === 'csv') {
+							const arrayBuffer = await file.arrayBuffer();
+							const workbook = XLSX.read(arrayBuffer, {type: 'array'});
+							text = XLSX.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+							} else if (ext === 'txt') {
+							text = await file.text();
+							} else {
+							throw new Error("Format tidak didukung");
+						}
+						
+						App.attachment = {
+							type: 'file',
+							name: file.name,
+							text: text
+						};
+						showFileChip(file.name, "file-text");
+						} catch (err) {
+						showToast("Gagal membaca file: " + err.message);
+						removeFile();
+					}
+				}
+				
+				// --- MODAL LINK LOGIC ---
+				let currentLinkTab = 'url';
+
+				function openLinkModal() {
+					document.getElementById('link-url-input').value = '';
+					document.getElementById('link-yt-input').value = '';
+					// Reset default ke Native
+					document.querySelector('input[name="url-method"][value="native"]').checked = true;
+					toggleUrlMethod('native');
+					switchLinkTab('url');
+
+					const modal = document.getElementById('modal-link');
+					const content = document.getElementById('modal-link-content');
+					modal.classList.remove('hidden');
+					setTimeout(() => {
+						modal.classList.remove('opacity-0');
+						content.classList.remove('scale-95');
+					}, 10);
+					lucide.createIcons();
+				}
+
+				function closeLinkModal() {
+					const modal = document.getElementById('modal-link');
+					const content = document.getElementById('modal-link-content');
+					modal.classList.add('opacity-0');
+					content.classList.add('scale-95');
+					setTimeout(() => modal.classList.add('hidden'), 300);
+				}
+
+				function switchLinkTab(tab) {
+					currentLinkTab = tab;
+					const tabUrl = document.getElementById('tab-link-url');
+					const tabYt = document.getElementById('tab-link-yt');
+					const panelUrl = document.getElementById('panel-link-url');
+					const panelYt = document.getElementById('panel-link-yt');
+
+					if (tab === 'url') {
+						tabUrl.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-gBlue bg-white dark:bg-gDarkSurface shadow-sm transition";
+						tabYt.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition";
+						panelUrl.classList.remove('hidden');
+						panelYt.classList.add('hidden');
+					} else {
+						tabYt.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-rose-500 bg-white dark:bg-gDarkSurface shadow-sm transition";
+						tabUrl.className = "flex-1 py-2 text-xs font-semibold rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white transition";
+						panelUrl.classList.add('hidden');
+						panelYt.classList.remove('hidden');
+					}
+					lucide.createIcons();
+				}
+
+				function toggleUrlMethod(method) {
+					const nativeLbl = document.getElementById('lbl-method-native');
+					const corsLbl = document.getElementById('lbl-method-cors');
+					if (method === 'native') {
+						nativeLbl.className = "flex flex-col p-2.5 border border-gBlue bg-gBlue/5 dark:bg-blue-900/10 rounded-xl cursor-pointer hover:border-gBlue transition shadow-sm";
+						corsLbl.className = "flex flex-col p-2.5 border border-gray-200 dark:border-gDarkBorder rounded-xl cursor-pointer hover:border-gBlue transition";
+					} else {
+						corsLbl.className = "flex flex-col p-2.5 border border-gBlue bg-gBlue/5 dark:bg-blue-900/10 rounded-xl cursor-pointer hover:border-gBlue transition shadow-sm";
+						nativeLbl.className = "flex flex-col p-2.5 border border-gray-200 dark:border-gDarkBorder rounded-xl cursor-pointer hover:border-gBlue transition";
+					}
+				}
+
+				async function processLinkInput() {
+					const btn = document.getElementById('btn-process-link');
+					const textSpan = document.getElementById('btn-process-text');
+					const spinner = document.getElementById('link-spinner');
+
+					if (currentLinkTab === 'url') {
+						const urlInput = document.getElementById('link-url-input').value.trim();
+						if (!urlInput) {
+							showToast("Harap isi URL situs terlebih dahulu.");
+							return;
+						}
+
+						const method = document.querySelector('input[name="url-method"]:checked').value;
+						let domain = "Situs Web";
+						try {
+							const parsedUrl = new URL(urlInput);
+							domain = parsedUrl.hostname;
+						} catch (e) {}
+
+						// JALUR 1: NATIVE GEMINI GROUNDING (SANGAT DIREKOMENDASIKAN)
+						if (method === 'native') {
+							App.attachment = {
+								type: 'url',
+								name: domain + " (Native Grounding)",
+								text: `https://www.detik.com/jabar/berita/d-6210608/pengertian-referensi-adalah-tujuan-jenis-dan-contoh-penulisannya: ${urlInput}\n\nTUGAS KHUSUS: Gunakan Google Search Grounding Anda secara langsung untuk mengakses, membaca, mengekstrak, dan menganalisis seluruh isi halaman web/artikel dari URL di atas guna menjawab instruksi pengguna secara akurat.`,
+								url: urlInput,
+								isNativeGrounding: true
+							};
+
+							showFileChip(domain + " (Native)", "globe");
+							showToast("Berhasil terhubung via Native Grounding!");
+							closeLinkModal();
+							return;
+						}
+
+						// JALUR 2: EKSTRAKSI LOKAL VIA CORS PROXY
+						textSpan.textContent = "Mengekstrak...";
+						btn.disabled = true;
+						spinner.classList.remove('hidden');
+
+						try {
+							const proxies = [
+								{
+									name: 'CorsProxy.io',
+									getUrl: (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+									parse: async (res) => await res.text()
+								},
+								{
+									name: 'AllOrigins',
+									getUrl: (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+									parse: async (res) => {
+										const json = await res.json();
+										return json.contents || "";
+									}
+								},
+								{
+									name: 'CodeTabs',
+									getUrl: (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+									parse: async (res) => await res.text()
+								}
+							];
+
+							let htmlString = "";
+							let success = false;
+							let lastError = "";
+
+							for (const proxy of proxies) {
+								try {
+									const targetUrl = proxy.getUrl(urlInput);
+									const response = await fetch(targetUrl);
+									if (!response.ok) throw new Error(`HTTP ${response.status}`);
+									
+									htmlString = await proxy.parse(response);
+									if (htmlString && htmlString.trim().length > 100) {
+										success = true;
+										console.log(`Berhasil mengekstrak konten dengan proxy: ${proxy.name}`);
+										break;
+									}
+								} catch (err) {
+									lastError = err.message;
+									console.warn(`Proxy ${proxy.name} gagal: ${err.message}.`);
+								}
+							}
+
+							// FALLBACK OTOMATIS KE NATIVE JIKA CORS GAGAL
+							if (!success) {
+								console.warn("Semua proxy CORS gagal. Mengalihkan secara otomatis ke Native Grounding...");
+								App.attachment = {
+									type: 'url',
+									name: domain + " (Native Fallback)",
+									text: `https://www.detik.com/jabar/berita/d-6210608/pengertian-referensi-adalah-tujuan-jenis-dan-contoh-penulisannya: ${urlInput}\n\n[Pemberitahuan Sistem]: Pengambilan teks lokal via CORS gagal (kemungkinan terproteksi keamanan web). Harap gunakan Google Search Grounding Anda secara langsung untuk mengakses, membaca, dan menganalisis halaman web di atas secara real-time.`,
+									url: urlInput,
+									isNativeGrounding: true
+								};
+
+								showFileChip(domain + " (Native)", "globe");
+								showToast("Proteksi CORS terdeteksi. Beralih ke Native Grounding!");
+								closeLinkModal();
+								return;
+							}
+
+							const parser = new DOMParser();
+							const doc = parser.parseFromString(htmlString, 'text/html');
+
+							// Bersihkan tag tidak penting
+							const toRemove = doc.querySelectorAll('script, style, nav, footer, iframe, noscript, header, svg, img');
+							toRemove.forEach(el => el.remove());
+
+							const elements = doc.querySelectorAll('h1, h2, h3, h4, p, li');
+							let extractedText = '';
+							elements.forEach(el => {
+								const text = el.textContent.trim();
+								if (text) extractedText += text + '\n\n';
+							});
+
+							if (extractedText.trim().length < 50) {
+								extractedText = doc.body?.innerText || doc.body?.textContent || '';
+							}
+
+							if (extractedText.trim().length < 10) {
+								throw new Error("Konten teks terlalu pendek.");
+							}
+
+							const title = doc.title || "Tautan Konten Web";
+							App.attachment = {
+								type: 'url',
+								name: title,
+								text: extractedText.substring(0, 80000),
+								url: urlInput,
+								isNativeGrounding: false
+							};
+
+							showFileChip(title, "globe");
+							showToast("Berhasil memproses halaman web!");
+							closeLinkModal();
+
+						} catch (error) {
+							// Jika terjadi kesalahan fatal apa pun pada proxy, beralih ke native grounding
+							App.attachment = {
+								type: 'url',
+								name: domain + " (Native Fallback)",
+								text: `https://www.detik.com/jabar/berita/d-6210608/pengertian-referensi-adalah-tujuan-jenis-dan-contoh-penulisannya: ${urlInput}\n\n[Pemberitahuan Sistem]: Kegagalan CORS lokal. Harap gunakan fitur Google Search Grounding Anda untuk merayap dan membaca situs ini secara langsung.`,
+								url: urlInput,
+								isNativeGrounding: true
+							};
+							
+							showFileChip(domain + " (Native)", "globe");
+							showToast("Dialihkan otomatis ke Native Grounding!");
+							closeLinkModal();
+						} finally {
+							textSpan.textContent = "Hubungkan";
+							btn.disabled = false;
+							spinner.classList.add('hidden');
+						}
+
+					} else {
+						const ytInput = document.getElementById('link-yt-input').value.trim();
+						if (!ytInput) {
+							showToast("Harap isi URL video YouTube terlebih dahulu.");
+							return;
+						}
+
+						// Extract YouTube ID
+						const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+						const match = ytInput.match(regExp);
+						const videoId = (match && match[2].length === 11) ? match[2] : null;
+
+						if (!videoId) {
+							showToast("Tautan video YouTube tidak dapat dikenali.");
+							return;
+						}
+
+						textSpan.textContent = "Menghubungkan...";
+						btn.disabled = true;
+						spinner.classList.remove('hidden');
+
+						try {
+							const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+							if (!response.ok) throw new Error("Gagal memproses metadata YouTube.");
+							const metadata = await response.json();
+
+							if (metadata.error) throw new Error(metadata.error);
+
+							const title = metadata.title || "Video YouTube";
+							const author = metadata.author_name || "Kreator";
+
+							App.attachment = {
+								type: 'yt',
+								name: title,
+								text: `Tonton Video di: ${ytInput} | Judul: ${title} | Kreator: ${author} | ID Video: ${videoId}`,
+								url: ytInput,
+								id: videoId
+							};
+
+							showFileChip(title, "video");
+							showToast("Berhasil menyinkronkan video YouTube!");
+							closeLinkModal();
+
+						} catch (error) {
+							showToast("Kesalahan oEmbed YouTube: " + error.message);
+						} finally {
+							textSpan.textContent = "Hubungkan";
+							btn.disabled = false;
+							spinner.classList.add('hidden');
+						}
+					}
+				}
+				
+				// --- UI TRANSITION ---
+				function transitionToResults() {
+					if (!App.isHome) return;
+					App.isHome = false;
+					
+					const mainLayout = document.getElementById('main-layout');
+					const logoContainer = document.getElementById('logo-container');
+					const homeBtns = document.getElementById('home-buttons');
+					const resultsContainer = document.getElementById('results-container');
+					
+					mainLayout.classList.remove('justify-center', 'pt-10', 'flex-1');
+					mainLayout.classList.add('justify-start', 'pt-4', 'pb-4', 'border-b', 'border-gray-100', 'dark:border-gDarkBorder', 'sticky', 'top-0', 'bg-white', 'dark:bg-gDarkBg', 'z-40');
+					
+					logoContainer.classList.add('hidden');
+					homeBtns.classList.add('hidden');
+					
+					resultsContainer.classList.remove('hidden');
+					resultsContainer.classList.add('flex', 'flex-col');
+				}
+				
+				// --- GOOGLE SEARCH (NATIVE) ---
+				function searchGoogle() {
+					const query = document.getElementById('main-input').value.trim();
+					if (query) {
+						window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
+						} else {
+						document.getElementById('main-input').focus();
+					}
+				}
+				
+				// --- MODE SELECTIONS & INSTANT DROPDOWN LOGIC ---
+				function toggleModeDropdown(event) {
+					event.stopPropagation();
+					const dropdown = document.getElementById('mode-dropdown');
+					// Tutup instan dropdown jika terbuka
+					document.getElementById('instant-dropdown').classList.add('hidden');
+					
+					if (dropdown.classList.contains('hidden')) {
+						dropdown.classList.remove('hidden');
+						setTimeout(() => dropdown.classList.remove('opacity-0', 'scale-95'), 10);
+						} else {
+						dropdown.classList.add('opacity-0', 'scale-95');
+						setTimeout(() => dropdown.classList.add('hidden'), 150);
+					}
+				}
+				
+				function selectMode(event, value, label) {
+					event.stopPropagation();
+					document.getElementById('mode-selector').value = value;
+					document.getElementById('mode-label').innerText = label;
+					
+					const dropdown = document.getElementById('mode-dropdown');
+					dropdown.classList.add('opacity-0', 'scale-95');
+					setTimeout(() => dropdown.classList.add('hidden'), 150);
+					document.getElementById('main-input').focus();
+				}
+				
+				// --- INSTANT ACTION PIPELINE ---
+				function toggleInstantDropdown(event) {
+					event.stopPropagation();
+					const dropdown = document.getElementById('instant-dropdown');
+					// Tutup mode dropdown jika terbuka
+					document.getElementById('mode-dropdown').classList.add('hidden');
+					
+					if (dropdown.classList.contains('hidden')) {
+						dropdown.classList.remove('hidden');
+						setTimeout(() => dropdown.classList.remove('opacity-0', 'scale-95'), 10);
+						} else {
+						dropdown.classList.add('opacity-0', 'scale-95');
+						setTimeout(() => dropdown.classList.add('hidden'), 150);
+					}
+				}
+				
+				function triggerInstant(type) {
+					const dropdown = document.getElementById('instant-dropdown');
+					dropdown.classList.add('opacity-0', 'scale-95');
+					setTimeout(() => dropdown.classList.add('hidden'), 150);
+					
+					const inputEl = document.getElementById('main-input');
+					const query = inputEl.value.trim();
+					if (!query && !App.attachment.text && !App.attachment.data) {
+						inputEl.focus();
+						showToast("Ketik instruksi/topik atau lampirkan file/link terlebih dahulu!");
+						return;
+					}
+					
+					document.getElementById('mode-selector').value = 'chat';
+					document.getElementById('mode-label').innerText = '✨ Tanya Bebas';
+					submitQuery(true, type);
+				}
+				
+				// --- CORE AI LOGIC ---
+				function buildSystemPrompt(mode) {
+					let sys = `Selalu berikan respon dalam Bahasa ${App.config.lang} dan gunakan format Markdown yang rapi.`;
+					
+					if (App.config.persona) sys += `\n[Persona/Peran Anda]: ${App.config.persona}`;
+					if (App.config.topic) sys += `\n[Fokus/Tema Bahasan Utama]: Arahkan dan fokuskan konteks obrolan pada tema "${App.config.topic}" jika memungkinkan.`;
+					sys += `\n[Nada Bicara]: ${App.config.tone}`;
+					sys += `\n[Tingkat Pemahaman Target]: Jawab dalam level ${App.config.level}.`;
+					sys += `\n[Panjang Respons]: Usahakan jawaban Anda ${App.config.length}.`;
+					if (App.config.extra) sys += `\n[Info Konteks Pengguna]: ${App.config.extra}`;
+					
+					if (App.config.maps) {
+						sys += `\n[Mode Grounding Maps Aktif]: Pengguna mengharapkan informasi geografis. Berikan penjelasan lokasi, alamat, arah, estimasi jarak, rute, atau ulasan tempat wisata seakurat mungkin layaknya Google Maps.`;
+					}
+					
+					// Dinamis menyematkan konteks lampiran ke sistem prompt
+					if (App.attachment.type === 'url') {
+						if (App.attachment.isNativeGrounding) {
+							sys += `\n\n[Konteks URL Native Grounding Aktif]:
+							Situs target: ${App.attachment.url}
+							TUGAS KHUSUS: Pengguna melampirkan sebuah link. Anda WAJIB menggunakan modul Google Search Grounding Anda secara langsung untuk mengakses, membaca, dan menganalisis tautan tersebut guna menjawab seluruh pertanyaan terkait.`;
+						} else {
+							sys += `\n\n[Konteks Lampiran Web URL]:
+							Judul Web: ${App.attachment.name}
+							Tautan URL: ${App.attachment.url}
+							Isi Teks Dokumen:
+							"""
+							${App.attachment.text}
+							"""
+							TUGAS KHUSUS: Analisis isi teks halaman web di atas secara komprehensif, logis, dan objektif untuk menyusun respons. Jika tidak ada jawaban di dalam teks, Anda diperbolehkan menggunakan Google Search Grounding untuk melakukan kualifikasi data real-time tambahan.`;
+						}
+					} else if (App.attachment.type === 'yt') {
+						sys += `\n\n[Konteks Lampiran YouTube Video]:
+						Judul Video: ${App.attachment.name}
+						Tautan URL Video: ${App.attachment.url}
+						ID Video: ${App.attachment.id}
+						TUGAS KHUSUS: Gunakan alat Google Search Grounding terintegrasi guna menelusuri transkrip, analisis konten video, atau timeline video tersebut agar Anda mampu mendedikasikan jawaban yang presisi dan akurat layaknya Anda telah melihat isi video tersebut langsung.`;
+					}
+					
+					if (mode === 'code') {
+						sys += "\n[Mode Khusus]: Anda adalah Senior Programmer. Berikan kode bersih, efisien, dan jelaskan cara kerjanya secara ringkas.";
+						} else if (mode === 'summarize') {
+						sys += "\n[Mode Khusus]: Buat ringkasan naratif dan masukkan poin penting berupa poin-poin (bullet points) untuk kemudahan membaca.";
+						} else if (mode === 'refine') {
+						sys += "\n[Mode Khusus]: Rapikan teks dan perbaiki ejaan sesuai kaidah bahasa ${App.config.lang}";
+						} else if (mode === 'emote') {
+						sys += "\n[Mode Khusus]: Analisis sentimen dan nada teks, lalu berikan alternatif teks dengan gaya ${App.config.tone}.";
+						} else if (mode === 'translate') {
+						sys += `\n[Mode Khusus]: Anda adalah Penerjemah Profesional. Terjemahkan teks ke Bahasa ${App.config.lang}.`;
+						} else if (mode === 'decide') {
+						sys += "\n[Mode Khusus]: Anda bertindak sebagai Analis yang berperan menganalisis topik dari sudut pandang SWOT (Kekuatan, Kelemahan, Peluang, Ancaman) atau metode analisis sejenis, pernyataan rekomendasi serta solusi alternatif yang praktis.";
+						} else if (mode === 'research') {
+						sys += "\n[Mode Khusus]: Anda bertindak sebagai Ahli yang memberikan penjelasan terkait topik dengan sudut pandang pemahaman ahli secara komprehensif, jelas, dan akurat sesuai kaidah akademis. Format jawaban Anda harus rapi dan terstruktur diawali dengan penjelasan singkat terkait riset yang dilakukan, latar belakang, kajian teori, metodologi riset (Jelaskan metodologi riset yang dapat dilakukan baik secara kualitatif, kuantitatif, maupun dengan metodologi lainnya yang sesuai dengan topik bahasan yang dimaksud ke dalam bentuk daftar. Tambahkan penjelasan singkat dan salah satu rekomendasi metodologi terbaik.), riset dan analisis (Lakukan simulasi riset dengan metodologi rekomendasi tersebut, didukung dengan analisis lebih dalam topik tersebut dalam bentuk narasi and/atau data (dalam bentuk daftar), hasil, simpulan dan saran, serta akhiri dengan referensi relevan dalam bentuk daftar.";
+						} else if (mode === 'creative') {
+						sys += "\n[Mode Khusus]: Bertindaklah sebagai seniman atau pencerita kreatif. Berikan ide dari topik berupa puisi, cerita pendek, lirik lagu, pantun, lelucon, kata mutiara, analogi metaforis, atau dialog imajiner.";	
+						} else if (mode === 'debate') {
+						sys += "\n[Mode Khusus]: Bertindaklah sebagai kritikus ahli. Berikan argumen kontra/kritik terhadap topik ini secara komprehensif.";
+						} else if (mode === 'prompt') {
+						sys += "\n[Mode Khusus]: Bertindaklah sebagai ahli prompter AI. Buatlah prompt AI LLM yang efektif, efisien, dan siap pakai sesuai permintaan pengguna (pembuatan gambar, pembuatan video, pembuatan AI, vibe coding, perencanaan kegiatan, atau untuk kebutuhan sehari-hari).";	            
+					}
+					
+					return sys;
+				}
+				
+				async function submitQuery(isInstant = false, instantType = null) {
+					const inputEl = document.getElementById('main-input');
+					const mode = document.getElementById('mode-selector').value;
+					const query = inputEl.value.trim();
+					const btn = document.getElementById('btn-submit');
+					
+					if (!query && !App.attachment.text && !App.attachment.data) return;
+					
+					if (!App.config.apiKey) {
+						return showToast("⚠️ Masukkan API Key di Setelan (Ikon ⚙️) terlebih dahulu!");
+					}
+					
+					transitionToResults();
+					const resultsContainer = document.getElementById('results-container');
+					
+					let displayQuery = query;
+					if (App.attachment.type === 'image') displayQuery = `🖼️ [Gambar Terlampir: ${App.attachment.name}]\n${query}`;
+					else if (App.attachment.type === 'file') displayQuery = `📎 [Dokumen Terlampir: ${App.attachment.name}]\n${query}`;
+					else if (App.attachment.type === 'url') displayQuery = `🌐 [${App.attachment.name}](${App.attachment.url})\n${query}`;
+					else if (App.attachment.type === 'yt') displayQuery = `🎥 [Video YouTube: ${App.attachment.name}]\n${query}`;
+					
+					// Tambahkan badge identifikasi mode instan di UI user chat
+					let badgeHtml = '';
+					if (isInstant && instantType) {
+						const labels = {
+							'txt_summary': 'Ringkasan (TXT)', 'md_detail': 'Rincian MD', 'md_code': 'Kode MD',
+							'html_page': 'HTML Web', 'html_quiz': 'Kuis HTML', 'html_questionnaire': 'Kuisioner HTML',
+							'html_mindmap': 'Mindmap HTML', 'html_flashcard': 'Flashcard HTML'
+						};
+						badgeHtml = `<span class="inline-block bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider mb-2">⚡ Buat Instan: ${labels[instantType] || 'Generasi'}</span><br>`;
+					}
+					
+					resultsContainer.innerHTML += `
+					<div class="flex justify-end mb-6 fade-in">
+                    <div class="bg-[#f1f3f4] dark:bg-[#3c4043] text-[#202124] dark:text-[#e8eaed] px-5 py-3 rounded-3xl rounded-tr-sm max-w-[85%] whitespace-pre-wrap">${badgeHtml}${displayQuery}</div>
+					</div>
+					`;
+					
+					inputEl.value = '';
+					inputEl.style.height = 'auto';
+					inputEl.focus();
+					
+					const loadId = 'load-' + Date.now();
+					resultsContainer.innerHTML += `
+					<div id="${loadId}" class="flex gap-4 mb-6 fade-in">
+                    <div class="w-8 h-8 rounded-full bg-[#e8eaed] dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+					<img src="https://www.gstatic.com/images/branding/product/1x/google_gemini_48dp.png" class="w-5 h-5 opacity-50 grayscale dark:invert" alt="AI">
+                    </div>
+                    <div class="flex items-center"><div class="loader"></div></div>
+					</div>
+					`;
+					resultsContainer.scrollTop = resultsContainer.scrollHeight;
+					btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>';
+					btn.disabled = true;
+					
+					let systemInstruction = buildSystemPrompt(mode);
+					let finalPromptText = query;
+					let expectedExtension = 'md';
+					
+					// Override prompt if it's from Dropdown "Buat Instan"
+					if (isInstant && instantType) {
+						switch(instantType) {
+							case 'txt_summary':
+							finalPromptText = `Buat ringkasan eksekutif dan padat dari topik berikut. Berikan format teks murni yang bersih tanpa gaya format berlebihan.\nTopik: ${query}`;
+							expectedExtension = 'txt';
+							break;
+							case 'md_detail':
+							finalPromptText = `Berikan rincian yang SANGAT komprehensif, mendalam, dan terstruktur menggunakan gaya dan format Markdown (heading, list, tabel jika perlu).\nTopik: ${query}`;
+							expectedExtension = 'md';
+							break;
+							case 'md_code':
+							finalPromptText = `Buatkan baris kode lengkap dan bersih beserta penjelasannya menggunakan format Markdown.\nTugas: ${query}`;
+							expectedExtension = 'md';
+							break;
+							case 'html_page':
+							finalPromptText = `Buatkan Laman Web Sederhana dalam SATU file HTML tunggal (HTML, CSS, JS tergabung) untuk: ${query}. Gunakan Tailwind CSS via CDN untuk desain yang modern dan responsif. Berikan langsung kodenya tanpa penjelasan basa-basi.`;
+							expectedExtension = 'html';
+							break;
+							case 'html_quiz':
+							finalPromptText = `Buatkan Kuis Interaktif berisi 30 soal pilihan ganda tentang ${query} dalam SATU file HTML tunggal. Gabungkan HTML, CSS (Tailwind via CDN), dan JS di dalamnya. Implementasikan logika penilaian (skor) di akhir kuis. Pastikan kodenya valid dan bisa langsung dijalankan (runnable) di browser.`;
+							expectedExtension = 'html';
+							break;
+							case 'html_questionnaire':
+							finalPromptText = `Buatkan Kuisioner / Sistem Pakar berisi 20 pertanyaan interaktif tentang ${query} dalam SATU file HTML tunggal. Gabungkan HTML, CSS (Tailwind via CDN), dan JS. Berikan hasil diagnosis atau klasifikasi di akhir berdasarkan jawaban pengguna. Pastikan kode bisa dijalankan.`;
+							expectedExtension = 'html';
+							break;
+							case 'html_mindmap':
+							finalPromptText = `Buatkan Mindmap Interaktif tentang ${query} dalam SATU file HTML tunggal. Anda bisa menggunakan HTML/CSS murni untuk merendernya, atau menyematkan script Markmap/Mermaid.js via CDN agar grafiknya interaktif dan cantik.`;
+							expectedExtension = 'html';
+							break;
+							case 'html_flashcard':
+							finalPromptText = `Buatkan Aplikasi Flashcard (20 kartu memori) tentang ${query} dalam SATU file HTML tunggal. Gabungkan HTML, CSS (Tailwind), dan JavaScript untuk membuat efek membalik kartu (flip 3D) dan tombol navigasi Prev/Next. Kode harus siap jalan.`;
+							expectedExtension = 'html';
+							break;
+						}
+						} else {
+						// Handling Mode Selector standar
+						if (mode === 'code') finalPromptText = `Tuliskan kode untuk: ${query}`;
+						else if (mode === 'summarize') finalPromptText = `Tolong ringkas ini:\n\n${query}`;
+						else if (mode === 'refine') finalPromptText = `Tolong perbaiki dan cek ejaan teks ini:\n\n${query}`;
+						else if (mode === 'emote') finalPromptText = `Tolong analisis sentimen dan nada teks ini:\n\n${query}`;
+						else if (mode === 'translate') finalPromptText = `Terjemahkan:\n\n${query}`;
+						else if (mode === 'research') finalPromptText = `Lakukan riset untuk:\n\n${query}`;
+						else if (mode === 'decide') finalPromptText = `Buat analisis SWOT, rekomendasi, dan alternatif solusi untuk:\n\n${query}`;
+						else if (mode === 'creative') finalPromptText = `Buatlah puisi, lirik, pantun, cerita, lelucon, atau karya sastra lain dari:\n\n${query}`;
+						else if (mode === 'debate') finalPromptText = `Berikan argumen kontra atau kritik dari:\n\n${query}`;
+						else if (mode === 'prompt') finalPromptText = `Buatkan prompt AI yang efektif dan efisien untuk:\n\n${query}`;
+					}
+					
+					// Gabungkan lampiran teks atau link ke dalam muatan prompt akhir
+					if (App.attachment.type === 'file' || App.attachment.type === 'url') {
+						finalPromptText = `[Dokumen Referensi Terlampir]:\n${App.attachment.text.substring(0, 30000)}\n\n[Tugas Utama/Pesan]:\n${finalPromptText}`;
+					}
+					
+					let parts = [];
+					if (finalPromptText) parts.push({ text: finalPromptText });
+					if (App.attachment.type === 'image' && App.attachment.data) parts.push({ inlineData: App.attachment.data });
+					
+					try {
+						let url;
+						if (App.config.provider === 'custom' && App.config.url) {
+							const base = App.config.url.replace(/\/$/, '');
+							url = `${base}/models/${App.config.model}:generateContent?key=${App.config.apiKey}`;
+							} else {
+							url = `https://generativelanguage.googleapis.com/v1beta/models/${App.config.model}:generateContent?key=${App.config.apiKey}`;
+						}
+						
+						let contents = [];
+						// Sejarah tidak diikutsertakan jika mode instan ATAU setting single respons ON
+						if (mode === 'chat' && !isInstant && !App.config.single && App.history.length > 0) {
+							contents = [...App.history];
+						}
+						contents.push({ role: "user", parts: parts });
+						
+						const payload = {
+							contents: contents,
+							systemInstruction: { parts: [{ text: systemInstruction }] },
+							generationConfig: { 
+								temperature: isInstant ? 0.4 : App.config.temp,
+								maxOutputTokens: App.config.maxTokens
+							}
+						};
+						
+						// Aktifkan Grounding Google Search secara otomatis untuk mode search, maps, YouTube, dan tautan web
+						if (App.config.search || mode === 'search' || App.attachment.type === 'yt' || App.attachment.type === 'url') {
+							payload.tools = [{ google_search: {} }];
+						}
+						
+						const response = await fetch(url, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify(payload)
+						});
+						
+						if (!response.ok) {
+							const err = await response.json();
+							throw new Error(err.error?.message || "HTTP Error " + response.status);
+						}
+						
+						const data = await response.json();
+						const aiText = data.candidates[0].content.parts[0].text;
+						
+						// --- EKSEKUSI PENGHITUNGAN TOKEN & USAGE ---
+						let tokenCount = 0;
+						if (data.usageMetadata && data.usageMetadata.totalTokenCount) {
+							tokenCount = data.usageMetadata.totalTokenCount;
+						}
+						updateUsage(tokenCount);								
+						if (mode === 'chat' && !isInstant && !App.config.single) {
+							App.history.push({ role: "user", parts: [{ text: finalPromptText }] });
+							App.history.push({ role: "model", parts: [{ text: aiText }] });
+							if (App.history.length > 10) App.history = App.history.slice(-10);
+						}
+						
+						document.getElementById(loadId).remove();
+						marked.setOptions({ breaks: true });
+						const parsedHtml = marked.parse(aiText);
+						
+						// --- LOGIKA TOMBOL EKSTRAKSI ---
+						let extractButtons = `
+						<button onclick="copyText(this)" data-text="${encodeURIComponent(aiText)}" class="px-3 py-1 bg-white dark:bg-gDarkSurface border border-gray-200 dark:border-gDarkBorder rounded-full text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1 shadow-sm">
+                        <i data-lucide="copy" class="w-3 h-3"></i> Salin
+						</button>
+						<button onclick="downloadText(this, 'txt')" data-text="${encodeURIComponent(aiText)}" class="px-3 py-1 bg-white dark:bg-gDarkSurface border border-gray-200 dark:border-gDarkBorder rounded-full text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1 shadow-sm">
+                        <i data-lucide="download" class="w-3 h-3"></i> TXT
+						</button>
+						<button onclick="downloadText(this, 'md')" data-text="${encodeURIComponent(aiText)}" class="px-3 py-1 bg-white dark:bg-gDarkSurface border border-gray-200 dark:border-gDarkBorder rounded-full text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-1 shadow-sm">
+                        <i data-lucide="download" class="w-3 h-3"></i> MD
+						</button>
+						`;
+						
+						// Cek jika diharapkan berupa HTML, tambahkan tombol Preview dan Download HTML
+						if (expectedExtension === 'html' || aiText.includes('<html') || aiText.includes('<!DOCTYPE html>')) {
+							let cleanHtmlContent = aiText;
+							const htmlMatch = cleanHtmlContent.match(/`{3}(?:html)?\s*([\s\S]*?)`{3}/i);
+							if(htmlMatch) cleanHtmlContent = htmlMatch[1].trim();
+							
+							extractButtons += `
+							<button onclick="downloadHtml(this)" data-text="${encodeURIComponent(cleanHtmlContent)}" class="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-full text-xs text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition flex items-center gap-1 shadow-sm ml-2">
+                            <i data-lucide="code" class="w-3 h-3"></i> Download HTML
+							</button>
+							<button onclick="previewHtml(this)" data-text="${encodeURIComponent(cleanHtmlContent)}" class="px-3 py-1 bg-gBlue text-white border border-transparent rounded-full text-xs hover:bg-blue-700 transition flex items-center gap-1 shadow-sm">
+                            <i data-lucide="play" class="w-3 h-3"></i> Preview Web
+							</button>
+							`;
+						}
+						
+						resultsContainer.innerHTML += `
+						<div class="flex gap-4 mb-8 fade-in group">
+                        <div class="w-8 h-8 rounded-full bg-white dark:bg-gDarkSurface border border-gray-200 dark:border-gDarkBorder flex items-center justify-center flex-shrink-0 shadow-sm mt-1">
+						<img src="https://www.gstatic.com/images/branding/product/1x/google_gemini_48dp.png" class="w-5 h-5" alt="AI">
+                        </div>
+                        <div class="flex-1 min-w-0">
+						<div class="prose max-w-none text-gray-800 dark:text-gray-200">${parsedHtml}</div>
+						<div class="mt-3 flex flex-wrap gap-2">
+						${extractButtons}
+						</div>
+                        </div>
+						</div>
+						`;
+						
+						} catch (error) {
+						document.getElementById(loadId).innerHTML = `
+						<div class="w-8 h-8 rounded-full bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 flex items-center justify-center flex-shrink-0"><i data-lucide="alert-triangle" class="w-4 h-4"></i></div>
+						<div class="text-red-500 dark:text-red-400 text-sm py-1 font-medium">Gagal: ${error.message}</div>
+						`;
+						} finally {
+						btn.innerHTML = '<i data-lucide="search" class="w-5 h-5"></i>';
+						btn.disabled = false;
+						removeFile(); 
+						lucide.createIcons();
+						resultsContainer.scrollTop = resultsContainer.scrollHeight;
+					}
+				}
+				
+				// --- EXPORT & PREVIEW UTILITIES ---
+				function copyText(btn) {
+					const text = decodeURIComponent(btn.getAttribute('data-text'));
+					navigator.clipboard.writeText(text).then(() => {
+						const originalHtml = btn.innerHTML;
+						btn.innerHTML = '<i data-lucide="check" class="w-3 h-3 text-gGreen"></i> Disalin';
+						lucide.createIcons();
+						setTimeout(() => { btn.innerHTML = originalHtml; lucide.createIcons(); }, 2000);
+					});
+				}
+				
+				function downloadText(btn, type) {
+					const text = decodeURIComponent(btn.getAttribute('data-text'));
+					const mimeType = type === 'md' ? 'text/markdown' : 'text/plain';
+					const blob = new Blob([text], { type: mimeType });
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = `MyAI_Export.${type}`;
+					a.click();
+					URL.revokeObjectURL(url);
+				}
+				
+				function downloadHtml(btn) {
+					const htmlContent = decodeURIComponent(btn.getAttribute('data-text'));
+					const blob = new Blob([htmlContent], { type: 'text/html' });
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = `MyAI_App.html`;
+					a.click();
+					URL.revokeObjectURL(url);
+					showToast("Memulai unduhan HTML...");
+				}
+				
+				function previewHtml(btn) {
+					const htmlContent = decodeURIComponent(btn.getAttribute('data-text'));
+					const newWindow = window.open();
+					newWindow.document.write(htmlContent);
+					newWindow.document.close();
+					showToast("Membuka Preview di Tab Baru...");
+				}
+			</script>
+		</body>
+	</html>

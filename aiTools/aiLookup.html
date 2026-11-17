@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>aiLookup</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind Typography Plugin for Markdown Styling -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Marked.js for Markdown Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #0f172a;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.1) 0px, transparent 50%), 
+                radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        /* Glassmorphism Effect */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        /* Input Glow */
+        .input-glow:focus-within {
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+            border-color: #6366f1;
+        }
+        
+        /* Select styling for Web Search & Specific Mode */
+        select option {
+            background-color: #1e293b;
+            color: #e2e8f0;
+        }
+
+        /* Markdown Styles Overrides */
+        .prose h1, .prose h2, .prose h3 { color: #e2e8f0; }
+        .prose strong { color: #f8fafc; }
+        .prose a { color: #38bdf8; text-decoration: none; }
+        .prose blockquote { border-left-color: #6366f1; color: #94a3b8; font-style: italic; }
+        .prose code { color: #f472b6; background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 4px; }
+        .prose ul > li::marker { color: #6366f1; }
+        
+        .tab-active {
+            background-color: rgba(99, 102, 241, 0.2);
+            border-color: #6366f1;
+            color: #818cf8;
+        }
+        .tab-inactive {
+            border-color: transparent;
+            color: #94a3b8;
+        }
+        .tab-inactive:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+        }
+        
+        /* Utility Animation */
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen flex flex-col items-center py-8 px-4">
+
+    <!-- Main Container -->
+    <main class="w-full max-w-4xl glass-panel rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[80vh]">
+        
+        <!-- Header -->
+        <div class="p-6 md:p-8 border-b border-white/5 bg-slate-900/50">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                        <i data-lucide="layers" class="text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">aiLookup</h1>
+                        <p class="text-xs text-slate-400 tracking-wider uppercase font-medium">Pencarian Terpadu</p>
+                    </div>
+                </div>
+                <!-- Main Navigation Tabs -->
+                <div class="flex p-1 bg-slate-800/80 rounded-lg border border-white/5">
+                    <button onclick="switchMainTab('ai')" id="tab-ai" class="px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 tab-active">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i> AI Analysis
+                    </button>
+                    <button onclick="switchMainTab('web')" id="tab-web" class="px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 tab-inactive">
+                        <i data-lucide="globe" class="w-4 h-4"></i> Web Search
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6 md:p-8 flex-grow flex flex-col">
+            
+            <!-- VIEW 1: AI LOOKUP -->
+            <div id="view-ai" class="space-y-6 flex-col flex">
+                <!-- Advanced Toggle -->
+				<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-800/40 p-3 rounded-xl border border-white/5 -mb-2">
+									<label class="inline-flex items-center cursor-pointer group select-none" title="Gunakan model Gemini 2.5 Flash untuk penalaran yang lebih dalam">
+										<span class="mr-3 text-xs font-medium text-slate-400 group-hover:text-slate-300 transition-colors flex items-center gap-1.5">
+											<i data-lucide="cpu" class="w-3.5 h-3.5 text-amber-500"></i> Mode Advanced
+										</span>
+										<div class="relative">
+											<input type="checkbox" id="advanced-toggle" class="sr-only peer">
+											<div class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+										</div>
+									</label>
+					
+					<div class="w-full sm:w-64 flex items-center gap-2 border border-slate-700 rounded-lg px-3 py-1.5 bg-slate-900/50 focus-within:border-indigo-500 focus-within:bg-slate-900 transition">
+                        <i data-lucide="key" class="w-3.5 h-3.5 text-slate-500 shrink-0"></i>
+                        <input type="password" id="custom-api-key" placeholder="Gemini API Key (Opsional)" class="w-full bg-transparent text-xs text-slate-300 outline-none placeholder-slate-500">
+                    </div>
+					
+                </div>
+
+                <!-- Mode Selector -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="mode" value="normal" checked class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-white/5 bg-slate-800/50 hover:bg-slate-700/50 peer-checked:bg-indigo-600 peer-checked:border-indigo-500 peer-checked:shadow-lg peer-checked:shadow-indigo-500/20 transition-all text-center">
+                            <i data-lucide="search" class="w-5 h-5 mx-auto mb-1 opacity-70 peer-checked:opacity-100"></i>
+                            <span class="text-sm font-medium">Normal</span>
+                        </div>
+                    </label>
+
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="mode" value="decide" class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-white/5 bg-slate-800/50 hover:bg-slate-700/50 peer-checked:bg-purple-600 peer-checked:border-purple-500 peer-checked:shadow-lg peer-checked:shadow-purple-500/20 transition-all text-center">
+                            <i data-lucide="scale" class="w-5 h-5 mx-auto mb-1 opacity-70 peer-checked:opacity-100"></i>
+                            <span class="text-sm font-medium">Decide</span>
+                        </div>
+                    </label>
+
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="mode" value="research" class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-white/5 bg-slate-800/50 hover:bg-slate-700/50 peer-checked:bg-teal-600 peer-checked:border-teal-500 peer-checked:shadow-lg peer-checked:shadow-teal-500/20 transition-all text-center">
+                            <i data-lucide="book-open" class="w-5 h-5 mx-auto mb-1 opacity-70 peer-checked:opacity-100"></i>
+                            <span class="text-sm font-medium">Research</span>
+                        </div>
+                    </label>
+
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="mode" value="creative" class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-white/5 bg-slate-800/50 hover:bg-slate-700/50 peer-checked:bg-pink-600 peer-checked:border-pink-500 peer-checked:shadow-lg peer-checked:shadow-pink-500/20 transition-all text-center">
+                            <i data-lucide="palette" class="w-5 h-5 mx-auto mb-1 opacity-70 peer-checked:opacity-100"></i>
+                            <span class="text-sm font-medium">Creative</span>
+                        </div>
+                    </label>
+
+                    <label class="cursor-pointer relative group">
+                        <input type="radio" name="mode" value="specific" class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-white/5 bg-slate-800/50 hover:bg-slate-700/50 peer-checked:bg-blue-600 peer-checked:border-blue-500 peer-checked:shadow-lg peer-checked:shadow-blue-500/20 transition-all text-center">
+                            <i data-lucide="target" class="w-5 h-5 mx-auto mb-1 opacity-70 peer-checked:opacity-100"></i>
+                            <span class="text-sm font-medium">Specific</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Specific Topic Dropdown (Hidden by default) -->
+                <div id="specific-topic-container" class="hidden animate-fade-in -mt-2">
+                    <label for="specific-topic" class="block text-xs font-medium text-slate-400 mb-2 ml-1">Pilih Topik Spesifik:</label>
+                    <div class="relative group input-glow rounded-xl bg-slate-800/80 border border-slate-700 transition-all">
+                        <select id="specific-topic" class="w-full bg-transparent text-slate-200 text-sm px-4 py-3 appearance-none focus:outline-none cursor-pointer rounded-xl">
+                            <option value="Berita dan Cuaca">Berita dan Cuaca</option>
+                            <option value="Internasional">Internasional</option>
+                            <option value="Olahraga">Olahraga</option>							
+                            <option value="Pendidikan">Pendidikan</option>
+                            <option value="Kesehatan">Kesehatan</option>
+                            <option value="Agama dan Moral">Agama dan Moral</option>
+                            <option value="Sosial dan Budaya">Sosial dan Budaya</option>
+                            <option value="Hukum">Hukum</option>
+                            <option value="Keadilan dan HAM">Keadilan dan HAM</option>	
+                            <option value="Keamanan dan Ketertiban">Keamanan dan Ketertiban</option>		
+                            <option value="Militer">Militer</option>								
+                            <option value="Politik">Politik</option>				
+                            <option value="Keuangan">Keuangan</option>
+                            <option value="Ekonomi dan Bisnis">Ekonomi dan Bisnis</option>
+                            <option value="Lowongan Kerja">Lowongan Kerja</option>							
+                            <option value="Kurs dan Pasar Modal">Kurs dan Pasar Modal</option>
+                            <option value="Musik">Musik</option>
+                            <option value="Film dan TV">Film dan TV</option>
+                            <option value="Selebriti dan Infotainment">Selebriti dan Infotainment</option>							
+                            <option value="Seni dan Hobi">Seni dan Hobi</option>
+							<option value="Pop Kultur">Pop Kultur</option>
+                            <option value="Belanja">Belanja</option>
+                            <option value="Perjalanan dan Pariwisata">Perjalanan dan Pariwisata</option>
+                            <option value="Penerbangan">Penerbangan</option>							
+                            <option value="Lalu Lintas">Lalu Lintas</option>							
+                            <option value="Ilmu Pengetahuan dan Teknologi">Ilmu Pengetahuan dan Teknologi</option>
+							<option value="Digital dan Siber">Digital dan Siber</option>
+                            <option value="Properti">Properti</option>
+							<option value="Otomotif">Otomotif</option>
+							<option value="DIY dan Prakarya">DIY dan Prakarya</option>
+							<option value="Gaya Hidup">Gaya Hidup</option>
+							<option value="Cinta dan Seks">Cinta dan Seks</option>
+                            <option value="Bayi, Anak, dan Keluarga">Bayi, Anak, dan Keluarga</option>
+							<option value="Ketenagakerjaan">Ketenagakerjaan</option>							
+                        </select>
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="text-center">
+                    <p id="mode-description" class="text-slate-400 text-sm transition-all duration-300">
+                        Pencarian cepat untuk fakta dan informasi umum.
+                    </p>
+                </div>
+
+                <!-- Input AI -->
+                <div class="relative group input-glow rounded-xl bg-slate-800/80 border border-slate-700 transition-all">
+                    <textarea id="ai-query-input" rows="3" 
+                        class="w-full bg-transparent p-4 pr-32 text-slate-200 placeholder-slate-500 focus:outline-none resize-none rounded-xl"
+                        placeholder="Tanya AI: Apa yang ingin Anda ketahui?"></textarea>
+                    
+                    <div class="absolute bottom-3 right-3 flex items-center gap-2">
+                        <button id="ai-lookup-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium text-sm transition-colors shadow-lg shadow-indigo-600/20 flex items-center gap-2">
+                            <span>Analisis</span>
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Output AI -->
+                <div id="ai-output-wrapper" class="relative hidden flex-grow">
+                    <div class="flex justify-between items-center mb-3 px-1">
+                        <h3 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                            <i data-lucide="bot" class="w-4 h-4 text-indigo-400"></i>
+                            Hasil Analisis <span id="model-badge" class="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 hidden">Model</span>
+                        </h3>
+                        <div class="flex gap-2">
+                            <button id="copy-btn" class="p-1.5 text-xs text-slate-400 hover:text-white hover:bg-white/10 rounded transition" title="Simpan .txt">
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                            <button id="download-btn" class="p-1.5 text-xs text-slate-400 hover:text-white hover:bg-white/10 rounded transition" title="Simpan .md">
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="relative min-h-[200px] bg-slate-900/50 rounded-xl border border-slate-700/50 p-6">
+                        <div id="loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-sm z-10 hidden rounded-xl">
+                            <div class="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-3"></div>
+                            <p class="text-sm text-indigo-300 animate-pulse">Sedang menelusuri semesta data...</p>
+                        </div>
+                        <div id="output-content" class="prose prose-invert prose-sm sm:prose-base max-w-none break-words leading-relaxed"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: WEB SEARCH -->
+            <div id="view-web" class="hidden flex-col flex-grow py-6 space-y-6">
+                <div class="text-center space-y-2 mb-4">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-500/30 mb-4">
+                        <i data-lucide="globe" class="w-8 h-8 text-white"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white">Multi Search Engine</h2>
+                    <p class="text-slate-400 text-sm">Pilih mesin pencari favorit Anda dan temukan hasilnya.</p>
+                </div>
+
+                <div class="w-full space-y-4">
+                    <form id="web-search-form" class="w-full">
+                        <!-- Unified Search Bar -->
+                        <div class="flex flex-col md:flex-row gap-0 bg-slate-800/80 border border-slate-700 rounded-xl focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all overflow-hidden shadow-lg">
+                            
+                            <!-- Select Engine -->
+                            <div class="relative md:border-r border-slate-700 group">
+                                <select id="web-engine" class="w-full md:w-[150px] h-full bg-slate-900/50 md:bg-transparent text-slate-300 text-sm px-4 py-4 md:py-0 appearance-none focus:outline-none cursor-pointer hover:text-white transition-colors">
+									<option value="google" selected>Google</option>
+									<option value="bing">Bing</option>
+									<option value="duckduckgo">DuckDuckGo</option>
+									<option value="yahoo">Yahoo</option>
+									<option value="ecosia">Ecosia</option>
+									<option value="baidu">Baidu</option>
+									<option value="yandex">Yandex</option>
+    						       	<option value="perplexity">Perplexity</option>
+    						        <option value="youtube">YouTube</option>
+									<option value="wikipedia">Wikipedia</option>
+									<option value="brave">Brave</option>
+									<option value="startpage">Startpage</option>
+									<option value="wolfram">Wolfram Alpha</option>
+									<option value="genius">Genius</option>
+									<option value="github">Github</option>
+									<option value="imdb">IMDB</option>
+									<option value="reddit">Reddit</option>
+									<option value="jdih">JDIH BPK</option>									
+									<option value="bpwr">Bypass Paywall Reader (URL)</option>
+									<option value="crtname">Pencari Subdomain (URL)</option>
+                                </select>
+                                <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                                    <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                                </div>
+                            </div>
+
+                            <!-- Input -->
+                            <input type="text" id="web-query" class="flex-grow bg-transparent text-white px-5 py-4 focus:outline-none placeholder-slate-500" placeholder="Ketik kata kunci pencarian..." required>
+
+                            <!-- Button -->
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 md:py-0 font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap md:rounded-l-none">
+                                <span>Cari</span>
+                                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </form>
+                    <p class="text-center text-xs text-slate-500">Tips: Gunakan tanda kutip untuk mencari frasa spesifik.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="p-4 border-t border-white/5 bg-slate-900/30 text-center">
+            <p class="text-xs text-slate-500">
+                aiLookup • Powered by Gemini and Other Services
+            </p>
+        </div>
+    </main>
+
+    <script type="module">
+        // --- Initialization ---
+        lucide.createIcons();
+        
+        // --- Tab Switching Logic ---
+        const views = {
+            'ai': document.getElementById('view-ai'),
+            'web': document.getElementById('view-web'),
+        };
+        const tabs = {
+            'ai': document.getElementById('tab-ai'),
+            'web': document.getElementById('tab-web'),
+        };
+
+        window.switchMainTab = function(tabName) {
+            // Hide all views
+            Object.values(views).forEach(el => el.classList.add('hidden'));
+            // Show selected view
+            views[tabName].classList.remove('hidden');
+            
+            // Reset tab styles
+            Object.values(tabs).forEach(el => {
+                el.classList.remove('tab-active');
+                el.classList.add('tab-inactive');
+            });
+            // Active tab style
+            tabs[tabName].classList.remove('tab-inactive');
+            tabs[tabName].classList.add('tab-active');
+        };
+
+		// --- CONFIG CUSTOM API KEY ---
+        const embeddedApiKey = ""; // API Key internal kosong bawaan environment lokal
+        const apiKeyInput = document.getElementById('custom-api-key');
+
+        // Ambil data kunci dari localStorage jika sebelumnya tersimpan
+        if (localStorage.getItem('gemini_custom_api_key')) {
+            apiKeyInput.value = localStorage.getItem('gemini_custom_api_key');
+        }
+
+        // Simpan otomatis ke penyimpanan browser setiap kali ada perubahan input
+        apiKeyInput.addEventListener('input', (e) => {
+            localStorage.setItem('gemini_custom_api_key', e.target.value.trim());
+        });
+
+        // --- FEATURE 1: AI LOOKUP LOGIC ---
+        const aiInput = document.getElementById('ai-query-input');
+        const aiBtn = document.getElementById('ai-lookup-btn');
+        const outputWrapper = document.getElementById('ai-output-wrapper');
+        const outputContent = document.getElementById('output-content');
+        const loading = document.getElementById('loading');
+        const modeDesc = document.getElementById('mode-description');
+        const modeInputs = document.querySelectorAll('input[name="mode"]');
+        const copyBtn = document.getElementById('copy-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const specificTopicContainer = document.getElementById('specific-topic-container');
+        const specificTopicSelect = document.getElementById('specific-topic');
+        const modelBadge = document.getElementById('model-badge');
+        const advancedToggle = document.getElementById('advanced-toggle');
+        let currentResultRaw = "";
+
+        const descriptions = {
+            'normal': 'Pencarian cepat, ensiklopedis, dan langsung ke inti fakta.',
+            'decide': 'Analisis SWOT, tabel pro & kontra, dan rekomendasi solusi strategis.',
+            'research': 'Format akademis, kajian teori, metodologi, dan referensi mendalam.',
+            'creative': 'Mode bebas untuk puisi, cerita, atau penjelasan metaforis yang unik.',
+            'specific': 'Pencarian mendalam dengan fokus eksklusif pada satu topik atau bidang tertentu.'
+        };
+
+        modeInputs.forEach(input => {
+            input.addEventListener('change', (e) => {
+                modeDesc.textContent = descriptions[e.target.value];
+                
+                // Toggle Dropdown Specific Topic
+                if (e.target.value === 'specific') {
+                    specificTopicContainer.classList.remove('hidden');
+                } else {
+                    specificTopicContainer.classList.add('hidden');
+                }
+            });
+        });
+
+        aiBtn.addEventListener('click', () => handleAISearch());
+        aiInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAISearch(); }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            if (!currentResultRaw) return;
+            const blob = new Blob([currentResultRaw], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ailookup-result.txt';
+            a.click();
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (!currentResultRaw) return;
+            const blob = new Blob([currentResultRaw], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ailookup-result.md';
+            a.click();
+        });
+
+		async function handleAISearch() {
+            // Validasi keberadaan API Key dari input kustom atau internal bawaan
+            const currentApiKey = apiKeyInput.value.trim() || embeddedApiKey;
+            
+            if (!currentApiKey) {
+                alert("API Key tidak ditemukan! Harap masukkan Gemini API Key Anda pada kolom di bagian atas sebelum memulai analisis.");
+                return;
+            }
+
+            const query = aiInput.value.trim();
+            if (!query) return;
+
+            outputWrapper.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            outputContent.innerHTML = '';
+            modelBadge.classList.add('hidden');
+            
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            const topic = specificTopicSelect.value;
+            const isAdvanced = advancedToggle.checked;
+            const systemPrompt = getSystemPrompt(mode, topic, isAdvanced);
+
+            try {
+                // Menentukan Model berdasarkan sakelar Toggle Advanced
+                let targetModel = isAdvanced ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite'; 
+                
+                // Variabel apiUrl diperbarui menggunakan currentApiKey secara dinamis
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${currentApiKey}`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: query }] }],
+                    tools: [{ "google_search": {} }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    let text = result.candidates[0].content.parts[0].text;
+                    const grounding = result.candidates[0].groundingMetadata;
+
+                    if (grounding?.groundingAttributions?.length > 0) {
+                        const sources = grounding.groundingAttributions
+                            .filter(s => s.web?.title && s.web?.uri)
+                            .map(s => `- [${s.web.title}](${s.web.uri})`)
+                            .join('\n');
+                        if (sources) text += `\n\n---\n**Sumber Referensi:**\n${sources}`;
+                    }
+                    currentResultRaw = text;
+                    outputContent.innerHTML = marked.parse(text);
+                    
+                    // Show Model Badge indicator
+                    modelBadge.textContent = targetModel;
+                    modelBadge.classList.remove('hidden');
+                    modelBadge.classList.add('inline-block');
+                } else {
+                    outputContent.innerHTML = '<p class="text-red-400">Maaf, AI tidak memberikan respons yang valid.</p>';
+                }
+            } catch (error) {
+                console.error(error);
+                outputContent.innerHTML = '<p class="text-red-400">Terjadi kesalahan koneksi.</p>';
+            } finally {
+                loading.classList.add('hidden');
+                lucide.createIcons();
+            }
+        }
+
+        function getSystemPrompt(mode, topic = "", isAdvanced = false) {
+             let basePrompt = "Anda adalah asisten AI yang cerdas dan berbahasa Indonesia.";
+             
+             if (isAdvanced) {
+                 basePrompt += " Anda menggunakan model tingkat lanjut (Gemini 2.5 Flash). Berikan analisis yang sangat mendalam, bernuansa, logis, dan terstruktur. Gunakan kemampuan penalaran dan literasi tingkat tinggi.";
+             }
+            
+            if (mode === 'normal') {
+                return `${basePrompt} Dengan fungsi ensiklopedia, jawablah pertanyaan pengguna dengan lengkap, akurat, dan berdasarkan fakta. Sertakan sumber atau referensi dalam bentuk daftar (baik dari situs, berita, hasil pencarian, buku, jurnal, maupun sumber lainnya).`;
+				
+            } else if (mode === 'decide') {
+                return `
+				${basePrompt} 
+				
+                    Anda bertindak sebagai:
+                    1.  *Scrapper:* Mencari informasi terkini dan relevan dari web, jurnal, buku, dan sumber tepercaya.
+                    2.  *Ensiklopedia:* Menjelaskan topik secara komprehensif, jelas, dan akurat.
+                    3.  *Analis:* Menganalisis topik dari sudut pandang SWOT (Kekuatan, Kelemahan, Peluang, Ancaman), dan memberikan rekomendasi serta solusi alternatif yang praktis.
+
+                    Format jawaban Anda harus rapi dan terstruktur sebagai berikut:
+
+                    "Jawaban:
+                    [Jelaskan topik secara komprehensif. Masukkan informasi hasil pencarian dan ensiklopedia di sini.]
+
+                    Analisis:
+                    - SWOT:
+                    Kekuatan: [Analisis kekuatan]
+                    Kelemahan: [Analisis kelemahan]
+                    Peluang: [Analisis peluang]
+                    Ancaman: [Analisis ancaman]
+
+                    - Solusi Alternatif:
+                    [Berikan solusi alternatif untuk mengatasi masalah atau memaksimalkan peluang.]
+
+                    Rekomendasi:
+                    1. Rekomendasi A
+                    2. Rekomendasi B
+                    3. Rekomendasi C
+                    ...dst
+
+                    Referensi:
+                    - Referensi A
+                    - Referensi B
+                    - Referensi C
+                    ...dst"
+                `;
+            } else if (mode === 'research') {
+                return `${basePrompt} 
+				
+				Anda bertindak sebagai:
+                    1.  *Scrapper:* Mencari informasi terkini dan relevan dari web, jurnal, buku, teori, dan sumber tepercaya.
+                    2.  *Ahli / Expert:* Memberikan penjelasan terkait topik dengan sudut pandang pemahaman ahli secara komprehensif, jelas, dan akurat sesuai kaidah akademis.
+
+                    Format jawaban Anda harus rapi dan terstruktur sebagai berikut:
+
+                    "Jawaban:
+                    [Jelaskan topik secara singkat terlebih dahulu sebagai abstrak dari riset yang dilakukan.]
+					
+					Pendahuluan:
+                    [Jelaskan latar belakang masalah atau bahasan topik yang dimaksud.]					
+					
+					Kajian Teori:
+					[Jelaskan topik secara komprehensif. Masukkan informasi hasil pencarian, data, dan teori ahli di sini sebagai acuan hipotesis awal.]
+					
+					Metodologi:
+					[Jelaskan metodologi riset yang dapat dilakukan baik secara kualitatif, kuantitatif, maupun dengan metodologi lainnya yang sesuai dengan topik bahasan yang dimaksud ke dalam bentuk daftar. Tambahkan penjelasan singkat dan salah satu rekomendasi metodologi terbaik.] 
+					
+					Riset dan Analisis:
+					[Lakukan simulasi riset dengan metodologi rekomendasi tersebut, didukung dengan analisis lebih dalam topik tersebut dalam bentuk narasi dan/atau data (dalam bentuk daftar)]
+
+					Hasil:
+					[Dari riset dan analisis sebelumnya, ringkas dan berikan pembahasan terkait kesesuaian dengan hipotesis awal, makna praktis, dan makna teoritisnya.]
+					
+					Simpulan dan Saran:
+                    [Berikan simpulan dan saran atas hasil riset tersebut untuk mengatasi masalah atau memaksimalkan peluang.]					
+
+                    Referensi:
+                    - Referensi A
+                    - Referensi B
+                    - Referensi C
+                    ...dst"`;
+            } else if (mode === 'creative') {
+                return `${basePrompt} Bertindaklah sebagai seniman kata atau pencerita kreatif. Jelaskan topik ini dengan cara yang tidak biasa: bisa melalui puisi, cerita pendek, lirik lagu, pantun, lelucon, kata mutiara, analogi metaforis, atau dialog imajiner. Buat pengguna terhibur namun tetap mendapatkan intisari informasi. Sertakan sumber atau referensi dalam bentuk daftar (baik dari situs, berita, hasil pencarian, buku, jurnal, maupun sumber lainnya).`;
+            } else if (mode === 'specific') {
+                return `${basePrompt} Anda adalah seorang ahli khusus di bidang: ${topic}.
+                Tugas Anda adalah mencari, membedah, dan menjawab pertanyaan pengguna secara eksklusif dari informasi terbaru, kacamata, parameter, dan konteks bidang **${topic}**. 
+                Gunakan istilah teknis yang sesuai, berikan kedalaman materi layaknya profesional di bidang tersebut, dan singkirkan informasi yang tidak relevan dengan ranah ini. 
+                Format jawaban Anda dengan poin yang terstruktur, jelas, dan selalu sertakan sumber atau referensi tepercaya (situs, berita, jurnal, atau aturan terkait) di akhir jawaban.`;
+            }
+            return basePrompt;
+        }
+
+        // --- FEATURE 2: WEB SEARCH LOGIC ---
+        const ENGINE_BASES = {
+			google:     'https://www.google.com/search?q=',
+			bing:       'https://www.bing.com/search?q=',
+			duckduckgo: 'https://duckduckgo.com/?q=',
+			yahoo:      'https://search.yahoo.com/search?p=',
+			ecosia:     'https://www.ecosia.org/search?q=',
+			baidu:      'https://www.baidu.com/s?wd=',
+			yandex:     'https://yandex.com/search/?text=',
+			perplexity: 'https://www.perplexity.ai/search?q=',
+			youtube:    'https://www.youtube.com/results?search_query=',
+			wikipedia:  'https://id.wikipedia.org/w/index.php?search=',
+			brave:      'https://search.brave.com/search?q=',
+			startpage:  'https://www.startpage.com/do/dsearch?query=',
+			wolfram:	'https://www.wolframalpha.com/input?i=',
+			genius:		'https://genius.com/search?q=',
+			github:		'https://github.com/search?q=',
+			imdb:		'https://www.imdb.com/find/?q=',
+			reddit:		'https://www.reddit.com/search/?q=',
+			jdih:		'https://peraturan.bpk.go.id/Search?keywords=',			
+			bpwr:  		'https://www.bypasspaywallreader.com/search.html?url=',
+			crtname:    'https://crt.name/v1/search?apex=',
+        };
+        const webForm = document.getElementById('web-search-form');
+        const webInput = document.getElementById('web-query');
+        const webEngine = document.getElementById('web-engine');
+
+        // Restore saved engine
+        const savedEngine = localStorage.getItem('preferredEngine');
+        if (savedEngine && ENGINE_BASES[savedEngine]) {
+            webEngine.value = savedEngine;
+        }
+        webEngine.addEventListener('change', () => {
+            localStorage.setItem('preferredEngine', webEngine.value);
+        });
+
+        webForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = webInput.value.trim();
+            if(!query) return;
+
+            const base = ENGINE_BASES[webEngine.value] || ENGINE_BASES.google;
+            const url = base + encodeURIComponent(query);
+            window.open(url, '_blank', 'noopener');
+        });
+
+    </script>
+</body>
+</html>

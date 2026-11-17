@@ -1,0 +1,2021 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyAILive</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome & Google Fonts -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-glow: #3b82f6;
+            --secondary-glow: #06b6d4;
+            --recording-glow: #ef4444;
+            --processing-glow: #eab308;
+            --speaking-glow: #8b5cf6;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); }
+        .dark ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.6); }
+        .dark ::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 0.8); }
+
+        /* Orb Visualizer Styling */
+        .orb-container {
+            position: relative;
+            width: 240px;
+            height: 240px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+        }
+
+        .orb {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #94a3b8, #475569);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), inset 0 -5px 15px rgba(0, 0, 0, 0.2);
+            transition: transform 0.08s ease-out, box-shadow 0.1s ease-out, background 0.4s ease;
+            position: relative;
+            z-index: 10;
+        }
+
+        .dark .orb {
+            background: radial-gradient(circle at 35% 35%, #334155, #0f172a);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.15), inset 0 0 20px rgba(255, 255, 255, 0.05);
+        }
+
+        /* Orb Status States */
+        .orb.connected {
+            background: radial-gradient(circle at 35% 35%, #60a5fa, #2563eb);
+            box-shadow: 0 0 35px rgba(59, 130, 246, 0.5), inset 0 0 25px rgba(255, 255, 255, 0.6);
+            animation: orb-idle 4s ease-in-out infinite;
+        }
+
+        .orb.recording {
+            background: radial-gradient(circle at 35% 35%, #f87171, #dc2626);
+            box-shadow: 0 0 45px rgba(239, 68, 68, 0.6), inset 0 0 25px rgba(255, 255, 255, 0.7);
+            animation: orb-pulse-record 1.2s infinite;
+        }
+
+        .orb.processing {
+            background: radial-gradient(circle at 35% 35%, #facc15, #ca8a04);
+            box-shadow: 0 0 40px rgba(234, 179, 8, 0.6), inset 0 0 25px rgba(255, 255, 255, 0.7);
+            animation: orb-idle 2s ease-in-out infinite, orb-pulse-processing 1.5s infinite;
+        }
+
+        .orb.speaking {
+            background: radial-gradient(circle at 35% 35%, #a78bfa, #7c3aed);
+            box-shadow: 0 0 45px rgba(139, 92, 246, 0.65), inset 0 0 25px rgba(255, 255, 255, 0.8);
+            animation: orb-idle 3s ease-in-out infinite;
+        }
+
+        /* Orbiting Waves */
+        .orb-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 1.5px solid rgba(59, 130, 246, 0.4);
+            animation: ring-pulse 2.2s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+            z-index: 1;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .dark .orb-ring {
+            border-color: rgba(96, 165, 250, 0.4);
+        }
+
+        .is-active .orb-ring { opacity: 1; }
+
+        @keyframes orb-idle {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-8px) scale(1.03); }
+        }
+
+        @keyframes ring-pulse {
+            0% { transform: scale(0.65); opacity: 0.85; }
+            100% { transform: scale(1.45); opacity: 0; }
+        }
+
+        @keyframes orb-pulse-record {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes orb-pulse-processing {
+            0%, 100% { opacity: 0.85; }
+            50% { opacity: 1; }
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .dark .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(51, 65, 85, 0.4);
+        }
+
+        /* Dynamic Collapsible Sidebar */
+        #chat-sidebar {
+            transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), 
+                        opacity 0.3s ease, 
+                        transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #chat-sidebar.collapsed {
+            width: 0px !important;
+            min-width: 0px !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            transform: translateX(100%);
+        }
+
+        /* Custom Styling untuk Slider Setelan */
+        input[type="range"]::-webkit-slider-thumb {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.18);
+        }
+        .dark input[type="range"]::-webkit-slider-thumb {
+            background: #60a5fa;
+            box-shadow: 0 0 8px rgba(96, 165, 250, 0.5);
+        }
+
+        /* Segmented Tab Active Pill Indicator */
+        .settings-tab-btn.active {
+            background: rgba(59, 130, 246, 0.12);
+            color: #2563eb;
+            border-bottom-color: #3b82f6;
+        }
+        .dark .settings-tab-btn.active {
+            background: rgba(59, 130, 246, 0.18);
+            color: #60a5fa;
+            border-bottom-color: #60a5fa;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 dark:bg-[#020617] dark:text-slate-100 flex flex-col antialiased selection:bg-blue-500/30 selection:text-blue-600 dark:selection:text-blue-300">
+
+    <!-- Top Navigation & System Status Bar -->
+    <header class="h-16 border-b border-slate-200 dark:border-slate-800/80 px-6 flex items-center justify-between shrink-0 glass-panel z-20">
+        <!-- Logo & Branding -->
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25">
+                <i class="fa-solid fa-wave-square text-base"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                    MyAILive
+                </h1>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 -mt-0.5">Asisten Suara & Multimodal Cerdas</p>
+            </div>
+        </div>
+
+        <!-- Connection Status & Model Badge -->
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                <div id="status-indicator" class="w-2.5 h-2.5 rounded-full bg-slate-400 transition-all duration-300"></div>
+                <span id="status-text" class="text-xs font-medium text-slate-600 dark:text-slate-300">Sesi Terputus</span>
+            </div>
+            
+            <div class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 text-xs font-mono text-slate-500 dark:text-slate-400">
+                <i class="fa-solid fa-microchip text-blue-500 text-[11px]"></i>
+                <span id="active-model-display">gemini-3.1-flash-lite</span>
+            </div>
+
+            <!-- Action Buttons: Theme, Chat Toggle, Settings -->
+            <div class="flex items-center gap-1.5">
+                <button id="btn-toggle-theme" class="w-9 h-9 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors flex items-center justify-center" title="Ganti Tema (Dark/Light)">
+                    <i id="theme-icon" class="fa-solid fa-moon text-sm"></i>
+                </button>
+
+                <button id="btn-toggle-chat" class="w-9 h-9 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors flex items-center justify-center relative" title="Sembunyikan / Tampilkan Obrolan">
+                    <i class="fa-solid fa-comments text-sm"></i>
+                    <span id="chat-badge" class="hidden absolute top-1 right-1 w-2 h-2 rounded-full bg-blue-500"></span>
+                </button>
+
+                <button id="btn-open-settings" class="w-9 h-9 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 dark:text-blue-400 transition-colors flex items-center justify-center border border-blue-200 dark:border-blue-800/60" title="Setelan Lengkap & API">
+                    <i class="fa-solid fa-sliders text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Body -->
+    <div class="flex-1 flex w-full h-[calc(100vh-4rem)] overflow-hidden relative">
+
+        <!-- Center Interactive Voice & Visualizer Area -->
+        <main id="center-panel" class="flex-1 flex flex-col relative h-full overflow-hidden transition-all duration-300">
+            
+            <!-- Grounding Badges (if active) -->
+            <div id="grounding-badges" class="absolute top-4 left-6 flex flex-wrap gap-2 z-10 pointer-events-none"></div>
+
+            <!-- Core Visualizer Stage -->
+            <div class="flex-1 flex flex-col items-center justify-center p-6 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-50/50 via-slate-50 to-slate-100 dark:from-slate-900 dark:via-[#020617] dark:to-[#020617]">
+                
+                <!-- Animated Reactive Orb -->
+                <div class="orb-container" id="orb-container">
+                    <div class="orb" id="ai-orb"></div>
+                    <div class="orb-ring" style="animation-delay: 0s;"></div>
+                    <div class="orb-ring" style="animation-delay: 0.6s;"></div>
+                    <div class="orb-ring" style="animation-delay: 1.2s;"></div>
+                </div>
+
+                <!-- Status Feedback Labels -->
+                <div id="ai-speaking-label" class="mt-8 text-purple-600 dark:text-purple-400 font-semibold text-xs tracking-widest uppercase opacity-0 transition-opacity duration-300 flex items-center gap-2">
+                    <span class="inline-block w-2 h-2 rounded-full bg-purple-500 animate-ping"></span> AI Sedang Berbicara...
+                </div>
+                
+                <div id="ai-processing-label" class="mt-8 text-amber-600 dark:text-amber-400 font-semibold text-xs tracking-widest uppercase hidden flex items-center gap-2">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i> Memproses & Menganalisis...
+                </div>
+
+                <div id="ai-listening-label" class="mt-8 text-red-600 dark:text-red-400 font-semibold text-xs tracking-widest uppercase hidden flex items-center gap-2">
+                    <span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Mendengarkan Suara Anda...
+                </div>
+
+                <!-- Floating Video Camera / Screen Preview -->
+                <div id="video-container" class="absolute bottom-6 left-6 w-52 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 shadow-2xl hidden z-20 bg-black transition-all hover:scale-105 hover:w-64">
+                    <div class="bg-slate-800 text-[10px] text-slate-200 px-3 py-1.5 flex justify-between items-center font-semibold">
+                        <span id="video-label"><i class="fa-solid fa-camera mr-1"></i> Preview Kamera</span>
+                        <span class="text-red-400 flex items-center gap-1"><i class="fa-solid fa-circle text-[7px] animate-pulse"></i> AKTIF</span>
+                    </div>
+                    <video id="video-preview" autoplay playsinline muted class="w-full h-36 object-cover bg-black"></video>
+                    <canvas id="video-canvas" class="hidden"></canvas>
+                </div>
+            </div>
+
+            <!-- Floating Bottom Interaction Toolbar -->
+            <div class="h-24 border-t border-slate-200 dark:border-slate-800/80 px-6 flex items-center justify-center gap-3 shrink-0 glass-panel z-20">
+                
+                <!-- Camera Button -->
+                <button id="btn-camera" class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white hover:border-blue-500 transition-all flex items-center justify-center shadow-sm" title="Aktifkan Kamera">
+                    <i class="fa-solid fa-video text-base"></i>
+                </button>
+                
+                <!-- Screen Share Button -->
+                <button id="btn-screen" class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white hover:border-blue-500 transition-all flex items-center justify-center shadow-sm" title="Bagikan Layar">
+                    <i class="fa-solid fa-desktop text-base"></i>
+                </button>
+
+                <!-- Core Session Button (Connect / Disconnect) -->
+                <button id="btn-connect" class="mx-2 px-8 py-3.5 rounded-full bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-semibold shadow-lg shadow-blue-500/25 transition-all transform hover:scale-[1.02] active:scale-95 flex items-center gap-2.5">
+                    <i class="fa-solid fa-power-off text-sm"></i> <span>Mulai Sesi</span>
+                </button>
+                
+                <!-- Recording / Mic Toggle (Active during session) -->
+                <button id="btn-record" class="hidden mx-2 px-8 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-600/30 transition-all flex items-center gap-2.5 w-48 justify-center active:scale-95">
+                    <i class="fa-solid fa-microphone text-sm"></i> <span>Mulai Bicara</span>
+                </button>
+
+                <!-- End Session Button -->
+                <button id="btn-disconnect" class="hidden w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Akhiri Sesi">
+                    <i class="fa-solid fa-phone-slash text-base"></i>
+                </button>
+
+                <!-- Interrupt AI Speech Button -->
+                <button id="btn-interrupt" class="hidden w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/60 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Hentikan AI Berbicara">
+                    <i class="fa-solid fa-circle-stop text-base"></i>
+                </button>
+
+            </div>
+        </main>
+
+        <!-- Right Collapsible Panel: Chat & Transcripts -->
+        <aside id="chat-sidebar" class="w-[380px] border-l border-slate-200 dark:border-slate-800/80 flex flex-col h-full glass-panel z-10 shrink-0">
+            <!-- Sidebar Header -->
+            <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-comments text-blue-500 text-sm"></i>
+                    <h2 class="text-sm font-bold tracking-tight text-slate-800 dark:text-slate-200">Log Obrolan</h2>
+                    <span id="chat-count-badge" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">0</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <button id="btn-export-log" class="p-1.5 text-xs text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" title="Ekspor Chat (.md)">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                    <button id="btn-clear-log" class="p-1.5 text-xs text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" title="Hapus Riwayat">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                    <button id="btn-close-chat" class="p-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" title="Tutup Panel">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Messages Log List -->
+            <div id="transcript-box" class="flex-1 overflow-y-auto p-4 space-y-3.5 text-sm min-h-0">
+                <div id="empty-log-msg" class="text-slate-400 dark:text-slate-500 text-center text-xs py-16 flex flex-col items-center gap-3">
+                    <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center text-slate-400">
+                        <i class="fa-regular fa-comment-dots text-xl"></i>
+                    </div>
+                    <span>Belum ada percakapan.<br/>Tekan <strong>Mulai Sesi</strong> atau ketik pesan di bawah.</span>
+                </div>
+            </div>
+
+            <!-- Text Message Input Box -->
+            <div class="p-3 bg-white/70 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 shrink-0">
+                <form id="text-form" class="relative flex items-center" onsubmit="event.preventDefault(); sendUserText();">
+                    <input type="text" id="text-input" placeholder="Ketik pesan atau instruksi..." class="w-full bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700/80 rounded-full pl-4 pr-11 py-2.5 text-xs md:text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all">
+                    <button type="submit" id="btn-send-text" class="absolute right-1.5 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-colors shadow-sm disabled:opacity-50">
+                        <i class="fa-solid fa-arrow-up text-xs"></i>
+                    </button>
+                </form>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Comprehensive Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-md hidden flex items-center justify-center p-3 md:p-6 transition-all duration-300">
+        <div class="bg-white dark:bg-[#0f172a] w-full max-w-3xl max-h-[92vh] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/70 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white flex items-center justify-center shadow-md shadow-blue-500/20 font-bold">
+                        <i class="fa-solid fa-sliders text-base"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base font-bold text-slate-900 dark:text-white tracking-tight">Setelan MyAILive</h3>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">Multi-Agen</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Konfigurasi Model Teks, Suara TTS, Personalisasi, dan Grounding</p>
+                    </div>
+                </div>
+                <button id="btn-close-settings" class="w-8 h-8 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Modal Navigation Tabs (Pill Segmented Control) -->
+            <div class="flex border-b border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-950/60 px-4 md:px-6 pt-2.5 gap-1.5 overflow-x-auto shrink-0 scrollbar-none">
+                <button class="settings-tab-btn active py-2 px-3.5 text-xs font-semibold rounded-t-xl border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 flex items-center gap-2 transition-all whitespace-nowrap" data-tab="tab-text">
+                    <i class="fa-solid fa-brain text-sm"></i> <span>Model Teks</span>
+                </button>
+                <button class="settings-tab-btn py-2 px-3.5 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition-all whitespace-nowrap" data-tab="tab-tts">
+                    <i class="fa-solid fa-volume-high text-sm"></i> <span>Suara & TTS</span>
+                </button>
+                <button class="settings-tab-btn py-2 px-3.5 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition-all whitespace-nowrap" data-tab="tab-persona">
+                    <i class="fa-solid fa-user-astronaut text-sm"></i> <span>Personalisasi</span>
+                </button>
+                <button class="settings-tab-btn py-2 px-3.5 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition-all whitespace-nowrap" data-tab="tab-tools">
+                    <i class="fa-solid fa-compass-drafting text-sm"></i> <span>Alat & Grounding</span>
+                </button>
+                <button class="settings-tab-btn py-2 px-3.5 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition-all whitespace-nowrap" data-tab="tab-live">
+                    <i class="fa-solid fa-tower-broadcast text-sm"></i> <span>Live & Visual</span>
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-5 md:p-6 overflow-y-auto flex-1 space-y-5 text-xs">
+                
+                <!-- TAB 1: Agen Model Teks -->
+                <div id="tab-text" class="tab-pane space-y-4">
+                    <!-- Quick Presets -->
+                    <div class="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-bolt text-amber-500"></i> Preset Cepat Provider
+                            </span>
+                            <span class="text-[10px] text-slate-400">Klik untuk menerapkan otomatis</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" class="btn-preset-provider px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-blue-500 hover:text-blue-600 transition flex items-center gap-1.5 font-medium shadow-xs" data-provider="gemini" data-model="gemini-3.1-flash-lite" data-url="">
+                                <i class="fa-brands fa-google text-blue-500"></i> Google Gemini
+                            </button>
+                            <button type="button" class="btn-preset-provider px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-emerald-500 hover:text-emerald-600 transition flex items-center gap-1.5 font-medium shadow-xs" data-provider="openai" data-model="gpt-4o-mini" data-url="https://api.openai.com/v1">
+                                <i class="fa-solid fa-robot text-emerald-500"></i> OpenAI (ChatGPT)
+                            </button>
+                            <button type="button" class="btn-preset-provider px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-cyan-500 hover:text-cyan-600 transition flex items-center gap-1.5 font-medium shadow-xs" data-provider="openai" data-model="deepseek-chat" data-url="https://api.deepseek.com/v1">
+                                <i class="fa-solid fa-brain text-cyan-500"></i> DeepSeek
+                            </button>
+                            <button type="button" class="btn-preset-provider px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-orange-500 hover:text-orange-600 transition flex items-center gap-1.5 font-medium shadow-xs" data-provider="ollama" data-model="llama3" data-url="http://localhost:11434/v1">
+                                <i class="fa-solid fa-server text-orange-500"></i> Ollama Lokal
+                            </button>
+                            <button type="button" class="btn-preset-provider px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-purple-500 hover:text-purple-600 transition flex items-center gap-1.5 font-medium shadow-xs" data-provider="openai" data-model="llama-3.3-70b-versatile" data-url="https://api.groq.com/openai/v1">
+                                <i class="fa-solid fa-gauge-high text-purple-500"></i> Groq Fast
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Provider & Model Input Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Provider API Teks</label>
+                            <select id="cfg-text-provider" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition">
+                                <option value="gemini">Google Gemini (Default Native)</option>
+                                <option value="openai">OpenAI Compatible (ChatGPT, Grok, DeepSeek, dll)</option>
+                                <option value="ollama">Ollama (Lokal Self-Hosted)</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">ID Model Teks</label>
+                            <input type="text" id="cfg-text-model" value="gemini-3.1-flash-lite" placeholder="Cth: gemini-3.1-flash-lite" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition font-mono">
+                        </div>
+                    </div>
+
+                    <!-- API Key -->
+                    <div class="space-y-1">
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">API Key Model Teks</label>
+                        <div class="relative">
+                            <input type="password" id="cfg-text-key" placeholder="Masukkan API Key teks..." class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 pr-10 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition font-mono">
+                            <button type="button" class="btn-toggle-eye absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition" data-target="cfg-text-key" title="Tampilkan/Sembunyikan">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom Base URL -->
+                    <div id="wrap-text-baseurl" class="space-y-1 hidden">
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Base URL Teks (OpenAI Standard Endpoint)</label>
+                        <input type="text" id="cfg-text-url" placeholder="Cth: https://api.openai.com/v1 atau http://localhost:11434/v1" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition font-mono">
+                        <p class="text-[10px] text-slate-400">Endpoint akan memanggil rute <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800">/chat/completions</code></p>
+                    </div>
+
+                    <!-- Temperature & Max Tokens -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                        <div class="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Kreativitas (Temperature)</span>
+                                <span id="temp-display" class="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-mono text-[11px] font-bold">0.7</span>
+                            </div>
+                            <input type="range" id="cfg-text-temp" min="0" max="2" step="0.1" value="0.7" class="w-full accent-blue-600 cursor-pointer">
+                            <div class="flex justify-between text-[9px] text-slate-400">
+                                <span>0.0 (Presisi)</span>
+                                <span>0.7 (Seimbang)</span>
+                                <span>2.0 (Kreatif)</span>
+                            </div>
+                        </div>
+
+                        <div class="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <label for="cfg-text-maxtokens" class="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Maks Token Output</label>
+                                <div class="flex gap-1">
+                                    <button type="button" class="btn-token-chip px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[9px] font-mono hover:bg-blue-500 hover:text-white transition" data-tokens="2048">2k</button>
+                                    <button type="button" class="btn-token-chip px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[9px] font-mono hover:bg-blue-500 hover:text-white transition" data-tokens="4096">4k</button>
+                                    <button type="button" class="btn-token-chip px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[9px] font-mono hover:bg-blue-500 hover:text-white transition" data-tokens="8192">8k</button>
+                                </div>
+                            </div>
+                            <input type="number" id="cfg-text-maxtokens" value="4096" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none font-mono">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: Suara & TTS -->
+                <div id="tab-tts" class="tab-pane hidden space-y-4">
+                    
+                    <!-- Engine Selection Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                        <label class="tts-engine-card relative flex flex-col p-3 rounded-2xl border cursor-pointer transition border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 hover:border-purple-500">
+                            <input type="radio" name="tts-engine-choice" value="gemini" checked class="sr-only">
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="fa-solid fa-wand-magic-sparkles text-purple-500"></i>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">Gemini TTS</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 leading-snug">Native high-definition PCM dari Google.</span>
+                        </label>
+
+                        <label class="tts-engine-card relative flex flex-col p-3 rounded-2xl border cursor-pointer transition border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 hover:border-purple-500">
+                            <input type="radio" name="tts-engine-choice" value="local" class="sr-only">
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="fa-solid fa-laptop text-emerald-500"></i>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">TTS Lokal</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 leading-snug">100% Gratis, instan, suara bawaan OS tanpa kuota.</span>
+                        </label>
+
+                        <label class="tts-engine-card relative flex flex-col p-3 rounded-2xl border cursor-pointer transition border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 hover:border-purple-500">
+                            <input type="radio" name="tts-engine-choice" value="openai" class="sr-only">
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="fa-solid fa-cloud text-blue-500"></i>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">OpenAI TTS</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 leading-snug">Standar audio speech (Alloy, Echo, Nova, dll).</span>
+                        </label>
+                    </div>
+
+                    <!-- Hidden input to keep compatibility -->
+                    <input type="hidden" id="cfg-tts-engine" value="gemini">
+
+                    <!-- Voice Selection & Voice Tester -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                        <div class="md:col-span-2 space-y-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Karakter Suara AI</label>
+                            <select id="cfg-tts-voice" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none transition">
+                                <!-- Populated dynamically by JS -->
+                            </select>
+                        </div>
+                        <button type="button" id="btn-test-voice" class="h-[38px] px-3 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800 flex items-center justify-center gap-2 font-semibold transition active:scale-95">
+                            <i class="fa-solid fa-circle-play text-sm"></i> <span>Uji Suara</span>
+                        </button>
+                    </div>
+
+                    <!-- TTS Cloud Specific Fields -->
+                    <div id="wrap-tts-cloud" class="space-y-3 p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/50">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="space-y-1">
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">ID Model TTS Cloud</label>
+                                <input type="text" id="cfg-tts-model" value="gemini-3.1-flash-tts-preview" placeholder="Cth: gemini-3.1-flash-tts-preview atau tts-1" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-purple-500 outline-none font-mono">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">API Key Khusus TTS (Opsional)</label>
+                                <div class="relative">
+                                    <input type="password" id="cfg-tts-key" placeholder="Kosongkan jika sama dengan Key Teks" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 pr-10 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-purple-500 outline-none font-mono">
+                                    <button type="button" class="btn-toggle-eye absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" data-target="cfg-tts-key">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="wrap-tts-baseurl" class="space-y-1 hidden">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Base URL OpenAI TTS Endpoint</label>
+                            <input type="text" id="cfg-tts-url" placeholder="Cth: https://api.openai.com/v1" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-purple-500 outline-none font-mono">
+                        </div>
+                    </div>
+
+                    <!-- Voice Speed Slider -->
+                    <div class="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Kecepatan Bicara (Speech Rate)</span>
+                            <span id="speed-display" class="px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 font-mono text-[11px] font-bold">1.0x</span>
+                        </div>
+                        <input type="range" id="cfg-tts-speed" min="0.75" max="1.5" step="0.05" value="1.0" class="w-full accent-purple-600 cursor-pointer">
+                        <div class="flex justify-between text-[9px] text-slate-400">
+                            <span>0.75x (Lambat)</span>
+                            <span>1.0x (Normal)</span>
+                            <span>1.5x (Cepat)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: Personalisasi & Persona -->
+                <div id="tab-persona" class="tab-pane hidden space-y-4">
+                    
+                    <!-- Language & Tone -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Bahasa Utama</label>
+                            <select id="cfg-persona-lang" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none">
+                                <option value="Indonesia">Indonesia</option>
+                                <option value="Inggris">Inggris</option>
+                                <option value="Jepang">Jepang</option>
+                                <option value="Arab">Arab</option>
+                                <option value="Mandarin">Mandarin</option>
+                                <option value="Jerman">Jerman</option>
+                                <option value="Prancis">Prancis</option>
+                                <option value="Spanyol">Spanyol</option>
+                                <option value="Portugis">Portugis</option>
+                                <option value="Korea">Korea</option>
+                                <option value="Rusia">Rusia</option>
+                                <option value="Hindi">Hindi</option>
+                                <option value="Thai">Thai</option>
+                                <option value="Vietnam">Vietnam</option>
+                                <option value="Tagalog">Tagalog</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Nada Berbicara (Tone)</label>
+                            <select id="cfg-persona-tone" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none">
+                                <option value="Ramah dan Natural">Ramah & Natural</option>
+                                <option value="Formal dan Profesional">Formal & Profesional</option>
+                                <option value="Santai dan Gaul">Santai & Gaul</option>
+                                <option value="Ceria dan Bersemangat">Ceria & Bersemangat</option>
+                                <option value="Empatik dan Hangat">Empatik & Hangat</option>
+                                <option value="Lucu dan Menghibur">Lucu & Menghibur</option>
+                                <option value="Ringkas dan Tegas">Ringkas & Tegas</option>
+                                <option value="Persuasif">Persuasif</option>
+                                <option value="Penuh Emoji">Penuh Emoji ✨</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Target Level & Response Length -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Tingkat Pemahaman Target</label>
+                            <select id="cfg-persona-level" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none">
+                                <optgroup label="Non-Akademik">
+                                    <option value="Standar (Umum)">Standar (Umum)</option>
+                                    <option value="Gen Alpha">Gen Alpha</option>
+                                    <option value="Sederhana (Pemula dan Anak-Anak)">Pemula & Anak-Anak</option>
+                                    <option value="Remaja">Remaja</option>
+                                    <option value="Analitis">Analitis</option>
+                                    <option value="Ahli">Ahli / Pakar</option>
+                                </optgroup>
+                                <optgroup label="Tingkat Akademik">
+                                    <option value="Pelajar / Mahasiswa">Pelajar / Mahasiswa</option>
+                                    <option value="S1 (Sarjana)">S1 (Sarjana)</option>
+                                    <option value="S2 (Magister)">S2 (Magister)</option>
+                                    <option value="S3 (Doktoral)">S3 (Doktoral)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Gaya Panjang Respons</label>
+                            <select id="cfg-persona-length" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none">
+                                <option value="Singkat dan Mengalir (Sangat Direkomendasikan untuk Suara)">Singkat & Mengalir (Optimal untuk Suara)</option>
+                                <option value="Sedang (Biasa)">Sedang (Biasa)</option>
+                                <option value="Panjang dan Komprehensif">Panjang & Komprehensif</option>
+                                <option value="Dalam Poin Ringkas">Dalam Poin-Poin Ringkas</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Persona & Topic Fields (from MyAI) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Karakter / Peran Spesifik (Persona)</label>
+                            <input type="text" id="cfg-persona-role" placeholder="Cth: Asisten Ramah, Dosen Komputer, Teman Curhat" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Fokus Tema / Topik (Opsional)</label>
+                            <input type="text" id="cfg-persona-topic" placeholder="Cth: Teknologi, Coding, Kesehatan, Bisnis" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+
+                    <!-- System Instructions Textarea with Quick Persona Chips -->
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Instruksi Sistem Lengkap</label>
+                            <div class="flex gap-1">
+                                <button type="button" class="btn-persona-preset text-[10px] text-blue-600 dark:text-blue-400 hover:underline" data-preset="assistant">Default</button>
+                                <span class="text-slate-300 dark:text-slate-700">&bull;</span>
+                                <button type="button" class="btn-persona-preset text-[10px] text-blue-600 dark:text-blue-400 hover:underline" data-preset="tutor">Tutor Sabar</button>
+                                <span class="text-slate-300 dark:text-slate-700">&bull;</span>
+                                <button type="button" class="btn-persona-preset text-[10px] text-blue-600 dark:text-blue-400 hover:underline" data-preset="coder">Senior Dev</button>
+                            </div>
+                        </div>
+                        <textarea id="cfg-persona-sys" rows="2" class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none resize-none">Anda adalah asisten AI serbaguna yang cerdas, tanggap, dan bersahabat. Jawab secara natural dan enak didengar saat dibacakan.</textarea>
+                    </div>
+
+                    <!-- User Context -->
+                    <div class="space-y-1">
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">Info Konteks Pengguna (Tentang Diri Anda)</label>
+                        <textarea id="cfg-persona-user" rows="2" placeholder="Cth: Nama saya Budi, saya bekerja sebagai frontend engineer..." class="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none resize-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- TAB 4: Alat & Grounding -->
+                <div id="tab-tools" class="tab-pane hidden space-y-3.5">
+                    
+                    <div class="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 flex items-center justify-between gap-4">
+                        <div class="space-y-0.5">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-earth-americas text-emerald-500 text-sm"></i>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">Google Search Grounding</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Izinkan AI menelusuri data web internet secara real-time (khusus provider Gemini).</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                            <input type="checkbox" id="cfg-tool-search" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+
+                    <div class="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 flex items-center justify-between gap-4">
+                        <div class="space-y-0.5">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-location-dot text-cyan-500 text-sm"></i>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">Google Maps Grounding</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Prioritaskan pencarian lokasi, koordinat, rute navigasi, dan rekomendasi tempat wisata akurat.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                            <input type="checkbox" id="cfg-tool-maps" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+
+                    <div class="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 flex items-center justify-between gap-4">
+                        <div class="space-y-0.5">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-bolt-lightning text-amber-500 text-sm"></i>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">Mode Hemat Token (Single Response)</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Jangan kirim riwayat percakapan masa lalu ke API (menghemat pemakaian kuota token secara signifikan).</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                            <input type="checkbox" id="cfg-tool-single" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- TAB 5: Live & Visual -->
+                <div id="tab-live" class="tab-pane hidden space-y-4">
+                    <div class="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-video text-blue-500 text-sm"></i>
+                            <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">Model Live API (Multimodal Vision)</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            Model yang digunakan saat kamera atau berbagi layar aktif. AI akan menangkap frame visual dan menganalisisnya bersamaan dengan pertanyaan suara atau teks Anda.
+                        </p>
+                        <div class="space-y-1 pt-1">
+                            <label class="block font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px]">ID Model Live</label>
+                            <input type="text" id="cfg-live-model" value="gemini-3.1-flash-live-preview" placeholder="gemini-3.1-flash-live-preview" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none font-mono">
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-amber-50/50 dark:bg-amber-950/20 rounded-2xl border border-amber-200/80 dark:border-amber-900/40 flex items-start gap-3">
+                        <i class="fa-solid fa-circle-info text-amber-500 mt-0.5"></i>
+                        <div class="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                            <strong>Tip Multimodal:</strong> Untuk pengalaman vision terbaik saat menunjukkan dokumen, objek, atau layar kerja, pastikan koneksi pencahayaan kamera memadai dan resolusi browser tidak terlalu kecil.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-slate-50/80 dark:bg-slate-950/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+                <button type="button" id="btn-reset-settings" class="text-xs text-rose-600 dark:text-rose-400 hover:underline font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-rotate-left"></i> <span>Reset Default</span>
+                </button>
+                <div class="flex items-center gap-2.5">
+                    <button id="btn-cancel-settings" class="px-4 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition">
+                        Batal
+                    </button>
+                    <button id="btn-save-settings" class="px-5 py-2 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition active:scale-95 flex items-center gap-1.5">
+                        <i class="fa-solid fa-check"></i> <span>Simpan Setelan</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Toast Notification Box -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <script>
+        const APP_STORAGE_KEY = 'myai_live_unified_config';
+        const CHAT_STORAGE_KEY = 'myai_live_chat_history';
+
+        // Default Configuration (Model names strictly preserved)
+        const DEFAULT_CONFIG = {
+            // Text LLM Agent
+            textProvider: 'gemini',
+            textModel: 'gemini-3.1-flash-lite',
+            textApiKey: '',
+            textBaseUrl: '',
+            textTemperature: 0.7,
+            textMaxTokens: 4096,
+
+            // TTS Audio Agent
+            ttsEngine: 'gemini', // 'gemini' | 'local' | 'openai'
+            ttsModel: 'gemini-3.1-flash-tts-preview',
+            ttsApiKey: '',
+            ttsBaseUrl: '',
+            ttsVoice: 'Kore',
+            ttsSpeed: 1.0,
+
+            // Live Model ID
+            liveModel: 'gemini-3.1-flash-live-preview',
+
+            // Personalization (Enhanced with MyAI attributes)
+            lang: 'Indonesia',
+            persona: '',
+            topic: '',
+            tone: 'Ramah dan Natural',
+            level: 'Standar (Umum)',
+            length: 'Singkat dan Mengalir (Sangat Direkomendasikan untuk Suara)',
+            sysInstruction: 'Anda adalah asisten AI serbaguna yang cerdas, tanggap, dan bersahabat. Jawab secara natural dan nyaman didengar saat dibacakan.',
+            userInfo: '',
+
+            // Grounding & Advanced
+            enableSearch: false,
+            enableMaps: false,
+            singleResponse: false,
+
+            // UI
+            theme: 'dark',
+            chatSidebarOpen: true
+        };
+
+        let appConfig = { ...DEFAULT_CONFIG };
+        let conversationHistory = [];
+
+        // Audio & Media Streams State
+        let audioContext = null;
+        let micStream = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        let inputAnalyser = null;
+        let outputAnalyser = null;
+        let inputDataArray = null;
+        let outputDataArray = null;
+        let animationFrameId = null;
+        let currentAudioSource = null;
+
+        // Local TTS State
+        let synthVoices = [];
+        let isLocalSpeaking = false;
+        let localSpeechAnimId = null;
+
+        // Video / Vision State
+        let videoStream = null;
+        let currentVideoMode = 'none'; // 'none' | 'camera' | 'screen'
+
+        const dom = {
+            html: document.documentElement,
+            statusIndicator: document.getElementById('status-indicator'),
+            statusText: document.getElementById('status-text'),
+            activeModelDisplay: document.getElementById('active-model-display'),
+            groundingBadges: document.getElementById('grounding-badges'),
+            
+            aiOrb: document.getElementById('ai-orb'),
+            orbContainer: document.getElementById('orb-container'),
+            aiSpeakingLabel: document.getElementById('ai-speaking-label'),
+            aiProcessingLabel: document.getElementById('ai-processing-label'),
+            aiListeningLabel: document.getElementById('ai-listening-label'),
+            
+            btnConnect: document.getElementById('btn-connect'),
+            btnRecord: document.getElementById('btn-record'),
+            btnDisconnect: document.getElementById('btn-disconnect'),
+            btnInterrupt: document.getElementById('btn-interrupt'),
+            btnCamera: document.getElementById('btn-camera'),
+            btnScreen: document.getElementById('btn-screen'),
+            
+            videoContainer: document.getElementById('video-container'),
+            videoPreview: document.getElementById('video-preview'),
+            videoCanvas: document.getElementById('video-canvas'),
+            videoLabel: document.getElementById('video-label'),
+            
+            chatSidebar: document.getElementById('chat-sidebar'),
+            btnToggleChat: document.getElementById('btn-toggle-chat'),
+            btnCloseChat: document.getElementById('btn-close-chat'),
+            chatBadge: document.getElementById('chat-badge'),
+            chatCountBadge: document.getElementById('chat-count-badge'),
+            transcriptBox: document.getElementById('transcript-box'),
+            emptyLogMsg: document.getElementById('empty-log-msg'),
+            textInput: document.getElementById('text-input'),
+            btnSendText: document.getElementById('btn-send-text'),
+            btnClearLog: document.getElementById('btn-clear-log'),
+            btnExportLog: document.getElementById('btn-export-log'),
+
+            btnToggleTheme: document.getElementById('btn-toggle-theme'),
+            themeIcon: document.getElementById('theme-icon'),
+            btnOpenSettings: document.getElementById('btn-open-settings'),
+            btnCloseSettings: document.getElementById('btn-close-settings'),
+            btnCancelSettings: document.getElementById('btn-cancel-settings'),
+            btnSaveSettings: document.getElementById('btn-save-settings'),
+            settingsModal: document.getElementById('settings-modal'),
+            toastContainer: document.getElementById('toast-container')
+        };
+
+        const canvasCtx = dom.videoCanvas.getContext('2d');
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const icons = {
+                info: 'fa-circle-info text-blue-400',
+                success: 'fa-circle-check text-emerald-400',
+                warning: 'fa-triangle-exclamation text-amber-400',
+                error: 'fa-circle-xmark text-rose-400'
+            };
+
+            toast.className = `flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900/90 dark:bg-slate-800/95 text-white border border-slate-700 shadow-xl text-xs backdrop-blur-md transform transition-all duration-300 translate-y-3 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} text-sm"></i> <span>${message}</span>`;
+
+            dom.toastContainer.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-3', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-3', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function loadConfig() {
+            const raw = localStorage.getItem(APP_STORAGE_KEY);
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    appConfig = { ...DEFAULT_CONFIG, ...parsed };
+                } catch (e) {
+                    console.error("Gagal membaca cache konfigurasi:", e);
+                }
+            }
+            
+            // Sync UI theme
+            if (appConfig.theme === 'light') {
+                dom.html.classList.remove('dark');
+                dom.themeIcon.className = 'fa-solid fa-sun text-sm text-amber-500';
+            } else {
+                dom.html.classList.add('dark');
+                dom.themeIcon.className = 'fa-solid fa-moon text-sm text-slate-300';
+            }
+
+            // Sync Chat Sidebar
+            if (!appConfig.chatSidebarOpen) {
+                dom.chatSidebar.classList.add('collapsed');
+            } else {
+                dom.chatSidebar.classList.remove('collapsed');
+            }
+
+            // Sync Header Display
+            dom.activeModelDisplay.textContent = appConfig.textModel;
+            renderGroundingBadges();
+        }
+
+        function saveConfigToStorage() {
+            localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(appConfig));
+            dom.activeModelDisplay.textContent = appConfig.textModel;
+            renderGroundingBadges();
+        }
+
+        function renderGroundingBadges() {
+            dom.groundingBadges.innerHTML = '';
+            if (appConfig.enableSearch) {
+                dom.groundingBadges.innerHTML += `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"><i class="fa-solid fa-earth-americas"></i> Search Grounding</span>`;
+            }
+            if (appConfig.enableMaps) {
+                dom.groundingBadges.innerHTML += `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800"><i class="fa-solid fa-location-dot"></i> Maps Grounding</span>`;
+            }
+        }
+
+        function populateVoiceList() {
+            const voiceSelect = document.getElementById('cfg-tts-voice');
+            const engine = document.getElementById('cfg-tts-engine').value;
+            voiceSelect.innerHTML = '';
+
+            if (engine === 'gemini') {
+                const geminiVoices = [
+                    { id: 'Aoede', name: 'Aoede (Hangat, Bersahabat)' },
+                    { id: 'Charon', name: 'Charon (Berat, Berwibawa)' },
+                    { id: 'Fenrir', name: 'Fenrir (Cepat, Energik)' },
+                    { id: 'Kore', name: 'Kore (Jelas, Profesional)' },
+                    { id: 'Puck', name: 'Puck (Ceria, Antusias)' }
+                ];
+                geminiVoices.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    opt.textContent = v.name;
+                    if (v.id === appConfig.ttsVoice) opt.selected = true;
+                    voiceSelect.appendChild(opt);
+                });
+            } else if (engine === 'openai') {
+                const openAIVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+                openAIVoices.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v;
+                    opt.textContent = v.charAt(0).toUpperCase() + v.slice(1);
+                    if (v === appConfig.ttsVoice.toLowerCase()) opt.selected = true;
+                    voiceSelect.appendChild(opt);
+                });
+            } else if (engine === 'local') {
+                if ('speechSynthesis' in window) {
+                    synthVoices = window.speechSynthesis.getVoices();
+                    if (synthVoices.length === 0) {
+                        const opt = document.createElement('option');
+                        opt.textContent = 'Memuat suara perangkat...';
+                        voiceSelect.appendChild(opt);
+                    } else {
+                        synthVoices.forEach((v, idx) => {
+                            const opt = document.createElement('option');
+                            opt.value = v.name;
+                            opt.textContent = `${v.name} (${v.lang})`;
+                            if (v.name === appConfig.ttsVoice || (!appConfig.ttsVoice && v.lang.startsWith('id'))) {
+                                opt.selected = true;
+                            }
+                            voiceSelect.appendChild(opt);
+                        });
+                    }
+                }
+            }
+        }
+
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                if (document.getElementById('cfg-tts-engine').value === 'local') {
+                    populateVoiceList();
+                }
+            };
+        }
+
+        function setAppStatus(state) {
+            dom.aiOrb.className = 'orb';
+            dom.aiSpeakingLabel.classList.add('opacity-0');
+            dom.aiProcessingLabel.classList.add('hidden');
+            dom.aiListeningLabel.classList.add('hidden');
+            dom.btnInterrupt.classList.add('hidden');
+
+            if (state === 'connected') {
+                dom.statusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]';
+                dom.statusText.textContent = 'Menunggu Input';
+                dom.orbContainer.classList.add('is-active');
+                dom.aiOrb.classList.add('connected');
+
+                dom.btnConnect.classList.add('hidden');
+                dom.btnRecord.classList.remove('hidden');
+                dom.btnDisconnect.classList.remove('hidden');
+
+                dom.btnRecord.disabled = false;
+                dom.btnRecord.innerHTML = '<i class="fa-solid fa-microphone text-sm"></i> <span>Mulai Bicara</span>';
+                dom.btnRecord.className = 'mx-2 px-8 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-600/25 transition-all flex items-center gap-2.5 w-48 justify-center active:scale-95';
+            } else if (state === 'recording') {
+                dom.statusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_#f43f5e]';
+                dom.statusText.textContent = 'Merekam Suara...';
+                dom.aiOrb.classList.add('recording');
+                dom.aiListeningLabel.classList.remove('hidden');
+
+                dom.btnRecord.innerHTML = '<i class="fa-solid fa-stop text-sm"></i> <span>Kirim Pesan</span>';
+                dom.btnRecord.className = 'mx-2 px-8 py-3.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-lg shadow-rose-600/40 transition-all flex items-center gap-2.5 w-48 justify-center animate-pulse';
+            } else if (state === 'processing') {
+                dom.statusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b]';
+                dom.statusText.textContent = 'Menganalisis...';
+                dom.aiOrb.classList.add('processing');
+                dom.aiProcessingLabel.classList.remove('hidden');
+
+                dom.btnRecord.disabled = true;
+                dom.btnRecord.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i> <span>Memproses...</span>';
+                dom.btnRecord.className = 'mx-2 px-8 py-3.5 rounded-full bg-slate-400 dark:bg-slate-700 text-white font-semibold shadow-md transition-all flex items-center gap-2.5 w-48 justify-center cursor-not-allowed';
+            } else if (state === 'speaking') {
+                dom.statusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_10px_#a855f7]';
+                dom.statusText.textContent = 'AI Berbicara';
+                dom.aiOrb.classList.add('speaking');
+                dom.aiSpeakingLabel.classList.remove('opacity-0');
+                dom.btnInterrupt.classList.remove('hidden');
+
+                dom.btnRecord.disabled = false;
+                dom.btnRecord.innerHTML = '<i class="fa-solid fa-microphone text-sm"></i> <span>Bicara Lagi</span>';
+                dom.btnRecord.className = 'mx-2 px-8 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg transition-all flex items-center gap-2.5 w-48 justify-center';
+            } else { // disconnected
+                dom.statusIndicator.className = 'w-2.5 h-2.5 rounded-full bg-slate-400';
+                dom.statusText.textContent = 'Sesi Terputus';
+
+                dom.btnConnect.classList.remove('hidden');
+                dom.btnRecord.classList.add('hidden');
+                dom.btnDisconnect.classList.add('hidden');
+                dom.orbContainer.classList.remove('is-active');
+
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                if (localSpeechAnimId) cancelAnimationFrame(localSpeechAnimId);
+            }
+        }
+
+        async function stopVideoStream() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            dom.videoContainer.classList.add('hidden');
+            dom.btnCamera.classList.remove('bg-blue-600', 'text-white', 'border-blue-500');
+            dom.btnScreen.classList.remove('bg-blue-600', 'text-white', 'border-blue-500');
+            currentVideoMode = 'none';
+        }
+
+        async function toggleCamera() {
+            if (currentVideoMode === 'camera') return stopVideoStream();
+            await stopVideoStream();
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640 } });
+                dom.videoPreview.srcObject = videoStream;
+                dom.videoContainer.classList.remove('hidden');
+                dom.videoLabel.innerHTML = '<i class="fa-solid fa-camera mr-1"></i> Preview Kamera';
+                dom.btnCamera.classList.add('bg-blue-600', 'text-white', 'border-blue-500');
+                currentVideoMode = 'camera';
+                showToast("Kamera aktif. AI dapat melihat visual saat Anda mengirim pesan.", "info");
+            } catch (err) {
+                showToast("Gagal mengakses kamera: " + err.message, "error");
+            }
+        }
+
+        async function toggleScreen() {
+            if (currentVideoMode === 'screen') return stopVideoStream();
+            await stopVideoStream();
+            try {
+                videoStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                dom.videoPreview.srcObject = videoStream;
+                dom.videoContainer.classList.remove('hidden');
+                dom.videoLabel.innerHTML = '<i class="fa-solid fa-desktop mr-1"></i> Preview Layar';
+                dom.btnScreen.classList.add('bg-blue-600', 'text-white', 'border-blue-500');
+                currentVideoMode = 'screen';
+                videoStream.getVideoTracks()[0].onended = stopVideoStream;
+                showToast("Berbagi layar aktif.", "info");
+            } catch (err) {
+                showToast("Berbagi layar dibatalkan.", "warning");
+            }
+        }
+
+        function captureFrameBase64() {
+            if (currentVideoMode === 'none' || !dom.videoPreview.videoWidth) return null;
+            dom.videoCanvas.width = dom.videoPreview.videoWidth;
+            dom.videoCanvas.height = dom.videoPreview.videoHeight;
+            canvasCtx.drawImage(dom.videoPreview, 0, 0, dom.videoCanvas.width, dom.videoCanvas.height);
+            return dom.videoCanvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+        }
+
+        function runAudioVisualizer() {
+            let avgInput = 0;
+            let avgOutput = 0;
+
+            if (inputAnalyser && isRecording) {
+                inputAnalyser.getByteFrequencyData(inputDataArray);
+                let sum = 0;
+                for (let i = 0; i < inputDataArray.length; i++) sum += inputDataArray[i];
+                avgInput = sum / inputDataArray.length;
+            }
+
+            if (outputAnalyser && currentAudioSource) {
+                outputAnalyser.getByteFrequencyData(outputDataArray);
+                let sum = 0;
+                for (let i = 0; i < outputDataArray.length; i++) sum += outputDataArray[i];
+                avgOutput = sum / outputDataArray.length;
+            }
+
+            // Reactive Transform Calculations
+            if (isRecording) {
+                const scale = 1 + (avgInput / 255) * 0.45;
+                dom.aiOrb.style.transform = `scale(${scale})`;
+            } else if (currentAudioSource) {
+                const scale = 1 + (avgOutput / 255) * 0.4;
+                dom.aiOrb.style.transform = `scale(${scale})`;
+            } else if (!isLocalSpeaking) {
+                dom.aiOrb.style.transform = `scale(1)`;
+            }
+
+            animationFrameId = requestAnimationFrame(runAudioVisualizer);
+        }
+
+        // Simulated pulse visualizer for local device TTS
+        function startLocalSpeechSimulation() {
+            isLocalSpeaking = true;
+            let time = 0;
+            function pulse() {
+                if (!isLocalSpeaking) return;
+                time += 0.15;
+                const wave = Math.sin(time) * 0.15 + (Math.sin(time * 2.3) * 0.08);
+                dom.aiOrb.style.transform = `scale(${1.08 + Math.abs(wave)})`;
+                localSpeechAnimId = requestAnimationFrame(pulse);
+            }
+            pulse();
+        }
+
+        function stopLocalSpeechSimulation() {
+            isLocalSpeaking = false;
+            if (localSpeechAnimId) cancelAnimationFrame(localSpeechAnimId);
+            dom.aiOrb.style.transform = 'scale(1)';
+        }
+
+        function appendTranscript(speaker, text, role = 'user') {
+            dom.emptyLogMsg.style.display = 'none';
+
+            const msgDiv = document.createElement('div');
+            const isAI = role === 'ai';
+            const isSys = role === 'system';
+
+            let bgColor = isAI 
+                ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50 text-slate-800 dark:text-blue-100 mr-auto' 
+                : (isSys 
+                    ? 'bg-slate-100 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 mx-auto text-center text-xs' 
+                    : 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white ml-auto border-transparent');
+
+            msgDiv.className = `p-3 rounded-2xl max-w-[88%] border shadow-sm ${bgColor} ${isSys ? 'rounded-xl w-full' : ''}`;
+            
+            if (!isSys) {
+                const header = document.createElement('div');
+                header.className = `text-[10px] uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5 ${isAI ? 'text-blue-600 dark:text-blue-400' : 'text-blue-100'}`;
+                header.innerHTML = isAI ? `<i class="fa-solid fa-sparkles"></i> ${speaker}` : `<i class="fa-solid fa-user"></i> ${speaker}`;
+                msgDiv.appendChild(header);
+            }
+
+            const content = document.createElement('div');
+            content.className = 'leading-relaxed text-xs md:text-[13px] whitespace-pre-wrap';
+            content.textContent = text;
+            msgDiv.appendChild(content);
+
+            dom.transcriptBox.appendChild(msgDiv);
+            dom.transcriptBox.scrollTop = dom.transcriptBox.scrollHeight;
+
+            // Update transcript counter badge
+            const totalMessages = dom.transcriptBox.querySelectorAll('.p-3').length;
+            dom.chatCountBadge.textContent = totalMessages;
+
+            if (dom.chatSidebar.classList.contains('collapsed') && role !== 'system') {
+                dom.chatBadge.classList.remove('hidden');
+            }
+        }
+
+        function constructSystemInstruction() {
+            let prompt = appConfig.sysInstruction.trim() || "Anda adalah asisten AI serbaguna yang cerdas.";
+            if (appConfig.persona && appConfig.persona.trim()) {
+                prompt += `\n[Persona/Peran Anda]: ${appConfig.persona.trim()}`;
+            }
+            if (appConfig.topic && appConfig.topic.trim()) {
+                prompt += `\n[Fokus Tema Utama]: Arahkan konteks pada bahasan "${appConfig.topic.trim()}".`;
+            }
+            prompt += `\n[Ketentuan Utama]: Selalu respons dalam Bahasa ${appConfig.lang}.`;
+            prompt += `\n[Nada Bicara]: ${appConfig.tone}.`;
+            prompt += `\n[Tingkat Pemahaman Target]: Jawab dalam level ${appConfig.level}.`;
+            prompt += `\n[Gaya Panjang Respons]: ${appConfig.length}.`;
+            
+            if (appConfig.userInfo && appConfig.userInfo.trim()) {
+                prompt += `\n[Informasi Pengguna]: ${appConfig.userInfo.trim()}`;
+            }
+
+            if (appConfig.enableMaps) {
+                prompt += `\n[Konteks Lokasi/Maps]: Berikan informasi geografis, tempat, dan arah secara akurat.`;
+            }
+
+            return prompt;
+        }
+
+        async function processMessagePipeline({ text = null, audioBase64 = null, audioMimeType = null }) {
+            setAppStatus('processing');
+            stopPlayback();
+
+            const imageFrame = captureFrameBase64();
+            const apiKey = appConfig.textApiKey.trim();
+            const textProvider = appConfig.textProvider;
+            const systemPrompt = constructSystemInstruction();
+
+            let userTextLabel = text || "[Pesan Suara]";
+            if (imageFrame) userTextLabel += " 📷";
+            appendTranscript("Anda", userTextLabel, "user");
+
+            try {
+                let aiTextResponse = "";
+
+                // === 1. CALL TEXT MODEL AGENT ===
+                if (textProvider === 'gemini') {
+                    // Google Gemini Native API
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${appConfig.textModel}:generateContent?key=${apiKey}`;
+                    
+                    const userParts = [];
+                    if (text) userParts.push({ text: text });
+                    if (audioBase64 && audioMimeType) {
+                        userParts.push({ inlineData: { mimeType: audioMimeType, data: audioBase64 } });
+                    }
+                    if (imageFrame) {
+                        userParts.push({ inlineData: { mimeType: 'image/jpeg', data: imageFrame } });
+                    }
+
+                    const payload = {
+                        contents: appConfig.singleResponse ? [{ role: "user", parts: userParts }] : [...conversationHistory, { role: "user", parts: userParts }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        generationConfig: {
+                            temperature: appConfig.textTemperature,
+                            maxOutputTokens: appConfig.textMaxTokens
+                        }
+                    };
+
+                    const tools = [];
+                    if (appConfig.enableSearch) tools.push({ google_search: {} });
+                    if (appConfig.enableMaps) tools.push({ google_maps: {} });
+                    if (tools.length > 0) payload.tools = tools;
+
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.error?.message || `HTTP ${res.status}`);
+                    }
+
+                    const data = await res.json();
+                    aiTextResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "(Tidak ada respons teks)";
+
+                } else {
+                    // OpenAI-Compatible Standard (ChatGPT, DeepSeek, Grok, Ollama)
+                    let baseUrl = appConfig.textBaseUrl.trim() || (textProvider === 'ollama' ? 'http://localhost:11434/v1' : 'https://api.openai.com/v1');
+                    baseUrl = baseUrl.replace(/\/+$/, '');
+                    const url = `${baseUrl}/chat/completions`;
+
+                    const messages = [{ role: "system", content: systemPrompt }];
+                    
+                    if (!appConfig.singleResponse) {
+                        conversationHistory.forEach(item => {
+                            messages.push({
+                                role: item.role === 'model' ? 'assistant' : 'user',
+                                content: item.parts?.[0]?.text || ''
+                            });
+                        });
+                    }
+
+                    // Handle OpenAI Vision image array if image captured
+                    let userContent = text || "Pengguna mengirim pesan suara.";
+                    if (imageFrame) {
+                        userContent = [
+                            { type: "text", text: userContent },
+                            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageFrame}` } }
+                        ];
+                    }
+
+                    messages.push({ role: "user", content: userContent });
+
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({
+                            model: appConfig.textModel,
+                            messages: messages,
+                            temperature: appConfig.textTemperature,
+                            max_tokens: appConfig.textMaxTokens
+                        })
+                    });
+
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.error?.message || `HTTP ${res.status}`);
+                    }
+
+                    const data = await res.json();
+                    aiTextResponse = data.choices?.[0]?.message?.content || "(Tanpa respons)";
+                }
+
+                // Append AI Response to UI & History
+                appendTranscript("AI", aiTextResponse, "ai");
+
+                if (!appConfig.singleResponse) {
+                    conversationHistory.push({ role: "user", parts: [{ text: userTextLabel }] });
+                    conversationHistory.push({ role: "model", parts: [{ text: aiTextResponse }] });
+                    if (conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
+                }
+
+                // === 2. CALL TTS AGENT (SUARA) ===
+                await dispatchSpeechSynthesis(aiTextResponse);
+
+            } catch (err) {
+                console.error("Pipeline Error:", err);
+                appendTranscript("Sistem", `Kesalahan: ${err.message}`, "system");
+                showToast(`Gagal: ${err.message}`, "error");
+                setAppStatus('connected');
+            }
+        }
+
+        async function dispatchSpeechSynthesis(text) {
+            setAppStatus('speaking');
+            const engine = appConfig.ttsEngine;
+
+            // Mode A: TTS Perangkat Lokal (Web Speech API)
+            if (engine === 'local') {
+                if (!('speechSynthesis' in window)) {
+                    showToast("Peramban Anda tidak mendukung Web Speech API.", "warning");
+                    setAppStatus('connected');
+                    return;
+                }
+
+                window.speechSynthesis.cancel();
+                const cleanText = text.replace(/[*_~`#\[\]]/g, '').trim();
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.rate = appConfig.ttsSpeed || 1.0;
+
+                if (appConfig.ttsVoice) {
+                    const found = synthVoices.find(v => v.name === appConfig.ttsVoice);
+                    if (found) utterance.voice = found;
+                }
+
+                utterance.onstart = () => {
+                    startLocalSpeechSimulation();
+                };
+
+                utterance.onend = () => {
+                    stopLocalSpeechSimulation();
+                    setAppStatus('connected');
+                };
+
+                utterance.onerror = (e) => {
+                    console.error("Local TTS Error:", e);
+                    stopLocalSpeechSimulation();
+                    setAppStatus('connected');
+                };
+
+                window.speechSynthesis.speak(utterance);
+                return;
+            }
+
+            // Mode B: Gemini Native TTS API
+            if (engine === 'gemini') {
+                const ttsKey = appConfig.ttsApiKey.trim() || appConfig.textApiKey.trim();
+                const ttsModel = appConfig.ttsModel.trim() || 'gemini-3.1-flash-tts-preview';
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${ttsModel}:generateContent?key=${ttsKey}`;
+
+                const cleanText = text.replace(/[*_~`#\[\]]/g, '').substring(0, 1200);
+
+                const ttsPayload = {
+                    model: ttsModel,
+                    contents: [{ parts: [{ text: cleanText }] }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: {
+                            voiceConfig: {
+                                prebuiltVoiceConfig: { voiceName: appConfig.ttsVoice || 'Kore' }
+                            }
+                        }
+                    }
+                };
+
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(ttsPayload)
+                    });
+
+                    if (!res.ok) throw new Error(`Gemini TTS HTTP ${res.status}`);
+                    const data = await res.json();
+                    const pcmBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+                    if (pcmBase64) {
+                        await playPCM16(pcmBase64);
+                    } else {
+                        setAppStatus('connected');
+                    }
+                } catch (e) {
+                    console.warn("Gemini TTS gagal, beralih ke suara lokal:", e);
+                    showToast("TTS Cloud bermasalah, beralih ke suara lokal perangkat.", "warning");
+                    appConfig.ttsEngine = 'local';
+                    dispatchSpeechSynthesis(text);
+                }
+                return;
+            }
+
+            // Mode C: OpenAI Standard TTS API (/v1/audio/speech)
+            if (engine === 'openai') {
+                const ttsKey = appConfig.ttsApiKey.trim() || appConfig.textApiKey.trim();
+                let baseUrl = appConfig.ttsBaseUrl.trim() || 'https://api.openai.com/v1';
+                baseUrl = baseUrl.replace(/\/+$/, '');
+                const url = `${baseUrl}/audio/speech`;
+
+                const cleanText = text.replace(/[*_~`#\[\]]/g, '').substring(0, 1500);
+
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${ttsKey}`
+                        },
+                        body: JSON.stringify({
+                            model: appConfig.ttsModel || 'tts-1',
+                            input: cleanText,
+                            voice: (appConfig.ttsVoice || 'alloy').toLowerCase(),
+                            speed: appConfig.ttsSpeed || 1.0
+                        })
+                    });
+
+                    if (!res.ok) throw new Error(`OpenAI TTS HTTP ${res.status}`);
+                    const arrayBuffer = await res.arrayBuffer();
+                    await playDecodedAudioBuffer(arrayBuffer);
+                } catch (e) {
+                    console.warn("OpenAI TTS gagal, beralih ke suara lokal:", e);
+                    showToast("OpenAI TTS gagal, beralih ke suara lokal perangkat.", "warning");
+                    appConfig.ttsEngine = 'local';
+                    dispatchSpeechSynthesis(text);
+                }
+            }
+        }
+
+        async function playPCM16(base64) {
+            if (!audioContext) return;
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+            const int16 = new Int16Array(bytes.buffer);
+            const sampleRate = 24000;
+            const audioBuffer = audioContext.createBuffer(1, int16.length, sampleRate);
+            const channel = audioBuffer.getChannelData(0);
+
+            for (let i = 0; i < int16.length; i++) {
+                channel[i] = int16[i] / 32768.0;
+            }
+
+            attachSourceToOutput(audioBuffer);
+        }
+
+        async function playDecodedAudioBuffer(arrayBuffer) {
+            if (!audioContext) return;
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            attachSourceToOutput(audioBuffer);
+        }
+
+        function attachSourceToOutput(audioBuffer) {
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+
+            if (!outputAnalyser) {
+                outputAnalyser = audioContext.createAnalyser();
+                outputAnalyser.fftSize = 256;
+                outputDataArray = new Uint8Array(outputAnalyser.frequencyBinCount);
+            }
+
+            source.connect(outputAnalyser);
+            outputAnalyser.connect(audioContext.destination);
+
+            source.onended = () => {
+                currentAudioSource = null;
+                setAppStatus('connected');
+            };
+
+            currentAudioSource = source;
+            source.start(0);
+        }
+
+        function stopPlayback() {
+            if (currentAudioSource) {
+                try { currentAudioSource.stop(); } catch (e) {}
+                currentAudioSource = null;
+            }
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            stopLocalSpeechSimulation();
+        }
+
+        async function connectSession() {
+            if (!appConfig.textApiKey.trim()) {
+                showToast("Harap isi API Key di Setelan terlebih dahulu.", "warning");
+                openSettingsModal();
+                return;
+            }
+
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                micStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                });
+
+                const source = audioContext.createMediaStreamSource(micStream);
+                inputAnalyser = audioContext.createAnalyser();
+                inputAnalyser.fftSize = 256;
+                inputDataArray = new Uint8Array(inputAnalyser.frequencyBinCount);
+                source.connect(inputAnalyser);
+
+                runAudioVisualizer();
+                setAppStatus('connected');
+                showToast("Sesi terhubung. Tekan 'Mulai Bicara' untuk berinteraksi.", "success");
+            } catch (err) {
+                console.error("Mic Access Error:", err);
+                showToast("Gagal mengakses mikrofon: " + err.message, "error");
+                setAppStatus('disconnected');
+            }
+        }
+
+        function disconnectSession() {
+            stopPlayback();
+            stopVideoStream();
+
+            if (micStream) {
+                micStream.getTracks().forEach(t => t.stop());
+                micStream = null;
+            }
+
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+
+            setAppStatus('disconnected');
+            showToast("Sesi diakhiri.", "info");
+        }
+
+        function toggleRecording() {
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                audioChunks = [];
+                mediaRecorder = new MediaRecorder(micStream);
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    if (audioChunks.length === 0) {
+                        setAppStatus('connected');
+                        return;
+                    }
+
+                    const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                    const audioBlob = new Blob(audioChunks, { type: mimeType });
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64Audio = reader.result.split(',')[1];
+                        processMessagePipeline({ audioBase64: base64Audio, audioMimeType: mimeType });
+                    };
+                    reader.readAsDataURL(audioBlob);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                setAppStatus('recording');
+                stopPlayback();
+
+            } else if (mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                isRecording = false;
+            }
+        }
+
+        function sendUserText() {
+            const text = dom.textInput.value.trim();
+            if (!text) return;
+
+            dom.textInput.value = '';
+            processMessagePipeline({ text: text });
+        }
+
+        function openSettingsModal() {
+            // Tab 1: Text
+            document.getElementById('cfg-text-provider').value = appConfig.textProvider;
+            document.getElementById('cfg-text-model').value = appConfig.textModel;
+            document.getElementById('cfg-text-key').value = appConfig.textApiKey;
+            document.getElementById('cfg-text-url').value = appConfig.textBaseUrl;
+            document.getElementById('cfg-text-temp').value = appConfig.textTemperature;
+            document.getElementById('temp-display').textContent = appConfig.textTemperature;
+            document.getElementById('cfg-text-maxtokens').value = appConfig.textMaxTokens;
+
+            // Tab 2: TTS
+            document.getElementById('cfg-tts-engine').value = appConfig.ttsEngine;
+            const engineRadio = document.querySelector(`input[name="tts-engine-choice"][value="${appConfig.ttsEngine}"]`);
+            if (engineRadio) engineRadio.checked = true;
+
+            document.getElementById('cfg-tts-model').value = appConfig.ttsModel;
+            document.getElementById('cfg-tts-key').value = appConfig.ttsApiKey;
+            document.getElementById('cfg-tts-url').value = appConfig.ttsBaseUrl;
+            document.getElementById('cfg-tts-speed').value = appConfig.ttsSpeed;
+            document.getElementById('speed-display').textContent = `${appConfig.ttsSpeed}x`;
+
+            // Tab 3: Persona
+            document.getElementById('cfg-persona-lang').value = appConfig.lang;
+            document.getElementById('cfg-persona-tone').value = appConfig.tone;
+            document.getElementById('cfg-persona-level').value = appConfig.level;
+            document.getElementById('cfg-persona-length').value = appConfig.length;
+            document.getElementById('cfg-persona-role').value = appConfig.persona || '';
+            document.getElementById('cfg-persona-topic').value = appConfig.topic || '';
+            document.getElementById('cfg-persona-sys').value = appConfig.sysInstruction;
+            document.getElementById('cfg-persona-user').value = appConfig.userInfo;
+
+            // Tab 4: Tools
+            document.getElementById('cfg-tool-search').checked = appConfig.enableSearch;
+            document.getElementById('cfg-tool-maps').checked = appConfig.enableMaps;
+            document.getElementById('cfg-tool-single').checked = appConfig.singleResponse;
+
+            // Tab 5: Live
+            document.getElementById('cfg-live-model').value = appConfig.liveModel || 'gemini-3.1-flash-live-preview';
+
+            toggleTextProviderUI();
+            toggleTTSEngineUI();
+            populateVoiceList();
+
+            dom.settingsModal.classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            dom.settingsModal.classList.add('hidden');
+        }
+
+        function saveSettingsFromModal() {
+            appConfig.textProvider = document.getElementById('cfg-text-provider').value;
+            appConfig.textModel = document.getElementById('cfg-text-model').value.trim() || 'gemini-3.1-flash-lite';
+            appConfig.textApiKey = document.getElementById('cfg-text-key').value.trim();
+            appConfig.textBaseUrl = document.getElementById('cfg-text-url').value.trim();
+            appConfig.textTemperature = parseFloat(document.getElementById('cfg-text-temp').value);
+            appConfig.textMaxTokens = parseInt(document.getElementById('cfg-text-maxtokens').value) || 4096;
+
+            appConfig.ttsEngine = document.getElementById('cfg-tts-engine').value;
+            appConfig.ttsModel = document.getElementById('cfg-tts-model').value.trim() || 'gemini-3.1-flash-tts-preview';
+            appConfig.ttsApiKey = document.getElementById('cfg-tts-key').value.trim();
+            appConfig.ttsBaseUrl = document.getElementById('cfg-tts-url').value.trim();
+            appConfig.ttsVoice = document.getElementById('cfg-tts-voice').value;
+            appConfig.ttsSpeed = parseFloat(document.getElementById('cfg-tts-speed').value);
+
+            appConfig.lang = document.getElementById('cfg-persona-lang').value;
+            appConfig.tone = document.getElementById('cfg-persona-tone').value;
+            appConfig.level = document.getElementById('cfg-persona-level').value;
+            appConfig.length = document.getElementById('cfg-persona-length').value;
+            appConfig.persona = document.getElementById('cfg-persona-role').value.trim();
+            appConfig.topic = document.getElementById('cfg-persona-topic').value.trim();
+            appConfig.sysInstruction = document.getElementById('cfg-persona-sys').value.trim();
+            appConfig.userInfo = document.getElementById('cfg-persona-user').value.trim();
+
+            appConfig.enableSearch = document.getElementById('cfg-tool-search').checked;
+            appConfig.enableMaps = document.getElementById('cfg-tool-maps').checked;
+            appConfig.singleResponse = document.getElementById('cfg-tool-single').checked;
+
+            appConfig.liveModel = document.getElementById('cfg-live-model').value.trim() || 'gemini-3.1-flash-live-preview';
+
+            saveConfigToStorage();
+            closeSettingsModal();
+            showToast("Setelan MyAILive berhasil disimpan!", "success");
+        }
+
+        function toggleTextProviderUI() {
+            const val = document.getElementById('cfg-text-provider').value;
+            const wrap = document.getElementById('wrap-text-baseurl');
+            wrap.classList.toggle('hidden', val === 'gemini');
+        }
+
+        function toggleTTSEngineUI() {
+            const val = document.getElementById('cfg-tts-engine').value;
+            const wrapCloud = document.getElementById('wrap-tts-cloud');
+            const wrapUrl = document.getElementById('wrap-tts-baseurl');
+
+            wrapCloud.classList.toggle('hidden', val === 'local');
+            wrapUrl.classList.toggle('hidden', val !== 'openai');
+
+            // Highlight selected card
+            document.querySelectorAll('.tts-engine-card').forEach(card => {
+                const radio = card.querySelector('input[type="radio"]');
+                if (radio && radio.value === val) {
+                    card.classList.add('border-purple-500', 'bg-purple-50/50', 'dark:bg-purple-950/30');
+                } else {
+                    card.classList.remove('border-purple-500', 'bg-purple-50/50', 'dark:bg-purple-950/30');
+                }
+            });
+
+            populateVoiceList();
+        }
+
+        // Voice preview testing
+        async function testTtsVoice() {
+            const btn = document.getElementById('btn-test-voice');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i> <span>Menguji...</span>';
+
+            const testSampleText = "Halo, ini adalah pengujian suara asisten pintar MyAILive.";
+            
+            try {
+                // Ensure audio context is ready
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                await dispatchSpeechSynthesis(testSampleText);
+                showToast("Sampel suara sedang diputar.", "info");
+            } catch (err) {
+                console.error("Test Voice Error:", err);
+                showToast("Gagal menguji suara: " + err.message, "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        function resetSettingsToDefault() {
+            if (confirm("Kembalikan semua pengaturan ke konfigurasi bawaan awal?")) {
+                const preservedTheme = appConfig.theme;
+                const preservedSidebar = appConfig.chatSidebarOpen;
+                appConfig = { ...DEFAULT_CONFIG, theme: preservedTheme, chatSidebarOpen: preservedSidebar };
+                saveConfigToStorage();
+                openSettingsModal();
+                showToast("Pengaturan berhasil direset ke default.", "info");
+            }
+        }
+
+        function exportChatMarkdown() {
+            const items = dom.transcriptBox.querySelectorAll('.p-3');
+            if (items.length === 0) {
+                showToast("Belum ada obrolan untuk diekspor.", "warning");
+                return;
+            }
+
+            let md = `# Log Obrolan MyAILive\n\n`;
+            md += `*Tanggal Ekspor: ${new Date().toLocaleString('id-ID')}*\n\n---\n\n`;
+
+            items.forEach(el => {
+                const header = el.querySelector('.uppercase')?.textContent || 'Pesan';
+                const body = el.querySelector('.whitespace-pre-wrap')?.textContent || '';
+                md += `### ${header}\n${body}\n\n`;
+            });
+
+            const blob = new Blob([md], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `MyAILive_${Date.now()}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("Riwayat obrolan diunduh (.md)", "success");
+        }
+
+        function clearChatTranscript() {
+            dom.transcriptBox.innerHTML = '';
+            dom.transcriptBox.appendChild(dom.emptyLogMsg);
+            dom.emptyLogMsg.style.display = 'flex';
+            dom.chatCountBadge.textContent = '0';
+            conversationHistory = [];
+            showToast("Riwayat obrolan dibersihkan.", "info");
+        }
+
+        function setupEventListeners() {
+            // Theme toggle
+            dom.btnToggleTheme.addEventListener('click', () => {
+                appConfig.theme = appConfig.theme === 'dark' ? 'light' : 'dark';
+                saveConfigToStorage();
+                loadConfig();
+            });
+
+            // Chat sidebar toggle
+            const toggleChatHandler = () => {
+                appConfig.chatSidebarOpen = !appConfig.chatSidebarOpen;
+                dom.chatSidebar.classList.toggle('collapsed', !appConfig.chatSidebarOpen);
+                if (appConfig.chatSidebarOpen) dom.chatBadge.classList.add('hidden');
+                saveConfigToStorage();
+            };
+            dom.btnToggleChat.addEventListener('click', toggleChatHandler);
+            dom.btnCloseChat.addEventListener('click', toggleChatHandler);
+
+            // Session controls
+            dom.btnConnect.addEventListener('click', connectSession);
+            dom.btnDisconnect.addEventListener('click', disconnectSession);
+            dom.btnRecord.addEventListener('click', toggleRecording);
+            dom.btnInterrupt.addEventListener('click', () => {
+                stopPlayback();
+                setAppStatus('connected');
+                showToast("Respons suara AI dihentikan.", "info");
+            });
+
+            // Camera & Screen
+            dom.btnCamera.addEventListener('click', toggleCamera);
+            dom.btnScreen.addEventListener('click', toggleScreen);
+
+            // Settings Modal
+            dom.btnOpenSettings.addEventListener('click', openSettingsModal);
+            dom.btnCloseSettings.addEventListener('click', closeSettingsModal);
+            dom.btnCancelSettings.addEventListener('click', closeSettingsModal);
+            dom.btnSaveSettings.addEventListener('click', saveSettingsFromModal);
+            document.getElementById('btn-reset-settings').addEventListener('click', resetSettingsToDefault);
+            document.getElementById('btn-test-voice').addEventListener('click', testTtsVoice);
+
+            // Settings Tabs
+            document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.settings-tab-btn').forEach(b => {
+                        b.className = 'settings-tab-btn py-2 px-3.5 text-xs font-semibold rounded-t-xl border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition-all whitespace-nowrap';
+                    });
+                    btn.className = 'settings-tab-btn active py-2 px-3.5 text-xs font-semibold rounded-t-xl border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 flex items-center gap-2 transition-all whitespace-nowrap';
+
+                    document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.add('hidden'));
+                    const target = document.getElementById(btn.dataset.tab);
+                    if (target) target.classList.remove('hidden');
+                });
+            });
+
+            // Sliders Display
+            document.getElementById('cfg-text-temp').addEventListener('input', (e) => {
+                document.getElementById('temp-display').textContent = e.target.value;
+            });
+            document.getElementById('cfg-tts-speed').addEventListener('input', (e) => {
+                document.getElementById('speed-display').textContent = `${e.target.value}x`;
+            });
+
+            // Token Quick Chips
+            document.querySelectorAll('.btn-token-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    document.getElementById('cfg-text-maxtokens').value = chip.dataset.tokens;
+                });
+            });
+
+            // Provider Quick Presets
+            document.querySelectorAll('.btn-preset-provider').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('cfg-text-provider').value = btn.dataset.provider;
+                    document.getElementById('cfg-text-model').value = btn.dataset.model;
+                    document.getElementById('cfg-text-url').value = btn.dataset.url;
+                    toggleTextProviderUI();
+                    showToast(`Preset ${btn.textContent.trim()} diterapkan!`, 'info');
+                });
+            });
+
+            // Persona Quick Chips
+            document.querySelectorAll('.btn-persona-preset').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const preset = btn.dataset.preset;
+                    const sysInput = document.getElementById('cfg-persona-sys');
+                    const roleInput = document.getElementById('cfg-persona-role');
+                    const toneSelect = document.getElementById('cfg-persona-tone');
+
+                    if (preset === 'assistant') {
+                        roleInput.value = 'Asisten Serbaguna';
+                        toneSelect.value = 'Ramah dan Natural';
+                        sysInput.value = 'Anda adalah asisten AI serbaguna yang cerdas, tanggap, dan bersahabat. Jawab secara natural dan enak didengar saat dibacakan.';
+                    } else if (preset === 'tutor') {
+                        roleInput.value = 'Tutor & Pendidik Sabar';
+                        toneSelect.value = 'Empatik dan Hangat';
+                        sysInput.value = 'Anda adalah tutor privat yang sabar dan membimbing. Terangkan konsep rumit dengan analogi sederhana yang mudah dipahami.';
+                    } else if (preset === 'coder') {
+                        roleInput.value = 'Senior Software Engineer';
+                        toneSelect.value = 'Ringkas dan Tegas';
+                        sysInput.value = 'Anda adalah Senior Software Engineer. Berikan solusi kode yang bersih, efisien, berstandar industri, dan langsung ke inti permasalahan.';
+                    }
+                });
+            });
+
+            // TTS Radio Cards
+            document.querySelectorAll('input[name="tts-engine-choice"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    document.getElementById('cfg-tts-engine').value = e.target.value;
+                    toggleTTSEngineUI();
+                });
+            });
+
+            // Dynamic Form UI Toggles
+            document.getElementById('cfg-text-provider').addEventListener('change', toggleTextProviderUI);
+
+            // Eye Button Toggles
+            document.querySelectorAll('.btn-toggle-eye').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = document.getElementById(btn.dataset.target);
+                    if (target.type === 'password') {
+                        target.type = 'text';
+                        btn.innerHTML = '<i class="fa-solid fa-eye-slash"></i>';
+                    } else {
+                        target.type = 'password';
+                        btn.innerHTML = '<i class="fa-solid fa-eye"></i>';
+                    }
+                });
+            });
+
+            // Transcript Actions
+            dom.btnExportLog.addEventListener('click', exportChatMarkdown);
+            dom.btnClearLog.addEventListener('click', clearChatTranscript);
+        }
+
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+            setupEventListeners();
+            populateVoiceList();
+        });
+    </script>
+</body>
+</html>
