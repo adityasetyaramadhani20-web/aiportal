@@ -83,6 +83,12 @@ Halaman utama proyek yang memiliki fitur navigasi tab, mode Gelap/Terang (*Dark/
 | Nama Komponen | Penjelasan Singkat |
 | :--- | :--- |
 | `MiniSys` (`app.py`) | Aplikasi web mikro berbasis Python (`http://localhost:5000`) yang dilengkapi antarmuka HTML (`templates/index.html`), penyimpanan data terstruktur (`url_database.csv`), kunci keamanan (`secret.key`), dan peluncur instan (`start.bat`). |
+|a. Split Excel ke CSV| Split file Excel ke dalam beberapa file CSV (ZIP). |
+|b. Merge File CSV| Menggabungkan beberapa file CSV jadi satu file. |
+|c. PDFVert Optimizer| Kompresi file PDF dan konversi file PDF ke format Word, Excel, atau PowerPoint. |
+|d. MediaVert| Konversi file multimedia seperti foto, video, dan gambar. |
+|e. MediaChive| Alat pengarsip video dan audio online dengan pustaka yt-dlp. |
+|f. LongShort| Alat pemanjang dan pemendek link dengan hosting domain sesuai `url_database.csv` |
 
 #### B. Dokumen, Teks & Kantor (`minitools/`)
 | Nama File | Penjelasan Singkat |
