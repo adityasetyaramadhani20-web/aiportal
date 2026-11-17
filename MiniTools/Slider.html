@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slider</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        neo: {
+                            bg: '#09090b',
+                            card: '#18181b',
+                            border: '#ffffff',
+                            accent: '#38bdf8',
+                            purple: '#a855f7',
+                            pink: '#ec4899',
+                            yellow: '#facc15',
+                            green: '#10b981'
+                        }
+                    },
+                    boxShadow: {
+                        'neo': '4px 4px 0px 0px currentColor',
+                        'neo-lg': '6px 6px 0px 0px currentColor',
+                        'neo-sm': '2px 2px 0px 0px currentColor'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Space Grotesk & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
+
+    <!-- Third-Party Libraries for Parsing & Export -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        h1, h2, h3, h4, h5, h6, .font-heading {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Neobrutalist custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(120, 120, 120, 0.1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #38bdf8;
+            border: 2px solid currentColor;
+        }
+
+        /* Slide Ratio Box */
+        .slide-container {
+            aspect-ratio: 16 / 9;
+            width: 100%;
+            max-width: 960px;
+        }
+
+        /* Custom Dropdown Animation */
+        .dropdown-menu {
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .dropdown-menu.hidden {
+            display: none;
+            opacity: 0;
+            transform: translateY(-8px);
+        }
+        .dropdown-menu:not(.hidden) {
+            display: flex;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Print CSS for PDF export */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .no-print {
+                display: none !important;
+            }
+            #print-container, #print-container * {
+                visibility: visible;
+            }
+            #print-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .print-slide {
+                page-break-after: always;
+                break-after: page;
+                width: 100vw;
+                height: 56.25vw;
+                box-sizing: border-box;
+                margin: 0;
+                padding: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-zinc-950 text-zinc-100 dark:bg-zinc-950 dark:text-zinc-100">
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="no-print h-16 border-b-4 border-black dark:border-white bg-white dark:bg-zinc-900 text-black dark:text-white px-4 flex items-center justify-between z-30 shrink-0 transition-colors">
+        <div class="flex items-center gap-3">
+            <!-- Application Title Only: SLIDER -->
+            <div class="bg-amber-400 text-black font-black text-xl md:text-2xl px-3 py-1 border-2 border-black dark:border-white shadow-neo tracking-wider uppercase">
+                SLIDER
+            </div>
+        </div>
+
+        <!-- Header Actions -->
+        <div class="flex items-center gap-2 py-1">
+            <!-- App Theme Toggle (Light / Dark UI) -->
+            <button onclick="toggleAppTheme()" title="Ubah Mode Tampilan Aplikasi" class="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white px-3 py-1.5 font-bold text-xs md:text-sm border-2 border-black dark:border-white shadow-neo active:translate-x-0.5 active:translate-y-0.5 transition-all">
+                <i id="app-theme-icon" class="fa-solid fa-sun text-amber-500"></i>
+                <span id="app-theme-text" class="hidden sm:inline">Terang</span>
+            </button>
+
+            <button onclick="openImportModal()" class="flex items-center gap-2 bg-purple-500 text-white px-3 py-1.5 font-bold text-xs md:text-sm border-2 border-black dark:border-white shadow-neo active:translate-x-0.5 active:translate-y-0.5 transition-all">
+                <i class="fa-solid fa-file-import"></i> Impor
+            </button>
+            <button onclick="triggerAutoSplitter()" class="flex items-center gap-2 bg-sky-400 text-black px-3 py-1.5 font-bold text-xs md:text-sm border-2 border-black dark:border-white shadow-neo active:translate-x-0.5 active:translate-y-0.5 transition-all">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Auto Split
+            </button>
+            <button onclick="startPresenterMode()" class="flex items-center gap-2 bg-emerald-400 text-black px-3 py-1.5 font-bold text-xs md:text-sm border-2 border-black dark:border-white shadow-neo active:translate-x-0.5 active:translate-y-0.5 transition-all">
+                <i class="fa-solid fa-play"></i> Presentasi
+            </button>
+
+            <!-- EXPORT MODAL TRIGGER BUTTON -->
+            <button onclick="openExportModal()" class="flex items-center gap-2 bg-pink-500 text-white px-3 py-1.5 font-bold text-xs md:text-sm border-2 border-black dark:border-white shadow-neo active:translate-x-0.5 active:translate-y-0.5 transition-all">
+                <i class="fa-solid fa-download"></i> Simpan / Ekspor
+            </button>
+
+            <!-- Manual Save Cache -->
+            <button onclick="saveToCacheManually()" title="Simpan Draf Ke Cache Browser" class="bg-zinc-200 dark:bg-zinc-800 text-black dark:text-white p-2 border-2 border-black dark:border-white shadow-neo hover:bg-zinc-300 dark:hover:bg-zinc-700 active:translate-x-0.5 active:translate-y-0.5 transition-all">
+                <i class="fa-solid fa-floppy-disk"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN APPLICATION CONTAINER -->
+    <div class="no-print flex-1 flex flex-col lg:flex-row overflow-hidden">
+        
+        <!-- LEFT SIDEBAR / EDITOR PANEL -->
+        <aside class="w-full lg:w-[460px] bg-zinc-100 dark:bg-zinc-900 text-black dark:text-white border-b-4 lg:border-b-0 lg:border-r-4 border-black dark:border-white flex flex-col h-1/2 lg:h-full shrink-0">
+            
+            <!-- Sidebar Navigation Tabs -->
+            <div class="flex border-b-2 border-black dark:border-white bg-zinc-200 dark:bg-zinc-950 text-xs font-bold">
+                <button onclick="switchTab('outline')" id="tab-btn-outline" class="flex-1 py-2.5 px-2 border-r-2 border-black dark:border-white text-center bg-sky-400 text-black font-extrabold uppercase transition-all">
+                    <i class="fa-solid fa-list-check"></i> Outline
+                </button>
+                <button onclick="switchTab('slides')" id="tab-btn-slides" class="flex-1 py-2.5 px-2 border-r-2 border-black dark:border-white text-center text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-800 uppercase transition-all">
+                    <i class="fa-solid fa-layer-group"></i> Slide (<span id="slide-count-badge">0</span>)
+                </button>
+                <button onclick="switchTab('editor')" id="tab-btn-editor" class="flex-1 py-2.5 px-2 border-r-2 border-black dark:border-white text-center text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-800 uppercase transition-all">
+                    <i class="fa-solid fa-sliders"></i> Edit
+                </button>
+                <button onclick="switchTab('theme')" id="tab-btn-theme" class="flex-1 py-2.5 px-2 text-center text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-800 uppercase transition-all">
+                    <i class="fa-solid fa-palette"></i> Tema
+                </button>
+            </div>
+
+            <!-- TAB CONTENT CONTAINER -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                
+                <!-- TAB 1: OUTLINE TEXT & MARKDOWN INPUT -->
+                <div id="tab-content-outline" class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <label class="font-heading font-extrabold text-xs md:text-sm text-sky-600 dark:text-sky-400 uppercase tracking-wide">
+                            <i class="fa-solid fa-align-left"></i> Input Teks / Markdown
+                        </label>
+                        <span class="text-[10px] bg-zinc-200 dark:bg-zinc-800 border border-black dark:border-zinc-600 px-2 py-0.5 rounded text-zinc-700 dark:text-zinc-300">
+                            Gunakan # judul, --- pemisah
+                        </span>
+                    </div>
+
+                    <textarea id="raw-outline-input" class="w-full h-60 bg-white dark:bg-zinc-950 border-2 border-black dark:border-white p-3 font-mono text-xs text-black dark:text-zinc-100 focus:outline-none focus:border-sky-500 shadow-neo leading-relaxed" placeholder="# Judul Slide Utama
+## Sub-Judul Presentasi Ringkas
+- Poin pertama yang menarik perhatian
+- Poin kedua tentang statistik bisnis
+
+---
+
+# Slide Kedua: Data Visual
+## Performa Kuartal Ini
+[Chart: bar | Penjualan | Q1: 120 | Q2: 150 | Q3: 180]
+- Pertumbuhan mencapai 25% YoY
+- Konversi pelanggan meningkat pesat"></textarea>
+
+                    <div class="flex gap-2">
+                        <button onclick="processOutlineToSlides()" class="flex-1 bg-amber-400 text-black font-extrabold py-2 px-4 border-2 border-black dark:border-white shadow-neo hover:bg-amber-300 active:translate-x-0.5 active:translate-y-0.5 transition-all uppercase text-xs">
+                            <i class="fa-solid fa-gears"></i> Generate Slide dari Teks
+                        </button>
+                    </div>
+
+                    <!-- Quick Drop File Card -->
+                    <div onclick="openImportModal()" class="cursor-pointer border-2 border-dashed border-zinc-400 dark:border-zinc-500 hover:border-sky-500 p-4 text-center bg-white dark:bg-zinc-900/60 transition-all rounded-sm">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-sky-500 mb-1"></i>
+                        <p class="text-xs font-bold text-zinc-800 dark:text-zinc-200">Klik atau Drag & Drop File</p>
+                        <p class="text-[10px] text-zinc-500 dark:text-zinc-400">Mendukung .MD, .TXT, .CSV, .XLSX, .JSON</p>
+                    </div>
+                </div>
+
+                <!-- TAB 2: SLIDE THUMBNAIL LIST & REORDER -->
+                <div id="tab-content-slides" class="space-y-3 hidden">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-extrabold uppercase text-amber-600 dark:text-amber-400">Daftar Slide Presentasi</span>
+                        <button onclick="addNewSlide()" class="bg-emerald-400 text-black px-2.5 py-1 text-xs font-bold border-2 border-black dark:border-white shadow-neo active:translate-x-0.5 active:translate-y-0.5 transition-all">
+                            <i class="fa-solid fa-plus"></i> Slide Baru
+                        </button>
+                    </div>
+                    <div id="slides-thumbnail-container" class="space-y-2">
+                        <!-- Dynamic Thumbnails -->
+                    </div>
+                </div>
+
+                <!-- TAB 3: ACTIVE SLIDE EDITOR -->
+                <div id="tab-content-editor" class="space-y-4 hidden">
+                    <div class="bg-white dark:bg-zinc-950 p-3 border-2 border-black dark:border-white shadow-neo space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-extrabold uppercase text-pink-500">Tipe Layout Slide</span>
+                            <span id="editing-slide-index" class="text-xs font-mono text-zinc-500 dark:text-zinc-400">Slide #1</span>
+                        </div>
+                        <select id="editor-layout-type" onchange="updateCurrentSlideLayout(this.value)" class="w-full bg-zinc-100 dark:bg-zinc-900 border-2 border-black dark:border-white p-2 text-xs font-bold text-black dark:text-zinc-100 focus:outline-none">
+                            <option value="title">Title Slide (Judul Utama)</option>
+                            <option value="content">Content Slide (Judul & Poin Teks)</option>
+                            <option value="chart">Split Content & Visual Chart</option>
+                            <option value="table">Data Table Slide (Tabel Matrix)</option>
+                            <option value="stat">Big Stat / Highlight Metric</option>
+                        </select>
+                    </div>
+
+                    <!-- Slide Form Fields -->
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-zinc-600 dark:text-zinc-400 mb-1">Judul Slide</label>
+                            <input type="text" id="editor-title" oninput="updateCurrentSlideData()" class="w-full bg-white dark:bg-zinc-950 border-2 border-black dark:border-white p-2 text-xs font-bold text-black dark:text-white focus:outline-none focus:border-sky-500 shadow-sm" placeholder="Masukkan judul slide...">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-zinc-600 dark:text-zinc-400 mb-1">Sub-Judul / Tagline</label>
+                            <input type="text" id="editor-subtitle" oninput="updateCurrentSlideData()" class="w-full bg-white dark:bg-zinc-950 border-2 border-black dark:border-white p-2 text-xs font-bold text-black dark:text-white focus:outline-none focus:border-sky-500 shadow-sm" placeholder="Masukkan sub-judul...">
+                        </div>
+
+                        <!-- Rich Text Bullet Points -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-[11px] font-bold uppercase text-zinc-600 dark:text-zinc-400">Isi Teks / Poin Bullet (1 per baris)</label>
+                                <div class="flex gap-1">
+                                    <button type="button" onclick="insertRichTextFormatting('bold')" class="px-1.5 py-0.5 text-[10px] bg-zinc-200 dark:bg-zinc-800 text-black dark:text-white border border-black dark:border-white font-bold"><b>B</b></button>
+                                    <button type="button" onclick="insertRichTextFormatting('highlight')" class="px-1.5 py-0.5 text-[10px] bg-amber-400 text-black font-bold border border-black dark:border-white">HL</button>
+                                </div>
+                            </div>
+                            <textarea id="editor-bullets" oninput="updateCurrentSlideData()" rows="4" class="w-full bg-white dark:bg-zinc-950 border-2 border-black dark:border-white p-2 font-mono text-xs text-black dark:text-white focus:outline-none focus:border-sky-500 shadow-sm" placeholder="- Poin pertama&#10;- Poin kedua"></textarea>
+                        </div>
+
+                        <!-- Data Chart / Table Options Editor -->
+                        <div id="chart-editor-box" class="bg-white dark:bg-zinc-950 border-2 border-black dark:border-white p-3 space-y-2">
+                            <span class="text-xs font-extrabold uppercase text-amber-500 block">Pengaturan Data & Grafik</span>
+                            
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Tipe Grafik</label>
+                                    <select id="editor-chart-type" onchange="updateCurrentSlideData()" class="w-full bg-zinc-100 dark:bg-zinc-900 border border-black dark:border-white p-1 text-xs text-black dark:text-white">
+                                        <option value="bar">Batang (Bar)</option>
+                                        <option value="line">Garis (Line)</option>
+                                        <option value="pie">Lingkaran (Pie)</option>
+                                        <option value="doughnut">Doughnut</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Judul Grafik</label>
+                                    <input type="text" id="editor-chart-title" oninput="updateCurrentSlideData()" class="w-full bg-zinc-100 dark:bg-zinc-900 border border-black dark:border-white p-1 text-xs text-black dark:text-white" placeholder="Sensus Data">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 mb-1">Data CSV (Label, Nilai1, Nilai2)</label>
+                                <textarea id="editor-chart-csv" oninput="updateCurrentSlideData()" rows="3" class="w-full bg-zinc-100 dark:bg-zinc-900 border border-black dark:border-white p-1 font-mono text-[11px] text-black dark:text-white" placeholder="Label, Nilai&#10;Jan, 120&#10;Feb, 190&#10;Mar, 300"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: THEME & COLOR ACCENTS -->
+                <div id="tab-content-theme" class="space-y-4 hidden">
+                    <span class="text-xs font-extrabold uppercase text-purple-600 dark:text-purple-400 block">Pilih Tema Tampilan Slide</span>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <!-- LIGHT THEMES -->
+                        <button onclick="setGlobalTheme('light')" class="p-3 border-2 border-black dark:border-white bg-white text-black text-left hover:border-sky-500 transition-all shadow-neo">
+                            <div class="w-full h-3 bg-sky-400 mb-2 border border-black"></div>
+                            <p class="font-extrabold text-xs text-black">LIGHT NEO</p>
+                            <p class="text-[10px] text-zinc-600">Latar Putih Bright & Black Border</p>
+                        </button>
+                        <button onclick="setGlobalTheme('clean-light')" class="p-3 border-2 border-black dark:border-white bg-slate-50 text-black text-left hover:border-emerald-500 transition-all shadow-neo">
+                            <div class="w-full h-3 bg-emerald-400 mb-2 border border-black"></div>
+                            <p class="font-extrabold text-xs text-black">MINIMAL WHITE</p>
+                            <p class="text-[10px] text-zinc-600">Latar Putih Bersih & Mint Accent</p>
+                        </button>
+
+                        <!-- DARK THEMES -->
+                        <button onclick="setGlobalTheme('cyber')" class="p-3 border-2 border-black dark:border-white bg-zinc-900 text-white text-left hover:border-sky-400 transition-all shadow-neo">
+                            <div class="w-full h-3 bg-sky-400 mb-2"></div>
+                            <p class="font-extrabold text-xs">CYBER NEON</p>
+                            <p class="text-[10px] text-zinc-400">Latar Gelap Cyan & Zinc</p>
+                        </button>
+                        <button onclick="setGlobalTheme('retro')" class="p-3 border-2 border-black dark:border-white bg-zinc-900 text-white text-left hover:border-amber-400 transition-all shadow-neo">
+                            <div class="w-full h-3 bg-amber-400 mb-2"></div>
+                            <p class="font-extrabold text-xs">RETRO AMBER</p>
+                            <p class="text-[10px] text-zinc-400">Latar Gelap Amber Gold</p>
+                        </button>
+                        <button onclick="setGlobalTheme('vapor')" class="p-3 border-2 border-black dark:border-white bg-zinc-900 text-white text-left hover:border-pink-500 transition-all shadow-neo">
+                            <div class="w-full h-3 bg-pink-500 mb-2"></div>
+                            <p class="font-extrabold text-xs">VAPOR PINK</p>
+                            <p class="text-[10px] text-zinc-400">Latar Gelap Neon Pink</p>
+                        </button>
+                        <button onclick="setGlobalTheme('emerald')" class="p-3 border-2 border-black dark:border-white bg-zinc-900 text-white text-left hover:border-emerald-400 transition-all shadow-neo">
+                            <div class="w-full h-3 bg-emerald-400 mb-2"></div>
+                            <p class="font-extrabold text-xs">EMERALD GLOW</p>
+                            <p class="text-[10px] text-zinc-400">Latar Gelap Mint Emerald</p>
+                        </button>
+                    </div>
+
+                    <div class="bg-white dark:bg-zinc-950 border-2 border-black dark:border-white p-3 space-y-2 mt-4 shadow-neo">
+                        <span class="text-xs font-bold uppercase text-zinc-700 dark:text-zinc-300 block">Penyimpanan Cache</span>
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-zinc-600 dark:text-zinc-400">Auto-Save Browser:</span>
+                            <span class="text-emerald-500 font-bold"><i class="fa-solid fa-circle-check"></i> Aktif</span>
+                        </div>
+                        <button onclick="clearCacheData()" class="w-full mt-2 bg-red-600 text-white font-bold py-1.5 border-2 border-black dark:border-white text-xs hover:bg-red-700 transition-all">
+                            <i class="fa-solid fa-trash-can"></i> Reset Presentasi
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- RIGHT CANVAS STAGE / LIVE SLIDE PREVIEW -->
+        <main class="flex-1 bg-zinc-200 dark:bg-zinc-950 p-4 md:p-8 flex flex-col items-center justify-center overflow-auto relative transition-colors">
+            
+            <!-- Controls Bar above Preview -->
+            <div class="w-full max-w-[960px] flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-mono font-bold bg-white dark:bg-zinc-900 text-black dark:text-white border-2 border-black dark:border-white px-3 py-1 shadow-neo">
+                        SLIDE <span id="current-slide-num" class="text-sky-500 font-black">1</span> / <span id="total-slides-num">1</span>
+                    </span>
+                    <span id="current-layout-badge" class="text-[10px] uppercase font-bold bg-purple-500 text-white px-2 py-1 border border-black dark:border-white">
+                        Title Slide
+                    </span>
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="prevSlide()" class="bg-white dark:bg-zinc-800 text-black dark:text-white font-bold px-3 py-1 border-2 border-black dark:border-white shadow-neo hover:bg-zinc-100 dark:hover:bg-zinc-700 active:translate-x-0.5 active:translate-y-0.5 transition-all text-xs">
+                        <i class="fa-solid fa-chevron-left"></i> Prev
+                    </button>
+                    <button onclick="nextSlide()" class="bg-white dark:bg-zinc-800 text-black dark:text-white font-bold px-3 py-1 border-2 border-black dark:border-white shadow-neo hover:bg-zinc-100 dark:hover:bg-zinc-700 active:translate-x-0.5 active:translate-y-0.5 transition-all text-xs">
+                        Next <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- THE CANVAS SLIDE STAGE (16:9 Aspect Ratio Container) -->
+            <div id="slide-stage" class="slide-container border-4 border-black dark:border-white shadow-neo-lg p-6 md:p-10 flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+                <!-- Content will be rendered dynamically by renderActiveSlide() -->
+            </div>
+
+            <!-- Footer Navigation Hint -->
+            <div class="mt-4 text-center text-zinc-500 text-[11px] font-mono">
+                Gunakan Keyboard <kbd class="px-1.5 py-0.5 bg-white dark:bg-zinc-800 border border-black dark:border-zinc-600 text-black dark:text-zinc-300 rounded font-bold">←</kbd> dan <kbd class="px-1.5 py-0.5 bg-white dark:bg-zinc-800 border border-black dark:border-zinc-600 text-black dark:text-zinc-300 rounded font-bold">→</kbd> untuk navigasi slide
+            </div>
+
+        </main>
+    </div>
+
+    <!-- MODAL 1: FILE IMPORT -->
+    <div id="import-modal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-zinc-900 text-black dark:text-white border-4 border-black dark:border-white shadow-neo-lg w-full max-w-lg p-6 space-y-4">
+            <div class="flex justify-between items-center border-b-2 border-black dark:border-white pb-3">
+                <h3 class="font-heading font-extrabold text-lg text-amber-500">
+                    <i class="fa-solid fa-file-arrow-up"></i> IMPOR DOKUMEN / DATA
+                </h3>
+                <button onclick="closeImportModal()" class="text-zinc-500 hover:text-black dark:hover:text-white font-bold text-xl">&times;</button>
+            </div>
+
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                Pilih file Markdown (<code>.md</code>), Teks (<code>.txt</code>), CSV (<code>.csv</code>), Excel (<code>.xlsx</code>), atau Proyek Slider (<code>.json</code>).
+            </p>
+
+            <div class="border-4 border-dashed border-black dark:border-white bg-zinc-50 dark:bg-zinc-950 p-8 text-center space-y-3 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all" onclick="document.getElementById('file-input-element').click()">
+                <i class="fa-solid fa-file-excel text-3xl text-emerald-500"></i>
+                <i class="fa-solid fa-file-lines text-3xl text-sky-500 ml-2"></i>
+                <i class="fa-solid fa-file-code text-3xl text-purple-500 ml-2"></i>
+                <p class="font-bold text-sm text-black dark:text-white">Klik untuk Memilih File Dokumen</p>
+                <input type="file" id="file-input-element" onchange="handleFileSelect(event)" accept=".md,.txt,.csv,.xlsx,.xls,.json" class="hidden">
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeImportModal()" class="bg-zinc-200 dark:bg-zinc-800 text-black dark:text-white font-bold px-4 py-2 border-2 border-black dark:border-white shadow-neo hover:bg-zinc-300 text-xs">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: EXPORT OPTIONS -->
+    <div id="export-modal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-zinc-900 text-black dark:text-white border-4 border-black dark:border-white shadow-neo-lg w-full max-w-md p-6 space-y-4">
+            <div class="flex justify-between items-center border-b-2 border-black dark:border-white pb-3">
+                <h3 class="font-heading font-extrabold text-lg text-pink-500 uppercase tracking-wide">
+                    <i class="fa-solid fa-download"></i> Simpan / Ekspor Dokumen
+                </h3>
+                <button onclick="closeExportModal()" class="text-zinc-500 hover:text-black dark:hover:text-white font-bold text-xl">&times;</button>
+            </div>
+
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 font-medium">
+                Pilih format berkas yang ingin Anda unduh:
+            </p>
+
+            <div class="space-y-2.5">
+                <button onclick="exportPPTX(); closeExportModal();" class="w-full text-left p-3 bg-zinc-50 dark:bg-zinc-950 border-2 border-black dark:border-white shadow-neo hover:bg-sky-400 hover:text-black transition-all flex items-center gap-3">
+                    <i class="fa-solid fa-file-powerpoint text-amber-500 text-xl w-6 text-center"></i>
+                    <div>
+                        <div class="font-bold text-xs uppercase">PowerPoint (.pptx)</div>
+                        <div class="text-[10px] opacity-75">Format file presentasi Microsoft PowerPoint</div>
+                    </div>
+                </button>
+
+                <button onclick="exportPDF(); closeExportModal();" class="w-full text-left p-3 bg-zinc-50 dark:bg-zinc-950 border-2 border-black dark:border-white shadow-neo hover:bg-pink-400 hover:text-black transition-all flex items-center gap-3">
+                    <i class="fa-solid fa-file-pdf text-red-500 text-xl w-6 text-center"></i>
+                    <div>
+                        <div class="font-bold text-xs uppercase">PDF Document (.pdf)</div>
+                        <div class="text-[10px] opacity-75">Dokumen PDF vektor resolusi tinggi</div>
+                    </div>
+                </button>
+
+                <button onclick="exportPNGZip(); closeExportModal();" class="w-full text-left p-3 bg-zinc-50 dark:bg-zinc-950 border-2 border-black dark:border-white shadow-neo hover:bg-amber-400 hover:text-black transition-all flex items-center gap-3">
+                    <i class="fa-solid fa-file-archive text-amber-500 text-xl w-6 text-center"></i>
+                    <div>
+                        <div class="font-bold text-xs uppercase">Paket Gambar PNG (.zip)</div>
+                        <div class="text-[10px] opacity-75">Kumpulan gambar slide format PNG dalam ZIP</div>
+                    </div>
+                </button>
+
+                <button onclick="exportMarkdownFile(); closeExportModal();" class="w-full text-left p-3 bg-zinc-50 dark:bg-zinc-950 border-2 border-black dark:border-white shadow-neo hover:bg-purple-400 hover:text-black transition-all flex items-center gap-3">
+                    <i class="fa-solid fa-file-code text-purple-500 text-xl w-6 text-center"></i>
+                    <div>
+                        <div class="font-bold text-xs uppercase">Markdown (.md)</div>
+                        <div class="text-[10px] opacity-75">Ekspor teks struktur outline ke berkas Markdown</div>
+                    </div>
+                </button>
+
+                <button onclick="exportJSONFile(); closeExportModal();" class="w-full text-left p-3 bg-zinc-50 dark:bg-zinc-950 border-2 border-black dark:border-white shadow-neo hover:bg-emerald-400 hover:text-black transition-all flex items-center gap-3">
+                    <i class="fa-solid fa-code text-emerald-500 text-xl w-6 text-center"></i>
+                    <div>
+                        <div class="font-bold text-xs uppercase">Proyek Slider (.json)</div>
+                        <div class="text-[10px] opacity-75">Simpan draf proyek lengkap untuk diimpor kembali nanti</div>
+                    </div>
+                </button>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button onclick="closeExportModal()" class="bg-zinc-200 dark:bg-zinc-800 text-black dark:text-white font-bold px-4 py-2 border-2 border-black dark:border-white shadow-neo hover:bg-zinc-300 text-xs uppercase">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: FULLSCREEN PRESENTER MODE -->
+    <div id="presenter-modal" class="fixed inset-0 bg-black z-50 flex flex-col hidden">
+        <div class="p-4 bg-zinc-900 border-b-2 border-white flex justify-between items-center text-xs">
+            <div class="flex items-center gap-4">
+                <span class="font-extrabold text-amber-400 tracking-widest text-sm uppercase">SLIDER PRESENTER</span>
+                <span id="presenter-timer" class="font-mono bg-zinc-800 border border-white px-2 py-0.5 text-sky-400 font-bold">00:00:00</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="presenter-counter" class="font-mono font-bold text-zinc-300">Slide 1 / 1</span>
+                <button onclick="exitPresenterMode()" class="bg-pink-500 text-white font-bold px-3 py-1 border border-white shadow-neo text-xs hover:bg-pink-600">
+                    <i class="fa-solid fa-xmark"></i> Keluar (Esc)
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 flex items-center justify-center p-4 md:p-12 relative">
+            <div id="presenter-slide-viewport" class="slide-container border-4 border-white p-10 flex flex-col justify-between w-full max-w-[1200px]">
+                <!-- Slide Content Cloned Dynamic -->
+            </div>
+        </div>
+
+        <div class="p-3 bg-zinc-900 border-t-2 border-white flex justify-between items-center">
+            <button onclick="prevSlide()" class="bg-zinc-800 text-white font-bold px-4 py-2 border-2 border-white shadow-neo text-xs">
+                <i class="fa-solid fa-arrow-left"></i> Slide Sebelumnya
+            </button>
+            <span class="text-[11px] text-zinc-400 font-mono">Gunakan Tombol Panah Kiri/Kanan atau Layar Sentuh</span>
+            <button onclick="nextSlide()" class="bg-sky-400 text-black font-bold px-4 py-2 border-2 border-white shadow-neo text-xs">
+                Slide Selanjutnya <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- HIDDEN CONTAINER FOR PRINT PDF VECTOR EXPORT -->
+    <div id="print-container"></div>
+
+    <script>
+        // APP GLOBAL STATE
+        const state = {
+            appTheme: 'dark', // 'dark' or 'light'
+            slides: [
+                {
+                    id: 1,
+                    type: 'title',
+                    title: 'SLIDER: GENERATOR PRESENTASI',
+                    subtitle: 'Konversi Otomatis Teks, Markdown, CSV & Excel ke Slide Neobrutalis',
+                    bullets: [
+                        'Input Teks Outline & Editor Rich Text Langsung',
+                        'Grafik Data Interaktif (Batang, Garis, Lingkaran)',
+                        'Ekspor Serbaguna: PPTX, PDF, & PNG ZIP'
+                    ],
+                    chartType: 'bar',
+                    chartTitle: 'Statistik Penggunaan',
+                    chartData: 'Fitur, Nilai\nParsing MD, 95\nVisual Data, 88\nEkspor PPT, 92'
+                },
+                {
+                    id: 2,
+                    type: 'chart',
+                    title: 'Visualisasi Data Penjualan',
+                    subtitle: 'Pertumbuhan Kuartal Bisnis 2026',
+                    bullets: [
+                        'Peningkatan signifikan pada kuartal 3 dan 4',
+                        'Pertumbuhan dipicu oleh optimasi otomatisasi',
+                        'Konversi data tabel Excel langsung menjadi chart'
+                    ],
+                    chartType: 'bar',
+                    chartTitle: 'Laporan Pendapatan (Juta IDR)',
+                    chartData: 'Bulan, Pendapatan, Profit\nJan, 120, 45\nFeb, 150, 60\nMar, 180, 75\nApr, 220, 95'
+                },
+                {
+                    id: 3,
+                    type: 'content',
+                    title: 'Keunggulan Format Neobrutalisme',
+                    subtitle: 'Estetika Kontras Tinggi & Bersih',
+                    bullets: [
+                        '<mark class="bg-amber-400 text-black font-bold px-1 border border-black">Garis Border Tebal</mark> mempermudah navigasi visual.',
+                        'Bayangan solid tanpa blur memberikan impresi tegas.',
+                        'Dukungan penuh mode terang dan gelap untuk fleksibilitas presentasi.'
+                    ],
+                    chartType: 'pie',
+                    chartTitle: '',
+                    chartData: ''
+                }
+            ],
+            activeSlideIndex: 0,
+            activeTab: 'outline',
+            slideTheme: 'light', // light, clean-light, cyber, retro, vapor, emerald
+            activeChartInstance: null,
+            presenterTimerInterval: null,
+            presenterSeconds: 0
+        };
+
+        // SLIDE THEME DEFINITIONS (Supports both Light and Dark themes)
+        const slideThemes = {
+            'light': {
+                name: 'Light Neo',
+                isDark: false,
+                bgClass: 'bg-white',
+                textClass: 'text-black',
+                borderClass: 'border-black',
+                cardBgClass: 'bg-zinc-50',
+                accentHex: '#0284c7', // Sky blue
+                accentTextClass: 'text-sky-600',
+                accentBgClass: 'bg-sky-400',
+                tagBgClass: 'bg-amber-400 text-black',
+                bulletColor: '#0284c7',
+                chartTickColor: '#000000',
+                chartGridColor: '#e5e7eb'
+            },
+            'clean-light': {
+                name: 'Minimal White',
+                isDark: false,
+                bgClass: 'bg-slate-50',
+                textClass: 'text-zinc-900',
+                borderClass: 'border-zinc-900',
+                cardBgClass: 'bg-white',
+                accentHex: '#059669', // Emerald
+                accentTextClass: 'text-emerald-700',
+                accentBgClass: 'bg-emerald-400',
+                tagBgClass: 'bg-emerald-400 text-black',
+                bulletColor: '#059669',
+                chartTickColor: '#0f172a',
+                chartGridColor: '#cbd5e1'
+            },
+            'cyber': {
+                name: 'Cyber Neon',
+                isDark: true,
+                bgClass: 'bg-zinc-900',
+                textClass: 'text-white',
+                borderClass: 'border-white',
+                cardBgClass: 'bg-zinc-950',
+                accentHex: '#38bdf8',
+                accentTextClass: 'text-sky-400',
+                accentBgClass: 'bg-sky-400',
+                tagBgClass: 'bg-sky-400 text-black',
+                bulletColor: '#38bdf8',
+                chartTickColor: '#ffffff',
+                chartGridColor: '#3f3f46'
+            },
+            'retro': {
+                name: 'Retro Amber',
+                isDark: true,
+                bgClass: 'bg-zinc-900',
+                textClass: 'text-white',
+                borderClass: 'border-white',
+                cardBgClass: 'bg-zinc-950',
+                accentHex: '#facc15',
+                accentTextClass: 'text-amber-400',
+                accentBgClass: 'bg-amber-400',
+                tagBgClass: 'bg-amber-400 text-black',
+                bulletColor: '#facc15',
+                chartTickColor: '#ffffff',
+                chartGridColor: '#3f3f46'
+            },
+            'vapor': {
+                name: 'Vapor Pink',
+                isDark: true,
+                bgClass: 'bg-zinc-900',
+                textClass: 'text-white',
+                borderClass: 'border-white',
+                cardBgClass: 'bg-zinc-950',
+                accentHex: '#ec4899',
+                accentTextClass: 'text-pink-400',
+                accentBgClass: 'bg-pink-500',
+                tagBgClass: 'bg-pink-500 text-white',
+                bulletColor: '#ec4899',
+                chartTickColor: '#ffffff',
+                chartGridColor: '#3f3f46'
+            },
+            'emerald': {
+                name: 'Emerald Glow',
+                isDark: true,
+                bgClass: 'bg-zinc-900',
+                textClass: 'text-white',
+                borderClass: 'border-white',
+                cardBgClass: 'bg-zinc-950',
+                accentHex: '#10b981',
+                accentTextClass: 'text-emerald-400',
+                accentBgClass: 'bg-emerald-400',
+                tagBgClass: 'bg-emerald-400 text-black',
+                bulletColor: '#10b981',
+                chartTickColor: '#ffffff',
+                chartGridColor: '#3f3f46'
+            }
+        };
+
+        window.onload = function() {
+            loadCacheData();
+            applyAppTheme();
+            renderSlideThumbnails();
+            renderActiveSlide();
+            setupKeyboardShortcuts();
+        };
+
+        function toggleAppTheme() {
+            state.appTheme = state.appTheme === 'dark' ? 'light' : 'dark';
+            applyAppTheme();
+            saveToCache();
+        }
+
+        function applyAppTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('app-theme-icon');
+            const text = document.getElementById('app-theme-text');
+
+            if (state.appTheme === 'dark') {
+                html.classList.add('dark');
+                if (icon) icon.className = "fa-solid fa-moon text-sky-400";
+                if (text) text.innerText = "Gelap";
+            } else {
+                html.classList.remove('dark');
+                if (icon) icon.className = "fa-solid fa-sun text-amber-500";
+                if (text) text.innerText = "Terang";
+            }
+        }
+
+        /* EXPORT MODAL CONTROL FUNCTIONS */
+        function openExportModal() {
+            document.getElementById('export-modal').classList.remove('hidden');
+        }
+
+        function closeExportModal() {
+            document.getElementById('export-modal').classList.add('hidden');
+        }
+
+        function switchTab(tabName) {
+            state.activeTab = tabName;
+            ['outline', 'slides', 'editor', 'theme'].forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                const content = document.getElementById(`tab-content-${t}`);
+                if (t === tabName) {
+                    btn.className = "flex-1 py-2.5 px-2 border-r-2 border-black dark:border-white text-center bg-sky-400 text-black font-extrabold uppercase transition-all";
+                    content.classList.remove('hidden');
+                } else {
+                    btn.className = "flex-1 py-2.5 px-2 border-r-2 border-black dark:border-white text-center text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-800 uppercase transition-all";
+                    content.classList.add('hidden');
+                }
+            });
+
+            if (tabName === 'editor') {
+                loadEditorFieldsFromActiveSlide();
+            }
+        }
+
+        function processOutlineToSlides() {
+            const rawText = document.getElementById('raw-outline-input').value;
+            if (!rawText.trim()) return;
+
+            const rawSections = rawText.split(/\n\s*---\s*\n/);
+            const generatedSlides = [];
+
+            rawSections.forEach((sec, idx) => {
+                const lines = sec.trim().split('\n');
+                let title = 'Slide Baru';
+                let subtitle = '';
+                let bullets = [];
+                let chartType = 'bar';
+                let chartTitle = 'Grafik Data';
+                let chartData = '';
+                let layout = 'content';
+
+                lines.forEach(line => {
+                    const trimmed = line.trim();
+                    if (trimmed.startsWith('# ')) {
+                        title = trimmed.replace('# ', '').trim();
+                        if (idx === 0) layout = 'title';
+                    } else if (trimmed.startsWith('## ')) {
+                        subtitle = trimmed.replace('## ', '').trim();
+                    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                        bullets.push(trimmed.replace(/^[-*]\s*/, ''));
+                    } else if (trimmed.startsWith('[Chart:')) {
+                        layout = 'chart';
+                        const chartMatch = trimmed.match(/\[Chart:\s*(\w+)\s*\|\s*([^|]+)\s*\|\s*(.+)\]/);
+                        if (chartMatch) {
+                            chartType = chartMatch[1].trim();
+                            chartTitle = chartMatch[2].trim();
+                            const rawDataPoints = chartMatch[3].split('|').map(dp => dp.trim()).join('\n');
+                            chartData = "Item, Nilai\n" + rawDataPoints.replace(/:/g, ',');
+                        }
+                    } else if (trimmed.length > 0 && !trimmed.startsWith('#')) {
+                        bullets.push(trimmed);
+                    }
+                });
+
+                generatedSlides.push({
+                    id: Date.now() + idx,
+                    type: layout,
+                    title: title || 'Tanpa Judul',
+                    subtitle: subtitle,
+                    bullets: bullets.length > 0 ? bullets : ['Isi konten slide di sini'],
+                    chartType: chartType,
+                    chartTitle: chartTitle,
+                    chartData: chartData || 'Kategori, Nilai\nAlpha, 40\nBeta, 70\nGamma, 90'
+                });
+            });
+
+            if (generatedSlides.length > 0) {
+                state.slides = generatedSlides;
+                state.activeSlideIndex = 0;
+                renderSlideThumbnails();
+                renderActiveSlide();
+                saveToCache();
+                switchTab('slides');
+            }
+        }
+
+        function triggerAutoSplitter() {
+            processOutlineToSlides();
+        }
+
+        function setGlobalTheme(themeKey) {
+            if (slideThemes[themeKey]) {
+                state.slideTheme = themeKey;
+                renderActiveSlide();
+                renderSlideThumbnails();
+                saveToCache();
+                showNotification(`Tema Slide diubah ke: ${slideThemes[themeKey].name}`);
+            }
+        }
+
+        function renderActiveSlide() {
+            const container = document.getElementById('slide-stage');
+            const slide = state.slides[state.activeSlideIndex];
+            if (!slide || !container) return;
+
+            const t = slideThemes[state.slideTheme] || slideThemes['light'];
+
+            // Update stage element dynamic background and border styles
+            container.className = `slide-container ${t.bgClass} ${t.textClass} border-4 ${t.borderClass} shadow-neo-lg p-6 md:p-10 flex flex-col justify-between relative overflow-hidden transition-all duration-300`;
+
+            // Update header badges
+            document.getElementById('current-slide-num').innerText = state.activeSlideIndex + 1;
+            document.getElementById('total-slides-num').innerText = state.slides.length;
+            document.getElementById('slide-count-badge').innerText = state.slides.length;
+            document.getElementById('current-layout-badge').innerText = slide.type.toUpperCase();
+
+            let slideHTML = '';
+
+            if (slide.type === 'title') {
+                slideHTML = `
+                    <div class="h-full flex flex-col justify-between z-10">
+                        <div class="inline-block self-start">
+                            <span class="${t.tagBgClass} font-extrabold text-xs px-3 py-1 border-2 ${t.borderClass} shadow-neo uppercase">
+                                PRESENTASI UTAMA
+                            </span>
+                        </div>
+
+                        <div class="my-auto space-y-4">
+                            <h1 class="text-3xl md:text-5xl font-black uppercase tracking-tight ${t.textClass} leading-tight">
+                                ${slide.title}
+                            </h1>
+                            ${slide.subtitle ? `<p class="text-base md:text-xl font-bold ${t.accentTextClass} border-l-4 ${t.borderClass} pl-4">${slide.subtitle}</p>` : ''}
+                        </div>
+
+                        <div class="pt-4 border-t-2 ${t.borderClass} flex justify-between items-center text-xs font-mono opacity-80">
+                            <span>Slider App</span>
+                            <span>16 : 9 Widescreen</span>
+                        </div>
+                    </div>
+                `;
+            } else if (slide.type === 'content') {
+                const bulletList = slide.bullets.map(b => `<li class="flex items-start gap-3"><span style="color:${t.bulletColor}" class="font-black text-lg">■</span> <span class="text-sm md:text-base ${t.textClass} font-medium">${b}</span></li>`).join('');
+                slideHTML = `
+                    <div class="h-full flex flex-col justify-between z-10">
+                        <div class="border-b-4 ${t.borderClass} pb-3">
+                            <h2 class="text-2xl md:text-3xl font-black uppercase ${t.textClass}">${slide.title}</h2>
+                            ${slide.subtitle ? `<p class="text-xs md:text-sm font-bold ${t.accentTextClass} mt-1">${slide.subtitle}</p>` : ''}
+                        </div>
+
+                        <ul class="my-auto space-y-3 pl-2">
+                            ${bulletList}
+                        </ul>
+
+                        <div class="text-[10px] font-mono opacity-70 border-t ${t.borderClass} pt-2 flex justify-between">
+                            <span>Slider Presentation</span>
+                            <span>Halaman ${state.activeSlideIndex + 1}</span>
+                        </div>
+                    </div>
+                `;
+            } else if (slide.type === 'chart') {
+                const bulletList = slide.bullets.map(b => `<li class="text-xs md:text-sm flex items-start gap-2"><span style="color:${t.bulletColor}" class="font-bold">•</span> <span>${b}</span></li>`).join('');
+                slideHTML = `
+                    <div class="h-full flex flex-col justify-between z-10">
+                        <div class="border-b-4 ${t.borderClass} pb-2 mb-2">
+                            <h2 class="text-xl md:text-2xl font-black uppercase ${t.textClass}">${slide.title}</h2>
+                            ${slide.subtitle ? `<p class="text-xs font-bold ${t.accentTextClass}">${slide.subtitle}</p>` : ''}
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 items-center">
+                            <div class="space-y-2">
+                                <ul class="space-y-2">
+                                    ${bulletList}
+                                </ul>
+                            </div>
+                            <div class="${t.cardBgClass} border-2 ${t.borderClass} p-3 shadow-neo h-48 md:h-56 relative flex flex-col items-center justify-center">
+                                <span class="text-[10px] font-bold opacity-80 mb-1 uppercase">${slide.chartTitle || 'Visualisasi Data'}</span>
+                                <div class="w-full h-full relative">
+                                    <canvas id="active-slide-chart-canvas"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-[10px] font-mono opacity-70 border-t ${t.borderClass} pt-1">
+                            Grafik Data Interaktif ${slide.chartType.toUpperCase()}
+                        </div>
+                    </div>
+                `;
+            } else if (slide.type === 'table') {
+                const tableData = parseCSVToMatrix(slide.chartData || "Header 1, Header 2\nData 1, Data 2");
+                let tableHTML = `<table class="w-full text-left text-xs border-collapse"><thead><tr class="${t.accentBgClass} text-black font-extrabold">`;
+                if (tableData.length > 0) {
+                    tableData[0].forEach(h => { tableHTML += `<th class="p-2 border border-black">${h}</th>`; });
+                    tableHTML += `</tr></thead><tbody>`;
+                    tableData.slice(1).forEach((row, rIdx) => {
+                        const rowBg = t.isDark ? (rIdx % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950') : (rIdx % 2 === 0 ? 'bg-white' : 'bg-zinc-100');
+                        tableHTML += `<tr class="${rowBg}">`;
+                        row.forEach(c => { tableHTML += `<td class="p-2 border border-zinc-400 dark:border-zinc-700">${c}</td>`; });
+                        tableHTML += `</tr>`;
+                    });
+                    tableHTML += `</tbody></table>`;
+                }
+
+                slideHTML = `
+                    <div class="h-full flex flex-col justify-between z-10">
+                        <div class="border-b-4 ${t.borderClass} pb-2 mb-2">
+                            <h2 class="text-xl md:text-2xl font-black uppercase ${t.textClass}">${slide.title}</h2>
+                            ${slide.subtitle ? `<p class="text-xs font-bold ${t.accentTextClass}">${slide.subtitle}</p>` : ''}
+                        </div>
+
+                        <div class="flex-1 overflow-auto ${t.cardBgClass} border-2 ${t.borderClass} shadow-neo p-2 my-2">
+                            ${tableHTML}
+                        </div>
+
+                        <div class="text-[10px] font-mono opacity-70 border-t ${t.borderClass} pt-1">
+                            Tabel Data Matrix
+                        </div>
+                    </div>
+                `;
+            } else if (slide.type === 'stat') {
+                slideHTML = `
+                    <div class="h-full flex flex-col justify-between items-center text-center justify-center z-10 space-y-4">
+                        <span class="${t.tagBgClass} font-extrabold text-xs px-3 py-1 border-2 ${t.borderClass} shadow-neo uppercase">
+                            HIGHLIGHT METRIK
+                        </span>
+
+                        <h2 class="text-4xl md:text-6xl font-black ${t.accentTextClass} tracking-wider">${slide.title}</h2>
+                        <p class="text-base md:text-xl font-bold ${t.textClass} max-w-lg">${slide.subtitle || slide.bullets[0] || ''}</p>
+
+                        <div class="text-[10px] font-mono opacity-70 pt-4">
+                            Metrik Terverifikasi
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = slideHTML;
+
+            if (slide.type === 'chart') {
+                setTimeout(() => renderChartInstance(slide, t), 50);
+            }
+        }
+
+        function renderChartInstance(slide, t) {
+            const canvas = document.getElementById('active-slide-chart-canvas');
+            if (!canvas) return;
+
+            if (state.activeChartInstance) {
+                state.activeChartInstance.destroy();
+            }
+
+            const parsed = parseCSVToMatrix(slide.chartData);
+            if (parsed.length < 2) return;
+
+            const labels = parsed.slice(1).map(row => row[0]);
+            const datasets = [];
+            const numCols = parsed[0].length;
+            const colors = ['#38bdf8', '#ec4899', '#facc15', '#10b981', '#a855f7'];
+
+            for (let col = 1; col < numCols; col++) {
+                const dataValues = parsed.slice(1).map(row => parseFloat(row[col]) || 0);
+                datasets.push({
+                    label: parsed[0][col] || `Seri ${col}`,
+                    data: dataValues,
+                    backgroundColor: slide.chartType === 'pie' || slide.chartType === 'doughnut' ? colors : colors[(col - 1) % colors.length],
+                    borderColor: t.isDark ? '#ffffff' : '#000000',
+                    borderWidth: 2
+                });
+            }
+
+            const ctx = canvas.getContext('2d');
+            state.activeChartInstance = new Chart(ctx, {
+                type: slide.chartType || 'bar',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: t.chartTickColor, font: { family: 'Space Grotesk', weight: 'bold' } } }
+                    },
+                    scales: (slide.chartType === 'pie' || slide.chartType === 'doughnut') ? {} : {
+                        x: { ticks: { color: t.chartTickColor }, grid: { color: t.chartGridColor } },
+                        y: { ticks: { color: t.chartTickColor }, grid: { color: t.chartGridColor } }
+                    }
+                }
+            });
+        }
+
+        function parseCSVToMatrix(csvText) {
+            if (!csvText) return [];
+            return csvText.trim().split('\n').map(row => row.split(',').map(cell => cell.trim()));
+        }
+
+        function renderSlideThumbnails() {
+            const container = document.getElementById('slides-thumbnail-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            state.slides.forEach((s, idx) => {
+                const isSelected = idx === state.activeSlideIndex;
+                const item = document.createElement('div');
+                item.className = `p-3 border-2 border-black dark:border-white cursor-pointer transition-all flex items-center justify-between ${isSelected ? 'bg-sky-400 text-black font-bold shadow-neo' : 'bg-white dark:bg-zinc-900 text-black dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`;
+                item.onclick = () => {
+                    state.activeSlideIndex = idx;
+                    renderSlideThumbnails();
+                    renderActiveSlide();
+                    if (state.activeTab === 'editor') loadEditorFieldsFromActiveSlide();
+                };
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <span class="font-mono text-xs px-1.5 py-0.5 border border-current font-bold">${idx + 1}</span>
+                        <div class="truncate text-xs font-heading font-extrabold uppercase">${s.title || 'Slide Tanpa Judul'}</div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="event.stopPropagation(); deleteSlide(${idx})" class="p-1 hover:text-red-500 text-xs" title="Hapus Slide">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function addNewSlide() {
+            const newSlide = {
+                id: Date.now(),
+                type: 'content',
+                title: 'Judul Slide Baru',
+                subtitle: 'Sub-judul deskriptif',
+                bullets: ['Poin diskusi pertama', 'Poin diskusi kedua'],
+                chartType: 'bar',
+                chartTitle: '',
+                chartData: ''
+            };
+            state.slides.push(newSlide);
+            state.activeSlideIndex = state.slides.length - 1;
+            renderSlideThumbnails();
+            renderActiveSlide();
+            saveToCache();
+        }
+
+        function deleteSlide(index) {
+            if (state.slides.length <= 1) return;
+            state.slides.splice(index, 1);
+            if (state.activeSlideIndex >= state.slides.length) {
+                state.activeSlideIndex = state.slides.length - 1;
+            }
+            renderSlideThumbnails();
+            renderActiveSlide();
+            saveToCache();
+        }
+
+        function loadEditorFieldsFromActiveSlide() {
+            const s = state.slides[state.activeSlideIndex];
+            if (!s) return;
+
+            document.getElementById('editing-slide-index').innerText = `Slide #${state.activeSlideIndex + 1}`;
+            document.getElementById('editor-layout-type').value = s.type;
+            document.getElementById('editor-title').value = s.title;
+            document.getElementById('editor-subtitle').value = s.subtitle || '';
+            document.getElementById('editor-bullets').value = s.bullets ? s.bullets.join('\n') : '';
+            document.getElementById('editor-chart-type').value = s.chartType || 'bar';
+            document.getElementById('editor-chart-title').value = s.chartTitle || '';
+            document.getElementById('editor-chart-csv').value = s.chartData || '';
+
+            const chartBox = document.getElementById('chart-editor-box');
+            if (s.type === 'chart' || s.type === 'table') {
+                chartBox.classList.remove('hidden');
+            } else {
+                chartBox.classList.add('hidden');
+            }
+        }
+
+        function updateCurrentSlideLayout(newType) {
+            state.slides[state.activeSlideIndex].type = newType;
+            loadEditorFieldsFromActiveSlide();
+            renderActiveSlide();
+            renderSlideThumbnails();
+            saveToCache();
+        }
+
+        function updateCurrentSlideData() {
+            const s = state.slides[state.activeSlideIndex];
+            if (!s) return;
+
+            s.title = document.getElementById('editor-title').value;
+            s.subtitle = document.getElementById('editor-subtitle').value;
+            const bulletsRaw = document.getElementById('editor-bullets').value;
+            s.bullets = bulletsRaw.split('\n').filter(b => b.trim().length > 0);
+            s.chartType = document.getElementById('editor-chart-type').value;
+            s.chartTitle = document.getElementById('editor-chart-title').value;
+            s.chartData = document.getElementById('editor-chart-csv').value;
+
+            renderActiveSlide();
+            renderSlideThumbnails();
+            saveToCache();
+        }
+
+        function insertRichTextFormatting(fmt) {
+            const txt = document.getElementById('editor-bullets');
+            const start = txt.selectionStart;
+            const end = txt.selectionEnd;
+            const sel = txt.value.substring(start, end);
+            let replacement = sel;
+
+            if (fmt === 'bold') replacement = `<b>${sel || 'Teks Tebal'}</b>`;
+            if (fmt === 'highlight') replacement = `<mark class="bg-amber-400 text-black font-bold px-1 border border-black">${sel || 'Teks Highlight'}</mark>`;
+
+            txt.value = txt.value.substring(0, start) + replacement + txt.value.substring(end);
+            updateCurrentSlideData();
+        }
+
+        function openImportModal() {
+            document.getElementById('import-modal').classList.remove('hidden');
+        }
+
+        function closeImportModal() {
+            document.getElementById('import-modal').classList.add('hidden');
+        }
+
+        function handleFileSelect(evt) {
+            const file = evt.target.files[0];
+            if (!file) return;
+
+            const filename = file.name.toLowerCase();
+
+            if (filename.endsWith('.json')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const parsed = JSON.parse(e.target.result);
+                        if (parsed.slides) state.slides = parsed.slides;
+                        if (parsed.slideTheme) state.slideTheme = parsed.slideTheme;
+                        state.activeSlideIndex = 0;
+                        renderSlideThumbnails();
+                        renderActiveSlide();
+                        saveToCache();
+                        closeImportModal();
+                        showNotification("Proyek Slider JSON berhasil diimpor!");
+                    } catch (err) {
+                        showNotification("File JSON tidak valid");
+                    }
+                };
+                reader.readAsText(file);
+            } else if (filename.endsWith('.md') || filename.endsWith('.txt')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('raw-outline-input').value = e.target.result;
+                    processOutlineToSlides();
+                    closeImportModal();
+                };
+                reader.readAsText(file);
+            } else if (filename.endsWith('.csv')) {
+                Papa.parse(file, {
+                    complete: function(results) {
+                        createSlideFromParsedTable(file.name, results.data);
+                        closeImportModal();
+                    }
+                });
+            } else if (filename.endsWith('.xlsx') || filename.endsWith('.xls')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonMatrix = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    createSlideFromParsedTable(file.name, jsonMatrix);
+                    closeImportModal();
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        function createSlideFromParsedTable(filename, matrix) {
+            if (!matrix || matrix.length === 0) return;
+
+            const csvString = matrix.map(row => row.join(', ')).join('\n');
+            const newSlide = {
+                id: Date.now(),
+                type: 'chart',
+                title: `Data: ${filename}`,
+                subtitle: 'Impor Otomatis Spreadsheet',
+                bullets: ['Data tabel berhasil dimuat secara langsung.'],
+                chartType: 'bar',
+                chartTitle: filename,
+                chartData: csvString
+            };
+
+            state.slides.push(newSlide);
+            state.activeSlideIndex = state.slides.length - 1;
+            renderSlideThumbnails();
+            renderActiveSlide();
+            saveToCache();
+            switchTab('slides');
+        }
+
+        function nextSlide() {
+            if (state.activeSlideIndex < state.slides.length - 1) {
+                state.activeSlideIndex++;
+                renderActiveSlide();
+                renderSlideThumbnails();
+                if (document.getElementById('presenter-modal').classList.contains('hidden') === false) {
+                    updatePresenterViewport();
+                }
+            }
+        }
+
+        function prevSlide() {
+            if (state.activeSlideIndex > 0) {
+                state.activeSlideIndex--;
+                renderActiveSlide();
+                renderSlideThumbnails();
+                if (document.getElementById('presenter-modal').classList.contains('hidden') === false) {
+                    updatePresenterViewport();
+                }
+            }
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
+                if (e.key === 'ArrowRight' || e.key === 'Space') {
+                    nextSlide();
+                } else if (e.key === 'ArrowLeft') {
+                    prevSlide();
+                } else if (e.key === 'Escape') {
+                    exitPresenterMode();
+                    closeExportModal();
+                    closeImportModal();
+                }
+            });
+        }
+
+        function startPresenterMode() {
+            document.getElementById('presenter-modal').classList.remove('hidden');
+            state.presenterSeconds = 0;
+            updatePresenterViewport();
+
+            if (state.presenterTimerInterval) clearInterval(state.presenterTimerInterval);
+            state.presenterTimerInterval = setInterval(() => {
+                state.presenterSeconds++;
+                const hrs = String(Math.floor(state.presenterSeconds / 3600)).padStart(2, '0');
+                const mins = String(Math.floor((state.presenterSeconds % 3600) / 60)).padStart(2, '0');
+                const secs = String(state.presenterSeconds % 60).padStart(2, '0');
+                document.getElementById('presenter-timer').innerText = `${hrs}:${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function exitPresenterMode() {
+            document.getElementById('presenter-modal').classList.add('hidden');
+            if (state.presenterTimerInterval) clearInterval(state.presenterTimerInterval);
+        }
+
+        function updatePresenterViewport() {
+            const viewport = document.getElementById('presenter-slide-viewport');
+            const currentStage = document.getElementById('slide-stage');
+            viewport.className = currentStage.className.replace('shadow-neo-lg', 'shadow-2xl') + ' w-full max-w-[1200px]';
+            viewport.innerHTML = currentStage.innerHTML;
+            document.getElementById('presenter-counter').innerText = `Slide ${state.activeSlideIndex + 1} / ${state.slides.length}`;
+        }
+
+        function exportPPTX() {
+            const pptx = new PptxGenJS();
+            pptx.layout = 'LAYOUT_16x9';
+
+            const t = slideThemes[state.slideTheme] || slideThemes['light'];
+
+            state.slides.forEach(s => {
+                const slide = pptx.addSlide();
+                slide.background = { color: t.isDark ? '18181B' : 'FFFFFF' };
+
+                slide.addText(s.title.toUpperCase(), {
+                    x: 0.5, y: 0.5, w: '90%', h: 1.0,
+                    fontFace: 'Arial', fontSize: 26, color: t.isDark ? 'FFFFFF' : '000000', bold: true
+                });
+
+                if (s.subtitle) {
+                    slide.addText(s.subtitle, {
+                        x: 0.5, y: 1.4, w: '90%', h: 0.5,
+                        fontFace: 'Arial', fontSize: 16, color: t.isDark ? '38BDF8' : '0284C7'
+                    });
+                }
+
+                if (s.bullets && s.bullets.length > 0) {
+                    const cleanBullets = s.bullets.map(b => b.replace(/<[^>]*>?/gm, ''));
+                    slide.addText(cleanBullets.join('\n'), {
+                        x: 0.5, y: 2.2, w: '85%', h: 4.0,
+                        fontFace: 'Arial', fontSize: 14, color: t.isDark ? 'F4F4F5' : '18181B', bullet: true
+                    });
+                }
+            });
+
+            pptx.writeFile({ fileName: 'Presentasi-Slider.pptx' });
+        }
+
+        function exportPDF() {
+            const printContainer = document.getElementById('print-container');
+            printContainer.innerHTML = '';
+            const t = slideThemes[state.slideTheme] || slideThemes['light'];
+
+            state.slides.forEach((s) => {
+                const div = document.createElement('div');
+                div.className = 'print-slide';
+                div.style.backgroundColor = t.isDark ? '#18181b' : '#ffffff';
+                div.style.color = t.isDark ? '#ffffff' : '#000000';
+                div.style.border = `4px solid ${t.isDark ? '#ffffff' : '#000000'}`;
+                
+                div.innerHTML = `
+                    <h1 style="font-size:32px; font-weight:bold; text-transform:uppercase;">${s.title}</h1>
+                    ${s.subtitle ? `<h3 style="font-size:18px; color:${t.bulletColor};">${s.subtitle}</h3>` : ''}
+                    <hr style="margin:20px 0; border-color:${t.isDark ? '#ffffff' : '#000000'};"/>
+                    <ul style="font-size:16px; line-height:1.8;">
+                        ${s.bullets ? s.bullets.map(b => `<li>${b.replace(/<[^>]*>?/gm, '')}</li>`).join('') : ''}
+                    </ul>
+                `;
+                printContainer.appendChild(div);
+            });
+
+            window.print();
+        }
+
+        async function exportPNGZip() {
+            const zip = new JSZip();
+            const folder = zip.folder("slides_png");
+
+            const stage = document.getElementById('slide-stage');
+            const originalIndex = state.activeSlideIndex;
+
+            showNotification("Memproses paket gambar PNG...");
+
+            for (let i = 0; i < state.slides.length; i++) {
+                state.activeSlideIndex = i;
+                renderActiveSlide();
+                await new Promise(r => setTimeout(r, 120));
+
+                const canvas = await html2canvas(stage, { scale: 2 });
+                const imgData = canvas.toDataURL('image/png').replace(/^data:image\/(png|jpg);base64,/, "");
+                folder.file(`slide_${i + 1}.png`, imgData, { base64: true });
+            }
+
+            state.activeSlideIndex = originalIndex;
+            renderActiveSlide();
+
+            zip.generateAsync({ type: "blob" }).then(function(content) {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(content);
+                a.download = "Presentasi_Slider_PNG.zip";
+                a.click();
+            });
+        }
+
+        function exportMarkdownFile() {
+            let mdText = "";
+            state.slides.forEach((s, idx) => {
+                mdText += `# ${s.title}\n`;
+                if (s.subtitle) mdText += `## ${s.subtitle}\n`;
+                if (s.bullets && s.bullets.length > 0) {
+                    s.bullets.forEach(b => {
+                        mdText += `- ${b.replace(/<[^>]*>?/gm, '')}\n`;
+                    });
+                }
+                if (idx < state.slides.length - 1) {
+                    mdText += `\n---\n\n`;
+                }
+            });
+
+            downloadFile(mdText, 'Presentasi-Slider.md', 'text/markdown');
+        }
+
+        function exportJSONFile() {
+            const dataStr = JSON.stringify({
+                slides: state.slides,
+                slideTheme: state.slideTheme,
+                appTheme: state.appTheme
+            }, null, 2);
+            downloadFile(dataStr, 'Proyek-Slider.json', 'application/json');
+        }
+
+        function downloadFile(content, fileName, contentType) {
+            const a = document.createElement("a");
+            const file = new Blob([content], { type: contentType });
+            a.href = URL.createObjectURL(file);
+            a.download = fileName;
+            a.click();
+        }
+
+        function saveToCache() {
+            localStorage.setItem('SLIDER_APP_DATA', JSON.stringify({
+                slides: state.slides,
+                slideTheme: state.slideTheme,
+                appTheme: state.appTheme
+            }));
+        }
+
+        function saveToCacheManually() {
+            saveToCache();
+            showNotification("Draf presentasi berhasil disimpan ke cache browser!");
+        }
+
+        function loadCacheData() {
+            const cached = localStorage.getItem('SLIDER_APP_DATA');
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed.slides && parsed.slides.length > 0) state.slides = parsed.slides;
+                    if (parsed.slideTheme) state.slideTheme = parsed.slideTheme;
+                    if (parsed.appTheme) state.appTheme = parsed.appTheme;
+                } catch (e) {
+                    console.error("Gagal membaca cache data", e);
+                }
+            }
+        }
+
+        function clearCacheData() {
+            localStorage.removeItem('SLIDER_APP_DATA');
+            location.reload();
+        }
+
+        function showNotification(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-5 right-5 bg-amber-400 text-black font-extrabold px-4 py-2 border-2 border-black shadow-neo z-50 text-xs uppercase';
+            toast.innerText = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+</body>
+</html>

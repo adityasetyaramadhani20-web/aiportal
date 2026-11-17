@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DocuWiki</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Mammoth.js for Word (.docx to HTML) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+  
+  <!-- SheetJS for Excel (.xlsx, .xls, .csv to HTML/Table) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <!-- JSZip for PPTX extraction & entire Wiki ZIP export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
+  <!-- Turndown for HTML to Markdown (GFM supported) -->
+  <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
+  <script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+  
+  <!-- Marked for Markdown to HTML preview -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              300: '#a5b4fc',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.7);
+    }
+
+    /* Markdown Rendered Prose Typography */
+    .wiki-prose h1 { font-size: 1.85rem; font-weight: 800; margin-top: 1.25rem; margin-bottom: 0.75rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.35rem; color: inherit; }
+    .dark .wiki-prose h1 { border-bottom-color: #334155; }
+    .wiki-prose h2 { font-size: 1.45rem; font-weight: 700; margin-top: 1.1rem; margin-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25rem; color: inherit; }
+    .dark .wiki-prose h2 { border-bottom-color: #334155; }
+    .wiki-prose h3 { font-size: 1.2rem; font-weight: 600; margin-top: 0.9rem; margin-bottom: 0.4rem; color: inherit; }
+    .wiki-prose h4 { font-size: 1.05rem; font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.3rem; color: inherit; }
+    .wiki-prose p { margin-bottom: 0.85rem; line-height: 1.65; }
+    .wiki-prose ul { list-style-type: disc; margin-left: 1.75rem; margin-bottom: 0.85rem; }
+    .wiki-prose ol { list-style-type: decimal; margin-left: 1.75rem; margin-bottom: 0.85rem; }
+    .wiki-prose li { margin-bottom: 0.25rem; }
+    .wiki-prose blockquote { border-left: 4px solid #6366f1; padding: 0.5rem 1rem; margin: 1rem 0; background: rgba(99, 102, 241, 0.05); border-radius: 0 0.5rem 0.5rem 0; }
+    .wiki-prose code:not(pre code) { background: rgba(148, 163, 184, 0.2); padding: 0.2rem 0.4rem; border-radius: 0.35rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.875em; }
+    .wiki-prose pre { background: #0f172a; color: #f8fafc; padding: 1rem; border-radius: 0.75rem; overflow-x: auto; margin: 1rem 0; font-size: 0.875rem; }
+    .wiki-prose table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+    .wiki-prose th, .wiki-prose td { border: 1px solid #cbd5e1; padding: 0.6rem 0.85rem; text-align: left; }
+    .dark .wiki-prose th, .dark .wiki-prose td { border-color: #334155; }
+    .wiki-prose th { background: rgba(148, 163, 184, 0.15); font-weight: 600; }
+    .wiki-prose hr { border: none; border-top: 2px dashed #cbd5e1; margin: 1.5rem 0; }
+    .dark .wiki-prose hr { border-top-color: #334155; }
+    .wiki-prose img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 0.75rem 0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .wiki-link { color: #6366f1; font-weight: 600; text-decoration: underline; text-decoration-style: dotted; cursor: pointer; transition: color 0.15s; }
+    .wiki-link:hover { color: #4338ca; }
+
+    /* Rich Editor ContentEditable Reset */
+    #richTextCanvas:focus { outline: none; }
+    [contenteditable=true]:empty:before {
+      content: attr(data-placeholder);
+      color: #94a3b8;
+      pointer-events: none;
+      display: block;
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200 selection:bg-brand-500 selection:text-white">
+
+  <header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 z-20 flex-shrink-0">
+    <div class="flex items-center space-x-3">
+      <!-- Sidebar Mobile Toggle -->
+      <button id="btnToggleSidebarMobile" class="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none" aria-label="Buka Menu">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      <!-- Brand Logo & Title -->
+      <div class="flex items-center space-x-2.5 cursor-pointer" id="btnAppLogo">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center space-x-1.5">
+            <span class="text-lg font-black tracking-tight bg-gradient-to-r from-brand-600 to-violet-600 dark:from-brand-400 dark:to-violet-400 bg-clip-text text-transparent">DocuWiki</span>
+          </div>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">Dokumentasi & Wiki Multi-Format Berbasis Peramban</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-1.5 sm:space-x-2">
+      <!-- Import / Convert Multi-Format File -->
+      <button id="btnOpenImportModal" class="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 active:scale-95 rounded-lg shadow-sm transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        <span class="hidden sm:inline">Konversi Dokumen</span>
+        <span class="sm:hidden">Impor</span>
+      </button>
+
+      <!-- Dropdown Ekspor -->
+      <div class="relative inline-block text-left" id="exportDropdownContainer">
+        <button id="btnExportMenu" class="flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span class="hidden md:inline">Ekspor</span>
+          <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <!-- Ekspor Menu Popover -->
+        <div id="exportMenuDropdown" class="hidden absolute right-0 mt-2 w-52 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 z-50 text-xs">
+          <button id="exportActMd" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2 text-slate-700 dark:text-slate-200">
+            <span class="w-5 h-5 rounded bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[10px]">MD</span>
+            <div>
+              <div class="font-medium">Unduh Dokumen .md</div>
+              <div class="text-[10px] text-slate-400">File Markdown aktif</div>
+            </div>
+          </button>
+          <button id="exportActHtml" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2 text-slate-700 dark:text-slate-200">
+            <span class="w-5 h-5 rounded bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-[10px]">HTM</span>
+            <div>
+              <div class="font-medium">Unduh Dokumen .html</div>
+              <div class="text-[10px] text-slate-400">Halaman mandiri berformat</div>
+            </div>
+          </button>
+          <div class="h-px bg-slate-200 dark:bg-slate-700 my-1"></div>
+          <button id="exportActZip" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2 text-slate-700 dark:text-slate-200">
+            <span class="w-5 h-5 rounded bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-[10px]">ZIP</span>
+            <div>
+              <div class="font-medium">Unduh Semua Wiki (.zip)</div>
+              <div class="text-[10px] text-slate-400">Struktur folder & semua berkas</div>
+            </div>
+          </button>
+          <button id="exportActJson" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center space-x-2 text-slate-700 dark:text-slate-200">
+            <span class="w-5 h-5 rounded bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[10px]">BAK</span>
+            <div>
+              <div class="font-medium">Cadangkan Wiki (.json)</div>
+              <div class="text-[10px] text-slate-400">Simpan state penuh aplikasi</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Copy Markdown Button -->
+      <button id="btnQuickCopy" class="flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Salin Markdown ke Clipboard">
+        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <span class="hidden md:inline">Salin</span>
+      </button>
+
+      <!-- Dark Mode Toggle -->
+      <button id="btnToggleTheme" class="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 transition-colors" title="Ubah Tema">
+        <svg id="themeIconDark" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <svg id="themeIconLight" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- SIDEBAR: Pohon Folder & Berkas Wiki -->
+    <aside id="sidebarPanel" class="w-72 sm:w-80 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col flex-shrink-0 absolute lg:static inset-y-0 left-0 z-30 transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out">
+      
+      <!-- Header Sidebar & Toolbar Aksi Pohon -->
+      <div class="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <svg class="w-4 h-4 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Pohon Wiki</span>
+        </div>
+
+        <div class="flex items-center space-x-1">
+          <!-- Buat Dokumen Baru -->
+          <button id="btnNewDocRoot" class="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-brand-600 transition-colors" title="Dokumen Baru">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </button>
+          <!-- Buat Folder Baru -->
+          <button id="btnNewFolderRoot" class="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-amber-500 transition-colors" title="Folder Baru">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            </svg>
+          </button>
+          <!-- Import JSON Workspace -->
+          <button id="btnRestoreJson" class="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-emerald-500 transition-colors" title="Pulihkan / Muat Cadangan (.json)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+          </button>
+          <input type="file" id="jsonFileInput" accept=".json" class="hidden" />
+        </div>
+      </div>
+
+      <div class="p-2 border-b border-slate-100 dark:border-slate-800">
+        <div class="relative">
+          <input 
+            type="text" 
+            id="treeSearchInput" 
+            placeholder="Cari dokumen..." 
+            class="w-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-500 border border-transparent focus:border-brand-500"
+          />
+          <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- Kontainer Tampilan Pohon Folder -->
+      <div class="flex-1 overflow-y-auto p-2 space-y-0.5 select-none" id="wikiTreeContainer">
+        <!-- Rendered dynamically by JavaScript -->
+      </div>
+
+      <!-- Sidebar Footer Status -->
+      <div class="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+        <span id="statDocCount">0 Dokumen</span>
+        <button id="btnResetToDemo" class="text-brand-600 dark:text-brand-400 hover:underline">Muat Wiki Sampel</button>
+      </div>
+    </aside>
+
+    <!-- Overlay Latar Belakang Mobile -->
+    <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-20 hidden lg:hidden"></div>
+
+    <main class="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 overflow-hidden">
+      
+      <!-- Dokumen Active Meta Bar -->
+      <div class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+        <div class="flex items-center space-x-2 min-w-0">
+          <span class="text-slate-400 dark:text-slate-500 text-xs font-mono" id="docBreadcrumb">Root /</span>
+          <input 
+            type="text" 
+            id="docTitleInput" 
+            value="Judul Dokumen" 
+            placeholder="Ketik judul dokumen..."
+            class="text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-brand-500 focus:outline-none px-1 py-0.5 rounded transition-all max-w-xs sm:max-w-md"
+          />
+        </div>
+
+        <!-- Mode Editor Switcher (WYSIWYG / Markdown / Split / Pratinjau) -->
+        <div class="flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+          <button id="tabBtnWysiwyg" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-xs transition-all flex items-center space-x-1">
+            <svg class="w-3.5 h-3.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>Rich Text</span>
+          </button>
+          <button id="tabBtnMarkdown" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center space-x-1">
+            <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+            <span>Markdown</span>
+          </button>
+          <button id="tabBtnSplit" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all hidden md:flex items-center space-x-1">
+            <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4.5v15m6-15v15m-10.5-15h15a2.25 2.25 0 012.25 2.25v13.5a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 013 18V6.75A2.25 2.25 0 015.25 4.5z" />
+            </svg>
+            <span>Split View</span>
+          </button>
+          <button id="tabBtnPreview" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center space-x-1">
+            <svg class="w-3.5 h-3.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span>Pratinjau</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="formatToolbar" class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 py-1.5 flex items-center space-x-1 overflow-x-auto flex-shrink-0 text-slate-700 dark:text-slate-200">
+        <button type="button" data-cmd="bold" class="fmt-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Tebal (Ctrl+B)">
+          <span class="font-bold text-xs px-1">B</span>
+        </button>
+        <button type="button" data-cmd="italic" class="fmt-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Miring (Ctrl+I)">
+          <span class="italic text-xs px-1 font-serif">I</span>
+        </button>
+        <button type="button" data-cmd="underline" class="fmt-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Garis Bawah (Ctrl+U)">
+          <span class="underline text-xs px-1">U</span>
+        </button>
+        <button type="button" data-cmd="strikeThrough" class="fmt-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Coretan">
+          <span class="line-through text-xs px-1">S</span>
+        </button>
+
+        <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+        <button type="button" data-cmd="formatBlock" data-val="h1" class="fmt-btn px-1.5 py-1 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Heading 1">H1</button>
+        <button type="button" data-cmd="formatBlock" data-val="h2" class="fmt-btn px-1.5 py-1 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Heading 2">H2</button>
+        <button type="button" data-cmd="formatBlock" data-val="h3" class="fmt-btn px-1.5 py-1 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Heading 3">H3</button>
+
+        <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+        <button type="button" data-cmd="insertUnorderedList" class="fmt-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Daftar Bullet">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16M2 6h.01M2 12h.01M2 18h.01" />
+          </svg>
+        </button>
+        <button type="button" data-cmd="insertOrderedList" class="fmt-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Daftar Nomor">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 6h13M7 12h13M7 18h13M3 6h1v4M3 14h2l-2 2v1h2M3 19h2" />
+          </svg>
+        </button>
+        <button type="button" data-cmd="formatBlock" data-val="blockquote" class="fmt-btn p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Kutipan">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+        </button>
+        <button type="button" id="btnInsertCodeBlock" class="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Blok Kode">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        </button>
+        <button type="button" id="btnInsertTable" class="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Sisipkan Tabel">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </button>
+        <button type="button" id="btnInsertWikilink" class="px-2 py-0.5 text-xs font-medium rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-brand-600 dark:text-brand-400" title="Sisipkan Wikilink [[Nama Halaman]]">
+          [[WikiLink]]
+        </button>
+      </div>
+
+      <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- PANEL 1: Rich Text (WYSIWYG) Canvas -->
+        <div id="wrapperWysiwyg" class="flex-1 overflow-y-auto p-4 sm:p-8 flex justify-center bg-white dark:bg-slate-900">
+          <div 
+            id="richTextCanvas" 
+            contenteditable="true" 
+            data-placeholder="Mulai ketik isi dokumen wiki, atau klik tombol 'Konversi Dokumen' di atas..."
+            class="w-full max-w-4xl min-h-[500px] text-slate-800 dark:text-slate-100 wiki-prose leading-relaxed focus:outline-none"
+          ></div>
+        </div>
+
+        <!-- PANEL 2: Raw Markdown Source Editor -->
+        <div id="wrapperMarkdown" class="flex-1 flex flex-col p-4 bg-slate-900 dark:bg-slate-950 hidden">
+          <div class="flex items-center justify-between pb-2 text-[11px] text-slate-400 font-mono">
+            <span>Sintaks Markdown GFM (.md)</span>
+            <span>Otomatis disinkronkan</span>
+          </div>
+          <textarea 
+            id="rawMarkdownTextarea" 
+            placeholder="# Ketik sintaks Markdown di sini..." 
+            class="flex-1 w-full p-4 bg-slate-950 text-emerald-400 font-mono text-xs sm:text-sm rounded-xl border border-slate-800 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500 leading-relaxed overflow-y-auto selection:bg-brand-600 selection:text-white"
+            spellcheck="false"
+          ></textarea>
+        </div>
+
+        <!-- PANEL 3: Live Rendered Markdown Preview -->
+        <div id="wrapperPreview" class="flex-1 overflow-y-auto p-4 sm:p-8 flex justify-center bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 hidden">
+          <div id="renderedPreviewCanvas" class="w-full max-w-4xl wiki-prose text-slate-800 dark:text-slate-100">
+            <!-- Konten render dinamis -->
+          </div>
+        </div>
+
+      </div>
+
+      <footer class="h-8 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-4 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono flex-shrink-0">
+        <div class="flex items-center space-x-4">
+          <span>Kata: <b id="statWords" class="text-slate-700 dark:text-slate-300 font-sans">0</b></span>
+          <span>Karakter: <b id="statChars" class="text-slate-700 dark:text-slate-300 font-sans">0</b></span>
+          <span>Baris: <b id="statLines" class="text-slate-700 dark:text-slate-300 font-sans">0</b></span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="saveStatusIndicator" class="font-sans text-slate-500">Tersimpan</span>
+        </div>
+      </footer>
+    </main>
+
+  </div>
+
+  <div id="importModal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-slate-100">Konversi & Impor Berkas</h3>
+            <p class="text-xs text-slate-500">Dukung Word (.docx), Excel (.xlsx/.csv), PowerPoint (.pptx), Teks & MD</p>
+          </div>
+        </div>
+        <button id="btnCloseImportModal" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Dropzone Drag and Drop File -->
+      <div class="mt-4">
+        <div id="modalDropZone" class="border-2 border-dashed border-brand-300 dark:border-brand-700/60 hover:border-brand-500 bg-brand-50/40 dark:bg-brand-950/20 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center group">
+          <input type="file" id="universalFileInput" accept=".docx,.xlsx,.xls,.csv,.pptx,.txt,.md,.json" class="hidden" />
+          <div class="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center text-brand-600 dark:text-brand-400 mb-3 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <p class="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">Pilih atau Tarik Berkas ke Sini</p>
+          <p class="text-[11px] text-slate-400 mb-3">Format: .docx, .xlsx, .pptx, .csv, .txt, .md</p>
+          <span class="px-3.5 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-semibold shadow-sm hover:bg-brand-700 transition-colors">
+            Cari di Komputer
+          </span>
+        </div>
+      </div>
+
+      <!-- Opsi Sasaran Hasil Konversi -->
+      <div class="mt-4 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-2">
+        <label class="block font-semibold text-slate-700 dark:text-slate-300">Tindakan terhadap Hasil Konversi:</label>
+        <div class="space-y-1.5">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" name="importTargetAction" value="newDoc" checked class="text-brand-600 focus:ring-brand-500" />
+            <span class="text-slate-700 dark:text-slate-300">Buat dokumen wiki baru dengan nama berkas ini</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" name="importTargetAction" value="replaceDoc" class="text-brand-600 focus:ring-brand-500" />
+            <span class="text-slate-700 dark:text-slate-300">Gantikan isi dokumen aktif saat ini</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" name="importTargetAction" value="appendDoc" class="text-brand-600 focus:ring-brand-500" />
+            <span class="text-slate-700 dark:text-slate-300">Sisipkan di bagian bawah dokumen aktif</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Tab Opsi Paste Rich Text Langsung -->
+      <div class="mt-4">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Atau Tempel (Paste) Teks Berformat:</span>
+          <button id="btnProcessPasted" class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline">Konversi Teks Tempelan &rarr;</button>
+        </div>
+        <div 
+          id="pasteBoxArea" 
+          contenteditable="true" 
+          data-placeholder="Salin teks tabel/paragraf dari Word atau Web, lalu tekan Ctrl+V di kotak ini..."
+          class="w-full h-24 p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-brand-500 overflow-y-auto"
+        ></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="customDialogModal" class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl animate-fade-in">
+      <h3 id="dialogTitle" class="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2">Konfirmasi</h3>
+      <p id="dialogMessage" class="text-xs text-slate-600 dark:text-slate-300 mb-4 leading-relaxed">Apakah Anda yakin?</p>
+      
+      <div id="dialogInputContainer" class="mb-4 hidden">
+        <input 
+          type="text" 
+          id="dialogPromptInput" 
+          class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500" 
+        />
+      </div>
+
+      <div class="flex justify-end space-x-2 text-xs">
+        <button id="dialogBtnCancel" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium">Batal</button>
+        <button id="dialogBtnConfirm" class="px-3.5 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-xs">Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed bottom-10 right-6 z-50 pointer-events-none flex flex-col gap-2"></div>
+
+  <!-- JAVASCRIPT LOGIC ENGINE -->
+  <script>
+    // Database / In-Memory State Model
+    const AppState = {
+      theme: 'light',
+      currentMode: 'wysiwyg', // 'wysiwyg', 'markdown', 'split', 'preview'
+      activeDocId: 'doc-welcome',
+      tree: [
+        {
+          id: 'folder-getting-started',
+          type: 'folder',
+          name: '1. Memulai Wiki',
+          expanded: true,
+          children: [
+            {
+              id: 'doc-welcome',
+              type: 'doc',
+              name: 'Selamat Datang di DocuWiki',
+              markdown: `# Selamat Datang di DocuWiki 🚀\n\n**DocuWiki** adalah pustaka dokumentasi modern berbasis web yang mengubah berbagai format kantor (*Office*) menjadi format **Markdown** dan **HTML** bersih secara otomatis.\n\n## 🌟 Keunggulan Utama\n- **Konversi Multi-Format Otomatis**: Impor berkas Microsoft Word (\`.docx\`), Excel (\`.xlsx\`, \`.xls\`, \`.csv\`), PowerPoint (\`.pptx\`), atau teks langsung ke wiki.\n- **Pohon Folder Virtual**: Kelola dokumentasi dengan struktur hierarki tak terbatas.\n- **Dukungan [[WikiLink]]**: Hubungkan halaman satu dengan yang lain secara cepat menggunakan tanda kurung siku ganda!\n- **Editor Ganda Berkecepatan Tinggi**: Tulis dalam mode visual *Rich Text* atau sintaksis *Markdown* murni dengan sinkronisasi instan.\n\n> "Dokumentasi yang baik adalah fondasi dari setiap proyek yang sukses."\n\nCoba klik tombol **Konversi Dokumen** di bagian atas untuk mencoba berkas Anda sendiri!`,
+              updatedAt: Date.now()
+            },
+            {
+              id: 'doc-syntax-guide',
+              type: 'doc',
+              name: 'Panduan Format & Fitur',
+              markdown: `## Panduan Format Cepat\n\nDocuWiki mendukung sintaks GitHub Flavored Markdown (GFM):\n\n### 1. Daftar Pekerjaan (Task List)\n- [x] Konversi Dokumen Word\n- [x] Tabel otomatis dari Excel\n- [ ] Hubungkan dengan tim pengembang\n\n### 2. Contoh Tabel Markdown\n| Fitur | Status | Keterangan |\n| :--- | :---: | :--- |\n| Word (.docx) | ✅ Siap | Didukung penuh via Mammoth.js |\n| Excel (.xlsx) | ✅ Siap | Dikonversi ke tabel GFM |\n| PowerPoint (.pptx) | ✅ Siap | Diekstrak per slide |\n| Ekspor ZIP | ✅ Siap | Bundel seluruh hierarki folder |\n\n### 3. Tautan Wiki\nKunjungi [[Selamat Datang di DocuWiki]] untuk kembali ke pengantar.`,
+              updatedAt: Date.now()
+            }
+          ]
+        },
+        {
+          id: 'folder-specs',
+          type: 'folder',
+          name: '2. Spesifikasi Teknis',
+          expanded: false,
+          children: [
+            {
+              id: 'doc-api-spec',
+              type: 'doc',
+              name: 'Spesifikasi REST API',
+              markdown: `## Spesifikasi Antarmuka API\n\nBerikut adalah contoh dokumentasi endpoint sistem kami:\n\n\`\`\`json\n{\n  "status": "success",\n  "version": "2.0.0",\n  "capabilities": ["docx", "xlsx", "pptx", "markdown"]\n}\n\`\`\`\n\nSemua data di DocuWiki diproses secara privat di sisi peramban klien tanpa mengirimkan berkas Anda ke server manapun.`,
+              updatedAt: Date.now()
+            }
+          ]
+        }
+      ]
+    };
+
+    function createTurndownService() {
+      const td = new TurndownService({
+        headingStyle: 'atx',
+        bulletListMarker: '-',
+        codeBlockStyle: 'fenced',
+        emDelimiter: '_',
+        strongDelimiter: '**'
+      });
+
+      if (window.turndownPluginGfm) {
+        td.use(window.turndownPluginGfm.gfm);
+      }
+
+      // Aturan untuk menjaga elemen HTML penting dan membersihkan tag kosong
+      td.addRule('cleanEmpty', {
+        filter: (node) => ['P', 'SPAN', 'DIV'].includes(node.nodeName) && node.innerHTML.trim() === '',
+        replacement: () => ''
+      });
+
+      return td;
+    }
+
+    const turndownEngine = createTurndownService();
+
+    function configureMarkedRenderer() {
+      const renderer = new marked.Renderer();
+
+      // Custom link parser for Wikilinks: [[Judul Dokumen]]
+      const originalTextRenderer = renderer.text.bind(renderer);
+      renderer.text = function(text) {
+        let parsed = originalTextRenderer(text);
+        parsed = parsed.replace(/\[\[(.*?)\]\]/g, function(match, title) {
+          return `<span class="wiki-link" onclick="openDocByTitle('${title.replace(/'/g, "\\'")}')" title="Buka tautan wiki: ${title}">${title}</span>`;
+        });
+        return parsed;
+      };
+
+      marked.setOptions({
+        renderer: renderer,
+        gfm: true,
+        breaks: true,
+        headerIds: true
+      });
+    }
+
+    configureMarkedRenderer();
+
+    const elTreeContainer = document.getElementById('wikiTreeContainer');
+    const elDocTitleInput = document.getElementById('docTitleInput');
+    const elDocBreadcrumb = document.getElementById('docBreadcrumb');
+    const elRichCanvas = document.getElementById('richTextCanvas');
+    const elRawMarkdown = document.getElementById('rawMarkdownTextarea');
+    const elRenderedPreview = document.getElementById('renderedPreviewCanvas');
+    
+    const wrapperWysiwyg = document.getElementById('wrapperWysiwyg');
+    const wrapperMarkdown = document.getElementById('wrapperMarkdown');
+    const wrapperPreview = document.getElementById('wrapperPreview');
+    const formatToolbar = document.getElementById('formatToolbar');
+
+    const tabBtnWysiwyg = document.getElementById('tabBtnWysiwyg');
+    const tabBtnMarkdown = document.getElementById('tabBtnMarkdown');
+    const tabBtnSplit = document.getElementById('tabBtnSplit');
+    const tabBtnPreview = document.getElementById('tabBtnPreview');
+
+    const statWords = document.getElementById('statWords');
+    const statChars = document.getElementById('statChars');
+    const statLines = document.getElementById('statLines');
+    const statDocCount = document.getElementById('statDocCount');
+    const saveStatusIndicator = document.getElementById('saveStatusIndicator');
+
+    const importModal = document.getElementById('importModal');
+    const btnOpenImportModal = document.getElementById('btnOpenImportModal');
+    const btnCloseImportModal = document.getElementById('btnCloseImportModal');
+    const modalDropZone = document.getElementById('modalDropZone');
+    const universalFileInput = document.getElementById('universalFileInput');
+    const pasteBoxArea = document.getElementById('pasteBoxArea');
+    const btnProcessPasted = document.getElementById('btnProcessPasted');
+
+    const exportMenuDropdown = document.getElementById('exportMenuDropdown');
+    const btnExportMenu = document.getElementById('btnExportMenu');
+    const btnQuickCopy = document.getElementById('btnQuickCopy');
+    const btnToggleTheme = document.getElementById('btnToggleTheme');
+    const themeIconDark = document.getElementById('themeIconDark');
+    const themeIconLight = document.getElementById('themeIconLight');
+
+    const sidebarPanel = document.getElementById('sidebarPanel');
+    const btnToggleSidebarMobile = document.getElementById('btnToggleSidebarMobile');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      let badgeColor = 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900';
+      if (type === 'success') badgeColor = 'bg-emerald-600 text-white';
+      if (type === 'error') badgeColor = 'bg-rose-600 text-white';
+
+      toast.className = `${badgeColor} text-xs font-medium px-4 py-2.5 rounded-xl shadow-lg flex items-center space-x-2 transition-all duration-300 opacity-0 translate-y-4`;
+      toast.innerHTML = `
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('opacity-0', 'translate-y-4');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-4');
+        setTimeout(() => toast.remove(), 300);
+      }, 2800);
+    }
+
+    function showCustomDialog({ title, message, showInput = false, defaultValue = '', onConfirm }) {
+      const modal = document.getElementById('customDialogModal');
+      const dialogTitle = document.getElementById('dialogTitle');
+      const dialogMessage = document.getElementById('dialogMessage');
+      const inputContainer = document.getElementById('dialogInputContainer');
+      const inputEl = document.getElementById('dialogPromptInput');
+      const btnCancel = document.getElementById('dialogBtnCancel');
+      const btnConfirm = document.getElementById('dialogBtnConfirm');
+
+      dialogTitle.textContent = title;
+      dialogMessage.textContent = message;
+
+      if (showInput) {
+        inputContainer.classList.remove('hidden');
+        inputEl.value = defaultValue;
+        setTimeout(() => inputEl.focus(), 100);
+      } else {
+        inputContainer.classList.add('hidden');
+      }
+
+      modal.classList.remove('hidden');
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        btnCancel.onclick = null;
+        btnConfirm.onclick = null;
+      };
+
+      btnCancel.onclick = () => cleanup();
+
+      btnConfirm.onclick = () => {
+        const val = inputEl.value.trim();
+        cleanup();
+        if (onConfirm) onConfirm(val);
+      };
+    }
+
+    function findDocOrFolder(nodes, id) {
+      for (const node of nodes) {
+        if (node.id === id) return { node, parent: null };
+        if (node.children) {
+          const found = findInSubtree(node.children, id, node);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function findInSubtree(nodes, id, parent) {
+      for (const node of nodes) {
+        if (node.id === id) return { node, parent };
+        if (node.children) {
+          const found = findInSubtree(node.children, id, node);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function findDocByTitleRecursive(nodes, title) {
+      const lower = title.toLowerCase().trim();
+      for (const node of nodes) {
+        if (node.type === 'doc' && node.name.toLowerCase().trim() === lower) {
+          return node;
+        }
+        if (node.children) {
+          const found = findDocByTitleRecursive(node.children, title);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function getAllDocs(nodes) {
+      let docs = [];
+      for (const node of nodes) {
+        if (node.type === 'doc') docs.push(node);
+        if (node.children) docs = docs.concat(getAllDocs(node.children));
+      }
+      return docs;
+    }
+
+    function getBreadcrumbPath(nodes, targetId, path = []) {
+      for (const node of nodes) {
+        if (node.id === targetId) {
+          return [...path, node.name];
+        }
+        if (node.children) {
+          const found = getBreadcrumbPath(node.children, targetId, [...path, node.name]);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function renderWikiTree(filterKeyword = '') {
+      elTreeContainer.innerHTML = '';
+      const totalDocs = getAllDocs(AppState.tree).length;
+      statDocCount.textContent = `${totalDocs} Dokumen`;
+
+      function buildNodeEl(node, depth = 0) {
+        if (filterKeyword) {
+          const matches = node.name.toLowerCase().includes(filterKeyword.toLowerCase());
+          if (node.type === 'doc' && !matches) return null;
+        }
+
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'group';
+
+        const row = document.createElement('div');
+        const isActive = node.id === AppState.activeDocId;
+        
+        row.className = `flex items-center justify-between px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+          isActive 
+            ? 'bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 font-bold border-l-2 border-brand-600' 
+            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+        }`;
+        row.style.paddingLeft = `${depth * 14 + 8}px`;
+
+        // Left section: Icon + Title
+        const leftContent = document.createElement('div');
+        leftContent.className = 'flex items-center space-x-2 truncate flex-1 min-w-0';
+
+        if (node.type === 'folder') {
+          const chevron = document.createElement('span');
+          chevron.className = 'text-slate-400 transform transition-transform text-[10px]';
+          chevron.innerHTML = node.expanded ? '▼' : '▶';
+          
+          const folderIcon = document.createElement('span');
+          folderIcon.innerHTML = `<svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>`;
+          
+          leftContent.appendChild(chevron);
+          leftContent.appendChild(folderIcon);
+        } else {
+          const docIcon = document.createElement('span');
+          docIcon.innerHTML = `<svg class="w-4 h-4 ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>`;
+          leftContent.appendChild(docIcon);
+        }
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'truncate';
+        titleSpan.textContent = node.name;
+        leftContent.appendChild(titleSpan);
+
+        row.appendChild(leftContent);
+
+        // Right Action icons (Add inside folder, Rename, Delete)
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'hidden group-hover:flex items-center space-x-1 pl-1 flex-shrink-0';
+
+        if (node.type === 'folder') {
+          const btnAddDoc = document.createElement('button');
+          btnAddDoc.title = 'Tambah Dokumen ke Folder';
+          btnAddDoc.className = 'p-1 hover:text-brand-600 rounded';
+          btnAddDoc.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>`;
+          btnAddDoc.onclick = (e) => {
+            e.stopPropagation();
+            promptCreateNewItem('doc', node.id);
+          };
+          actionsDiv.appendChild(btnAddDoc);
+        }
+
+        const btnRename = document.createElement('button');
+        btnRename.title = 'Ubah Nama';
+        btnRename.className = 'p-1 hover:text-indigo-600 rounded';
+        btnRename.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>`;
+        btnRename.onclick = (e) => {
+          e.stopPropagation();
+          promptRenameItem(node.id);
+        };
+        actionsDiv.appendChild(btnRename);
+
+        const btnDelete = document.createElement('button');
+        btnDelete.title = 'Hapus';
+        btnDelete.className = 'p-1 hover:text-rose-600 rounded';
+        btnDelete.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>`;
+        btnDelete.onclick = (e) => {
+          e.stopPropagation();
+          confirmDeleteItem(node.id);
+        };
+        actionsDiv.appendChild(btnDelete);
+
+        row.appendChild(actionsDiv);
+
+        // Click Row Event
+        row.onclick = () => {
+          if (node.type === 'folder') {
+            node.expanded = !node.expanded;
+            renderWikiTree(document.getElementById('treeSearchInput').value);
+          } else {
+            selectActiveDocument(node.id);
+          }
+        };
+
+        itemDiv.appendChild(row);
+
+        // Render Children if folder is expanded
+        if (node.type === 'folder' && node.expanded && node.children) {
+          const childrenCont = document.createElement('div');
+          childrenCont.className = 'space-y-0.5 mt-0.5';
+          node.children.forEach(child => {
+            const childEl = buildNodeEl(child, depth + 1);
+            if (childEl) childrenCont.appendChild(childEl);
+          });
+          itemDiv.appendChild(childrenCont);
+        }
+
+        return itemDiv;
+      }
+
+      AppState.tree.forEach(rootNode => {
+        const el = buildNodeEl(rootNode, 0);
+        if (el) elTreeContainer.appendChild(el);
+      });
+    }
+
+    function selectActiveDocument(docId) {
+      const match = findDocOrFolder(AppState.tree, docId);
+      if (!match || match.node.type !== 'doc') return;
+
+      AppState.activeDocId = docId;
+      const doc = match.node;
+
+      // Update Title & Breadcrumbs
+      elDocTitleInput.value = doc.name;
+      const crumbs = getBreadcrumbPath(AppState.tree, docId) || [doc.name];
+      crumbs.pop();
+      elDocBreadcrumb.textContent = (crumbs.length ? crumbs.join(' / ') + ' / ' : 'Wiki / ');
+
+      // Populate Markdown & Rich Canvas
+      const md = doc.markdown || '';
+      elRawMarkdown.value = md;
+      elRichCanvas.innerHTML = marked.parse(md);
+      elRenderedPreview.innerHTML = marked.parse(md);
+
+      updateStatistics(md);
+      renderWikiTree(document.getElementById('treeSearchInput').value);
+
+      // Close mobile sidebar if open
+      sidebarPanel.classList.add('-translate-x-full');
+      sidebarBackdrop.classList.add('hidden');
+    }
+
+    window.openDocByTitle = function(title) {
+      const doc = findDocByTitleRecursive(AppState.tree, title);
+      if (doc) {
+        selectActiveDocument(doc.id);
+        showToast(`Membuka: ${doc.name}`, 'success');
+      } else {
+        showCustomDialog({
+          title: 'Buat Dokumen Wiki Baru?',
+          message: `Dokumen dengan judul "${title}" belum ada. Buat sekarang?`,
+          onConfirm: () => {
+            const newDoc = {
+              id: 'doc-' + Date.now(),
+              type: 'doc',
+              name: title,
+              markdown: `# ${title}\n\nHalaman ini dibuat otomatis dari WikiLink.`,
+              updatedAt: Date.now()
+            };
+            AppState.tree.push(newDoc);
+            renderWikiTree();
+            selectActiveDocument(newDoc.id);
+            showToast(`Dokumen "${title}" berhasil dibuat!`, 'success');
+          }
+        });
+      }
+    };
+
+    function promptCreateNewItem(type, targetFolderId = null) {
+      showCustomDialog({
+        title: type === 'folder' ? 'Buat Folder Baru' : 'Buat Dokumen Baru',
+        message: type === 'folder' ? 'Masukkan nama folder baru:' : 'Masukkan judul dokumen baru:',
+        showInput: true,
+        defaultValue: type === 'folder' ? 'Folder Baru' : 'Dokumen Tanpa Judul',
+        onConfirm: (name) => {
+          if (!name) return;
+          const newItem = {
+            id: (type === 'folder' ? 'folder-' : 'doc-') + Date.now(),
+            type: type,
+            name: name,
+            ...(type === 'folder' ? { expanded: true, children: [] } : { markdown: `# ${name}\n\nMulai menulis dokumentasi...`, updatedAt: Date.now() })
+          };
+
+          if (targetFolderId) {
+            const match = findDocOrFolder(AppState.tree, targetFolderId);
+            if (match && match.node.type === 'folder') {
+              match.node.children.push(newItem);
+              match.node.expanded = true;
+            } else {
+              AppState.tree.push(newItem);
+            }
+          } else {
+            AppState.tree.push(newItem);
+          }
+
+          renderWikiTree();
+          if (type === 'doc') {
+            selectActiveDocument(newItem.id);
+          }
+          showToast(`${type === 'folder' ? 'Folder' : 'Dokumen'} berhasil dibuat!`, 'success');
+        }
+      });
+    }
+
+    function promptRenameItem(id) {
+      const match = findDocOrFolder(AppState.tree, id);
+      if (!match) return;
+      showCustomDialog({
+        title: 'Ubah Nama',
+        message: 'Masukkan nama baru:',
+        showInput: true,
+        defaultValue: match.node.name,
+        onConfirm: (newName) => {
+          if (!newName) return;
+          match.node.name = newName;
+          if (AppState.activeDocId === id) {
+            elDocTitleInput.value = newName;
+          }
+          renderWikiTree();
+          showToast('Nama berhasil diubah!', 'success');
+        }
+      });
+    }
+
+    function confirmDeleteItem(id) {
+      const match = findDocOrFolder(AppState.tree, id);
+      if (!match) return;
+      showCustomDialog({
+        title: 'Hapus Item',
+        message: `Apakah Anda yakin ingin menghapus "${match.node.name}" beserta seluruh isinya?`,
+        onConfirm: () => {
+          if (match.parent) {
+            match.parent.children = match.parent.children.filter(item => item.id !== id);
+          } else {
+            AppState.tree = AppState.tree.filter(item => item.id !== id);
+          }
+          renderWikiTree();
+          if (AppState.activeDocId === id) {
+            const allDocs = getAllDocs(AppState.tree);
+            if (allDocs.length > 0) {
+              selectActiveDocument(allDocs[0].id);
+            } else {
+              promptCreateNewItem('doc');
+            }
+          }
+          showToast('Item berhasil dihapus.', 'info');
+        }
+      });
+    }
+
+    let isSyncing = false;
+    let autoSaveTimer = null;
+
+    function handleRichTextChange() {
+      if (isSyncing) return;
+      isSyncing = true;
+      try {
+        const html = elRichCanvas.innerHTML;
+        const md = turndownEngine.turndown(html);
+        elRawMarkdown.value = md;
+        elRenderedPreview.innerHTML = marked.parse(md);
+        saveCurrentDocument(md);
+        updateStatistics(md);
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    function handleRawMarkdownChange() {
+      if (isSyncing) return;
+      isSyncing = true;
+      try {
+        const md = elRawMarkdown.value;
+        const html = marked.parse(md);
+        elRichCanvas.innerHTML = html;
+        elRenderedPreview.innerHTML = html;
+        saveCurrentDocument(md);
+        updateStatistics(md);
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    function saveCurrentDocument(markdown) {
+      saveStatusIndicator.textContent = 'Menyimpan...';
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        const match = findDocOrFolder(AppState.tree, AppState.activeDocId);
+        if (match && match.node.type === 'doc') {
+          match.node.markdown = markdown;
+          match.node.updatedAt = Date.now();
+        }
+        saveStatusIndicator.textContent = 'Tersimpan';
+      }, 400);
+    }
+
+    function updateStatistics(text) {
+      const chars = text.length;
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const lines = text ? text.split('\n').length : 0;
+      statChars.textContent = chars.toLocaleString('id-ID');
+      statWords.textContent = words.toLocaleString('id-ID');
+      statLines.textContent = lines.toLocaleString('id-ID');
+    }
+
+    function setViewMode(mode) {
+      AppState.currentMode = mode;
+      
+      // Update Tab Styles
+      [tabBtnWysiwyg, tabBtnMarkdown, tabBtnSplit, tabBtnPreview].forEach(btn => {
+        btn.classList.remove('bg-white', 'dark:bg-slate-700', 'text-slate-800', 'dark:text-white', 'shadow-xs');
+        btn.classList.add('text-slate-600', 'dark:text-slate-300');
+      });
+
+      wrapperWysiwyg.classList.add('hidden');
+      wrapperMarkdown.classList.add('hidden');
+      wrapperPreview.classList.add('hidden');
+      formatToolbar.classList.remove('hidden');
+
+      if (mode === 'wysiwyg') {
+        tabBtnWysiwyg.classList.add('bg-white', 'dark:bg-slate-700', 'text-slate-800', 'dark:text-white', 'shadow-xs');
+        tabBtnWysiwyg.classList.remove('text-slate-600', 'dark:text-slate-300');
+        wrapperWysiwyg.classList.remove('hidden');
+      } else if (mode === 'markdown') {
+        tabBtnMarkdown.classList.add('bg-white', 'dark:bg-slate-700', 'text-slate-800', 'dark:text-white', 'shadow-xs');
+        tabBtnMarkdown.classList.remove('text-slate-600', 'dark:text-slate-300');
+        wrapperMarkdown.classList.remove('hidden');
+        formatToolbar.classList.add('hidden');
+      } else if (mode === 'split') {
+        tabBtnSplit.classList.add('bg-white', 'dark:bg-slate-700', 'text-slate-800', 'dark:text-white', 'shadow-xs');
+        tabBtnSplit.classList.remove('text-slate-600', 'dark:text-slate-300');
+        wrapperMarkdown.classList.remove('hidden');
+        wrapperPreview.classList.remove('hidden');
+        formatToolbar.classList.add('hidden');
+      } else if (mode === 'preview') {
+        tabBtnPreview.classList.add('bg-white', 'dark:bg-slate-700', 'text-slate-800', 'dark:text-white', 'shadow-xs');
+        tabBtnPreview.classList.remove('text-slate-600', 'dark:text-slate-300');
+        wrapperPreview.classList.remove('hidden');
+        formatToolbar.classList.add('hidden');
+      }
+    }
+
+    async function processUploadedFile(file) {
+      const fileName = file.name;
+      const ext = fileName.split('.').pop().toLowerCase();
+      showToast(`Memproses ${fileName}...`, 'info');
+
+      try {
+        let convertedMarkdown = '';
+        let convertedHtml = '';
+
+        if (ext === 'docx') {
+          // WORD (.docx) to HTML via Mammoth.js
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+          convertedHtml = result.value;
+          convertedMarkdown = turndownEngine.turndown(convertedHtml);
+        } else if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+          // EXCEL / CSV via SheetJS
+          const arrayBuffer = await file.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          let fullHtml = '';
+          
+          workbook.SheetNames.forEach(sheetName => {
+            const sheet = workbook.Sheets[sheetName];
+            const tableHtml = XLSX.utils.sheet_to_html(sheet);
+            fullHtml += `<h3>Lembar: ${sheetName}</h3>` + tableHtml;
+          });
+          
+          convertedHtml = fullHtml;
+          convertedMarkdown = turndownEngine.turndown(fullHtml);
+        } else if (ext === 'pptx') {
+          // POWERPOINT (.pptx) via JSZip + XML extraction
+          const arrayBuffer = await file.arrayBuffer();
+          const zip = await JSZip.loadAsync(arrayBuffer);
+          
+          // Cari slide XML
+          const slideFiles = [];
+          zip.forEach((relativePath) => {
+            const match = relativePath.match(/^ppt\/slides\/slide(\d+)\.xml$/i);
+            if (match) {
+              slideFiles.push({ path: relativePath, index: parseInt(match[1], 10) });
+            }
+          });
+
+          slideFiles.sort((a, b) => a.index - b.index);
+
+          let slidesMd = `# Presentasi: ${fileName.replace(/\.pptx$/i, '')}\n\n`;
+          for (const s of slideFiles) {
+            const xmlContent = await zip.file(s.path).async('text');
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlContent, 'application/xml');
+            
+            // Ambil semua tag teks PowerPoint (<a:t>)
+            const textNodes = xmlDoc.getElementsByTagName('a:t');
+            const paragraphs = [];
+            for (let i = 0; i < textNodes.length; i++) {
+              const textVal = textNodes[i].textContent.trim();
+              if (textVal) paragraphs.push(textVal);
+            }
+
+            slidesMd += `## Slide ${s.index}\n`;
+            if (paragraphs.length > 0) {
+              slidesMd += `### ${paragraphs[0]}\n`;
+              for (let j = 1; j < paragraphs.length; j++) {
+                slidesMd += `- ${paragraphs[j]}\n`;
+              }
+            } else {
+              slidesMd += `*(Slide tanpa teks atau hanya visual)*\n`;
+            }
+            slidesMd += `\n---\n\n`;
+          }
+          convertedMarkdown = slidesMd;
+          convertedHtml = marked.parse(slidesMd);
+        } else if (['txt', 'md', 'json'].includes(ext)) {
+          // Teks Polos & Markdown Langsung
+          const text = await file.text();
+          if (ext === 'json') {
+            convertedMarkdown = `# ${fileName}\n\n\`\`\`json\n${text}\n\`\`\``;
+          } else {
+            convertedMarkdown = text;
+          }
+          convertedHtml = marked.parse(convertedMarkdown);
+        } else {
+          showToast(`Format .${ext} belum didukung.`, 'error');
+          return;
+        }
+
+        // Simpan Hasil Sesuai Target Terpilih di Modal
+        applyImportedContent(fileName, convertedMarkdown, convertedHtml);
+        importModal.classList.add('hidden');
+        showToast(`${fileName} berhasil dikonversi!`, 'success');
+      } catch (err) {
+        console.error('Error saat konversi berkas:', err);
+        showToast(`Gagal mengonversi ${fileName}. Pastikan berkas tidak terenkripsi.`, 'error');
+      }
+    }
+
+    function applyImportedContent(fileName, markdown, html) {
+      const targetAction = document.querySelector('input[name="importTargetAction"]:checked')?.value || 'newDoc';
+      const cleanName = fileName.replace(/\.[^/.]+$/, "");
+
+      if (targetAction === 'newDoc') {
+        const newDoc = {
+          id: 'doc-' + Date.now(),
+          type: 'doc',
+          name: cleanName,
+          markdown: markdown,
+          updatedAt: Date.now()
+        };
+        AppState.tree.push(newDoc);
+        renderWikiTree();
+        selectActiveDocument(newDoc.id);
+      } else if (targetAction === 'replaceDoc') {
+        elRawMarkdown.value = markdown;
+        elRichCanvas.innerHTML = html;
+        elRenderedPreview.innerHTML = html;
+        saveCurrentDocument(markdown);
+        updateStatistics(markdown);
+      } else if (targetAction === 'appendDoc') {
+        const current = elRawMarkdown.value;
+        const combined = current + '\n\n---\n\n' + markdown;
+        elRawMarkdown.value = combined;
+        const combinedHtml = marked.parse(combined);
+        elRichCanvas.innerHTML = combinedHtml;
+        elRenderedPreview.innerHTML = combinedHtml;
+        saveCurrentDocument(combined);
+        updateStatistics(combined);
+      }
+    }
+
+    function exportActiveDocAsMarkdown() {
+      const match = findDocOrFolder(AppState.tree, AppState.activeDocId);
+      if (!match) return;
+      const doc = match.node;
+      const blob = new Blob([doc.markdown || ''], { type: 'text/markdown;charset=utf-8' });
+      triggerFileDownload(blob, `${doc.name}.md`);
+      showToast('Dokumen Markdown berhasil diunduh!', 'success');
+    }
+
+    function exportActiveDocAsHtml() {
+      const match = findDocOrFolder(AppState.tree, AppState.activeDocId);
+      if (!match) return;
+      const doc = match.node;
+      const bodyContent = marked.parse(doc.markdown || '');
+      
+      const fullHtml = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${doc.name} - DocuWiki</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.7; max-width: 860px; margin: 40px auto; padding: 0 20px; color: #1e293b; background: #f8fafc; }
+    h1 { font-size: 2rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+    h2 { font-size: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+    th { background: #f1f5f9; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+    pre { background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 8px; overflow-x: auto; }
+    blockquote { border-left: 4px solid #6366f1; padding-left: 16px; color: #475569; margin: 16px 0; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>${doc.name}</h1>
+  ${bodyContent}
+</body>
+</html>`;
+
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      triggerFileDownload(blob, `${doc.name}.html`);
+      showToast('Dokumen HTML mandiri berhasil diunduh!', 'success');
+    }
+
+    async function exportEntireWikiZip() {
+      showToast('Mempersiapkan paket ZIP seluruh wiki...', 'info');
+      const zip = new JSZip();
+
+      function addNodesToZip(folderZip, nodes) {
+        nodes.forEach(node => {
+          if (node.type === 'folder') {
+            const subFolder = folderZip.folder(node.name);
+            if (node.children) {
+              addNodesToZip(subFolder, node.children);
+            }
+          } else if (node.type === 'doc') {
+            const safeName = node.name.replace(/[\\/:*?"<>|]/g, '_') + '.md';
+            folderZip.file(safeName, node.markdown || '');
+          }
+        });
+      }
+
+      addNodesToZip(zip, AppState.tree);
+
+      // Tambahkan README.md di root zip
+      zip.file('README.md', `# Arsip DocuWiki\n\nDibuat secara otomatis pada: ${new Date().toLocaleString('id-ID')}\nTotal Dokumen: ${getAllDocs(AppState.tree).length}`);
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      triggerFileDownload(content, `DocuWiki-Arsip-${new Date().toISOString().slice(0, 10)}.zip`);
+      showToast('Paket ZIP wiki berhasil diunduh!', 'success');
+    }
+
+    function exportWorkspaceJson() {
+      const dataStr = JSON.stringify(AppState.tree, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      triggerFileDownload(blob, `DocuWiki-Cadangan-${new Date().toISOString().slice(0, 10)}.json`);
+      showToast('Cadangan JSON berhasil diunduh!', 'success');
+    }
+
+    function triggerFileDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Title Input Auto-Sync
+    elDocTitleInput.addEventListener('input', () => {
+      const match = findDocOrFolder(AppState.tree, AppState.activeDocId);
+      if (match && match.node.type === 'doc') {
+        match.node.name = elDocTitleInput.value || 'Dokumen Tanpa Judul';
+        renderWikiTree(document.getElementById('treeSearchInput').value);
+      }
+    });
+
+    // Rich Text Canvas & Markdown Events
+    elRichCanvas.addEventListener('input', handleRichTextChange);
+    elRawMarkdown.addEventListener('input', handleRawMarkdownChange);
+
+    // Toolbar Command Handlers
+    document.querySelectorAll('.fmt-btn[data-cmd]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.getAttribute('data-cmd');
+        const val = btn.getAttribute('data-val') || null;
+        document.execCommand(cmd, false, val);
+        elRichCanvas.focus();
+        handleRichTextChange();
+      });
+    });
+
+    document.getElementById('btnInsertCodeBlock').addEventListener('click', () => {
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      code.textContent = '// Tulis kode di sini';
+      pre.appendChild(code);
+      insertNodeAtCursor(pre);
+      handleRichTextChange();
+    });
+
+    document.getElementById('btnInsertTable').addEventListener('click', () => {
+      const tableHtml = `<table border="1"><thead><tr><th>Header 1</th><th>Header 2</th><th>Header 3</th></tr></thead><tbody><tr><td>Data 1</td><td>Data 2</td><td>Data 3</td></tr><tr><td>Data 4</td><td>Data 5</td><td>Data 6</td></tr></tbody></table><p></p>`;
+      document.execCommand('insertHTML', false, tableHtml);
+      handleRichTextChange();
+    });
+
+    document.getElementById('btnInsertWikilink').addEventListener('click', () => {
+      showCustomDialog({
+        title: 'Sisipkan WikiLink',
+        message: 'Masukkan nama halaman yang ingin ditautkan:',
+        showInput: true,
+        defaultValue: 'Nama Halaman',
+        onConfirm: (pageName) => {
+          if (!pageName) return;
+          if (AppState.currentMode === 'markdown' || AppState.currentMode === 'split') {
+            insertAtTextareaCursor(elRawMarkdown, `[[${pageName}]]`);
+            handleRawMarkdownChange();
+          } else {
+            document.execCommand('insertText', false, `[[${pageName}]]`);
+            handleRichTextChange();
+          }
+          showToast(`Tautan [[${pageName}]] disisipkan!`, 'info');
+        }
+      });
+    });
+
+    function insertNodeAtCursor(node) {
+      const sel = window.getSelection();
+      if (sel.getRangeAt && sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(node);
+      } else {
+        elRichCanvas.appendChild(node);
+      }
+    }
+
+    function insertAtTextareaCursor(textarea, text) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const val = textarea.value;
+      textarea.value = val.substring(0, start) + text + val.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + text.length;
+      textarea.focus();
+    }
+
+    // View Mode Tabs
+    tabBtnWysiwyg.addEventListener('click', () => setViewMode('wysiwyg'));
+    tabBtnMarkdown.addEventListener('click', () => setViewMode('markdown'));
+    tabBtnSplit.addEventListener('click', () => setViewMode('split'));
+    tabBtnPreview.addEventListener('click', () => setViewMode('preview'));
+
+    // Sidebar Root Actions
+    document.getElementById('btnNewDocRoot').addEventListener('click', () => promptCreateNewItem('doc'));
+    document.getElementById('btnNewFolderRoot').addEventListener('click', () => promptCreateNewItem('folder'));
+    
+    // Quick Copy
+    btnQuickCopy.addEventListener('click', () => {
+      const text = elRawMarkdown.value;
+      if (!text) {
+        showToast('Dokumen masih kosong!', 'error');
+        return;
+      }
+      
+      const tempInput = document.createElement('textarea');
+      tempInput.value = text;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+      showToast('Sintaks Markdown berhasil disalin ke clipboard!', 'success');
+    });
+
+    // Export Dropdown Trigger
+    btnExportMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportMenuDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', () => {
+      exportMenuDropdown.classList.add('hidden');
+    });
+
+    document.getElementById('exportActMd').addEventListener('click', exportActiveDocAsMarkdown);
+    document.getElementById('exportActHtml').addEventListener('click', exportActiveDocAsHtml);
+    document.getElementById('exportActZip').addEventListener('click', exportEntireWikiZip);
+    document.getElementById('exportActJson').addEventListener('click', exportWorkspaceJson);
+
+    // Restore Backup JSON
+    document.getElementById('btnRestoreJson').addEventListener('click', () => {
+      document.getElementById('jsonFileInput').click();
+    });
+
+    document.getElementById('jsonFileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const parsed = JSON.parse(evt.target.result);
+          if (Array.isArray(parsed)) {
+            AppState.tree = parsed;
+            renderWikiTree();
+            const allDocs = getAllDocs(AppState.tree);
+            if (allDocs.length > 0) selectActiveDocument(allDocs[0].id);
+            showToast('Cadangan Wiki berhasil dipulihkan!', 'success');
+          } else {
+            showToast('Format berkas JSON tidak sesuai struktur Wiki.', 'error');
+          }
+        } catch (err) {
+          showToast('Gagal membaca file JSON.', 'error');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // Reset Demo Tree Button
+    document.getElementById('btnResetToDemo').addEventListener('click', () => {
+      showCustomDialog({
+        title: 'Muat Contoh Panduan',
+        message: 'Apakah Anda ingin memuat kembali struktur contoh dokumen panduan?',
+        onConfirm: () => {
+          location.reload();
+        }
+      });
+    });
+
+    // Tree Search Filter
+    document.getElementById('treeSearchInput').addEventListener('input', (e) => {
+      renderWikiTree(e.target.value);
+    });
+
+    // Import Modal Dialog Handlers
+    btnOpenImportModal.addEventListener('click', () => {
+      pasteBoxArea.innerHTML = '';
+      importModal.classList.remove('hidden');
+    });
+
+    btnCloseImportModal.addEventListener('click', () => {
+      importModal.classList.add('hidden');
+    });
+
+    modalDropZone.addEventListener('click', () => universalFileInput.click());
+
+    modalDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      modalDropZone.classList.add('border-brand-600', 'bg-brand-100/50');
+    });
+
+    modalDropZone.addEventListener('dragleave', () => {
+      modalDropZone.classList.remove('border-brand-600', 'bg-brand-100/50');
+    });
+
+    modalDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      modalDropZone.classList.remove('border-brand-600', 'bg-brand-100/50');
+      if (e.dataTransfer.files.length > 0) {
+        processUploadedFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    universalFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        processUploadedFile(e.target.files[0]);
+      }
+    });
+
+    // Process Pasted Rich Text
+    btnProcessPasted.addEventListener('click', () => {
+      const html = pasteBoxArea.innerHTML.trim();
+      if (!html) {
+        showToast('Kotak tempelan masih kosong!', 'error');
+        return;
+      }
+      const md = turndownEngine.turndown(html);
+      applyImportedContent('Teks Tempelan Word', md, html);
+      importModal.classList.add('hidden');
+      showToast('Teks berformat berhasil dikonversi ke dokumen!', 'success');
+    });
+
+    // Mobile Sidebar Toggles
+    btnToggleSidebarMobile.addEventListener('click', () => {
+      sidebarPanel.classList.toggle('-translate-x-full');
+      sidebarBackdrop.classList.toggle('hidden');
+    });
+
+    sidebarBackdrop.addEventListener('click', () => {
+      sidebarPanel.classList.add('-translate-x-full');
+      sidebarBackdrop.classList.add('hidden');
+    });
+
+    // Dark/Light Mode Switcher
+    btnToggleTheme.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.toggle('dark');
+      AppState.theme = isDark ? 'dark' : 'light';
+      themeIconDark.classList.toggle('hidden', !isDark);
+      themeIconLight.classList.toggle('hidden', isDark);
+    });
+
+    window.onload = function() {
+      renderWikiTree();
+      selectActiveDocument(AppState.activeDocId);
+    };
+  </script>
+</body>
+</html>

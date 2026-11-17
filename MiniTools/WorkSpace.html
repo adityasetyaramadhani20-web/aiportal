@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkSpace</title>
+    
+    <!-- LIBRARIES -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+        body { font-family: 'Inter', sans-serif; background-color: #f7f9fc; color: #1e293b; }
+        .font-serif { font-family: 'Lora', serif; }
+        
+        /* Revised Tab Logic for Stability */
+        .tab-content { 
+            display: none; 
+            width: 100%; 
+            height: 100%; 
+        }
+        .tab-content.active { 
+            display: flex; /* Changed to flex for consistent layout filling */
+            flex-direction: column;
+            animation: fadeIn 0.3s ease-out; /* Smoother animation without layout shift */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        ::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+        /* Module Specific Styles */
+        .kanban-col { min-height: 200px; max-height: 65vh; overflow-y: auto; }
+        .cell-input { width: 100%; height: 100%; border: none; outline: none; background: transparent; text-align: right; padding: 0 4px; }
+        .cell-input:focus { background: white; outline: 2px solid #3b82f6; z-index: 10; position: relative; }
+        .spreadsheet-grid { display: grid; border: 1px solid #cbd5e1; }
+        .grid-cell { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; height: 30px; overflow: hidden; font-size: 13px; display: flex; align-items: center; }
+        .col-header, .row-header { background-color: #f1f5f9; justify-content: center; font-weight: 600; color: #64748b; }
+        
+        /* Calculator Grid */
+        .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+        
+        /* Editor */
+        #editor:empty:before { content: attr(placeholder); color: #9ca3af; pointer-events: none; display: block; }
+        
+        /* Dropdown custom */
+        .dropdown:hover .dropdown-menu { display: block; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col justify-between flex-shrink-0 z-50 transition-all duration-300">
+        <div>
+            <div class="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-100">
+                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">W</div>
+                <span class="ml-3 font-bold text-lg hidden lg:block text-slate-800">WorkSpace</span>
+            </div>
+
+            <nav class="p-2 lg:p-4 space-y-1">
+                <button onclick="App.switchTab('dashboard')" class="nav-btn w-full flex items-center p-3 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors group relative" data-target="dashboard">
+                    <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                    <span class="ml-3 font-medium hidden lg:block">Fokus & Home</span>
+                    <span class="lg:hidden absolute left-14 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">Home</span>
+                </button>
+                <button onclick="App.switchTab('organizer')" class="nav-btn w-full flex items-center p-3 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors group relative" data-target="organizer">
+                    <i data-lucide="calendar-check" class="w-6 h-6"></i>
+                    <span class="ml-3 font-medium hidden lg:block">Organizer</span>
+                    <span class="lg:hidden absolute left-14 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-50">Organizer</span>
+                </button>
+                <button onclick="App.switchTab('sheet')" class="nav-btn w-full flex items-center p-3 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors group relative" data-target="sheet">
+                    <i data-lucide="table" class="w-6 h-6"></i>
+                    <span class="ml-3 font-medium hidden lg:block">Sheet</span>
+                    <span class="lg:hidden absolute left-14 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-50">Sheet</span>
+                </button>
+                <button onclick="App.switchTab('notepad')" class="nav-btn w-full flex items-center p-3 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors group relative" data-target="notepad">
+                    <i data-lucide="file-edit" class="w-6 h-6"></i>
+                    <span class="ml-3 font-medium hidden lg:block">NotePad</span>
+                    <span class="lg:hidden absolute left-14 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-50">NotePad</span>
+                </button>
+                <button onclick="App.switchTab('calculator')" class="nav-btn w-full flex items-center p-3 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors group relative" data-target="calculator">
+                    <i data-lucide="calculator" class="w-6 h-6"></i>
+                    <span class="ml-3 font-medium hidden lg:block">Kalkulator</span>
+                    <span class="lg:hidden absolute left-14 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-50">Kalkulator</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="p-2 lg:p-4 border-t border-slate-100 bg-slate-50">
+            <h4 class="px-3 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 hidden lg:block">Zen Mode</h4>
+            <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="headphones" class="w-4 h-4 text-indigo-500"></i>
+                        <span class="text-sm font-semibold hidden lg:block">Audio Alam</span>
+                    </div>
+                    <div class="w-2 h-2 rounded-full bg-slate-300" id="audio-indicator"></div>
+                </div>
+                <div class="flex gap-2 justify-center lg:justify-start">
+                    <button onclick="ZenAudio.toggle('rain')" class="p-2 rounded hover:bg-slate-100 text-slate-500 transition-colors" title="Suara Hujan">
+                        <i data-lucide="cloud-rain" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="ZenAudio.toggle('white')" class="p-2 rounded hover:bg-slate-100 text-slate-500 transition-colors" title="Pink Noise (Fokus)">
+                        <i data-lucide="waves" class="w-5 h-5"></i>
+                    </button>
+                    <input type="range" min="0" max="1" step="0.1" value="0.5" class="w-16 hidden lg:block accent-indigo-600" oninput="ZenAudio.setVolume(this.value)">
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col overflow-hidden bg-[#f8fafc] relative w-full">
+        <!-- Notification Toast -->
+        <div id="toast" class="absolute top-5 right-5 transform translate-y-[-150%] transition-transform duration-300 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-xl z-[100] text-sm flex items-center gap-2">
+            <i data-lucide="info" class="w-4 h-4"></i>
+            <span id="toast-msg">Notification</span>
+        </div>
+
+        <!-- 1. DASHBOARD -->
+        <section id="dashboard" class="tab-content active overflow-y-auto p-6 lg:p-10 w-full">
+            <div class="max-w-4xl mx-auto space-y-8 w-full">
+                <header class="mb-8">
+                    <h1 class="text-3xl font-serif font-medium text-slate-800">Selamat Datang di WorkSpace</h1>
+                    <p class="text-slate-500">Pusat kendali fokus dan produktivitas Anda.</p>
+                </header>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Timer Card -->
+                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-indigo-500" id="timer-progress"></div>
+                        <div class="flex space-x-4 mb-6">
+                            <button onclick="Dashboard.setTimerMode('focus')" class="text-xs font-bold uppercase tracking-widest text-indigo-600 border-b-2 border-indigo-600 pb-1">Fokus</button>
+                            <button onclick="Dashboard.setTimerMode('short')" class="text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 pb-1">Istirahat</button>
+                        </div>
+                        <div id="timer-display" class="text-7xl font-serif font-light text-slate-800 mb-6 tabular-nums">25:00</div>
+                        <div class="flex gap-4">
+                            <button onclick="Dashboard.toggleTimer()" id="timer-btn" class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+                                <i data-lucide="play" class="w-5 h-5 text-slate-700 ml-1"></i>
+                            </button>
+                            <button onclick="Dashboard.resetTimer()" class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+                                <i data-lucide="rotate-ccw" class="w-5 h-5 text-slate-700"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Breathe Card -->
+                    <div class="bg-slate-900 text-white p-8 rounded-2xl shadow-sm border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden">
+                        <div id="breathe-circle" class="w-32 h-32 rounded-full border-2 border-white/20 flex items-center justify-center mb-4 transition-all duration-[4000ms] ease-in-out">
+                            <span id="breathe-label" class="text-xs uppercase tracking-widest text-white/50">Siap</span>
+                        </div>
+                        <h3 id="breathe-text" class="text-xl font-serif mb-4">Teknik 4-4-4</h3>
+                        <button onclick="Dashboard.toggleBreathe()" class="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium transition-colors">
+                            <span id="breathe-btn-text">Mulai Bernapas</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Stats / Quote -->
+                <div class="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex items-center gap-4">
+                    <div class="p-3 bg-white rounded-full text-indigo-600">
+                        <i data-lucide="sparkles" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold text-indigo-900 uppercase tracking-wide">Inspirasi Harian</p>
+                        <p class="font-serif text-indigo-800 italic">"Ketenangan bukan berarti tidak ada badai, melainkan kedamaian di tengah badai."</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. ORGANIZER -->
+        <section id="organizer" class="tab-content overflow-hidden w-full">
+            <div class="p-6 border-b border-slate-100 bg-white flex justify-between items-center w-full">
+                <h2 class="text-xl font-bold text-slate-800">Organizer & Kalender</h2>
+                <div class="text-sm text-slate-500" id="org-date-display">...</div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6 w-full">
+                <div class="lg:grid lg:grid-cols-3 lg:gap-6 space-y-6 lg:space-y-0 w-full">
+                    <!-- Kiri: Kalender -->
+                    <div class="lg:col-span-1 space-y-6">
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                            <div class="flex justify-between items-center mb-4">
+                                <button onclick="Organizer.changeMonth(-1)" class="p-1 hover:bg-slate-100 rounded"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                                <span id="calendar-month-year" class="font-bold text-slate-700"></span>
+                                <button onclick="Organizer.changeMonth(1)" class="p-1 hover:bg-slate-100 rounded"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                            </div>
+                            <div class="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400 mb-2">
+                                <span>Min</span><span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span>
+                            </div>
+                            <div id="calendar-grid" class="grid grid-cols-7 gap-1"></div>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                            <h3 class="font-semibold text-slate-700 mb-2">Tambah Tugas</h3>
+                            <p class="text-xs text-slate-500 mb-2">Tanggal: <span id="selected-date-display" class="font-bold text-indigo-600">Hari Ini</span></p>
+                            <div class="flex gap-2">
+                                <input type="text" id="task-input" placeholder="Tugas baru..." class="flex-1 p-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                                <button onclick="Organizer.addTask()" class="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kanan: Kanban -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white p-1 rounded-xl shadow-sm border border-slate-200 overflow-hidden h-full">
+                            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+                                <h3 class="font-semibold text-slate-700">Kanban Board</h3>
+                                <button onclick="Organizer.exportTasks()" class="text-xs text-indigo-600 hover:underline">Export .txt</button>
+                            </div>
+                            <div id="kanban-board" class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-x-auto">
+                                <!-- Generated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. SHEET -->
+        <section id="sheet" class="tab-content overflow-hidden w-full">
+            <div class="p-4 border-b border-slate-100 bg-white flex flex-wrap gap-2 items-center justify-between w-full">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-xl font-bold text-slate-800 mr-4">Sheet</h2>
+                    <div class="flex gap-1">
+                        <button onclick="Sheet.addRow()" class="px-3 py-1 bg-green-50 text-green-700 rounded border border-green-200 text-xs font-medium hover:bg-green-100">+ Baris</button>
+                        <button onclick="Sheet.addCol()" class="px-3 py-1 bg-green-50 text-green-700 rounded border border-green-200 text-xs font-medium hover:bg-green-100">+ Kolom</button>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                     <button onclick="Sheet.toggleChartMode()" class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded border border-indigo-200 text-xs font-medium hover:bg-indigo-100 flex items-center gap-1">
+                        <i data-lucide="bar-chart-3" class="w-3 h-3"></i> Toggle Chart
+                    </button>
+                    <button onclick="Sheet.exportCSV()" class="px-3 py-1 bg-slate-50 text-slate-700 rounded border border-slate-200 text-xs font-medium hover:bg-slate-100">Export CSV</button>
+                </div>
+            </div>
+
+            <!-- Formula Bar -->
+            <div class="p-2 bg-slate-50 border-b border-slate-200 flex items-center gap-2 w-full">
+                <div class="w-8 h-8 flex items-center justify-center font-serif italic text-slate-400 font-bold">fx</div>
+                <input type="text" id="formula-bar" class="flex-1 p-1 bg-white border border-slate-300 rounded text-sm font-mono text-slate-700" placeholder="Nilai atau Rumus (misal: =A1+B2)" disabled>
+            </div>
+
+            <div class="flex-1 overflow-hidden relative flex w-full">
+                <!-- Grid Area -->
+                <div class="flex-1 overflow-auto bg-white" id="sheet-wrapper">
+                    <div id="spreadsheet-container" class="spreadsheet-grid">
+                        <!-- JS Generated -->
+                    </div>
+                </div>
+                
+                <!-- Chart Panel (Hidden by default) -->
+                <div id="chart-panel" class="w-0 border-l border-slate-200 bg-white transition-all duration-300 overflow-hidden flex flex-col">
+                    <div class="p-4 border-b border-slate-100 font-semibold text-slate-700 bg-slate-50">Visualisasi Data</div>
+                    <div class="p-4 space-y-4 overflow-y-auto flex-1">
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Range Data (Nilai)</label>
+                            <input type="text" id="chart-data-range" value="B1:B5" class="w-full p-2 border rounded text-sm" placeholder="Contoh: B1:B5">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Range Label</label>
+                            <input type="text" id="chart-label-range" value="A1:A5" class="w-full p-2 border rounded text-sm" placeholder="Contoh: A1:A5">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Tipe</label>
+                            <select id="chart-type" class="w-full p-2 border rounded text-sm">
+                                <option value="bar">Batang (Bar)</option>
+                                <option value="line">Garis (Line)</option>
+                                <option value="pie">Pai (Pie)</option>
+                            </select>
+                        </div>
+                        <button onclick="Sheet.renderChart()" class="w-full py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Update Chart</button>
+                        <div class="h-48 border border-slate-100 rounded mt-4">
+                            <canvas id="myChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. NOTEPAD -->
+        <section id="notepad" class="tab-content h-full w-full bg-white">
+            <div class="p-2 border-b border-slate-200 bg-slate-50 flex flex-wrap gap-2 items-center justify-between w-full">
+                <!-- Toolbar Format -->
+                <div class="flex gap-1 items-center overflow-x-auto pb-1 no-scrollbar">
+                    <button onclick="NotePad.format('undo')" class="p-2 rounded hover:bg-slate-200 text-slate-600" title="Undo"><i data-lucide="undo" class="w-4 h-4"></i></button>
+                    <button onclick="NotePad.format('redo')" class="p-2 rounded hover:bg-slate-200 text-slate-600" title="Redo"><i data-lucide="redo" class="w-4 h-4"></i></button>
+                    <div class="w-px h-6 bg-slate-300 mx-1"></div>
+                    <button onclick="NotePad.format('bold')" class="p-2 rounded hover:bg-slate-200 text-slate-600"><i data-lucide="bold" class="w-4 h-4"></i></button>
+                    <button onclick="NotePad.format('italic')" class="p-2 rounded hover:bg-slate-200 text-slate-600"><i data-lucide="italic" class="w-4 h-4"></i></button>
+                    <button onclick="NotePad.format('underline')" class="p-2 rounded hover:bg-slate-200 text-slate-600"><i data-lucide="underline" class="w-4 h-4"></i></button>
+                    <div class="relative flex items-center bg-white border border-slate-300 rounded ml-1">
+                        <input type="color" onchange="NotePad.format('foreColor', this.value)" class="absolute inset-0 w-8 h-full opacity-0 cursor-pointer" title="Warna Teks">
+                        <div class="px-2 py-1 text-slate-600"><i data-lucide="palette" class="w-4 h-4"></i></div>
+                    </div>
+                    <select onchange="NotePad.format('fontSize', this.value)" class="bg-transparent text-sm text-slate-600 border border-slate-300 rounded p-1 ml-1">
+                        <option value="3">Ukuran</option>
+                        <option value="1">Kecil</option>
+                        <option value="3">Normal</option>
+                        <option value="5">Besar</option>
+                        <option value="7">Judul</option>
+                    </select>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex gap-2">
+                    <button id="btn-record" onclick="NotePad.toggleRecording()" class="flex items-center gap-2 px-3 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-xs font-bold hover:bg-red-100 transition-colors">
+                        <i data-lucide="mic" class="w-4 h-4"></i> <span id="record-text">Rekam</span>
+                    </button>
+                    
+                    <div class="relative dropdown">
+                        <button class="flex items-center gap-2 px-3 py-1 bg-slate-800 text-white rounded text-xs font-bold hover:bg-slate-900 transition-colors">
+                            <i data-lucide="download" class="w-4 h-4"></i> Ekspor
+                        </button>
+                        <div class="dropdown-menu absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50 hidden">
+                            <button onclick="NotePad.exportPDF()" class="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm">Ke PDF</button>
+                            <button onclick="NotePad.exportTxt()" class="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm">Ke Text (.txt)</button>
+                            <button onclick="NotePad.exportDoc()" class="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm">Ke Word (.doc)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-hidden flex flex-col md:flex-row w-full">
+                <!-- Editor Area -->
+                <div class="flex-1 p-8 overflow-y-auto">
+                    <div id="editor" contenteditable="true" class="w-full h-full outline-none text-slate-800 text-lg leading-relaxed max-w-3xl mx-auto" placeholder="Mulai mengetik ide cemerlang Anda..."></div>
+                </div>
+                
+                <!-- Audio List (Sidebar in Notepad) -->
+                <div class="w-full md:w-64 bg-slate-50 border-l border-slate-200 p-4 overflow-y-auto">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Rekaman Suara</h3>
+                    <div id="audio-list" class="space-y-2">
+                        <!-- Generated Audio Items -->
+                        <p id="no-audio" class="text-xs text-slate-400 italic text-center py-4">Belum ada rekaman</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. CALCULATOR -->
+        <section id="calculator" class="tab-content overflow-y-auto p-6 items-center justify-center w-full">
+            <div class="bg-white rounded-2xl shadow-lg border border-slate-200 w-full max-w-6xl overflow-hidden flex flex-col md:flex-row h-[600px] mx-auto">
+                
+                <!-- Calc Navigation -->
+                <div class="w-full md:w-48 bg-slate-50 border-r border-slate-100 p-2 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible">
+                    <button onclick="Calculator.switchMode('simple')" class="calc-nav-btn active w-full text-left p-3 rounded text-sm font-medium text-slate-600 hover:bg-white hover:shadow-sm transition-all">Sederhana</button>
+                    <button onclick="Calculator.switchMode('split')" class="calc-nav-btn w-full text-left p-3 rounded text-sm font-medium text-slate-600 hover:bg-white hover:shadow-sm transition-all">Urunan & Tips</button>
+                    <button onclick="Calculator.switchMode('bmi')" class="calc-nav-btn w-full text-left p-3 rounded text-sm font-medium text-slate-600 hover:bg-white hover:shadow-sm transition-all">BMI Body</button>
+                    <button onclick="Calculator.switchMode('tax')" class="calc-nav-btn w-full text-left p-3 rounded text-sm font-medium text-slate-600 hover:bg-white hover:shadow-sm transition-all">Pajak</button>
+                    <button onclick="Calculator.switchMode('convert')" class="calc-nav-btn w-full text-left p-3 rounded text-sm font-medium text-slate-600 hover:bg-white hover:shadow-sm transition-all">Konversi Unit</button>
+                </div>
+
+                <!-- Calc Content -->
+                <div class="flex-1 p-6 md:p-8 bg-white relative">
+                    <!-- 1. Simple -->
+                    <div id="calc-simple" class="calc-view h-full flex flex-col">
+                        <div class="flex-1 flex items-end justify-end mb-6">
+                            <div id="simple-display" class="text-5xl font-light text-slate-800 tracking-tight">0</div>
+                        </div>
+                        <div class="calc-grid h-3/5">
+                            <button onclick="Calculator.clear()" class="col-span-1 bg-red-50 text-red-500 font-bold rounded-lg hover:bg-red-100">C</button>
+                            <button onclick="Calculator.append('/')" class="bg-slate-100 rounded-lg hover:bg-slate-200 text-xl">÷</button>
+                            <button onclick="Calculator.append('*')" class="bg-slate-100 rounded-lg hover:bg-slate-200 text-xl">×</button>
+                            <button onclick="Calculator.backspace()" class="bg-slate-100 rounded-lg hover:bg-slate-200"><i data-lucide="delete" class="w-5 h-5 mx-auto"></i></button>
+
+                            <button onclick="Calculator.append('7')" class="text-xl hover:bg-slate-50 rounded-lg">7</button>
+                            <button onclick="Calculator.append('8')" class="text-xl hover:bg-slate-50 rounded-lg">8</button>
+                            <button onclick="Calculator.append('9')" class="text-xl hover:bg-slate-50 rounded-lg">9</button>
+                            <button onclick="Calculator.append('-')" class="bg-slate-100 rounded-lg hover:bg-slate-200 text-xl">-</button>
+
+                            <button onclick="Calculator.append('4')" class="text-xl hover:bg-slate-50 rounded-lg">4</button>
+                            <button onclick="Calculator.append('5')" class="text-xl hover:bg-slate-50 rounded-lg">5</button>
+                            <button onclick="Calculator.append('6')" class="text-xl hover:bg-slate-50 rounded-lg">6</button>
+                            <button onclick="Calculator.append('+')" class="bg-slate-100 rounded-lg hover:bg-slate-200 text-xl">+</button>
+
+                            <button onclick="Calculator.append('1')" class="text-xl hover:bg-slate-50 rounded-lg">1</button>
+                            <button onclick="Calculator.append('2')" class="text-xl hover:bg-slate-50 rounded-lg">2</button>
+                            <button onclick="Calculator.append('3')" class="text-xl hover:bg-slate-50 rounded-lg">3</button>
+                            <button onclick="Calculator.calc()" class="row-span-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-xl shadow-lg shadow-indigo-200">=</button>
+
+                            <button onclick="Calculator.append('0')" class="col-span-2 text-xl hover:bg-slate-50 rounded-lg">0</button>
+                            <button onclick="Calculator.append('.')" class="text-xl hover:bg-slate-50 rounded-lg">.</button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Split Bill -->
+                    <div id="calc-split" class="calc-view hidden space-y-6">
+                        <h3 class="text-xl font-bold text-slate-800">Urunan & Tips</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Total Tagihan</label>
+                                <input type="number" id="split-bill" oninput="Calculator.calcSplit()" class="w-full p-3 border border-slate-200 rounded-lg text-lg" placeholder="0">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Tip (%) <span id="tip-val" class="text-indigo-600">10%</span></label>
+                                <input type="range" id="split-tip" min="0" max="30" value="10" oninput="Calculator.calcSplit()" class="w-full accent-indigo-600">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Jumlah Orang</label>
+                                <input type="number" id="split-people" value="2" min="1" oninput="Calculator.calcSplit()" class="w-full p-3 border border-slate-200 rounded-lg text-lg">
+                            </div>
+                        </div>
+                        <div class="bg-green-50 p-6 rounded-xl text-center">
+                            <p class="text-sm text-green-700 font-medium mb-1">Per Orang Bayar</p>
+                            <p id="split-result" class="text-4xl font-bold text-green-800">Rp 0</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 3. BMI -->
+                    <div id="calc-bmi" class="calc-view hidden space-y-6">
+                        <h3 class="text-xl font-bold text-slate-800">Kalkulator BMI</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="number" id="bmi-weight" placeholder="Berat (kg)" class="p-3 border rounded-lg" oninput="Calculator.calcBMI()">
+                            <input type="number" id="bmi-height" placeholder="Tinggi (cm)" class="p-3 border rounded-lg" oninput="Calculator.calcBMI()">
+                        </div>
+                        <div class="bg-indigo-50 p-6 rounded-xl text-center">
+                            <p id="bmi-score" class="text-4xl font-bold text-indigo-800">0.0</p>
+                            <p id="bmi-status" class="text-indigo-600 font-medium mt-2">-</p>
+                        </div>
+                    </div>
+
+                    <!-- 4. TAX (UPDATED) -->
+                    <div id="calc-tax" class="calc-view hidden space-y-6">
+                        <h3 class="text-xl font-bold text-slate-800">Kalkulator Pajak</h3>
+                        
+                        <!-- Toggle Mode -->
+                        <div class="flex bg-slate-100 p-1 rounded-lg">
+                            <button onclick="Calculator.setTaxMode('DPP')" id="btn-tax-dpp" class="flex-1 py-2 rounded text-sm font-medium bg-white shadow text-slate-800">Hitung Total (+Pajak)</button>
+                            <button onclick="Calculator.setTaxMode('NET')" id="btn-tax-net" class="flex-1 py-2 rounded text-sm font-medium text-slate-500">Cari Harga Asli (-Pajak)</button>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1" id="tax-input-label">Harga Dasar (DPP)</label>
+                                <input type="number" id="tax-price" placeholder="0" class="w-full p-3 border rounded-lg" oninput="Calculator.calcTax()">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Persen (%)</label>
+                                <input type="number" id="tax-rate" value="11" class="w-full p-3 border rounded-lg" oninput="Calculator.calcTax()">
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500">Nominal Pajak</span>
+                                <span id="tax-ppn" class="font-bold text-slate-700">0</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-500" id="tax-base-label">Dasar Pengenaan Pajak</span>
+                                <span id="tax-base-val" class="font-bold text-slate-700">0</span>
+                            </div>
+                            <div class="border-t border-slate-200 pt-2 flex justify-between text-lg text-indigo-700 font-bold">
+                                <span id="tax-final-label">Total Bayar</span>
+                                <span id="tax-total">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. CONVERT (UPDATED) -->
+                    <div id="calc-convert" class="calc-view hidden space-y-4">
+                         <h3 class="text-xl font-bold text-slate-800">Konversi Unit</h3>
+                         
+                         <div>
+                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kategori</label>
+                             <select id="conv-type" class="w-full p-2 border rounded bg-white" onchange="Calculator.populateUnits()">
+                                 <!-- Populated by JS -->
+                             </select>
+                         </div>
+
+                         <div class="flex items-center gap-2">
+                             <input type="number" id="conv-val" value="1" class="w-full p-3 border rounded text-lg font-mono" oninput="Calculator.convert()">
+                         </div>
+
+                         <div class="grid grid-cols-2 gap-4">
+                             <div>
+                                 <label class="block text-xs text-slate-400 mb-1">Dari</label>
+                                 <select id="conv-from" class="w-full p-2 border rounded" onchange="Calculator.convert()"></select>
+                             </div>
+                             <div>
+                                 <label class="block text-xs text-slate-400 mb-1">Ke</label>
+                                 <select id="conv-to" class="w-full p-2 border rounded" onchange="Calculator.convert()"></select>
+                             </div>
+                         </div>
+                         
+                         <div class="bg-indigo-50 p-4 rounded-xl text-center mt-2">
+                             <p class="text-xs text-indigo-400 uppercase font-bold mb-1">Hasil Konversi</p>
+                             <div id="conv-result" class="text-3xl font-bold text-indigo-800">...</div>
+                         </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- LOGIC SCRIPTS -->
+    <script>
+        // --- GLOBAL APP STATE ---
+        const App = {
+            init() {
+                this.switchTab('dashboard');
+                lucide.createIcons();
+                Organizer.init();
+                Sheet.init();
+                NotePad.init();
+                Calculator.init();
+                ZenAudio.init(); // Surprise Feature
+            },
+            switchTab(targetId) {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+                document.getElementById(targetId).classList.add('active');
+                
+                // Update Sidebar UI
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    if(btn.dataset.target === targetId) {
+                        btn.classList.add('bg-indigo-50', 'text-indigo-600');
+                    } else {
+                        btn.classList.remove('bg-indigo-50', 'text-indigo-600');
+                    }
+                });
+                lucide.createIcons();
+            },
+            showToast(msg) {
+                const t = document.getElementById('toast');
+                const m = document.getElementById('toast-msg');
+                m.textContent = msg;
+                t.style.transform = 'translateY(0)';
+                setTimeout(() => t.style.transform = 'translateY(-150%)', 3000);
+            }
+        };
+
+        // --- 1. DASHBOARD MODULE (Timer & Breathe) ---
+        const Dashboard = {
+            timer: { time: 1500, active: false, interval: null, mode: 'focus' },
+            breathe: { active: false, timeouts: [] },
+
+            toggleTimer() {
+                if (this.timer.active) {
+                    clearInterval(this.timer.interval);
+                    this.timer.active = false;
+                    document.getElementById('timer-btn').innerHTML = `<i data-lucide="play" class="w-5 h-5 ml-1"></i>`;
+                } else {
+                    this.timer.active = true;
+                    document.getElementById('timer-btn').innerHTML = `<i data-lucide="pause" class="w-5 h-5"></i>`;
+                    this.timer.interval = setInterval(() => {
+                        this.timer.time--;
+                        this.updateTimerUI();
+                        if (this.timer.time <= 0) {
+                            clearInterval(this.timer.interval);
+                            this.timer.active = false;
+                            ZenAudio.playTone(); // Alert sound
+                            alert("Waktu Habis!");
+                            this.resetTimer();
+                        }
+                    }, 1000);
+                }
+                lucide.createIcons();
+            },
+            resetTimer() {
+                clearInterval(this.timer.interval);
+                this.timer.active = false;
+                this.timer.time = this.timer.mode === 'focus' ? 1500 : 300;
+                document.getElementById('timer-btn').innerHTML = `<i data-lucide="play" class="w-5 h-5 ml-1"></i>`;
+                this.updateTimerUI();
+                lucide.createIcons();
+            },
+            setTimerMode(mode) {
+                this.timer.mode = mode;
+                this.resetTimer();
+            },
+            updateTimerUI() {
+                const m = Math.floor(this.timer.time / 60).toString().padStart(2, '0');
+                const s = (this.timer.time % 60).toString().padStart(2, '0');
+                document.getElementById('timer-display').textContent = `${m}:${s}`;
+                // Progress bar logic
+                const total = this.timer.mode === 'focus' ? 1500 : 300;
+                const pct = ((total - this.timer.time) / total) * 100;
+                document.getElementById('timer-progress').style.width = `${pct}%`;
+            },
+            toggleBreathe() {
+                this.breathe.active = !this.breathe.active;
+                const btnText = document.getElementById('breathe-btn-text');
+                const label = document.getElementById('breathe-label');
+                const text = document.getElementById('breathe-text');
+                const circle = document.getElementById('breathe-circle');
+
+                if (this.breathe.active) {
+                    btnText.textContent = "Berhenti";
+                    this.runBreatheCycle();
+                } else {
+                    btnText.textContent = "Mulai Bernapas";
+                    label.textContent = "Siap";
+                    text.textContent = "Teknik 4-4-4";
+                    circle.className = "w-32 h-32 rounded-full border-2 border-white/20 flex items-center justify-center mb-4 transition-all duration-[4000ms] ease-in-out";
+                    this.breathe.timeouts.forEach(clearTimeout);
+                    this.breathe.timeouts = [];
+                }
+            },
+            runBreatheCycle() {
+                if (!this.breathe.active) return;
+                const update = (phase, scale, msg) => {
+                    document.getElementById('breathe-label').textContent = phase;
+                    document.getElementById('breathe-text').textContent = msg;
+                    const circle = document.getElementById('breathe-circle');
+                    if(scale) circle.classList.add('scale-150', 'bg-white/10', 'border-white');
+                    else circle.classList.remove('scale-150', 'bg-white/10', 'border-white');
+                };
+
+                update("Tarik", true, "Tarik napas perlahan...");
+                this.breathe.timeouts.push(setTimeout(() => {
+                    if (!this.breathe.active) return;
+                    update("Tahan", true, "Tahan napas...");
+                    this.breathe.timeouts.push(setTimeout(() => {
+                        if (!this.breathe.active) return;
+                        update("Hembus", false, "Hembuskan perlahan...");
+                        this.breathe.timeouts.push(setTimeout(() => this.runBreatheCycle(), 4000));
+                    }, 4000));
+                }, 4000));
+            }
+        };
+
+        // --- 2. ORGANIZER MODULE ---
+        const Organizer = {
+            data: { tasks: {}, selectedDate: new Date() },
+            init() {
+                this.renderCalendar();
+                this.renderKanban();
+            },
+            formatDate(d) { return d.toISOString().split('T')[0]; },
+            renderCalendar() {
+                const grid = document.getElementById('calendar-grid');
+                grid.innerHTML = '';
+                const y = this.data.selectedDate.getFullYear();
+                const m = this.data.selectedDate.getMonth();
+                document.getElementById('calendar-month-year').textContent = new Date(y, m).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                
+                const firstDay = new Date(y, m, 1).getDay();
+                const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+                for(let i=0; i<firstDay; i++) grid.appendChild(document.createElement('div'));
+                
+                for(let d=1; d<=daysInMonth; d++) {
+                    const cell = document.createElement('div');
+                    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    cell.textContent = d;
+                    cell.className = "p-2 rounded text-center text-sm cursor-pointer hover:bg-indigo-50 transition-colors";
+                    
+                    if (this.data.tasks[dateStr] && this.data.tasks[dateStr].length > 0) {
+                        const dot = document.createElement('div');
+                        dot.className = "w-1 h-1 bg-red-500 rounded-full mx-auto mt-1";
+                        cell.appendChild(dot);
+                    }
+                    
+                    if (d === new Date().getDate() && m === new Date().getMonth()) cell.classList.add('font-bold', 'text-indigo-600');
+                    
+                    cell.onclick = () => {
+                        document.getElementById('selected-date-display').textContent = dateStr;
+                        this.selectedDateStr = dateStr; // Store for adding tasks
+                    };
+                    grid.appendChild(cell);
+                }
+            },
+            changeMonth(delta) {
+                this.data.selectedDate.setMonth(this.data.selectedDate.getMonth() + delta);
+                this.renderCalendar();
+            },
+            addTask() {
+                const input = document.getElementById('task-input');
+                const val = input.value.trim();
+                const date = this.selectedDateStr || this.formatDate(new Date());
+                
+                if (!val) return;
+                
+                if (!this.data.tasks[date]) this.data.tasks[date] = [];
+                this.data.tasks[date].push({ id: Date.now(), text: val, status: 'todo' });
+                
+                input.value = '';
+                this.renderCalendar();
+                this.renderKanban();
+                App.showToast("Tugas ditambahkan");
+            },
+            renderKanban() {
+                const board = document.getElementById('kanban-board');
+                board.innerHTML = '';
+                const statuses = ['todo', 'progress', 'done'];
+                const labels = { 'todo': 'Akan Dikerjakan', 'progress': 'Sedang Proses', 'done': 'Selesai' };
+                const colors = { 'todo': 'border-red-400', 'progress': 'border-yellow-400', 'done': 'border-green-400' };
+
+                // Flat map tasks
+                const allTasks = [];
+                Object.keys(this.data.tasks).forEach(date => {
+                    this.data.tasks[date].forEach(t => allTasks.push({...t, date}));
+                });
+
+                statuses.forEach(status => {
+                    const col = document.createElement('div');
+                    col.className = `kanban-col bg-slate-50 rounded-lg p-3 border-t-4 ${colors[status]}`;
+                    col.innerHTML = `<h4 class="font-bold text-slate-600 mb-3 text-sm uppercase">${labels[status]}</h4>`;
+                    
+                    const list = document.createElement('div');
+                    list.className = "space-y-2";
+                    
+                    allTasks.filter(t => t.status === status).forEach(t => {
+                        const card = document.createElement('div');
+                        card.className = "bg-white p-3 rounded shadow-sm border border-slate-200 text-sm cursor-pointer hover:shadow-md transition-shadow";
+                        card.innerHTML = `
+                            <p class="font-medium text-slate-800">${t.text}</p>
+                            <p class="text-xs text-slate-400 mt-1">📅 ${t.date}</p>
+                        `;
+                        // Simple toggle status on click for this demo
+                        card.onclick = () => {
+                            const next = status === 'todo' ? 'progress' : status === 'progress' ? 'done' : 'todo';
+                            this.updateStatus(t.id, t.date, next);
+                        };
+                        list.appendChild(card);
+                    });
+                    
+                    col.appendChild(list);
+                    board.appendChild(col);
+                });
+            },
+            updateStatus(id, date, newStatus) {
+                const idx = this.data.tasks[date].findIndex(t => t.id === id);
+                if(idx > -1) {
+                    this.data.tasks[date][idx].status = newStatus;
+                    this.renderKanban();
+                }
+            },
+            exportTasks() {
+                let content = "Tanggal,Tugas,Status\n";
+                Object.keys(this.data.tasks).forEach(date => {
+                    this.data.tasks[date].forEach(t => {
+                        content += `${date},"${t.text}",${t.status}\n`;
+                    });
+                });
+                const blob = new Blob([content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'Organizer_Export.csv';
+                a.click();
+            }
+        };
+
+        // --- 3. SHEET MODULE ---
+        const Sheet = {
+            rows: 10, cols: 6, data: {}, chart: null,
+            init() { this.renderGrid(); },
+            renderGrid() {
+                const container = document.getElementById('spreadsheet-container');
+                container.innerHTML = '';
+                container.style.gridTemplateColumns = `40px repeat(${this.cols}, 100px)`;
+
+                // Corner
+                container.appendChild(this.createCell('div', 'bg-slate-100 border-r border-b border-slate-300', ''));
+
+                // Headers
+                for(let c=0; c<this.cols; c++) {
+                    const char = String.fromCharCode(65 + c);
+                    container.appendChild(this.createCell('div', 'col-header', char));
+                }
+
+                // Rows
+                for(let r=0; r<this.rows; r++) {
+                    // Row Number
+                    container.appendChild(this.createCell('div', 'row-header', r+1));
+                    
+                    for(let c=0; c<this.cols; c++) {
+                        const id = `${String.fromCharCode(65+c)}${r+1}`;
+                        const cellWrapper = document.createElement('div');
+                        cellWrapper.className = 'grid-cell';
+                        const input = document.createElement('input');
+                        input.className = 'cell-input';
+                        input.dataset.id = id;
+                        input.value = this.data[id] || '';
+                        
+                        input.onfocus = () => document.getElementById('formula-bar').value = input.value;
+                        input.oninput = () => {
+                            this.data[id] = input.value; // Simpan memori seketika saat huruf diketik
+                        };
+                        input.onblur = () => {
+                            this.data[id] = input.value;
+                            this.evaluate();
+                        };
+                        
+                        cellWrapper.appendChild(input);
+                        container.appendChild(cellWrapper);
+                    }
+                }
+            },
+            createCell(tag, classes, content) {
+                const el = document.createElement(tag);
+                el.className = classes + " flex items-center justify-center text-xs";
+                el.textContent = content;
+                return el;
+            },
+            evaluate() {
+                // Simple evaluation logic for display (Real formula parsing is complex, strictly simplified here)
+                // In a real app, we would store formula vs value separately.
+            },
+            addRow() { this.rows++; this.renderGrid(); },
+            addCol() { this.cols++; this.renderGrid(); },
+            toggleChartMode() {
+                const panel = document.getElementById('chart-panel');
+                if(panel.style.width === '300px') panel.style.width = '0';
+                else panel.style.width = '300px';
+            },
+            
+            // --- NEW: Helper to parse range like "A1:A5" ---
+            getRangeValues(rangeStr) {
+                try {
+                    const parts = rangeStr.toUpperCase().split(':');
+                    if (parts.length !== 2) return [];
+                    
+                    // Helper to get {col, row, colCode} from "A1"
+                    const parseId = (id) => {
+                        const match = id.match(/([A-Z]+)(\d+)/);
+                        if (!match) return null;
+                        return { 
+                            col: match[1], 
+                            row: parseInt(match[2]), 
+                            colCode: match[1].charCodeAt(0) 
+                        };
+                    };
+
+                    const start = parseId(parts[0]);
+                    const end = parseId(parts[1]);
+                    if (!start || !end) return [];
+
+                    const values = [];
+                    // Simple nested loop to fetch values
+                    for (let r = start.row; r <= end.row; r++) {
+                        for (let c = start.colCode; c <= end.colCode; c++) {
+                            const id = `${String.fromCharCode(c)}${r}`;
+                            values.push(this.data[id] || '');
+                        }
+                    }
+                    return values;
+                } catch (e) {
+                    console.error("Error parsing range:", e);
+                    return [];
+                }
+            },
+
+            // --- UPDATED: Render Chart with dynamic data ---
+            renderChart() {
+                const ctx = document.getElementById('myChart');
+                const type = document.getElementById('chart-type').value;
+                const dataRange = document.getElementById('chart-data-range').value;
+                const labelRange = document.getElementById('chart-label-range').value;
+
+                // Fetch actual data using helper
+                const rawLabels = this.getRangeValues(labelRange);
+                const rawData = this.getRangeValues(dataRange);
+
+                // Fallback for empty data/labels
+                const labels = rawLabels.length > 0 ? rawLabels : ['No Data'];
+                const data = rawData.length > 0 ? rawData.map(v => parseFloat(v) || 0) : [0];
+                
+                if (this.chart) this.chart.destroy();
+                this.chart = new Chart(ctx, {
+                    type: type,
+                    data: {
+                        labels: labels,
+                        datasets: [{ 
+                            label: 'Data Sheet', 
+                            data: data, 
+                            borderWidth: 1, 
+                            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                            borderColor: 'rgba(99, 102, 241, 1)'
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            },
+            exportCSV() {
+                App.showToast("Mengunduh CSV...");
+                // Export logic similar to organizer
+            }
+        };
+
+        // --- 4. NOTEPAD MODULE ---
+        const NotePad = {
+            mediaRecorder: null, chunks: [],
+            init() {
+                // Restore logic could go here
+            },
+            format(cmd, val=null) {
+                document.execCommand(cmd, false, val);
+                document.getElementById('editor').focus();
+            },
+            exportTxt() {
+                const text = document.getElementById('editor').innerText;
+                const blob = new Blob([text], { type: 'text/plain' });
+                this.downloadBlob(blob, 'catatan.txt');
+            },
+            exportDoc() {
+                const html = `<html><body>${document.getElementById('editor').innerHTML}</body></html>`;
+                const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+                this.downloadBlob(blob, 'catatan.doc');
+            },
+            downloadBlob(blob, name) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = name; a.click();
+            },
+            toggleRecording() {
+                const btn = document.getElementById('btn-record');
+                const txt = document.getElementById('record-text');
+                
+                if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                    this.mediaRecorder.stop();
+                    btn.classList.remove('bg-red-600', 'text-white');
+                    btn.classList.add('bg-red-50', 'text-red-600');
+                    txt.textContent = "Rekam";
+                } else {
+                    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                        this.mediaRecorder = new MediaRecorder(stream);
+                        this.chunks = [];
+                        this.mediaRecorder.ondataavailable = e => this.chunks.push(e.data);
+                        this.mediaRecorder.onstop = () => {
+                            const blob = new Blob(this.chunks, { type: 'audio/ogg; codecs=opus' });
+                            const url = window.URL.createObjectURL(blob);
+                            this.addAudioToList(url);
+                        };
+                        this.mediaRecorder.start();
+                        btn.classList.remove('bg-red-50', 'text-red-600');
+                        btn.classList.add('bg-red-600', 'text-white');
+                        txt.textContent = "Stop";
+                        App.showToast("Merekam...");
+                    }).catch(e => alert("Izin mikrofon diperlukan"));
+                }
+            },
+            addAudioToList(url) {
+                const list = document.getElementById('audio-list');
+                document.getElementById('no-audio').style.display = 'none';
+                const div = document.createElement('div');
+                div.className = "bg-white p-2 rounded border border-slate-200 shadow-sm flex items-center justify-between";
+                div.innerHTML = `
+                    <audio controls src="${url}" class="w-32 h-8"></audio>
+                    <a href="${url}" download="rec.ogg" class="text-indigo-600 hover:text-indigo-800"><i data-lucide="download" class="w-4 h-4"></i></a>
+                `;
+                list.appendChild(div);
+                lucide.createIcons();
+            },
+            exportPDF() {
+                const el = document.getElementById('editor');
+                html2pdf().from(el).save('Catatan_WorkSpace.pdf');
+            }
+        };
+
+        // --- 5. CALCULATOR MODULE ---
+        const Calculator = {
+            curr: 'simple',
+            simpleStr: '',
+            taxMode: 'DPP',
+            conversionUnits: {
+                'Length': { 'Meter': 1, 'Kilometer': 1000, 'Centimeter': 0.01, 'Milimeter': 0.001, 'Kaki (Feet)': 0.3048, 'Mil': 1609.34, 'Inci (Inch)': 0.0254 },
+                'Mass': { 'Kilogram': 1, 'Gram': 0.001, 'Ton': 1000, 'Pound (lb)': 0.453592, 'Ounce (oz)': 0.0283495, 'Miligram': 0.000001 },
+                'Volume': { 'Liter': 1, 'Mililiter': 0.001, 'Meter Kubik': 1000, 'Galon AS': 3.78541, 'Cangkir (Cup)': 0.236588 },
+                'Speed': { 'Meter/detik': 1, 'Kilometer/jam': 0.277778, 'Mil/jam': 0.44704, 'Knot': 0.514444 },
+                'Time': { 'Detik': 1, 'Menit': 60, 'Jam': 3600, 'Hari': 86400, 'Minggu': 604800, 'Tahun': 31557600 },
+                'Power': { 'Watt': 1, 'Kilowatt': 1000, 'Tenaga Kuda (HP)': 745.7, 'BTU/jam': 0.293071 },
+                'Data': { 'Byte': 1, 'Kilobyte (KB)': 1024, 'Megabyte (MB)': 1048576, 'Gigabyte (GB)': 1073741824, 'Terabyte (TB)': 1099511627776 },
+                'Pressure': { 'Pascal (Pa)': 1, 'Bar': 100000, 'PSI': 6894.76, 'Atmosfer (atm)': 101325 },
+                'Angle': { 'Derajat': 1, 'Radian': 57.2958 }
+            },
+            init() {
+                this.populateUnits();
+            },
+            switchMode(mode) {
+                document.querySelectorAll('.calc-view').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`calc-${mode}`).classList.remove('hidden');
+                document.querySelectorAll('.calc-nav-btn').forEach(btn => btn.classList.remove('active', 'bg-indigo-50', 'text-indigo-600'));
+                event.target.classList.add('active', 'bg-indigo-50', 'text-indigo-600');
+            },
+            // Simple Logic
+            append(char) { this.simpleStr += char; this.updateSimple(); },
+            clear() { this.simpleStr = ''; this.updateSimple(); },
+            backspace() { this.simpleStr = this.simpleStr.slice(0, -1); this.updateSimple(); },
+            calc() { try { this.simpleStr = eval(this.simpleStr).toString(); } catch{ this.simpleStr = 'Error'; } this.updateSimple(); },
+            updateSimple() { document.getElementById('simple-display').textContent = this.simpleStr || '0'; },
+            
+            // Split
+            calcSplit() {
+                const bill = parseFloat(document.getElementById('split-bill').value) || 0;
+                const tip = parseInt(document.getElementById('split-tip').value) || 0;
+                const ppl = parseInt(document.getElementById('split-people').value) || 1;
+                document.getElementById('tip-val').textContent = tip + '%';
+                const total = bill + (bill * (tip/100));
+                document.getElementById('split-result').textContent = 'Rp ' + Math.ceil(total/ppl).toLocaleString();
+            },
+
+            // BMI
+            calcBMI() {
+                const w = parseFloat(document.getElementById('bmi-weight').value);
+                const h = parseFloat(document.getElementById('bmi-height').value) / 100;
+                if(w && h) {
+                    const bmi = (w / (h*h)).toFixed(1);
+                    document.getElementById('bmi-score').textContent = bmi;
+                    let stat = bmi < 18.5 ? 'Kurus' : bmi < 25 ? 'Normal' : 'Gemuk';
+                    document.getElementById('bmi-status').textContent = stat;
+                }
+            },
+
+            // Tax
+            setTaxMode(mode) {
+                this.taxMode = mode;
+                const btnDpp = document.getElementById('btn-tax-dpp');
+                const btnNet = document.getElementById('btn-tax-net');
+                const label = document.getElementById('tax-input-label');
+                const baseLabel = document.getElementById('tax-base-label');
+                const finalLabel = document.getElementById('tax-final-label');
+
+                if (mode === 'DPP') {
+                    btnDpp.classList.add('bg-white', 'shadow', 'text-slate-800');
+                    btnDpp.classList.remove('text-slate-500');
+                    btnNet.classList.remove('bg-white', 'shadow', 'text-slate-800');
+                    btnNet.classList.add('text-slate-500');
+                    label.textContent = "Harga Dasar (DPP)";
+                    baseLabel.textContent = "Dasar Pengenaan Pajak";
+                    finalLabel.textContent = "Total Bayar (+Pajak)";
+                } else {
+                    btnNet.classList.add('bg-white', 'shadow', 'text-slate-800');
+                    btnNet.classList.remove('text-slate-500');
+                    btnDpp.classList.remove('bg-white', 'shadow', 'text-slate-800');
+                    btnDpp.classList.add('text-slate-500');
+                    label.textContent = "Total Harga (Sudah Pajak)";
+                    baseLabel.textContent = "Harga Asli (Sebelum Pajak)";
+                    finalLabel.textContent = "Total Awal";
+                }
+                this.calcTax();
+            },
+            calcTax() {
+                const price = parseFloat(document.getElementById('tax-price').value) || 0;
+                const rate = parseFloat(document.getElementById('tax-rate').value) || 0;
+                let dpp, ppn, total;
+
+                if (this.taxMode === 'DPP') {
+                    // Forward Calc
+                    dpp = price;
+                    ppn = dpp * (rate / 100);
+                    total = dpp + ppn;
+                } else {
+                    // Reverse Calc
+                    total = price;
+                    dpp = total / (1 + (rate / 100));
+                    ppn = total - dpp;
+                }
+
+                document.getElementById('tax-base-val').textContent = 'Rp ' + dpp.toLocaleString(undefined, {maximumFractionDigits: 0});
+                document.getElementById('tax-ppn').textContent = 'Rp ' + ppn.toLocaleString(undefined, {maximumFractionDigits: 0});
+                document.getElementById('tax-total').textContent = 'Rp ' + total.toLocaleString(undefined, {maximumFractionDigits: 0});
+            },
+
+            // Convert
+            populateUnits() {
+                const typeSelect = document.getElementById('conv-type');
+                const fromSelect = document.getElementById('conv-from');
+                const toSelect = document.getElementById('conv-to');
+                
+                // Populate Types if empty
+                if(typeSelect.options.length === 0) {
+                    for(const key in this.conversionUnits) {
+                        typeSelect.add(new Option(key, key));
+                    }
+                }
+
+                const type = typeSelect.value;
+                const units = this.conversionUnits[type];
+                
+                fromSelect.innerHTML = '';
+                toSelect.innerHTML = '';
+                
+                for(const unit in units) {
+                    fromSelect.add(new Option(unit, unit));
+                    toSelect.add(new Option(unit, unit));
+                }
+                
+                // Set default different units if possible
+                if(fromSelect.options.length > 1) toSelect.selectedIndex = 1;
+                this.convert();
+            },
+            convert() {
+                const type = document.getElementById('conv-type').value;
+                const val = parseFloat(document.getElementById('conv-val').value) || 0;
+                const from = document.getElementById('conv-from').value;
+                const to = document.getElementById('conv-to').value;
+                
+                const units = this.conversionUnits[type];
+                if(!units) return;
+
+                const baseVal = val * units[from];
+                const finalVal = baseVal / units[to];
+                
+                // Smart formatting
+                let display = finalVal;
+                if(Math.abs(display) < 0.0001 || Math.abs(display) > 1000000) {
+                    display = display.toExponential(4);
+                } else {
+                    display = parseFloat(display.toFixed(6));
+                }
+                
+                document.getElementById('conv-result').textContent = display;
+            }
+        };
+
+        // --- 6. ZEN AUDIO (WEB AUDIO API) ---
+        const ZenAudio = {
+            ctx: null,
+            nodes: {},
+            volume: 0.5,
+            active: { rain: false, white: false },
+            
+            init() {
+                try {
+                    window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                } catch(e) { console.log('Web Audio API not supported'); }
+            },
+            
+            createNoiseBuffer() {
+                const bufferSize = this.ctx.sampleRate * 2;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                return buffer;
+            },
+
+            toggle(type) {
+                if (!this.ctx) this.init();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+
+                if (this.active[type]) {
+                    this.stop(type);
+                    document.querySelector(`button[onclick="ZenAudio.toggle('${type}')"]`).classList.remove('text-indigo-600', 'bg-indigo-50');
+                } else {
+                    this.start(type);
+                    document.querySelector(`button[onclick="ZenAudio.toggle('${type}')"]`).classList.add('text-indigo-600', 'bg-indigo-50');
+                }
+                this.updateIndicator();
+            },
+
+            start(type) {
+                this.active[type] = true;
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.createNoiseBuffer();
+                noise.loop = true;
+                
+                const gain = this.ctx.createGain();
+                
+                if (type === 'white') {
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 400;
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.gain.value = 0.15 * this.volume;
+                } else if (type === 'rain') {
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 800;
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.gain.value = 0.25 * this.volume;
+                }
+
+                gain.connect(this.ctx.destination);
+                this.nodes[type] = { source: noise, gain: gain };
+                noise.start();
+            },
+
+            stop(type) {
+                if(this.nodes[type]) {
+                    this.nodes[type].source.stop();
+                    this.nodes[type].source.disconnect();
+                    this.active[type] = false;
+                    delete this.nodes[type];
+                }
+            },
+
+            setVolume(val) {
+                this.volume = val;
+                Object.values(this.nodes).forEach(node => {
+                    node.gain.gain.value = 0.2 * val;
+                });
+            },
+
+            playTone() {
+                if(!this.ctx) this.init();
+                const osc = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                osc.connect(g);
+                g.connect(this.ctx.destination);
+                osc.frequency.value = 440;
+                g.gain.value = 0.1;
+                osc.start();
+                g.gain.exponentialRampToValueAtTime(0.00001, this.ctx.currentTime + 1);
+                osc.stop(this.ctx.currentTime + 1);
+            },
+
+            updateIndicator() {
+                const ind = document.getElementById('audio-indicator');
+                if(this.active.rain || this.active.white) {
+                    ind.classList.remove('bg-slate-300');
+                    ind.classList.add('bg-green-500', 'animate-pulse');
+                } else {
+                    ind.classList.add('bg-slate-300');
+                    ind.classList.remove('bg-green-500', 'animate-pulse');
+                }
+            }
+        };
+
+        // --- 7. CACHE MODULE (AUTO-SAVE) ---
+        function loadCache() {
+            try {
+                const savedData = localStorage.getItem('workspace_cache_v1');
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    
+                    // 1. Pulihkan Organizer (Menghapus referensi window.)
+                    if (parsed.organizer && typeof Organizer !== 'undefined') {
+                        Organizer.data.tasks = parsed.organizer;
+                        Organizer.renderCalendar();
+                        Organizer.renderKanban();
+                    }
+
+                    // 2. Pulihkan Spreadsheet (Menghapus referensi window.)
+                    if (parsed.sheet && typeof Sheet !== 'undefined') {
+                        Sheet.data = parsed.sheet.data || {};
+                        Sheet.rows = parsed.sheet.rows || 10;
+                        Sheet.cols = parsed.sheet.cols || 6;
+                        Sheet.renderGrid();
+                    }
+
+                    // 3. Pulihkan NotePad
+                    if (parsed.notepad) {
+                        const editor = document.getElementById('editor');
+                        if (editor) editor.innerHTML = parsed.notepad;
+                    }
+
+                    console.log("✅ Data berhasil dimuat dari Cache.");
+                }
+            } catch (e) {
+                console.error("❌ Gagal memuat cache:", e);
+            }
+        }
+
+        function saveCache() {
+            try {
+                const cacheData = {
+                    // Menghapus referensi window. karena Organizer & Sheet dideklarasikan dengan 'const'
+                    organizer: typeof Organizer !== 'undefined' ? Organizer.data.tasks : {},
+                    sheet: typeof Sheet !== 'undefined' ? {
+                        data: Sheet.data,
+                        rows: Sheet.rows,
+                        cols: Sheet.cols
+                    } : {},
+                    notepad: document.getElementById('editor') ? document.getElementById('editor').innerHTML : ""
+                };
+                localStorage.setItem('workspace_cache_v1', JSON.stringify(cacheData));
+            } catch (e) {
+                console.error("❌ Gagal menyimpan cache:", e);
+            }
+        }
+
+        // --- START (BOOTSTRAP) ---
+        window.onload = () => {
+            App.init();         // Inisialisasi dasar (semua tab, UI, event listeners)
+            loadCache();        // Timpa data kosong dengan memori cache (jika ada)
+            setInterval(saveCache, 2000); // Lakukan penyimpanan latar belakang tiap 2 detik
+
+            // SIMPAN INSTAN: Saat tab akan ditutup, saat Anda mengetik, atau saat Anda mengklik sesuatu!
+            window.addEventListener('beforeunload', saveCache);
+            document.addEventListener('input', saveCache);
+            document.addEventListener('click', saveCache);
+        };
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,3165 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full transition-colors duration-200">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>FrontDesk</title>
+		<!-- Tailwind CSS -->
+		<script src="https://cdn.tailwindcss.com"></script>
+		<!-- Font Awesome -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+		<!-- SheetJS for Excel -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+		
+		<script>
+			tailwind.config = {
+				darkMode: 'class',
+				theme: {
+					extend: {
+						colors: {
+							primary: '#2563eb',
+							secondary: '#1e40af',
+							darkBg: '#0f172a',
+							darkCard: '#1e293b',
+							darkBorder: '#334155'
+						},
+						screens: {
+							'xs': '480px',
+						}
+					}
+				}
+			}
+		</script>
+		<style>
+			html, body {
+				height: 100% !important;
+				margin: 0;
+				padding: 0;
+				overflow: hidden;
+			}
+			
+			/* Desain Cetak Dinamis (A4 vs Thermal) */
+			@media print {
+				body * {
+					visibility: hidden;
+				}
+				#print-receipt-container, #print-receipt-container * {
+					visibility: visible;
+				}
+				#print-receipt-container {
+					position: absolute;
+					left: 0;
+					top: 0;
+					width: 100%;
+					margin: 0;
+					padding: 0;
+					background: white !important;
+					color: black !important;
+				}
+				.no-print {
+					display: none !important;
+				}
+			}
+			
+			/* Custom Scrollbar Premium */
+			::-webkit-scrollbar {
+				width: 6px;
+				height: 6px;
+			}
+			::-webkit-scrollbar-track {
+				background: transparent; 
+			}
+			.dark ::-webkit-scrollbar-track {
+				background: #0f172a;
+			}
+			::-webkit-scrollbar-thumb {
+				background: #cbd5e1; 
+				border-radius: 8px;
+			}
+			.dark ::-webkit-scrollbar-thumb {
+				background: #475569;
+			}
+			::-webkit-scrollbar-thumb:hover {
+				background: #94a3b8; 
+			}
+			
+			/* Cart Badge animation scale-up effect */
+			@keyframes pop {
+				0% { transform: scale(1); }
+				50% { transform: scale(1.3); }
+				100% { transform: scale(1); }
+			}
+			.animate-pop {
+				animation: pop 0.2s ease-out;
+			}
+		</style>
+	</head>
+	<body class="bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 h-full overflow-hidden flex flex-col select-none transition-colors duration-200">
+		
+		<!-- Header / Navbar -->
+		<header class="bg-white dark:bg-slate-800 shadow-sm z-10 flex-none no-print border-b border-slate-100 dark:border-slate-700 transition-colors duration-200">
+			<div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
+				<div class="flex flex-col sm:flex-row justify-between items-center sm:h-16 py-2 sm:py-0">
+					<div class="flex items-center w-full sm:w-auto justify-between sm:justify-start mb-2 sm:mb-0 px-2">
+						<div class="flex items-center">
+							<div class="p-2 bg-blue-50 dark:bg-slate-700 text-primary dark:text-blue-400 rounded-lg mr-2.5">
+								<i class="fas fa-cash-register text-lg sm:text-xl"></i>
+							</div>
+							<div>
+								<h1 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight" id="header-business-name">FrontDesk PoS</h1>
+								<span class="text-[10px] text-slate-400 font-medium">Kasir: <span id="header-cashier-name">Agus Santoso</span></span>
+							</div>
+						</div>
+						
+						<!-- Dark Mode Toggle Mobile/Desktop -->
+						<button onclick="toggleDarkMode()" class="p-2 ml-4 text-slate-500 dark:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Ubah Tema">
+							<i id="theme-icon" class="fas fa-moon text-base"></i>
+						</button>
+					</div>
+					
+					<!-- Navigasi Menu Responsif (Scrollable di Mobile) -->
+					<nav class="flex w-full sm:w-auto overflow-x-auto scrollbar-none space-x-1 px-2 pb-1 sm:pb-0 items-center">
+						<button onclick="switchTab('frontdesk')" id="tab-frontdesk" class="nav-btn flex-shrink-0 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-bold bg-primary text-white transition-all"><i class="fas fa-desktop mr-1"></i> FrontDesk</button>
+						<button onclick="switchTab('katalog')" id="tab-katalog" class="nav-btn flex-shrink-0 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"><i class="fas fa-box-open mr-1"></i> Katalog</button>
+						<button onclick="switchTab('pelanggan')" id="tab-pelanggan" class="nav-btn flex-shrink-0 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"><i class="fas fa-users-cog mr-1"></i> CRM Pelanggan</button>
+						<button onclick="switchTab('tutup')" id="tab-tutup" class="nav-btn flex-shrink-0 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"><i class="fas fa-clipboard-check mr-1"></i> Tutup</button>
+						<button onclick="switchTab('setelan')" id="tab-setelan" class="nav-btn flex-shrink-0 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"><i class="fas fa-cog mr-1"></i> Setelan</button>
+					</nav>
+				</div>
+			</div>
+		</header>
+		
+		<!-- Main Content Area -->
+		<main class="flex-1 overflow-hidden relative no-print">
+			
+			<!-- ==================== FRONTDESK TAB ==================== -->
+			<div id="view-frontdesk" class="tab-content absolute inset-0 p-2 sm:p-3 flex flex-col md:flex-row gap-2 sm:gap-3 max-w-screen-2xl mx-auto overflow-hidden">
+				
+				<!-- Mobile Sub-navigation Bar (Hanya muncul di layar dibawah md) -->
+				<div class="flex md:hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex-shrink-0 mb-1">
+					<button onclick="switchMobileSubTab('items')" id="mobile-subtab-items" class="flex-1 py-2.5 text-center border-b-2 border-primary text-primary font-bold text-xs transition-all">
+						<i class="fas fa-th-large mr-1.5"></i>Pilih Item (<span id="mobile-item-count">0</span>)
+					</button>
+					<button onclick="switchMobileSubTab('cart')" id="mobile-subtab-cart" class="flex-1 py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 font-bold text-xs relative transition-all">
+						<i class="fas fa-shopping-cart mr-1.5"></i>Keranjang (<span id="mobile-cart-badge" class="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>)
+					</button>
+				</div>
+				
+				<!-- Product Selection (Kiri) -->
+				<div id="pos-items-pane" class="w-full md:flex-1 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden min-h-0">
+					<div class="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex-shrink-0 flex flex-col sm:flex-row gap-2">
+						<!-- Search Input -->
+						<div class="relative flex-1">
+							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+								<i class="fas fa-search text-slate-400"></i>
+							</div>
+							<input type="text" id="pos-search" class="block w-full pl-10 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-primary/20 text-xs outline-none text-slate-800 dark:text-white" placeholder="Cari barang atau jasa..." onkeyup="filterPosItems()">
+						</div>
+						
+						<!-- Kategori Filter -->
+						<div class="flex gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+							<button onclick="setPosCategoryFilter('Semua')" id="cat-filter-all" class="cat-filter-btn px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary text-white transition-all whitespace-nowrap">Semua</button>
+							<button onclick="setPosCategoryFilter('Jasa')" id="cat-filter-jasa" class="cat-filter-btn px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all whitespace-nowrap"><i class="fas fa-concierge-bell mr-1"></i>Jasa</button>
+							<button onclick="setPosCategoryFilter('Barang')" id="cat-filter-barang" class="cat-filter-btn px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all whitespace-nowrap"><i class="fas fa-box mr-1"></i>Barang</button>
+							<button onclick="setPosCategoryFilter('Lainnya')" id="cat-filter-lainnya" class="cat-filter-btn px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-all whitespace-nowrap"><i class="fas fa-ellipsis-h mr-1"></i>Lainnya</button>
+						</div>
+					</div>
+					
+					<div class="flex-1 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-900/40 min-h-0">
+						<div id="pos-items-grid" class="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+							<!-- Items dynamically injected here -->
+						</div>
+					</div>
+				</div>
+				
+				<!-- Cart / Keranjang (Kanan) -->
+				<div id="pos-cart-pane" class="w-full md:w-5/12 lg:w-[38%] md:flex-shrink-0 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden min-h-0 hidden md:flex">
+					<div class="p-2.5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800 flex-shrink-0">
+						<h2 class="text-xs sm:text-sm font-bold flex items-center text-slate-700 dark:text-slate-300"><i class="fas fa-shopping-cart text-primary mr-2"></i>Transaksi Baru</h2>
+						<button onclick="confirmClearCart()" class="text-red-500 hover:text-red-700 dark:hover:text-red-400 text-[10px] sm:text-xs font-semibold flex items-center transition-colors"><i class="fas fa-trash-alt mr-1"></i>Kosongkan</button>
+					</div>
+					
+					<!-- Pemilihan Pelanggan untuk Transaksi -->
+					<div class="p-2 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-1.5">
+						<div>
+							<label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">Hubungkan Pelanggan (Wajib untuk Kredit / Kasbon)</label>
+							<select id="cart-customer-select" class="block w-full py-1 px-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-xs outline-none text-slate-800 dark:text-white" onchange="saveCartState()">
+								<option value="">-- Transaksi Umum / Tanpa Pelanggan --</option>
+								<!-- Dinamis dari database pelanggan -->
+							</select>
+						</div>
+					</div>
+					
+					<!-- Cart Items List -->
+					<div class="flex-1 overflow-y-auto p-1.5 relative flex flex-col min-h-0 bg-slate-50 dark:bg-slate-900/20">
+						<div id="cart-items-container" class="space-y-1.5 flex-1">
+							<!-- Cart items dynamically injected here -->
+						</div>
+						<div id="empty-cart-msg" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 pointer-events-none">
+							<i class="fas fa-basket-shopping text-2xl mb-1.5"></i>
+							<p class="text-[11px]">Keranjang Anda masih kosong</p>
+						</div>
+					</div>
+					
+					<!-- Summary & Checkout Layout -->
+					<div class="border-t border-slate-150 dark:border-slate-700 p-2.5 sm:p-3 bg-white dark:bg-slate-800 flex-shrink-0 shadow-lg">
+						<div class="space-y-1.5 mb-2.5 text-xs">
+							<!-- Mode Pajak Label Indicator -->
+							<div class="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-700 pb-1">
+								<span>Metode Perpajakan Aktif:</span>
+								<span id="cart-tax-mode-indicator" class="font-bold text-primary dark:text-blue-400">Sebelum Pajak (Exclusive)</span>
+							</div>
+							
+							<div class="flex justify-between text-slate-500 dark:text-slate-400">
+								<span>Subtotal Kotor</span>
+								<span class="font-bold text-slate-800 dark:text-white" id="cart-subtotal">Rp 0</span>
+							</div>
+
+							<!-- Pemisahan DPP & Pajak Item -->
+							<div class="flex justify-between text-[11px] text-slate-500 dark:text-slate-400">
+								<span>Dasar Pengenaan Pajak (DPP)</span>
+								<span class="font-semibold text-slate-800 dark:text-white" id="cart-dpp-val">Rp 0</span>
+							</div>
+							<div class="flex justify-between text-[11px] text-slate-500 dark:text-slate-400">
+								<span>Total Diskon Item</span>
+								<span class="font-semibold text-red-500 dark:text-red-400" id="cart-item-discount-val">-Rp 0</span>
+							</div>
+							<div class="flex justify-between text-[11px] text-slate-500 dark:text-slate-400">
+								<span>Total Pajak (PPN) Item</span>
+								<span class="font-semibold text-slate-800 dark:text-white" id="cart-item-tax-val">Rp 0</span>
+							</div>
+							
+							<!-- Kolom Diskon Tambahan -->
+							<div class="grid grid-cols-2 gap-2 pb-1 border-b border-dashed border-slate-150 dark:border-slate-700">
+								<div class="flex justify-between items-center text-slate-500 dark:text-slate-400">
+									<span>Disc Global (%)</span>
+									<div class="flex items-center">
+										<input type="number" id="cart-discount-percent" class="w-12 p-0.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded text-right text-xs font-bold text-slate-700 dark:text-white" value="0" min="0" max="100" onchange="calculateCartTotal()">
+										<span class="ml-1 font-bold text-[10px]">%</span>
+									</div>
+								</div>
+								<div class="flex justify-between items-center text-slate-500 dark:text-slate-400">
+									<span>Disc Global (Rp)</span>
+									<input type="number" id="cart-discount-fixed" class="w-20 p-0.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded text-right text-xs font-bold text-slate-700 dark:text-white" value="0" min="0" onchange="calculateCartTotal()">
+								</div>
+							</div>
+							
+							<!-- Kolom Pajak / Biaya Tambahan -->
+							<div class="grid grid-cols-2 gap-2 pt-0.5">
+								<div class="flex justify-between items-center text-slate-500 dark:text-slate-400">
+									<span>Charge (%)</span>
+									<div class="flex items-center">
+										<input type="number" id="cart-tax-percent" class="w-12 p-0.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded text-right text-xs font-bold text-slate-700 dark:text-white" value="0" min="0" onchange="calculateCartTotal()">
+										<span class="ml-1 font-bold text-[10px]">%</span>
+									</div>
+								</div>
+								<div class="flex justify-between items-center text-slate-500 dark:text-slate-400">
+									<span>Biaya Lain (Rp)</span>
+									<input type="number" id="cart-tax-fixed" class="w-20 p-0.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded text-right text-xs font-bold text-slate-700 dark:text-white" value="0" min="0" onchange="calculateCartTotal()">
+								</div>
+							</div>
+							
+							<div class="flex justify-between pt-1.5 border-t border-slate-150 dark:border-slate-700 font-black">
+								<span class="text-slate-700 dark:text-slate-200">Total Akhir</span>
+								<span class="text-primary dark:text-blue-400 text-sm sm:text-base" id="cart-total">Rp 0</span>
+							</div>
+						</div>
+						<button onclick="openCheckoutModal()" id="btn-selesai" class="w-full bg-primary hover:bg-secondary text-white font-bold py-2 px-3 rounded-xl shadow-md hover:shadow-lg transition-all text-xs sm:text-sm flex justify-center items-center">
+							Selesai Pembayaran <i class="fas fa-arrow-right ml-1.5 text-[10px]"></i>
+						</button>
+					</div>
+				</div>
+			</div>
+			
+			<!-- ==================== KATALOG TAB ==================== -->
+			<div id="view-katalog" class="tab-content absolute inset-0 p-3 sm:p-4 max-w-7xl mx-auto flex flex-col overflow-hidden hidden">
+				<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 flex-shrink-0">
+					<div>
+						<h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Katalog Barang & Jasa</h2>
+						<p class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Kelola daftar layanan, produk jualan, tarif pajak, dan diskon per item.</p>
+					</div>
+					<div class="flex flex-wrap gap-1.5 w-full sm:w-auto text-xs">
+						<label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg shadow font-bold transition-all flex items-center justify-center flex-1 sm:flex-initial text-[11px]">
+							<i class="fas fa-file-import mr-1.5"></i> Impor Excel
+							<input type="file" id="import-excel" accept=".xlsx, .xls" class="hidden" onchange="importCatalog(event)">
+						</label>
+						<button onclick="exportCatalog()" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg shadow font-bold transition-all flex-1 sm:flex-initial text-[11px]">
+							<i class="fas fa-file-export mr-1.5"></i> Ekspor Excel
+						</button>
+						<button onclick="openCatalogModal()" class="bg-primary hover:bg-secondary text-white px-2.5 py-1.5 rounded-lg shadow font-bold transition-all flex-1 sm:flex-initial text-[11px]">
+							<i class="fas fa-plus mr-1.5"></i> Tambah Item
+						</button>
+					</div>
+				</div>
+				
+				<div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-1 overflow-hidden flex flex-col">
+					<div class="p-2 sm:p-3 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center flex-shrink-0">
+						<div class="relative w-full max-w-md">
+							<input type="text" id="catalog-search" class="block w-full pl-10 pr-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs outline-none text-slate-800 dark:text-white" placeholder="Cari nama atau kode di katalog..." onkeyup="renderCatalogTable()">
+							<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+								<i class="fas fa-search text-slate-400 text-xs"></i>
+							</div>
+						</div>
+					</div>
+					<div class="flex-1 overflow-auto">
+						<table class="min-w-full divide-y divide-slate-150 dark:divide-slate-700 text-left">
+							<thead class="bg-slate-50 dark:bg-slate-800 sticky top-0 font-bold text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider z-10">
+								<tr>
+									<th class="px-4 py-2.5">Kategori</th>
+									<th class="px-4 py-2.5">Kode</th>
+									<th class="px-4 py-2.5">Nama Layanan / Barang</th>
+									<th class="px-4 py-2.5 text-right">Harga Satuan</th>
+									<th class="px-4 py-2.5 text-center">Diskon (%)</th>
+									<th class="px-4 py-2.5 text-center">Pajak (%)</th>
+									<th class="px-4 py-2.5 text-center">Stok</th>
+									<th class="px-4 py-2.5 text-center">Satuan</th>
+									<th class="px-4 py-2.5 text-center">Aksi</th>
+								</tr>
+							</thead>
+							<tbody id="catalog-table-body" class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700 text-xs text-slate-750 dark:text-slate-300">
+								<!-- Rows dynamically injected here -->
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			
+			<!-- ==================== CRM PELANGGAN TAB ==================== -->
+			<div id="view-pelanggan" class="tab-content absolute inset-0 p-3 sm:p-4 max-w-7xl mx-auto flex flex-col overflow-hidden hidden">
+				<!-- Header CRM -->
+				<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 flex-shrink-0">
+					<div>
+						<h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Mini CRM - Database Pelanggan</h2>
+						<p class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Rekam aktivitas, piutang kasbon, deal, dan status penawaran pelanggan.</p>
+					</div>
+					<div class="flex flex-wrap gap-1.5 w-full sm:w-auto text-xs">
+						<label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg shadow font-bold transition-all flex items-center justify-center flex-1 sm:flex-initial text-[11px]">
+							<i class="fas fa-file-import mr-1.5"></i> Impor CRM Excel
+							<input type="file" id="import-crm-excel" accept=".xlsx, .xls" class="hidden" onchange="importCustomersExcel(event)">
+						</label>
+						<button onclick="exportCustomersExcel()" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg shadow font-bold transition-all flex-1 sm:flex-initial text-[11px]">
+							<i class="fas fa-file-export mr-1.5"></i> Ekspor CRM Excel
+						</button>
+						<button onclick="openCustomerModal()" class="bg-primary hover:bg-secondary text-white px-2.5 py-1.5 rounded-lg shadow font-bold transition-all flex-1 sm:flex-initial text-[11px]">
+							<i class="fas fa-user-plus mr-1.5"></i> Tambah Pelanggan
+						</button>
+					</div>
+				</div>
+				
+				<!-- Main CRM Panel Layout -->
+				<div class="flex-1 flex flex-col lg:flex-row gap-3 min-h-0 overflow-hidden">
+					<!-- Kiri: Daftar Pelanggan -->
+					<div class="w-full lg:w-1/3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col min-h-0 overflow-hidden">
+						<div class="p-2.5 border-b border-slate-100 dark:border-slate-700 flex-shrink-0">
+							<div class="relative">
+								<input type="text" id="crm-search" class="w-full pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-xs outline-none text-slate-800 dark:text-white" placeholder="Cari pelanggan..." onkeyup="renderCustomersList()">
+								<span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 text-xs">
+									<i class="fas fa-search"></i>
+								</span>
+							</div>
+						</div>
+						<!-- Daftar List -->
+						<div id="crm-customers-list" class="flex-1 overflow-y-auto p-1.5 space-y-1 bg-slate-50 dark:bg-slate-900/20">
+							<!-- Items injected dynamic -->
+						</div>
+					</div>
+					
+					<!-- Kanan: Detail & Kegiatan Pelanggan -->
+					<div id="crm-detail-pane" class="hidden lg:flex flex-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex-col min-h-0 overflow-hidden relative">
+						<!-- Placeholder Empty State -->
+						<div id="crm-empty-state" class="absolute inset-0 bg-white dark:bg-slate-800 z-10 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-4">
+							<i class="fas fa-users text-4xl mb-2"></i>
+							<h4 class="font-bold text-slate-700 dark:text-slate-350 text-xs">Detail Profil Pelanggan</h4>
+							<p class="text-[10px] mt-1 text-center max-w-xs leading-relaxed">Pilih salah satu nama pelanggan di sebelah kiri untuk melihat histori aktivitas, status leads, log transaksi, atau melakukan pelunasan tagihan.</p>
+						</div>
+						
+						<!-- Header Profil Pelanggan -->
+						<div class="p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex-shrink-0 flex justify-between items-start">
+							<div>
+								<h3 id="crm-det-name" class="text-sm sm:text-base font-bold text-slate-900 dark:text-white">Nama Pelanggan</h3>
+								<p class="text-[10px] text-slate-400" id="crm-det-meta">Pelanggan Sejak -</p>
+							</div>
+							<div class="flex gap-1.5 text-[11px] font-bold">
+								<button onclick="exportSingleCustomerExcel()" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
+									<i class="fas fa-file-excel mr-1"></i> Ekspor Detail Excel
+								</button>
+								<button onclick="triggerEditCustomer()" class="px-2.5 py-1 border border-slate-200 dark:border-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
+									<i class="fas fa-user-edit mr-1"></i> Edit Profil
+								</button>
+								<button onclick="triggerDeleteCustomer()" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg">
+									<i class="fas fa-user-minus mr-1"></i> Hapus
+								</button>
+							</div>
+						</div>
+						
+						<!-- Rincian Identitas & Piutang Laci -->
+						<div class="p-3 border-b border-slate-150 dark:border-slate-700 bg-white dark:bg-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 flex-shrink-0 text-xs">
+							<div class="space-y-1.5">
+								<p class="flex items-center text-slate-600 dark:text-slate-400"><i class="fas fa-phone text-slate-400 w-5"></i> <span id="crm-det-phone">-</span></p>
+								<p class="flex items-center text-slate-600 dark:text-slate-400"><i class="fas fa-envelope text-slate-400 w-5"></i> <span id="crm-det-email">-</span></p>
+								<p class="flex items-center text-slate-600 dark:text-slate-400"><i class="fas fa-map-marker-alt text-slate-400 w-5"></i> <span id="crm-det-address">-</span></p>
+							</div>
+							<!-- Finansial Piutang -->
+							<div class="bg-amber-50 dark:bg-slate-800 p-2.5 rounded-lg border border-amber-100 dark:border-slate-700 flex flex-col justify-between">
+								<div class="flex justify-between items-start">
+									<div>
+										<h4 class="text-[9px] text-amber-700 dark:text-amber-400 uppercase tracking-wider font-bold">Total Piutang (Kasbon)</h4>
+										<p class="text-base font-black text-amber-600 dark:text-amber-400 mt-0.5" id="crm-det-balance">Rp 0</p>
+									</div>
+									<span class="p-1 bg-amber-100 dark:bg-slate-700 text-amber-600 dark:text-amber-300 rounded text-xs"><i class="fas fa-coins"></i></span>
+								</div>
+								<button onclick="triggerPayDebt()" id="crm-pay-debt-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold py-1 px-2 rounded mt-2 transition-all">
+									<i class="fas fa-hand-holding-usd mr-1"></i> Lunasi Piutang / Cicilan
+								</button>
+							</div>
+						</div>
+						
+						<!-- Sub-tabs Area Detail CRM -->
+						<div class="border-b border-slate-100 dark:border-slate-700 flex-shrink-0 bg-slate-50 dark:bg-slate-800 flex text-xs">
+							<button onclick="switchCrmDetailTab('activities')" id="crm-tab-activities" class="flex-1 py-2 text-center border-b-2 border-primary text-primary font-bold">Kegiatan</button>
+							<button onclick="switchCrmDetailTab('leads')" id="crm-tab-leads" class="flex-1 py-2 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 font-bold">Leads (Peluang)</button>
+							<button onclick="switchCrmDetailTab('deals')" id="crm-tab-deals" class="flex-1 py-2 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 font-bold">Deals (Transaksi)</button>
+						</div>
+						
+						<!-- Detail Lists Container -->
+						<div class="flex-1 overflow-y-auto p-3 bg-slate-50 dark:bg-slate-900/30 text-xs min-h-0">
+							<!-- Panel Kegiatan -->
+							<div id="crm-pane-activities" class="space-y-2">
+								<div class="flex justify-between items-center mb-1">
+									<h4 class="font-bold text-slate-700 dark:text-slate-300">Log Histori Kegiatan</h4>
+									<button onclick="openCrmAddModal('activity')" class="text-primary hover:text-secondary text-[11px] font-bold"><i class="fas fa-plus mr-0.5"></i> Tambah Catatan</button>
+								</div>
+								<div id="crm-list-activities" class="space-y-1.5">
+									<!-- Dinamis kegiatan -->
+								</div>
+							</div>
+							
+							<!-- Panel Leads -->
+							<div id="crm-pane-leads" class="space-y-2 hidden">
+								<div class="flex justify-between items-center mb-1">
+									<h4 class="font-bold text-slate-700 dark:text-slate-300">Peluang Penjualan (Leads)</h4>
+									<button onclick="openCrmAddModal('lead')" class="text-primary hover:text-secondary text-[11px] font-bold"><i class="fas fa-plus mr-0.5"></i> Tambah Peluang</button>
+								</div>
+								<div id="crm-list-leads" class="space-y-1.5">
+									<!-- Dinamis leads -->
+								</div>
+							</div>
+							
+							<!-- Panel Deals -->
+							<div id="crm-pane-deals" class="space-y-2 hidden">
+								<div class="flex justify-between items-center mb-1">
+									<h4 class="font-bold text-slate-700 dark:text-slate-300">Deal Transaksi Berhasil</h4>
+								</div>
+								<div id="crm-list-deals" class="space-y-1.5">
+									<!-- Dinamis deals -->
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<!-- ==================== TUTUP TAB ==================== -->
+			<div id="view-tutup" class="tab-content absolute inset-0 p-3 sm:p-4 max-w-7xl mx-auto flex flex-col overflow-hidden hidden">
+				<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 flex-shrink-0">
+					<div>
+						<h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Rekap Sesi / Tutup Shift</h2>
+						<p class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Tinjau transaksi kasir Anda hari ini sebelum mengakhiri hari.</p>
+					</div>
+					<button onclick="endOfDay()" class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-xl shadow-md font-bold transition-all text-xs flex items-center justify-center">
+						<i class="fas fa-door-closed mr-2"></i> Tutup Shift & Unduh Excel
+					</button>
+				</div>
+				
+				<!-- Rekap Kartu Keuangan (Ditambah Validasi Kas Laci) -->
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-3 flex-shrink-0">
+					<div class="bg-white dark:bg-slate-800 p-2.5 sm:p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 border-l-4 border-l-blue-500 flex items-center justify-between">
+						<div>
+							<h3 class="text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">Transaksi Sesi Ini</h3>
+							<p class="text-lg sm:text-xl font-black text-slate-800 dark:text-white mt-0.5" id="summary-tx-count">0</p>
+						</div>
+						<div class="p-2.5 bg-blue-50 dark:bg-slate-700 text-blue-600 dark:text-blue-300 rounded-xl text-base sm:text-lg"><i class="fas fa-receipt"></i></div>
+					</div>
+					<div class="bg-white dark:bg-slate-800 p-2.5 sm:p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 border-l-4 border-l-emerald-500 flex items-center justify-between">
+						<div>
+							<h3 class="text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">Total Pendapatan</h3>
+							<p class="text-lg sm:text-xl font-black text-slate-800 dark:text-white mt-0.5" id="summary-revenue">Rp 0</p>
+						</div>
+						<div class="p-2.5 bg-emerald-50 dark:bg-slate-700 text-emerald-600 dark:text-emerald-300 rounded-xl text-base sm:text-lg"><i class="fas fa-wallet"></i></div>
+					</div>
+					<div class="bg-white dark:bg-slate-800 p-2.5 sm:p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 border-l-4 border-l-amber-500 flex items-center justify-between">
+						<div>
+							<h3 class="text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider" title="Modal Awal Laci + Pembayaran Tunai">Uang Tunai di Laci Kas</h3>
+							<p class="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400 mt-0.5" id="summary-drawer-cash">Rp 0</p>
+						</div>
+						<div class="p-2.5 bg-amber-50 dark:bg-slate-700 text-amber-600 dark:text-amber-300 rounded-xl text-base sm:text-lg"><i class="fas fa-coins"></i></div>
+					</div>
+				</div>
+				
+				<div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-1 overflow-hidden flex flex-col">
+					<div class="border-b border-slate-100 dark:border-slate-700 flex-shrink-0 bg-slate-50 dark:bg-slate-800">
+						<nav class="flex">
+							<button onclick="switchRekapTab('rincian')" id="tab-rekap-rincian" class="w-1/2 py-2 text-center border-b-2 border-primary font-bold text-xs text-primary transition-all">Rincian Transaksi</button>
+							<button onclick="switchRekapTab('rekap')" id="tab-rekap-rekap" class="w-1/2 py-2 text-center border-b-2 border-transparent font-bold text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all">Rekap Penjualan Layanan</button>
+						</nav>
+					</div>
+					<div class="flex-1 overflow-auto" id="rekap-container">
+						<!-- Rincian or Rekap Tables dynamically injected here -->
+					</div>
+				</div>
+			</div>
+			
+			<!-- ==================== SETELAN TAB ==================== -->
+			<div id="view-setelan" class="tab-content absolute inset-0 p-3 sm:p-4 max-w-2xl mx-auto overflow-y-auto hidden">
+				<div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 sm:p-5 mb-6">
+					<h2 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-3 border-b border-slate-100 dark:border-slate-700 pb-1.5">Setelan Kasir & Identitas</h2>
+					
+					<form id="form-settings" onsubmit="saveSettings(event)" class="space-y-3.5 text-xs">
+						<!-- Info Usaha -->
+						<div class="space-y-2.5">
+							<h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center"><i class="fas fa-store text-slate-400 mr-2"></i>Informasi Instansi / Usaha</h3>
+							<div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+								<div class="sm:col-span-2">
+									<label class="block font-bold text-slate-700 dark:text-slate-300">Nama Usaha / Instansi</label>
+									<input type="text" id="set-business-name" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 dark:text-white" required>
+								</div>
+								<div class="sm:col-span-2">
+									<label class="block font-bold text-slate-700 dark:text-slate-300">Alamat Lengkap</label>
+									<textarea id="set-address" rows="2" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 dark:text-white"></textarea>
+								</div>
+								<div>
+									<label class="block font-bold text-slate-700 dark:text-slate-300">Kontak (Telpon/E-mail)</label>
+									<input type="text" id="set-contact" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 dark:text-white">
+								</div>
+								<div>
+									<label class="block font-bold text-slate-700 dark:text-slate-300">Nama Petugas Kasir</label>
+									<input type="text" id="set-username" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 dark:text-white" required>
+								</div>
+								<div class="sm:col-span-2">
+									<label class="block font-bold text-slate-700 dark:text-slate-300">Catatan Khusus Kaki Struk</label>
+									<textarea id="set-notes" rows="2" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 dark:text-white" placeholder="Catatan di bawah struk..."></textarea>
+								</div>
+							</div>
+						</div>
+						
+						<!-- Sistem Perpajakan Baru -->
+						<div class="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
+							<h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center"><i class="fas fa-percent text-slate-400 mr-2"></i>Sistem Perpajakan & Harga</h3>
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+								<div>
+									<label class="block font-bold text-slate-700 dark:text-slate-300">Mode Perhitungan Pajak</label>
+									<select id="set-tax-mode" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-800 dark:text-white">
+										<option value="exclusive">Sebelum Pajak (Exclusive Tax)</option>
+										<option value="inclusive">Setelah Pajak (Inclusive Tax / Termasuk PPN)</option>
+									</select>
+									<span class="text-[9px] text-slate-400 mt-1 block">Tentukan apakah harga katalog adalah harga sebelum pajak atau sudah bersih termasuk pajak.</span>
+								</div>
+								<div>
+									<label class="block font-bold text-slate-700 dark:text-slate-300">Tarif Pajak Global Standar (%)</label>
+									<input type="number" id="set-default-tax" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary/20 font-bold text-slate-800 dark:text-white" min="0" max="100" step="1" required>
+									<span class="text-[9px] text-slate-400 mt-1 block">Pajak standar (seperti PPN 11%) yang otomatis diterapkan pada item baru.</span>
+								</div>
+							</div>
+						</div>
+						
+						<!-- Modal Kas Laci Awal -->
+						<div class="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
+							<h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center"><i class="fas fa-coins text-slate-400 mr-2"></i>Kas & Laci Uang (Petty Cash)</h3>
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+								<div>
+									<label class="block font-bold text-slate-700 dark:text-slate-300">Modal Kas Awal Laci (Rp)</label>
+									<input type="number" id="set-starting-cash" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary/20 font-bold text-slate-800 dark:text-white" min="0" required>
+									<span class="text-[9px] text-slate-400 mt-1 block">Uang pecahan fisik di laci kas saat awal buka operasional.</span>
+								</div>
+							</div>
+						</div>
+						
+						<!-- Jenis Kertas Struk -->
+						<div class="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
+							<h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center"><i class="fas fa-file-invoice text-slate-400 mr-2"></i>Format & Jenis Kertas Struk</h3>
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+								<div>
+									<label class="block font-bold text-slate-700 dark:text-slate-300">Jenis Kertas</label>
+									<select id="set-paper-size" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-800 dark:text-white">
+										<option value="Thermal">Termal / Kertas Kasir (Monospace 80mm)</option>
+										<option value="A4">Biasa / Invoice Formal (HVS A4)</option>
+									</select>
+								</div>
+							</div>
+						</div>
+						
+						<!-- Preferensi Layanan / Mode Gratis -->
+						<div class="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
+							<h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center"><i class="fas fa-sliders-h text-slate-400 mr-2"></i>Preferensi Layanan</h3>
+							<div class="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+								<div class="pr-2">
+									<h4 class="font-bold text-slate-900 dark:text-white">Mode Layanan Publik / Gratis</h4>
+									<p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Aktifkan jika pendaftaran bebas biaya.</p>
+								</div>
+								<div>
+									<input type="checkbox" id="set-free-mode" class="h-4 w-4 text-primary dark:text-blue-500 border-slate-300 dark:border-slate-700 rounded focus:ring-primary cursor-pointer" onchange="toggleFreeModeSetting(this.checked)">
+								</div>
+							</div>
+						</div>
+						
+						<!-- Utilitas Sistem -->
+						<div class="pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
+							<h3 class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center"><i class="fas fa-toolbox text-slate-400 mr-2"></i>Utilitas Sistem</h3>
+							<div class="flex gap-2">
+								<button type="button" onclick="loadDemoData()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow font-bold">
+									<i class="fas fa-vial mr-1"></i> Muat Data Demo / Percobaan
+								</button>
+								<button type="button" onclick="triggerClearAllData()" class="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow font-bold">
+									<i class="fas fa-trash-alt mr-1"></i> Kosongkan Seluruh Database
+								</button>
+							</div>
+						</div>
+						
+						<div class="pt-3 flex justify-end">
+							<button type="submit" class="bg-primary hover:bg-secondary text-white font-bold px-4 py-2 rounded-lg shadow-md transition-all flex items-center">
+								<i class="fas fa-save mr-1.5"></i> Simpan Setelan
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</main>
+		
+		<!-- ==================== DIALOGS & MODALS ==================== -->
+		
+		<!-- Toast Container -->
+		<div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+		
+		<!-- Custom Confirm Modal -->
+		<div id="confirm-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+			<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-5 transform scale-95 transition-all">
+				<div class="flex items-center text-red-600 dark:text-red-400 mb-2">
+					<i class="fas fa-exclamation-triangle text-xl mr-2.5"></i>
+					<h3 class="text-base font-bold" id="confirm-title">Konfirmasi Tindakan</h3>
+				</div>
+				<p class="text-xs text-slate-600 dark:text-slate-350 mb-5 leading-relaxed" id="confirm-message">Apakah Anda yakin?</p>
+				<div class="flex justify-end space-x-2 text-xs font-bold">
+					<button id="confirm-btn-cancel" class="px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Batal</button>
+					<button id="confirm-btn-proceed" class="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow transition-colors">Lanjutkan</button>
+				</div>
+			</div>
+		</div>
+		
+		<!-- Checkout / Pembayaran Modal -->
+		<div id="checkout-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+			<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[95vh] transform scale-95 transition-all text-slate-800 dark:text-slate-100">
+				<div class="p-3 bg-primary text-white flex justify-between items-center flex-shrink-0">
+					<h3 class="font-bold flex items-center text-sm sm:text-base"><i class="fas fa-wallet mr-2"></i> Penyelesaian Pembayaran</h3>
+					<button onclick="closeCheckoutModal()" class="text-white hover:text-slate-200 transition-colors"><i class="fas fa-times text-lg"></i></button>
+				</div>
+				
+				<div class="p-4 overflow-y-auto flex-1 space-y-3.5 text-xs">
+					<div class="flex justify-between items-center pb-2.5 border-b border-slate-150 dark:border-slate-700">
+						<span class="text-slate-500 dark:text-slate-400 font-bold">Total Tagihan:</span>
+						<span class="text-lg sm:text-xl font-black text-primary dark:text-blue-400" id="checkout-total-val">Rp 0</span>
+					</div>
+					
+					<!-- Notifikasi Pelanggan Terpilih -->
+					<div id="checkout-customer-notice" class="p-2.5 bg-blue-50 dark:bg-slate-800 rounded-lg border border-blue-100 dark:border-slate-700 flex justify-between items-center">
+						<div>
+							<span class="text-[9px] text-slate-400 uppercase font-black block">Pelanggan Terhubung</span>
+							<span id="checkout-customer-name" class="font-bold text-slate-800 dark:text-white">-</span>
+						</div>
+						<span class="text-primary text-xs"><i class="fas fa-user-check"></i></span>
+					</div>
+					
+					<!-- Pilihan Metode Pembayaran -->
+					<div>
+						<label class="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">Metode Pembayaran</label>
+						<div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5" id="payment-methods-grid">
+							<!-- Dynamic Payment buttons -->
+						</div>
+					</div>
+					
+					<!-- Bagian Pembayaran Tunai / eWallet -->
+					<div id="cash-payment-section" class="space-y-2.5">
+						<div>
+							<label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Jumlah Uang yang Diterima</label>
+							<div class="relative">
+								<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-bold">Rp</span>
+								<input type="number" id="cash-paid-input" class="block w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg text-base font-bold focus:ring-2 focus:ring-primary/20 outline-none text-slate-850 dark:text-white" placeholder="0" oninput="calculateChange()">
+							</div>
+						</div>
+						
+						<!-- Tombol Uang Cepat -->
+						<div>
+							<span class="text-[9px] text-slate-400 font-bold block mb-1">Rekomendasi Uang Pecahan:</span>
+							<div id="quick-cash-container" class="flex flex-wrap gap-1">
+								<!-- Dynamic buttons injected here -->
+							</div>
+						</div>
+						
+						<div class="flex justify-between items-center p-2.5 bg-emerald-50 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded-xl border border-emerald-100 dark:border-emerald-800">
+							<span class="font-bold text-xs">Kembalian:</span>
+							<span class="text-base sm:text-lg font-black text-emerald-600 dark:text-emerald-400" id="checkout-change-val">Rp 0</span>
+						</div>
+					</div>
+				</div>
+				
+				<div class="p-3 bg-slate-50 dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row gap-1.5 flex-shrink-0 text-xs">
+					<button onclick="completeTransaction(true)" id="btn-save-print" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-3 rounded-xl shadow transition-all flex justify-center items-center">
+						<i class="fas fa-eye mr-1.5"></i> Tinjau Struk & Selesaikan
+					</button>
+					<button onclick="completeTransaction(false)" id="btn-save-only" class="flex-1 bg-primary hover:bg-secondary text-white font-bold py-2.5 px-3 rounded-xl shadow transition-all flex justify-center items-center">
+						<i class="fas fa-save mr-1.5"></i> Simpan Transaksi Saja
+					</button>
+				</div>
+			</div>
+		</div>
+		
+		<!-- Pelanggan Add/Edit Modal -->
+		<div id="customer-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+			<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col transform scale-95 transition-all text-xs text-slate-800 dark:text-slate-100">
+				<div class="p-3 bg-primary text-white flex justify-between items-center flex-shrink-0">
+					<h3 class="font-bold" id="customer-modal-title">Tambah Pelanggan Baru</h3>
+					<button type="button" onclick="closeCustomerModal()" class="text-white hover:text-slate-200"><i class="fas fa-times text-lg"></i></button>
+				</div>
+				<form onsubmit="saveCustomer(event)" class="p-4 sm:p-5 space-y-3">
+					<input type="hidden" id="cust-id">
+					<div>
+						<label class="block font-bold text-slate-700 dark:text-slate-300">Nama Lengkap</label>
+						<input type="text" id="cust-name" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none text-slate-800 dark:text-white" required>
+					</div>
+					<div>
+						<label class="block font-bold text-slate-700 dark:text-slate-300">No. Telepon / WhatsApp</label>
+						<input type="text" id="cust-phone" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none text-slate-800 dark:text-white" required>
+					</div>
+					<div>
+						<label class="block font-bold text-slate-700 dark:text-slate-300">Alamat Email</label>
+						<input type="email" id="cust-email" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none text-slate-800 dark:text-white">
+					</div>
+					<div>
+						<label class="block font-bold text-slate-700 dark:text-slate-300">Alamat Lengkap</label>
+						<textarea id="cust-address" rows="2" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none text-slate-800 dark:text-white"></textarea>
+					</div>
+					<div class="pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-end space-x-2 font-bold">
+						<button type="button" onclick="closeCustomerModal()" class="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Batal</button>
+						<button type="submit" class="px-4 py-1.5 bg-primary text-white rounded-lg hover:bg-secondary shadow">Simpan Pelanggan</button>
+					</div>
+				</form>
+			</div>
+		</div>
+		
+		<!-- CRM Tambah Catatan Kegiatan / Lead Modal -->
+		<div id="crm-add-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+			<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col text-xs text-slate-800 dark:text-slate-100">
+				<div class="p-3 bg-primary text-white flex justify-between items-center flex-shrink-0">
+					<h3 class="font-bold" id="crm-add-modal-title">Tambah Kegiatan</h3>
+					<button type="button" onclick="closeCrmAddModal()" class="text-white hover:text-slate-200"><i class="fas fa-times text-lg"></i></button>
+				</div>
+				<form onsubmit="saveCrmAdd(event)" class="p-4 space-y-3">
+					<input type="hidden" id="crm-add-type">
+					
+					<!-- Form Khusus Catatan Kegiatan -->
+					<div id="crm-add-form-activity" class="space-y-3">
+						<div>
+							<label class="block font-bold text-slate-700 dark:text-slate-300">Catatan Histori Kegiatan</label>
+							<textarea id="crm-act-text" rows="3" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none text-slate-800 dark:text-white" placeholder="Contoh: Menghubungi pelanggan mengenai janji temu besok pagi..."></textarea>
+						</div>
+					</div>
+					
+					<!-- Form Khusus Lead (Peluang) -->
+					<div id="crm-add-form-lead" class="space-y-3 hidden">
+						<div>
+							<label class="block font-bold text-slate-700 dark:text-slate-300">Judul Peluang (Lead)</label>
+							<input type="text" id="crm-lead-title" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none text-slate-800 dark:text-white" placeholder="Contoh: Paket Event Ruang VIP">
+						</div>
+						<div class="grid grid-cols-2 gap-2">
+							<div>
+								<label class="block font-bold text-slate-700 dark:text-slate-300">Estimasi Nilai (Rp)</label>
+								<input type="number" id="crm-lead-value" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none text-slate-800 dark:text-white" value="0">
+							</div>
+							<div>
+								<label class="block font-bold text-slate-700 dark:text-slate-300">Status Peluang</label>
+								<select id="crm-lead-status" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 outline-none text-slate-800 dark:text-white font-bold">
+									<option value="Prospect">Prospek Awal</option>
+									<option value="Contacted">Sudah Dihubungi</option>
+									<option value="Proposal">Negosiasi Proposal</option>
+									<option value="Won">Deal (Berhasil)</option>
+									<option value="Lost">Cancel (Gagal)</option>
+								</select>
+							</div>
+						</div>
+					</div>
+					
+					<div class="pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-end space-x-2 font-bold">
+						<button type="button" onclick="closeCrmAddModal()" class="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Batal</button>
+						<button type="submit" class="px-4 py-1.5 bg-primary text-white rounded-lg hover:bg-secondary">Simpan Catatan</button>
+					</div>
+				</form>
+			</div>
+		</div>
+		
+		<!-- Digital Receipt Preview Modal (Thermal vs A4 Rendering) -->
+		<div id="receipt-preview-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+			<div id="receipt-modal-card" class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transform scale-95 transition-all text-slate-800 dark:text-slate-100 w-full">
+				<div class="p-3 bg-emerald-600 text-white flex justify-between items-center flex-shrink-0">
+					<h3 class="font-bold flex items-center text-xs sm:text-sm"><i class="fas fa-file-invoice-dollar mr-1.5"></i> Pratinjau Cetak Struk (<span id="preview-paper-label">Thermal</span>)</h3>
+					<button onclick="closeReceiptPreview()" class="text-white hover:text-slate-200 transition-colors"><i class="fas fa-times text-lg"></i></button>
+				</div>
+				
+				<div class="p-4 overflow-y-auto flex-1 bg-slate-50 dark:bg-slate-900">
+					<!-- Frame Wrapper Monitor -->
+					<div id="receipt-screen-content" class="bg-white text-black p-4 border border-slate-250 rounded-lg shadow-sm mx-auto">
+						<!-- Struk render dynamic -->
+					</div>
+				</div>
+				
+				<div class="p-3 bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex gap-2 flex-shrink-0 text-xs justify-end">
+					<button onclick="triggerPhysicalPrint()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg flex justify-center items-center">
+						<i class="fas fa-print mr-1.5"></i> Kirim ke Printer
+					</button>
+					<button onclick="closeReceiptPreview()" class="px-4 py-2 bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-400 dark:hover:bg-slate-700 rounded-lg font-bold">
+						Tutup
+					</button>
+				</div>
+			</div>
+		</div>
+		
+		<!-- Katalog Add/Edit Modal -->
+		<div id="catalog-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+			<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col transform scale-95 transition-all text-xs text-slate-800 dark:text-slate-100">
+				<div class="p-3 bg-primary text-white flex justify-between items-center flex-shrink-0">
+					<h3 class="font-bold" id="catalog-modal-title">Tambah Produk/Jasa</h3>
+					<button onclick="closeCatalogModal()" class="text-white hover:text-slate-200 transition-colors"><i class="fas fa-times text-lg"></i></button>
+				</div>
+				<form onsubmit="saveCatalogItem(event)" class="p-4 sm:p-5 space-y-3">
+					<input type="hidden" id="cat-item-id">
+					
+					<div class="grid grid-cols-2 gap-2">
+						<div>
+							<label class="block font-bold text-slate-700 dark:text-slate-300">Kategori</label>
+							<select id="cat-item-category" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-800 dark:text-white" required>
+								<option value="Jasa">Jasa</option>
+								<option value="Barang">Barang</option>
+								<option value="Lainnya">Lainnya</option>
+							</select>
+						</div>
+						<div>
+							<label class="block font-bold text-slate-700 dark:text-slate-300">Kode Item</label>
+							<input type="text" id="cat-item-code" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none font-mono text-slate-850 dark:text-white" required placeholder="Contoh: SRV01">
+						</div>
+					</div>
+					
+					<div>
+						<label class="block font-bold text-slate-700 dark:text-slate-300">Nama Barang / Layanan</label>
+						<input type="text" id="cat-item-name" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none text-slate-850 dark:text-white" required placeholder="Nama item">
+					</div>
+					
+					<div class="grid grid-cols-2 gap-2">
+						<div>
+							<label class="block font-bold text-slate-700 dark:text-slate-300">Harga Jual (Rp)</label>
+							<input type="number" id="cat-item-price" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-850 dark:text-white" required min="0" placeholder="0">
+						</div>
+						<div>
+							<label class="block font-bold text-slate-700 dark:text-slate-300">Satuan</label>
+							<input type="text" id="cat-item-unit" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none text-slate-850 dark:text-white" required placeholder="Hari, Pcs, Jam">
+						</div>
+					</div>
+
+					<div class="grid grid-cols-2 gap-2">
+						<div>
+							<label class="block font-bold text-slate-700 dark:text-slate-300">Diskon Bawaan (%)</label>
+							<input type="number" id="cat-item-discount" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-850 dark:text-white" min="0" max="100" placeholder="0">
+						</div>
+						<div>
+							<label class="block font-bold text-slate-700 dark:text-slate-300">Tarif Pajak Item (%)</label>
+							<input type="number" id="cat-item-taxrate" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none font-bold text-slate-850 dark:text-white" min="0" max="100" placeholder="0">
+						</div>
+					</div>
+					
+					<div>
+						<label class="block font-bold text-slate-700 dark:text-slate-300">Batas Kuantitas / Stok</label>
+						<input type="number" id="cat-item-qty" class="mt-1 block w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-primary/20 outline-none text-slate-850 dark:text-white" required min="0" placeholder="999">
+						<span class="text-[9px] text-slate-400 dark:text-slate-500 mt-1 block">Gunakan angka besar jika berupa jasa tak terbatas.</span>
+					</div>
+					
+					<div class="pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-end space-x-2 font-bold">
+						<button type="button" onclick="closeCatalogModal()" class="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">Batal</button>
+						<button type="submit" class="px-4 py-1.5 bg-primary text-white rounded-lg hover:bg-secondary shadow">Simpan Item</button>
+					</div>
+				</form>
+			</div>
+		</div>
+		
+		<!-- ==================== PRINTABLE PHYSICAL RECEIPT TEMPLATE ==================== -->
+		<div id="print-receipt-container" class="hidden text-black bg-white select-text">
+			<!-- Cetakan fisik untuk printer diredirect ke div ini saat memicu cetak -->
+		</div>
+		
+		<!-- ==================== CORE JAVASCRIPT LOGIC ==================== -->
+		<script>
+			// State Global Aplikasi (Terhubung ke localStorage)
+			let catalog = [];
+			let cart = [];
+			let transactions = [];
+			let customers = []; // Mini CRM database
+			
+			let currentPaymentMethod = 'Tunai';
+			let activeRekapTab = 'rincian';
+			let activeMobileSubTab = 'items';
+			let currentPosCategoryFilter = 'Semua';
+			
+			let selectedCustomerId = null; // Terpilih di tab CRM Pelanggan
+			let activeCrmDetailTab = 'activities'; // Default tab rincian pelanggan
+			
+			let settings = {
+				businessName: "FrontDesk PoS",
+				address: "Jl. Diponegoro No. 123, Pontianak",
+				contact: "+62 812-3456-7890",
+				username: "Agus Santoso",
+				notes: "Terima kasih atas kerja sama dan kunjungan Anda!",
+				freeMode: false,
+				startingCash: 0, 
+				paperSize: "Thermal", // "Thermal" atau "A4"
+				darkMode: false,
+				taxMode: "exclusive", // "exclusive" (Sebelum Pajak) atau "inclusive" (Setelah Pajak)
+				defaultTaxRate: 11   // Tarif PPN Standar Indonesia (11%)
+			};
+			
+			// --- SISTEM PENYIMPANAN DATA (LOCALSTORAGE) ---
+			function loadSavedData() {
+				// Load Katalog
+				const savedCatalog = localStorage.getItem('frontdesk_catalog');
+				if (savedCatalog) {
+					catalog = JSON.parse(savedCatalog);
+				} else {
+					catalog = [];
+				}
+				
+				// Load Transaksi
+				const savedTransactions = localStorage.getItem('frontdesk_transactions');
+				if (savedTransactions) {
+					transactions = JSON.parse(savedTransactions);
+				}
+				
+				// Load Pelanggan CRM
+				const savedCustomers = localStorage.getItem('frontdesk_customers');
+				if (savedCustomers) {
+					customers = JSON.parse(savedCustomers);
+				}
+				
+				// Load Setelan
+				const savedSettings = localStorage.getItem('frontdesk_settings');
+				if (savedSettings) {
+					settings = { ...settings, ...JSON.parse(savedSettings) };
+				}
+				
+				// Load Keranjang
+				const savedCart = localStorage.getItem('frontdesk_cart');
+				if (savedCart) {
+					cart = JSON.parse(savedCart);
+					renderCart();
+					calculateCartTotal();
+				}
+			}
+			
+			function saveCatalogState() {
+				localStorage.setItem('frontdesk_catalog', JSON.stringify(catalog));
+			}
+			
+			function saveTransactionState() {
+				localStorage.setItem('frontdesk_transactions', JSON.stringify(transactions));
+			}
+			
+			function saveCustomersState() {
+				localStorage.setItem('frontdesk_customers', JSON.stringify(customers));
+			}
+			
+			function saveSettingsState() {
+				localStorage.setItem('frontdesk_settings', JSON.stringify(settings));
+			}
+			
+			function saveCartState() {
+				localStorage.setItem('frontdesk_cart', JSON.stringify(cart));
+				const selectEl = document.getElementById('cart-customer-select');
+				if (selectEl) {
+					localStorage.setItem('frontdesk_selected_cust', selectEl.value);
+				}
+			}
+			
+			// --- TEMA TERANG & GELAP (DARK MODE) ---
+			function toggleDarkMode() {
+				settings.darkMode = !settings.darkMode;
+				saveSettingsState();
+				applyTheme();
+			}
+			
+			function applyTheme() {
+				const htmlEl = document.documentElement;
+				const themeIcon = document.getElementById('theme-icon');
+				
+				if (settings.darkMode) {
+					htmlEl.classList.add('dark');
+					themeIcon.className = "fas fa-sun text-lg text-amber-400";
+				} else {
+					htmlEl.classList.remove('dark');
+					themeIcon.className = "fas fa-moon text-lg text-slate-500";
+				}
+			}
+			
+			// --- SISTEM NOTIFIKASI & POPUP ---
+			function showToast(message, type = 'success') {
+				const container = document.getElementById('toast-container');
+				const toast = document.createElement('div');
+				toast.className = "p-3 rounded-xl shadow-lg text-white font-bold text-xs flex items-center transition-all transform translate-y-2 opacity-0 pointer-events-auto max-w-sm z-50";
+				
+				if (type === 'success') {
+					toast.classList.add('bg-emerald-600');
+					toast.innerHTML = `<i class="fas fa-check-circle mr-2 text-sm"></i> <span>${message}</span>`;
+				} else if (type === 'error') {
+					toast.classList.add('bg-red-600');
+					toast.innerHTML = `<i class="fas fa-exclamation-circle mr-2 text-sm"></i> <span>${message}</span>`;
+				} else {
+					toast.classList.add('bg-blue-600');
+					toast.innerHTML = `<i class="fas fa-info-circle mr-2 text-sm"></i> <span>${message}</span>`;
+				}
+				
+				container.appendChild(toast);
+				setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+				
+				setTimeout(() => {
+					toast.classList.add('opacity-0', 'translate-y-2');
+					setTimeout(() => toast.remove(), 300);
+				}, 2500);
+			}
+			
+			function openConfirmModal(title, message, onProceed) {
+				const modal = document.getElementById('confirm-modal');
+				document.getElementById('confirm-title').innerText = title;
+				document.getElementById('confirm-message').innerText = message;
+				
+				modal.classList.remove('hidden');
+				
+				const btnCancel = document.getElementById('confirm-btn-cancel');
+				const btnProceed = document.getElementById('confirm-btn-proceed');
+				
+				const newBtnCancel = btnCancel.cloneNode(true);
+				const newBtnProceed = btnProceed.cloneNode(true);
+				btnCancel.parentNode.replaceChild(newBtnCancel, btnCancel);
+				btnProceed.parentNode.replaceChild(newBtnProceed, btnProceed);
+				
+				newBtnCancel.addEventListener('click', () => modal.classList.add('hidden'));
+				newBtnProceed.addEventListener('click', () => {
+					modal.classList.add('hidden');
+					onProceed();
+				});
+			}
+			
+			// --- CORE NAVIGATION ---
+			function switchTab(tabId) {
+				document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+				document.getElementById(`view-${tabId}`).classList.remove('hidden');
+				
+				document.querySelectorAll('.nav-btn').forEach(btn => {
+					btn.classList.remove('bg-primary', 'text-white');
+					btn.classList.add('text-slate-600', 'dark:text-slate-300', 'hover:bg-slate-100', 'dark:hover:bg-slate-700');
+				});
+				
+				const activeBtn = document.getElementById(`tab-${tabId}`);
+				if (activeBtn) {
+					activeBtn.classList.add('bg-primary', 'text-white');
+					activeBtn.classList.remove('text-slate-600', 'dark:text-slate-300', 'hover:bg-slate-100', 'dark:hover:bg-slate-700');
+				}
+				
+				if (tabId === 'frontdesk') {
+					renderCustomerDropdowns();
+					renderPosItems();
+				} else if (tabId === 'katalog') {
+					renderCatalogTable();
+				} else if (tabId === 'pelanggan') {
+					renderCustomersList();
+					renderCustomersDetails();
+				} else if (tabId === 'tutup') {
+					updateTutupOverview();
+				}
+			}
+			
+			function switchMobileSubTab(subTab) {
+				activeMobileSubTab = subTab;
+				const tabItems = document.getElementById('mobile-subtab-items');
+				const tabCart = document.getElementById('mobile-subtab-cart');
+				const paneItems = document.getElementById('pos-items-pane');
+				const paneCart = document.getElementById('pos-cart-pane');
+				
+				if (subTab === 'items') {
+					tabItems.className = "flex-1 py-2.5 text-center border-b-2 border-primary text-primary font-bold text-xs transition-all";
+					tabCart.className = "flex-1 py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 font-bold text-xs relative transition-all";
+					paneItems.classList.remove('hidden');
+					paneItems.classList.add('flex');
+					paneCart.classList.add('hidden');
+					paneCart.classList.remove('flex');
+				} else {
+					tabCart.className = "flex-1 py-2.5 text-center border-b-2 border-primary text-primary font-bold text-xs relative transition-all";
+					tabItems.className = "flex-1 py-2.5 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 font-bold text-xs transition-all";
+					paneCart.classList.remove('hidden');
+					paneCart.classList.add('flex');
+					paneItems.classList.add('hidden');
+					paneItems.classList.remove('flex');
+				}
+			}
+			
+			// --- SISTEM KASIR (FRONTDESK) ---
+			function formatRupiah(number) {
+				return new Intl.NumberFormat('id-ID', {
+					style: 'currency',
+					currency: 'IDR',
+					minimumFractionDigits: 0
+				}).format(number);
+			}
+			
+			function setPosCategoryFilter(category) {
+				currentPosCategoryFilter = category;
+				
+				document.querySelectorAll('.cat-filter-btn').forEach(btn => {
+					btn.classList.remove('bg-primary', 'text-white');
+					btn.classList.add('bg-slate-100', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300');
+				});
+				
+				const btnMap = {
+					'Semua': 'cat-filter-all',
+					'Jasa': 'cat-filter-jasa',
+					'Barang': 'cat-filter-barang',
+					'Lainnya': 'cat-filter-lainnya'
+				};
+				
+				const activeBtn = document.getElementById(btnMap[category]);
+				if (activeBtn) {
+					activeBtn.classList.add('bg-primary', 'text-white');
+					activeBtn.classList.remove('bg-slate-100', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300');
+				}
+				
+				renderPosItems();
+			}
+			
+			function renderPosItems() {
+				const searchVal = document.getElementById('pos-search').value.toLowerCase();
+				const grid = document.getElementById('pos-items-grid');
+				grid.innerHTML = '';
+				
+				if (catalog.length === 0) {
+					grid.innerHTML = `
+					<div class="col-span-full p-6 text-center text-slate-400 my-auto flex flex-col items-center justify-center min-h-[200px]">
+						<div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 mb-2 text-2xl">
+							<i class="fas fa-box-open"></i>
+						</div>
+						<h4 class="font-bold text-slate-700 dark:text-slate-350 text-xs">Katalog Produk Kosong</h4>
+						<p class="text-[10px] max-w-xs mt-1 leading-relaxed">Masuk ke menu <strong>Katalog</strong> untuk menambah produk/jasa, atau muat <strong>Data Demo</strong> di menu <strong>Setelan</strong>.</p>
+						<button onclick="switchTab('katalog')" class="mt-3 px-3.5 py-1.5 bg-primary hover:bg-secondary text-white text-[10px] font-bold rounded-lg shadow transition-all">
+							<i class="fas fa-plus mr-1"></i>Kelola Katalog
+						</button>
+					</div>
+					`;
+					document.getElementById('mobile-item-count').innerText = "0";
+					return;
+				}
+				
+				const filtered = catalog.filter(item => {
+					const matchSearch = item.code.toLowerCase().includes(searchVal) || item.name.toLowerCase().includes(searchVal);
+					const matchCategory = currentPosCategoryFilter === 'Semua' || item.category === currentPosCategoryFilter;
+					return matchSearch && matchCategory;
+				});
+				
+				if (filtered.length === 0) {
+					grid.innerHTML = `
+					<div class="col-span-full p-6 text-center text-slate-400 dark:text-slate-500">
+						<i class="fas fa-search text-2xl mb-1.5"></i>
+						<p class="text-[10px]">Tidak ada item yang cocok.</p>
+					</div>
+					`;
+					document.getElementById('mobile-item-count').innerText = "0";
+					return;
+				}
+				
+				filtered.forEach(item => {
+					const div = document.createElement('div');
+					div.className = "bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary dark:hover:border-blue-500 cursor-pointer hover:shadow-sm transition-all flex flex-col justify-between h-32 relative overflow-hidden group";
+					div.onclick = () => addToCart(item);
+					
+					let badgeColor = "bg-blue-500";
+					if (item.category === 'Jasa') badgeColor = "bg-indigo-500";
+					if (item.category === 'Barang') badgeColor = "bg-emerald-500";
+					if (item.category === 'Lainnya') badgeColor = "bg-amber-500";
+					
+					const taxLabel = item.taxRate ? `Pajak: ${item.taxRate}%` : 'Bebas Pajak';
+					const discountLabel = item.discount ? `Disc: ${item.discount}%` : '';
+					
+					div.innerHTML = `
+					<div class="flex flex-col h-full justify-between text-xs">
+						<div>
+							<div class="flex items-center justify-between gap-1 mb-1">
+								<span class="text-[8px] font-bold px-1 py-0.5 rounded text-white ${badgeColor}">${item.code}</span>
+								<span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium truncate max-w-[60px]">${item.unit}</span>
+							</div>
+							<h3 class="text-[11px] font-bold text-slate-800 dark:text-slate-200 line-clamp-2 group-hover:text-primary dark:group-hover:text-blue-400 transition-colors leading-tight">${item.name}</h3>
+							<div class="flex flex-wrap gap-1 mt-0.5">
+								<span class="text-[8px] text-slate-400 bg-slate-100 dark:bg-slate-700 px-1 rounded">${taxLabel}</span>
+								${discountLabel ? `<span class="text-[8px] text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-1 rounded font-bold">${discountLabel}</span>` : ''}
+							</div>
+						</div>
+						<div class="flex items-end justify-between pt-1">
+							<span class="text-[9px] text-slate-400 dark:text-slate-500">Stok: ${item.qty}</span>
+							<span class="text-[11px] font-black text-primary dark:text-blue-400">${formatRupiah(item.price)}</span>
+						</div>
+					</div>
+					`;
+					grid.appendChild(div);
+				});
+				
+				document.getElementById('mobile-item-count').innerText = filtered.length;
+			}
+			
+			function filterPosItems() {
+				renderPosItems();
+			}
+			
+			function addToCart(item) {
+				const existing = cart.find(i => i.id === item.id);
+				if (existing) {
+					if (existing.quantity >= item.qty) {
+						showToast(`Kuantitas melebihi batas stok tersedia (${item.qty} ${item.unit})`, "error");
+						return;
+					}
+					existing.quantity += 1;
+				} else {
+					if (item.qty <= 0) {
+						showToast("Stok item ini habis!", "error");
+						return;
+					}
+					cart.push({ 
+						...item, 
+						quantity: 1,
+						discount: item.discount || 0,
+						taxRate: item.taxRate !== undefined ? item.taxRate : settings.defaultTaxRate
+					});
+				}
+				
+				renderCart();
+				calculateCartTotal();
+				saveCartState();
+				
+				const badge = document.getElementById('mobile-cart-badge');
+				badge.classList.add('animate-pop');
+				setTimeout(() => badge.classList.remove('animate-pop'), 200);
+				
+				showToast(`${item.name} dimasukkan!`, "success");
+			}
+			
+			function renderCart() {
+				const container = document.getElementById('cart-items-container');
+				const emptyMsg = document.getElementById('empty-cart-msg');
+				container.innerHTML = '';
+				
+				if (cart.length === 0) {
+					emptyMsg.classList.remove('hidden');
+					return;
+				}
+				emptyMsg.classList.add('hidden');
+				
+				cart.forEach((item, index) => {
+					const row = document.createElement('div');
+					row.className = "bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col gap-1.5 shadow-xs";
+					row.innerHTML = `
+					<div class="flex justify-between items-start text-xs">
+						<div class="flex-1 min-w-0 pr-2">
+							<h4 class="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate" title="${item.name}">${item.name}</h4>
+							<span class="text-[9px] text-slate-400 dark:text-slate-500 font-mono">${item.code} (${item.unit})</span>
+						</div>
+						<button onclick="removeFromCart(${index})" class="text-slate-300 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors text-[10px] p-0.5"><i class="fas fa-trash-alt"></i></button>
+					</div>
+					
+					<!-- Edit Harga, Diskon, Pajak & Kuantitas secara Inline -->
+					<div class="grid grid-cols-2 gap-2 text-xs border-t border-slate-100 dark:border-slate-700/60 pt-2">
+						<!-- Kolom Harga & Qty -->
+						<div class="flex flex-col gap-1">
+							<div class="flex items-center">
+								<span class="text-[9px] text-slate-400 dark:text-slate-500 mr-1">Rp</span>
+								<input type="number" class="w-full border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded px-1 py-0.5 text-[10px] text-slate-700 dark:text-white font-bold outline-none" value="${item.price}" onchange="updateCartItemPrice(${index}, this.value)" title="Ubah harga dasar">
+							</div>
+							
+							<div class="flex items-center border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-800 overflow-hidden w-20">
+								<button onclick="updateCartQty(${index}, ${item.quantity - 1})" class="px-1.5 py-0.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-750 text-[10px]"><i class="fas fa-minus text-[7px]"></i></button>
+								<input type="number" class="w-full text-center text-[10px] font-bold text-slate-800 dark:text-white focus:outline-none bg-transparent [appearance:textfield]" value="${item.quantity}" onchange="updateCartQty(${index}, parseInt(this.value))">
+								<button onclick="updateCartQty(${index}, ${item.quantity + 1})" class="px-1.5 py-0.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-750 text-[10px]"><i class="fas fa-plus text-[7px]"></i></button>
+							</div>
+						</div>
+						
+						<!-- Kolom Diskon & Pajak Per Item -->
+						<div class="flex flex-col gap-1 text-[9px]">
+							<div class="flex items-center justify-between">
+								<span class="text-slate-400 dark:text-slate-500">Disc %:</span>
+								<input type="number" class="w-12 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded text-center font-bold text-slate-700 dark:text-white outline-none" value="${item.discount}" min="0" max="100" onchange="updateCartItemDiscount(${index}, this.value)">
+							</div>
+							<div class="flex items-center justify-between">
+								<span class="text-slate-400 dark:text-slate-500">Pajak %:</span>
+								<input type="number" class="w-12 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 rounded text-center font-bold text-slate-700 dark:text-white outline-none" value="${item.taxRate}" min="0" max="100" onchange="updateCartItemTaxRate(${index}, this.value)">
+							</div>
+						</div>
+					</div>
+					`;
+					container.appendChild(row);
+				});
+			}
+			
+			function updateCartQty(index, newQty) {
+				if (isNaN(newQty) || newQty <= 0) {
+					removeFromCart(index);
+					return;
+				}
+				
+				const item = cart[index];
+				if (newQty > item.qty) {
+					showToast(`Stok terbatas pada ${item.qty} ${item.unit}`, "error");
+					renderCart();
+					return;
+				}
+				
+				item.quantity = newQty;
+				renderCart();
+				calculateCartTotal();
+				saveCartState();
+			}
+			
+			function updateCartItemPrice(index, newPrice) {
+				const val = parseFloat(newPrice);
+				if (!isNaN(val) && val >= 0) {
+					cart[index].price = val;
+					calculateCartTotal();
+					saveCartState();
+				}
+			}
+
+			function updateCartItemDiscount(index, newDiscount) {
+				const val = parseFloat(newDiscount);
+				if (!isNaN(val) && val >= 0 && val <= 100) {
+					cart[index].discount = val;
+					calculateCartTotal();
+					saveCartState();
+				}
+			}
+
+			function updateCartItemTaxRate(index, newTax) {
+				const val = parseFloat(newTax);
+				if (!isNaN(val) && val >= 0 && val <= 100) {
+					cart[index].taxRate = val;
+					calculateCartTotal();
+					saveCartState();
+				}
+			}
+			
+			function removeFromCart(index) {
+				cart.splice(index, 1);
+				renderCart();
+				calculateCartTotal();
+				saveCartState();
+			}
+			
+			function confirmClearCart() {
+				if (cart.length === 0) return;
+				openConfirmModal(
+					"Kosongkan Keranjang",
+					"Apakah Anda yakin ingin menghapus semua item dari daftar transaksi?",
+					() => {
+						cart = [];
+						renderCart();
+						calculateCartTotal();
+						saveCartState();
+						showToast("Keranjang dibersihkan", "info");
+					}
+				);
+			}
+			
+			function calculateCartTotal() {
+				// Tampilkan indikator mode pajak secara visual di kasir
+				const modeIndicator = document.getElementById('cart-tax-mode-indicator');
+				if (modeIndicator) {
+					modeIndicator.innerText = settings.taxMode === 'inclusive' 
+						? "Setelah Pajak (Inclusive / PPN)" 
+						: "Sebelum Pajak (Exclusive / PPN)";
+				}
+
+				let subtotalDPP = 0;        // Total Dasar Pengenaan Pajak (DPP)
+				let totalItemDiscount = 0;  // Total potongan harga dari diskon item
+				let totalItemTax = 0;       // Total nilai PPN terkumpul dari item
+				let rawSubtotal = 0;        // Jumlah Harga Jual Kasir Kotor (Qty * Price)
+				
+				cart.forEach(item => {
+					const qty = item.quantity;
+					const price = item.price; // Harga jual tertera di katalog/keranjang
+					const dPct = item.discount || 0;
+					const tPct = item.taxRate || 0;
+
+					rawSubtotal += price * qty;
+
+					if (settings.taxMode === 'inclusive') {
+						// Jika inclusive: harga tertera SUDAH termasuk pajak.
+						// Kita harus memisahkan DPP & Pajak secara matematis:
+						// DPP Per Unit = Harga / (1 + Pajak%)
+						const dppPerUnit = price / (1 + (tPct / 100));
+						const discPerUnit = dppPerUnit * (dPct / 100);
+						const netDppPerUnit = dppPerUnit - discPerUnit;
+						const taxPerUnit = netDppPerUnit * (tPct / 100);
+
+						subtotalDPP += netDppPerUnit * qty;
+						totalItemDiscount += (discPerUnit * qty);
+						totalItemTax += (taxPerUnit * qty);
+					} else {
+						// Jika exclusive: harga tertera belum termasuk pajak.
+						// DPP Per Unit = Harga Jual itu sendiri
+						const dppPerUnit = price;
+						const discPerUnit = dppPerUnit * (dPct / 100);
+						const netDppPerUnit = dppPerUnit - discPerUnit;
+						const taxPerUnit = netDppPerUnit * (tPct / 100);
+
+						subtotalDPP += netDppPerUnit * qty;
+						totalItemDiscount += (discPerUnit * qty);
+						totalItemTax += (taxPerUnit * qty);
+					}
+				});
+
+				// Kalkulasi level Transaksi Global (Adjustments Footer)
+				const itemTotalNetSum = subtotalDPP + totalItemTax; // Subtotal setelah diskon + pajak item
+
+				const discPercent = parseFloat(document.getElementById('cart-discount-percent').value) || 0;
+				const discFixed = parseFloat(document.getElementById('cart-discount-fixed').value) || 0;
+				const taxPercent = parseFloat(document.getElementById('cart-tax-percent').value) || 0;
+				const taxFixed = parseFloat(document.getElementById('cart-tax-fixed').value) || 0;
+				
+				// Menghitung Diskon Global Tambahan
+				const globalDiscountAmount = (itemTotalNetSum * discPercent) / 100 + discFixed;
+				const baseAfterGlobalDisc = Math.max(0, itemTotalNetSum - globalDiscountAmount);
+				
+				// Menghitung Pajak / Charge Tambahan Global
+				const globalTaxAmount = (baseAfterGlobalDisc * taxPercent) / 100;
+				const totalFinal = baseAfterGlobalDisc + globalTaxAmount + taxFixed;
+				
+				// Tampilkan hasil rincian di panel kasir
+				document.getElementById('cart-subtotal').innerText = formatRupiah(rawSubtotal);
+				document.getElementById('cart-dpp-val').innerText = formatRupiah(subtotalDPP);
+				document.getElementById('cart-item-discount-val').innerText = "-" + formatRupiah(totalItemDiscount);
+				document.getElementById('cart-item-tax-val').innerText = formatRupiah(totalItemTax);
+				document.getElementById('cart-total').innerText = formatRupiah(totalFinal);
+				
+				// Perbarui indikator badge mobile
+				const totalCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
+				document.getElementById('mobile-cart-badge').innerText = totalCount;
+				
+				return { 
+					subtotal: rawSubtotal,
+					subtotalDPP: subtotalDPP,
+					itemDiscount: totalItemDiscount,
+					itemTax: totalItemTax,
+					globalDiscount: globalDiscountAmount,
+					globalTax: (globalTaxAmount + taxFixed),
+					total: totalFinal 
+				};
+			}
+			
+			function renderCustomerDropdowns() {
+				const selectEl = document.getElementById('cart-customer-select');
+				if (!selectEl) return;
+				
+				const prevVal = localStorage.getItem('frontdesk_selected_cust') || "";
+				selectEl.innerHTML = '<option value="">-- Transaksi Umum / Tanpa Pelanggan --</option>';
+				
+				customers.forEach(cust => {
+					const opt = document.createElement('option');
+					opt.value = cust.id;
+					opt.innerText = `${cust.name} (${cust.phone})`;
+					if (cust.id === prevVal) {
+						opt.selected = true;
+					}
+					selectEl.appendChild(opt);
+				});
+			}
+			
+			// --- CHECKOUT & METODE PEMBAYARAN ---
+			function selectPaymentMethod(method) {
+				currentPaymentMethod = method;
+				
+				document.querySelectorAll('.pay-method-btn').forEach(btn => {
+					btn.className = "pay-method-btn p-2 border rounded-xl text-center font-bold transition-all hover:bg-slate-50 dark:hover:bg-slate-700 flex flex-col items-center gap-1 border-slate-200 dark:border-slate-750 text-slate-650 dark:text-slate-400 text-[11px]";
+				});
+				
+				const activeBtn = document.getElementById(`pay-${method}`);
+				if (activeBtn) {
+					activeBtn.className = "pay-method-btn p-2 border rounded-xl text-center font-bold transition-all flex flex-col items-center gap-1 border-primary bg-blue-50 dark:bg-slate-700/60 text-primary dark:text-blue-400 text-[11px]";
+				}
+				
+				const cashSection = document.getElementById('cash-payment-section');
+				if (method === 'Tunai' || method === 'eWallet') {
+					cashSection.classList.remove('hidden');
+				} else {
+					cashSection.classList.add('hidden');
+				}
+			}
+			
+			function suggestCashButtons(total) {
+				const suggestions = [total];
+				const bills = [5000, 10000, 20000, 50000, 100000];
+				
+				bills.forEach(bill => {
+					if (bill > total && suggestions.length < 4) {
+						suggestions.push(bill);
+					}
+				});
+				
+				const nextRound = Math.ceil(total / 10000) * 10000;
+				if (nextRound > total && !suggestions.includes(nextRound) && suggestions.length < 4) {
+					suggestions.push(nextRound);
+				}
+				
+				return [...new Set(suggestions)].sort((a, b) => a - b);
+			}
+			
+			function openCheckoutModal() {
+				if (cart.length === 0) {
+					showToast("Keranjang Anda kosong!", "error");
+					return;
+				}
+				
+				const customerSelectVal = document.getElementById('cart-customer-select').value;
+				const targetCustomer = customers.find(c => c.id === customerSelectVal);
+				
+				const totals = calculateCartTotal();
+				
+				// Set data info pelanggan di Checkout Modal
+				const noticeEl = document.getElementById('checkout-customer-notice');
+				const nameEl = document.getElementById('checkout-customer-name');
+				if (targetCustomer) {
+					noticeEl.classList.remove('hidden');
+					nameEl.innerText = `${targetCustomer.name} (${targetCustomer.phone})`;
+				} else {
+					noticeEl.classList.add('hidden');
+					nameEl.innerText = "-";
+				}
+				
+				const valLabel = document.getElementById('checkout-total-val');
+				valLabel.innerText = formatRupiah(settings.freeMode ? 0 : totals.total);
+				
+				const methodGrid = document.getElementById('payment-methods-grid');
+				const cashSection = document.getElementById('cash-payment-section');
+				
+				if (settings.freeMode) {
+					cashSection.classList.add('hidden');
+					methodGrid.innerHTML = `
+					<button id="pay-Gratis" class="pay-method-btn col-span-4 p-3 border border-primary bg-blue-50 dark:bg-slate-700/40 text-primary dark:text-blue-400 rounded-xl text-center font-bold flex items-center justify-center gap-2">
+						<i class="fas fa-gift text-sm"></i>
+						<span>Layanan Publik (Bebas Biaya)</span>
+					</button>
+					`;
+					currentPaymentMethod = 'Gratis';
+				} else {
+					methodGrid.innerHTML = `
+					<button type="button" onclick="selectPaymentMethod('Tunai')" id="pay-Tunai" class="pay-method-btn p-2 border rounded-xl text-center font-bold transition-all flex flex-col items-center gap-1 border-slate-200 dark:border-slate-750">
+						<i class="fas fa-money-bill-wave text-sm"></i>
+						<span>Tunai</span>
+					</button>
+					<button type="button" onclick="selectPaymentMethod('QRIS')" id="pay-QRIS" class="pay-method-btn p-2 border rounded-xl text-center font-bold transition-all flex flex-col items-center gap-1 border-slate-200 dark:border-slate-750">
+						<i class="fas fa-qrcode text-sm"></i>
+						<span>QRIS</span>
+					</button>
+					<button type="button" onclick="selectPaymentMethod('Debit')" id="pay-Debit" class="pay-method-btn p-2 border rounded-xl text-center font-bold transition-all flex flex-col items-center gap-1 border-slate-200 dark:border-slate-750">
+						<i class="fas fa-credit-card text-sm"></i>
+						<span>Debit</span>
+					</button>
+					<button type="button" onclick="selectPaymentMethod('Transfer')" id="pay-Transfer" class="pay-method-btn p-2 border rounded-xl text-center font-bold transition-all flex flex-col items-center gap-1 border-slate-200 dark:border-slate-750">
+						<i class="fas fa-university text-sm"></i>
+						<span>Transfer</span>
+					</button>
+					<button type="button" onclick="selectPaymentMethod('eWallet')" id="pay-eWallet" class="pay-method-btn p-2 border rounded-xl text-center font-bold transition-all flex flex-col items-center gap-1 border-slate-200 dark:border-slate-750">
+						<i class="fas fa-wallet text-sm"></i>
+						<span>eWallet</span>
+					</button>
+					<button type="button" onclick="selectPaymentMethod('Kredit')" id="pay-Kredit" class="pay-method-btn p-2 border rounded-xl text-center font-bold transition-all flex flex-col items-center gap-1 border-slate-200 dark:border-slate-750">
+						<i class="fas fa-calendar-alt text-sm"></i>
+						<span>Kredit</span>
+					</button>
+					<button type="button" onclick="selectPaymentMethod('Kasbon')" id="pay-Kasbon" class="pay-method-btn p-2 border rounded-xl text-center font-bold transition-all flex flex-col items-center gap-1 border-slate-200 dark:border-slate-750">
+						<i class="fas fa-file-invoice text-sm"></i>
+						<span>Kasbon</span>
+					</button>
+					`;
+					selectPaymentMethod('Tunai');
+					document.getElementById('cash-paid-input').value = '';
+					document.getElementById('checkout-change-val').innerText = formatRupiah(0);
+					
+					// Tambahkan Uang Cepat (Quick Cash Suggestions)
+					const suggestions = suggestCashButtons(totals.total);
+					const quickCashContainer = document.getElementById('quick-cash-container');
+					quickCashContainer.innerHTML = '';
+					
+					suggestions.forEach(cashVal => {
+						const btn = document.createElement('button');
+						btn.className = "px-2.5 py-1 bg-slate-100 dark:bg-slate-700 dark:text-white hover:bg-primary dark:hover:bg-blue-500 hover:text-white rounded-lg text-[10px] font-bold transition-colors";
+						btn.innerText = formatRupiah(cashVal);
+						btn.onclick = () => {
+							document.getElementById('cash-paid-input').value = cashVal;
+							calculateChange();
+						};
+						quickCashContainer.appendChild(btn);
+					});
+				}
+				
+				document.getElementById('checkout-modal').classList.remove('hidden');
+			}
+			
+			function closeCheckoutModal() {
+				document.getElementById('checkout-modal').classList.add('hidden');
+			}
+			
+			function calculateChange() {
+				const totals = calculateCartTotal();
+				const paid = parseFloat(document.getElementById('cash-paid-input').value) || 0;
+				let change = paid - totals.total;
+				if (change < 0) change = 0;
+				document.getElementById('checkout-change-val').innerText = formatRupiah(change);
+			}
+			
+			function completeTransaction(shouldPreview) {
+				const totals = calculateCartTotal();
+				let paidAmount = totals.total;
+				let changeAmount = 0;
+				
+				const customerSelectVal = document.getElementById('cart-customer-select').value;
+				const targetCustomer = customers.find(c => c.id === customerSelectVal);
+				
+				// Validasi wajib Pelanggan untuk metode pembayaran Kredit / Kasbon
+				if ((currentPaymentMethod === 'Kredit' || currentPaymentMethod === 'Kasbon') && !targetCustomer) {
+					showToast("Metode Kredit / Kasbon wajib memilih Pelanggan di CRM!", "error");
+					return;
+				}
+				
+				if ((currentPaymentMethod === 'Tunai' || currentPaymentMethod === 'eWallet') && !settings.freeMode) {
+					const cashPaid = parseFloat(document.getElementById('cash-paid-input').value) || 0;
+					if (cashPaid < totals.total) {
+						showToast("Uang yang diterima kurang dari total tagihan!", "error");
+						return;
+					}
+					paidAmount = cashPaid;
+					changeAmount = cashPaid - totals.total;
+				}
+				
+				if (settings.freeMode) {
+					paidAmount = 0;
+					changeAmount = 0;
+				}
+				
+				const txId = 'TX-' + Date.now();
+				const dateObj = new Date();
+				const dateStr = dateObj.toLocaleString('id-ID', {
+					day: '2-digit', month: '2-digit', year: 'numeric',
+					hour: '2-digit', minute: '2-digit'
+				});
+				
+				const customerNameInput = targetCustomer ? targetCustomer.name : 'Umum';
+				
+				const newTx = {
+					id: txId,
+					date: dateStr,
+					customerId: customerSelectVal || null,
+					customerName: customerNameInput,
+					items: JSON.parse(JSON.stringify(cart)),
+					subtotal: totals.subtotal,
+					subtotalDPP: totals.subtotalDPP,
+					itemDiscount: totals.itemDiscount,
+					itemTax: totals.itemTax,
+					globalDiscount: totals.globalDiscount,
+					globalTax: totals.globalTax,
+					total: settings.freeMode ? 0 : totals.total,
+					paymentMethod: currentPaymentMethod,
+					paidAmount: paidAmount,
+					changeAmount: changeAmount,
+					cashier: settings.username,
+					taxMode: settings.taxMode
+				};
+				
+				transactions.push(newTx);
+				saveTransactionState();
+				
+				// Proses Kredit/Kasbon ke Piutang Pelanggan di CRM
+				if (targetCustomer && (currentPaymentMethod === 'Kredit' || currentPaymentMethod === 'Kasbon')) {
+					targetCustomer.balance += totals.total;
+					
+					// Tambah histori log kegiatan CRM pelanggan
+					targetCustomer.activities.unshift({
+						date: dateStr,
+						text: `Transaksi ${currentPaymentMethod} sebesar ${formatRupiah(totals.total)} dengan ID: ${txId}`
+					});
+					
+					// Tambah log Deals CRM
+					targetCustomer.deals.unshift({
+						id: txId,
+						title: `Pembelian via ${currentPaymentMethod}`,
+						amount: totals.total,
+						date: dateStr
+					});
+					
+					saveCustomersState();
+				} else if (targetCustomer) {
+					// Log kegiatan pelanggan umum
+					targetCustomer.activities.unshift({
+						date: dateStr,
+						text: `Transaksi tunai/lainnya sebesar ${formatRupiah(totals.total)} dengan ID: ${txId}`
+					});
+					targetCustomer.deals.unshift({
+						id: txId,
+						title: `Pembelian Lunas (${currentPaymentMethod})`,
+						amount: totals.total,
+						date: dateStr
+					});
+					saveCustomersState();
+				}
+				
+				// Kurangi stok di katalog utama
+				cart.forEach(cartItem => {
+					const original = catalog.find(cat => cat.id === cartItem.id);
+					if (original) {
+						original.qty = Math.max(0, original.qty - cartItem.quantity);
+					}
+				});
+				saveCatalogState();
+				
+				closeCheckoutModal();
+				renderPosItems();
+				renderCatalogTable();
+				
+				// Reset keranjang belanja kasir
+				cart = [];
+				document.getElementById('cart-customer-select').value = '';
+				document.getElementById('cart-discount-percent').value = 0;
+				document.getElementById('cart-discount-fixed').value = 0;
+				document.getElementById('cart-tax-percent').value = 0;
+				document.getElementById('cart-tax-fixed').value = 0;
+				
+				renderCart();
+				calculateCartTotal();
+				saveCartState();
+				switchMobileSubTab('items');
+				updateTutupOverview();
+				
+				if (shouldPreview) {
+					openReceiptPreview(newTx);
+				} else {
+					showToast(`Transaksi ${txId} sukses disimpan!`, "success");
+				}
+			}
+			
+			// --- SCREEN PREVIEW STRUK & CETAK FISIK ---
+			let activePrintingTx = null;
+			
+			function openReceiptPreview(tx) {
+				activePrintingTx = tx;
+				const container = document.getElementById('receipt-screen-content');
+				const previewModalCard = document.getElementById('receipt-modal-card');
+				const labelEl = document.getElementById('preview-paper-label');
+				
+				labelEl.innerText = settings.paperSize;
+				
+				if (settings.paperSize === 'Thermal') {
+					// Formatting Struk Termal Kasir Tradisional (80mm) - Teks Diperbesar & Detail Pajak Akurat
+					previewModalCard.className = "bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transform scale-95 transition-all text-slate-800 dark:text-slate-100 max-w-xs w-full";
+					container.className = "bg-white text-black p-4 border border-slate-200 rounded-lg font-mono text-sm max-w-[340px] mx-auto";
+					
+					const itemsRows = tx.items.map(item => `
+					<div class="mb-2 text-sm">
+						<div class="flex justify-between font-bold">
+							<span>${item.name}</span>
+							<span>${formatRupiah(item.price * item.quantity)}</span>
+						</div>
+						<div class="flex justify-between text-xs text-gray-600">
+							<span>${item.quantity} ${item.unit} x ${formatRupiah(item.price)}</span>
+							<span>${item.discount > 0 ? `(Disc: ${item.discount}%)` : ''} ${item.taxRate > 0 ? `(Pjk: ${item.taxRate}%)` : ''}</span>
+						</div>
+					</div>
+					`).join('');
+					
+					container.innerHTML = `
+					<div class="text-center font-bold text-base uppercase mb-1">${settings.businessName}</div>
+					<div class="text-center text-xs text-gray-700 leading-tight mb-1">${settings.address}</div>
+					<div class="text-center text-xs text-gray-700 mb-2">${settings.contact}</div>
+					<div class="border-t border-dashed border-black my-2"></div>
+					
+					<div class="flex justify-between text-xs text-gray-800 mb-1">
+						<span>No: ${tx.id}</span>
+						<span>${tx.date}</span>
+					</div>
+					<div class="flex justify-between text-xs text-gray-800 mb-2">
+						<span>Kasir: ${tx.cashier}</span>
+						<span>Plg: ${tx.customerName}</span>
+					</div>
+					<div class="text-[10px] text-gray-600 text-center uppercase mb-1">Mode: Harga ${tx.taxMode === 'inclusive' ? 'Setelah' : 'Sebelum'} Pajak</div>
+					<div class="border-t border-dashed border-black my-2"></div>
+					
+					<div class="mb-2">
+						${itemsRows}
+					</div>
+					<div class="border-t border-dashed border-black my-2"></div>
+					
+					<div class="space-y-1 text-gray-800 text-sm">
+						<div class="flex justify-between text-sm">
+							<span>Subtotal Kotor</span>
+							<span>${formatRupiah(tx.subtotal)}</span>
+						</div>
+						<div class="flex justify-between text-sm">
+							<span>DPP (Dasar Pajak)</span>
+							<span>${formatRupiah(tx.subtotalDPP)}</span>
+						</div>
+						${tx.itemDiscount > 0 ? `
+						<div class="flex justify-between text-sm text-red-600">
+							<span>Total Diskon Item</span>
+							<span>-${formatRupiah(tx.itemDiscount)}</span>
+						</div>
+						` : ''}
+						${tx.itemTax > 0 ? `
+						<div class="flex justify-between text-sm">
+							<span>PPN Item Terkumpul</span>
+							<span>${formatRupiah(tx.itemTax)}</span>
+						</div>
+						` : ''}
+						${tx.globalDiscount > 0 ? `
+						<div class="flex justify-between text-sm">
+							<span>Diskon Global</span>
+							<span>-${formatRupiah(tx.globalDiscount)}</span>
+						</div>
+						` : ''}
+						${tx.globalTax > 0 ? `
+						<div class="flex justify-between text-sm">
+							<span>Charge Tambahan</span>
+							<span>${formatRupiah(tx.globalTax)}</span>
+						</div>
+						` : ''}
+						<div class="flex justify-between font-bold text-base pt-1 border-t border-dashed border-black mt-1">
+							<span>TOTAL AKHIR</span>
+							<span>${formatRupiah(tx.total)}</span>
+						</div>
+						<div class="flex justify-between text-xs text-gray-700 mt-1">
+							<span>Metode Bayar</span>
+							<span class="font-bold">${tx.paymentMethod}</span>
+						</div>
+						${tx.paymentMethod === 'Tunai' || tx.paymentMethod === 'eWallet' ? `
+						<div class="flex justify-between text-sm">
+							<span>Diterima</span>
+							<span>${formatRupiah(tx.paidAmount)}</span>
+						</div>
+						<div class="flex justify-between font-bold text-sm">
+							<span>Kembalian</span>
+							<span>${formatRupiah(tx.changeAmount)}</span>
+						</div>
+						` : ''}
+					</div>
+					
+					<div class="border-t border-dashed border-black my-3"></div>
+					<div class="text-center text-xs italic leading-snug whitespace-pre-line">${settings.notes}</div>
+					`;
+				} else {
+					// Formatting Struk Invoice A4 Formal Kantoran Lengkap dengan Kolom Pajak dan Diskon
+					previewModalCard.className = "bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transform scale-95 transition-all text-slate-800 dark:text-slate-100 max-w-4xl w-full";
+					container.className = "bg-white text-black p-8 border border-slate-300 rounded-lg font-sans text-xs max-w-[800px] mx-auto min-h-[500px] flex flex-col justify-between";
+					
+					const itemsRows = tx.items.map((item, index) => `
+					<tr class="border-b border-gray-200">
+						<td class="py-2 text-center text-[11px]">${index + 1}</td>
+						<td class="py-2 px-2 text-[11px] font-bold">
+							${item.name} 
+							<span class="text-[9px] font-mono text-gray-500">(${item.code})</span>
+						</td>
+						<td class="py-2 text-center text-[11px]">${item.quantity} ${item.unit}</td>
+						<td class="py-2 text-right text-[11px]">${formatRupiah(item.price)}</td>
+						<td class="py-2 text-center text-[11px]">${item.discount}%</td>
+						<td class="py-2 text-center text-[11px]">${item.taxRate}%</td>
+						<td class="py-2 text-right text-[11px] font-bold">${formatRupiah(item.price * item.quantity)}</td>
+					</tr>
+					`).join('');
+					
+					container.innerHTML = `
+					<div>
+						<!-- Header Invoice / Letterhead -->
+						<div class="flex justify-between items-start border-b-2 border-slate-300 pb-4 mb-4">
+							<div>
+								<h1 class="text-xl font-black uppercase text-blue-700 tracking-wide">${settings.businessName}</h1>
+								<p class="text-[10px] text-gray-600 mt-1 max-w-xs whitespace-pre-line">${settings.address}</p>
+								<p class="text-[10px] text-gray-600 font-bold mt-0.5">Kontak: ${settings.contact}</p>
+							</div>
+							<div class="text-right">
+								<h2 class="text-lg font-bold text-gray-800">INVOICE PENJUALAN</h2>
+								<p class="text-[10px] text-gray-500 mt-1">ID Transaksi: <span class="font-mono font-bold text-gray-800">${tx.id}</span></p>
+								<p class="text-[10px] text-gray-500">Waktu Cetak: <span class="font-bold text-gray-800">${tx.date}</span></p>
+								<p class="text-[9px] text-gray-400">Mode Pajak: Harga ${tx.taxMode === 'inclusive' ? 'Sudah Termasuk' : 'Sebelum'} Pajak</p>
+							</div>
+						</div>
+						
+						<!-- Data Pelanggan / Kasir -->
+						<div class="grid grid-cols-2 gap-4 mb-6 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+							<div>
+								<span class="text-[9px] text-gray-400 font-bold uppercase block">Ditujukan Kepada:</span>
+								<p class="text-[11px] font-bold text-gray-850">${tx.customerName}</p>
+								<p class="text-[10px] text-gray-500">Pelanggan Terhubung</p>
+							</div>
+							<div>
+								<span class="text-[9px] text-gray-400 font-bold uppercase block">Kasir Bertugas:</span>
+								<p class="text-[11px] font-bold text-gray-850">${tx.cashier}</p>
+								<p class="text-[10px] text-gray-500">FrontDesk Operasional</p>
+							</div>
+						</div>
+						
+						<!-- Tabel Barang Layout HVS -->
+						<table class="w-full text-left border-collapse mb-6">
+							<thead>
+								<tr class="bg-slate-100 text-slate-700 uppercase text-[9px] font-black border-b border-slate-300">
+									<th class="py-2 text-center w-12">No</th>
+									<th class="py-2 px-2">Deskripsi Layanan / Barang</th>
+									<th class="py-2 text-center w-20">Jumlah</th>
+									<th class="py-2 text-right w-24">Harga Dasar</th>
+									<th class="py-2 text-center w-16">Disc (%)</th>
+									<th class="py-2 text-center w-16">PPN (%)</th>
+									<th class="py-2 text-right w-28">Subtotal Kotor</th>
+								</tr>
+							</thead>
+							<tbody>
+								${itemsRows}
+							</tbody>
+						</table>
+					</div>
+					
+					<!-- Summary & Tanda Tangan Bottom A4 -->
+					<div class="mt-auto">
+						<div class="flex justify-between items-start gap-8 border-t-2 border-slate-200 pt-4">
+							<!-- Kiri: Catatan & Notes -->
+							<div class="flex-1">
+								<span class="text-[9px] text-gray-400 font-bold uppercase block">Syarat & Catatan Khusus:</span>
+								<p class="text-[10px] text-gray-600 mt-1 leading-relaxed whitespace-pre-line">${settings.notes}</p>
+							</div>
+							
+							<!-- Kanan: Summary Cashier -->
+							<div class="w-72 space-y-1.5 text-gray-800">
+								<div class="flex justify-between text-[11px]">
+									<span>Subtotal Kotor</span>
+									<span>${formatRupiah(tx.subtotal)}</span>
+								</div>
+								<div class="flex justify-between text-[11px] text-slate-600">
+									<span>DPP (Dasar Pajak)</span>
+									<span>${formatRupiah(tx.subtotalDPP)}</span>
+								</div>
+								${tx.itemDiscount > 0 ? `
+								<div class="flex justify-between text-[11px] text-red-600 font-medium">
+									<span>Total Diskon Item</span>
+									<span>-${formatRupiah(tx.itemDiscount)}</span>
+								</div>
+								` : ''}
+								${tx.itemTax > 0 ? `
+								<div class="flex justify-between text-[11px] text-gray-650">
+									<span>PPN Terkumpul</span>
+									<span>${formatRupiah(tx.itemTax)}</span>
+								</div>
+								` : ''}
+								${tx.globalDiscount > 0 ? `
+								<div class="flex justify-between text-[11px] text-red-600">
+									<span>Potongan Diskon Global</span>
+									<span>-${formatRupiah(tx.globalDiscount)}</span>
+								</div>
+								` : ''}
+								${tx.globalTax > 0 ? `
+								<div class="flex justify-between text-[11px] text-gray-650">
+									<span>Charge Tambahan</span>
+									<span>${formatRupiah(tx.globalTax)}</span>
+								</div>
+								` : ''}
+								<div class="flex justify-between font-black text-xs pt-1.5 border-t border-slate-300 text-slate-900">
+									<span>TOTAL PENJUALAN</span>
+									<span>${formatRupiah(tx.total)}</span>
+								</div>
+								<div class="flex justify-between text-[10px] text-gray-600">
+									<span>Metode Pembayaran</span>
+									<span class="font-bold text-gray-800">${tx.paymentMethod}</span>
+								</div>
+								${tx.paymentMethod === 'Tunai' || tx.paymentMethod === 'eWallet' ? `
+								<div class="flex justify-between text-[11px]">
+									<span>Jumlah Dibayar</span>
+									<span>${formatRupiah(tx.paidAmount)}</span>
+								</div>
+								<div class="flex justify-between font-bold text-[11px] text-emerald-700">
+									<span>Kembalian Kasir</span>
+									<span>${formatRupiah(tx.changeAmount)}</span>
+								</div>
+								` : ''}
+							</div>
+						</div>
+						
+						<!-- Tanda Tangan Tembusan A4 -->
+						<div class="flex justify-between items-center mt-12 px-6">
+							<div class="text-center w-40">
+								<p class="text-[10px] text-gray-500 mb-10">Penerima / Pelanggan</p>
+								<div class="border-t border-gray-400 w-full"></div>
+								<p class="text-[9px] text-gray-400 mt-1">(Tanda Tangan & Nama Terang)</p>
+							</div>
+							<div class="text-center w-40">
+								<p class="text-[10px] text-gray-500 mb-10">Hormat Kami, Kasir</p>
+								<div class="border-t border-gray-400 w-full"></div>
+								<p class="text-[9px] text-gray-400 mt-1">${tx.cashier}</p>
+							</div>
+						</div>
+					</div>
+					`;
+				}
+				
+				document.getElementById('receipt-preview-modal').classList.remove('hidden');
+			}
+			
+			function closeReceiptPreview() {
+				document.getElementById('receipt-preview-modal').classList.add('hidden');
+				activePrintingTx = null;
+			}
+			
+			function triggerPhysicalPrint() {
+				if (!activePrintingTx) return;
+				
+				// Cloning struk digital ke wadah cetak printer fisik
+				const printSource = document.getElementById('receipt-screen-content').innerHTML;
+				const physicalPrintContainer = document.getElementById('print-receipt-container');
+				physicalPrintContainer.innerHTML = printSource;
+				
+				document.getElementById('receipt-preview-modal').classList.add('hidden');
+				physicalPrintContainer.classList.remove('hidden');
+				
+				setTimeout(() => {
+					window.print();
+					physicalPrintContainer.classList.add('hidden');
+					activePrintingTx = null;
+					showToast("Pengiriman dokumen ke printer sukses!", "success");
+				}, 250);
+			}
+			
+			// --- MANAJEMEN KATALOG ---
+			function renderCatalogTable() {
+				const searchVal = document.getElementById('catalog-search').value.toLowerCase();
+				const tbody = document.getElementById('catalog-table-body');
+				tbody.innerHTML = '';
+				
+				const filtered = catalog.filter(item => 
+					item.code.toLowerCase().includes(searchVal) || 
+					item.name.toLowerCase().includes(searchVal)
+				);
+				
+				if (filtered.length === 0) {
+					tbody.innerHTML = `
+					<tr>
+						<td colspan="9" class="px-6 py-8 text-center text-slate-400 dark:text-slate-500">
+							<i class="fas fa-box-open text-2xl mb-1.5"></i>
+							<p class="text-[11px]">Tidak ada item di katalog yang sesuai.</p>
+						</td>
+					</tr>
+					`;
+					return;
+				}
+				
+				filtered.forEach(item => {
+					let badgeColor = "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-350";
+					if (item.category === 'Jasa') badgeColor = "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-350";
+					if (item.category === 'Barang') badgeColor = "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-350";
+					if (item.category === 'Lainnya') badgeColor = "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-350";
+					
+					const tr = document.createElement('tr');
+					tr.className = "hover:bg-slate-50 dark:hover:bg-slate-750/30 transition-colors";
+					tr.innerHTML = `
+					<td class="px-4 py-2.5">
+						<span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}">${item.category || 'Lainnya'}</span>
+					</td>
+					<td class="px-4 py-2.5 font-mono font-bold text-slate-650 dark:text-slate-400">${item.code}</td>
+					<td class="px-4 py-2.5 font-bold text-slate-800 dark:text-slate-100">${item.name}</td>
+					<td class="px-4 py-2.5 text-right font-bold text-primary dark:text-blue-400">${formatRupiah(item.price)}</td>
+					<td class="px-4 py-2.5 text-center font-bold text-red-500 dark:text-red-400">${item.discount || 0}%</td>
+					<td class="px-4 py-2.5 text-center font-bold text-slate-600 dark:text-slate-400">${item.taxRate !== undefined ? item.taxRate : settings.defaultTaxRate}%</td>
+					<td class="px-4 py-2.5 text-center font-bold text-slate-600 dark:text-slate-400">${item.qty}</td>
+					<td class="px-4 py-2.5 text-center text-slate-450 dark:text-slate-500 font-bold">${item.unit}</td>
+					<td class="px-4 py-2.5 text-center whitespace-nowrap">
+						<button onclick="openCatalogModal('${item.id}')" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 font-bold mr-3"><i class="fas fa-edit mr-1"></i>Edit</button>
+						<button onclick="deleteCatalogItem('${item.id}')" class="text-red-500 hover:text-red-700 dark:hover:text-red-400 font-bold"><i class="fas fa-trash-alt mr-1"></i>Hapus</button>
+					</td>
+					`;
+					tbody.appendChild(tr);
+				});
+			}
+			
+			function openCatalogModal(id = null) {
+				const modal = document.getElementById('catalog-modal');
+				const title = document.getElementById('catalog-modal-title');
+				
+				if (id) {
+					title.innerText = "Edit Produk / Jasa";
+					const item = catalog.find(i => i.id === String(id));
+					if (item) {
+						document.getElementById('cat-item-id').value = item.id;
+						document.getElementById('cat-item-category').value = item.category || 'Jasa';
+						document.getElementById('cat-item-code').value = item.code;
+						document.getElementById('cat-item-name').value = item.name;
+						document.getElementById('cat-item-price').value = item.price;
+						document.getElementById('cat-item-discount').value = item.discount || 0;
+						document.getElementById('cat-item-taxrate').value = item.taxRate !== undefined ? item.taxRate : settings.defaultTaxRate;
+						document.getElementById('cat-item-unit').value = item.unit;
+						document.getElementById('cat-item-qty').value = item.qty;
+					}
+				} else {
+					title.innerText = "Tambah Produk / Jasa Baru";
+					document.getElementById('cat-item-id').value = '';
+					document.getElementById('cat-item-category').value = 'Jasa';
+					document.getElementById('cat-item-code').value = '';
+					document.getElementById('cat-item-name').value = '';
+					document.getElementById('cat-item-price').value = '';
+					document.getElementById('cat-item-discount').value = 0;
+					document.getElementById('cat-item-taxrate').value = settings.defaultTaxRate;
+					document.getElementById('cat-item-unit').value = 'Pcs';
+					document.getElementById('cat-item-qty').value = '999';
+				}
+				
+				modal.classList.remove('hidden');
+			}
+			
+			function closeCatalogModal() {
+				document.getElementById('catalog-modal').classList.add('hidden');
+			}
+			
+			function saveCatalogItem(event) {
+				event.preventDefault();
+				const id = document.getElementById('cat-item-id').value;
+				const category = document.getElementById('cat-item-category').value;
+				const code = document.getElementById('cat-item-code').value.trim().toUpperCase();
+				const name = document.getElementById('cat-item-name').value.trim();
+				const price = parseFloat(document.getElementById('cat-item-price').value) || 0;
+				const discount = parseFloat(document.getElementById('cat-item-discount').value) || 0;
+				const taxRate = parseFloat(document.getElementById('cat-item-taxrate').value) || 0;
+				const unit = document.getElementById('cat-item-unit').value.trim();
+				const qty = parseInt(document.getElementById('cat-item-qty').value) || 0;
+				
+				if (id) {
+					const idx = catalog.findIndex(i => i.id === String(id));
+					if (idx !== -1) {
+						catalog[idx] = { id, category, code, name, price, discount, taxRate, unit, qty };
+						showToast("Data katalog diperbarui!", "success");
+					}
+				} else {
+					const codeExists = catalog.some(i => i.code === code);
+					if (codeExists) {
+						showToast(`Kode katalog ${code} sudah ada!`, "error");
+						return;
+					}
+					catalog.push({ id: String(Date.now()), category, code, name, price, discount, taxRate, unit, qty });
+					showToast("Item katalog berhasil ditambahkan!", "success");
+				}
+				
+				saveCatalogState();
+				closeCatalogModal();
+				renderCatalogTable();
+				renderPosItems();
+			}
+			
+			function deleteCatalogItem(id) {
+				const item = catalog.find(i => i.id === String(id));
+				if (!item) return;
+				
+				openConfirmModal(
+					"Hapus Item Katalog",
+					`Apakah Anda yakin ingin menghapus "${item.name}" dari basis katalog Anda?`,
+					() => {
+						catalog = catalog.filter(i => i.id !== String(id));
+						saveCatalogState();
+						renderCatalogTable();
+						renderPosItems();
+						showToast("Katalog berhasil dihapus!", "success");
+					}
+				);
+			}
+			
+			// --- SISTEM EXCEL KATALOG ---
+			function exportCatalog() {
+				if (catalog.length === 0) {
+					showToast("Tidak ada produk untuk diekspor!", "error");
+					return;
+				}
+				const mapExport = catalog.map(i => ({
+					"Kategori": i.category || 'Lainnya',
+					"Kode": i.code,
+					"Nama Barang/Jasa": i.name,
+					"Harga": i.price,
+					"Diskon (%)": i.discount || 0,
+					"Pajak (%)": i.taxRate !== undefined ? i.taxRate : settings.defaultTaxRate,
+					"Kuantitas": i.qty,
+					"Satuan": i.unit
+				}));
+				
+				const ws = XLSX.utils.json_to_sheet(mapExport);
+				const wb = XLSX.utils.book_new();
+				XLSX.utils.book_append_sheet(wb, ws, "Katalog");
+				XLSX.writeFile(wb, "Katalog_FrontDesk_PoS.xlsx");
+				showToast("Sukses mengekspor data Katalog ke Excel!", "success");
+			}
+			
+			function importCatalog(event) {
+				const file = event.target.files[0];
+				if (!file) return;
+				
+				const r = new FileReader();
+				r.onload = function(e) {
+					try {
+						const data = new Uint8Array(e.target.result);
+						const wb = XLSX.read(data, { type: 'array' });
+						const sheetName = wb.SheetNames[0];
+						const sheet = wb.Sheets[sheetName];
+						const json = XLSX.utils.sheet_to_json(sheet);
+						
+						if (json.length === 0) {
+							showToast("Data berkas Excel kosong!", "error");
+							return;
+						}
+						
+						let importedList = [];
+						json.forEach((row, i) => {
+							const category = row["Kategori"] || row["Category"] || "Jasa";
+							const code = row["Kode"] || row["Code"] || `BRG-${i+1}`;
+							const name = row["Nama Barang/Jasa"] || row["Nama"] || row["Name"] || "Tanpa Nama";
+							const price = parseFloat(row["Harga"] || row["Price"] || 0);
+							const discount = parseFloat(row["Diskon (%)"] || row["Discount"] || 0);
+							const taxRate = parseFloat(row["Pajak (%)"] || row["TaxRate"] || settings.defaultTaxRate);
+							const qty = parseInt(row["Kuantitas"] || row["Qty"] || row["Stok"] || row["Stock"] || 999);
+							const unit = row["Satuan"] || row["Unit"] || "Pcs";
+							
+							importedList.push({
+								id: String(Date.now() + i),
+								category: String(category),
+								code: String(code),
+								name: String(name),
+								price: price,
+								discount: discount,
+								taxRate: taxRate,
+								qty: qty,
+								unit: String(unit)
+							});
+						});
+						
+						catalog = importedList;
+						saveCatalogState();
+						renderPosItems();
+						renderCatalogTable();
+						showToast(`Selesai mengimpor ${catalog.length} item baru!`, "success");
+					} catch (err) {
+						showToast("Kesalahan membaca format berkas excel!", "error");
+						console.error(err);
+					}
+				};
+				r.readAsArrayBuffer(file);
+				event.target.value = '';
+			}
+			
+			// --- SISTEM MINI CRM (PELANGGAN) ---
+			function renderCustomersList() {
+				const searchVal = document.getElementById('crm-search').value.toLowerCase();
+				const container = document.getElementById('crm-customers-list');
+				container.innerHTML = '';
+				
+				const filtered = customers.filter(c => 
+					c.name.toLowerCase().includes(searchVal) || 
+					c.phone.toLowerCase().includes(searchVal)
+				);
+				
+				if (filtered.length === 0) {
+					container.innerHTML = `
+					<div class="p-4 text-center text-slate-400 dark:text-slate-500 text-xs">
+						<i class="fas fa-users-slash text-xl mb-1"></i>
+						<p>Tidak ada pelanggan.</p>
+					</div>
+					`;
+					return;
+				}
+				
+				filtered.forEach(cust => {
+					const isSelected = selectedCustomerId === cust.id;
+					const div = document.createElement('div');
+					div.className = `p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between text-xs ${
+						isSelected 
+						? 'border-primary bg-blue-50 dark:bg-slate-700/60 text-primary dark:text-blue-300' 
+						: 'border-slate-150 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750'
+					}`;
+					div.onclick = () => selectCustomer(cust.id);
+					
+					div.innerHTML = `
+					<div class="truncate pr-2">
+						<h4 class="font-bold truncate">${cust.name}</h4>
+						<span class="text-[10px] text-slate-400 block mt-0.5 font-mono">${cust.phone}</span>
+					</div>
+					${cust.balance > 0 ? `
+					<span class="px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400 rounded text-[9px] font-bold">
+						Piutang
+					</span>
+					` : ''}
+					`;
+					container.appendChild(div);
+				});
+			}
+			
+			function selectCustomer(id) {
+				selectedCustomerId = id;
+				renderCustomersList();
+				renderCustomersDetails();
+			}
+			
+			function renderCustomersDetails() {
+				const emptyState = document.getElementById('crm-empty-state');
+				const detailPane = document.getElementById('crm-detail-pane');
+				
+				if (!selectedCustomerId) {
+					emptyState.classList.remove('hidden');
+					detailPane.classList.add('hidden', 'lg:flex');
+					return;
+				}
+				
+				const cust = customers.find(c => c.id === selectedCustomerId);
+				if (!cust) {
+					selectedCustomerId = null;
+					renderCustomersDetails();
+					return;
+				}
+				
+				emptyState.classList.add('hidden');
+				detailPane.classList.remove('hidden', 'lg:flex');
+				detailPane.classList.add('flex');
+				
+				// Set Data Profil Kanan
+				document.getElementById('crm-det-name').innerText = cust.name;
+				document.getElementById('crm-det-meta').innerText = `ID: ${cust.id}`;
+				document.getElementById('crm-det-phone').innerText = cust.phone;
+				document.getElementById('crm-det-email').innerText = cust.email || "Tidak ada email";
+				document.getElementById('crm-det-address').innerText = cust.address || "Tidak ada alamat";
+				document.getElementById('crm-det-balance').innerText = formatRupiah(cust.balance);
+				
+				const payDebtBtn = document.getElementById('crm-pay-debt-btn');
+				if (cust.balance > 0) {
+					payDebtBtn.classList.remove('hidden');
+				} else {
+					payDebtBtn.classList.add('hidden');
+				}
+				
+				renderCrmSubpaneData(cust);
+			}
+			
+			function renderCrmSubpaneData(cust) {
+				// Render Kegiatan
+				const actContainer = document.getElementById('crm-list-activities');
+				actContainer.innerHTML = '';
+				if (cust.activities.length === 0) {
+					actContainer.innerHTML = `<p class="text-slate-400 italic text-[10px]">Belum ada histori kegiatan.</p>`;
+				} else {
+					cust.activities.forEach(act => {
+						const el = document.createElement('div');
+						el.className = "p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700";
+						el.innerHTML = `
+						<div class="flex justify-between text-[9px] text-slate-400 mb-0.5">
+							<span class="font-bold"><i class="far fa-clock mr-1"></i>Catatan Kasir</span>
+							<span>${act.date}</span>
+						</div>
+						<p class="text-slate-700 dark:text-slate-300 font-medium">${act.text}</p>
+						`;
+						actContainer.appendChild(el);
+					});
+				}
+				
+				// Render Leads
+				const leadContainer = document.getElementById('crm-list-leads');
+				leadContainer.innerHTML = '';
+				if (cust.leads.length === 0) {
+					leadContainer.innerHTML = `<p class="text-slate-400 italic text-[10px]">Belum ada data peluang penjualan.</p>`;
+				} else {
+					cust.leads.forEach(lead => {
+						let color = "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
+						if (lead.status === 'Won') color = "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300";
+						if (lead.status === 'Lost') color = "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300";
+						
+						const el = document.createElement('div');
+						el.className = "p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center";
+						el.innerHTML = `
+						<div>
+							<h5 class="font-bold text-slate-800 dark:text-slate-200">${lead.title}</h5>
+							<span class="text-[10px] text-slate-400">Peluang Penjualan</span>
+						</div>
+						<div class="text-right">
+							<p class="font-bold text-primary dark:text-blue-400">${formatRupiah(lead.value)}</p>
+							<span class="px-1.5 py-0.5 text-[8px] font-bold rounded ${color}">${lead.status}</span>
+						</div>
+						`;
+						leadContainer.appendChild(el);
+					});
+				}
+				
+				// Render Deals
+				const dealContainer = document.getElementById('crm-list-deals');
+				dealContainer.innerHTML = '';
+				if (cust.deals.length === 0) {
+					dealContainer.innerHTML = `<p class="text-slate-400 italic text-[10px]">Belum ada histori deal penutupan transaksi.</p>`;
+				} else {
+					cust.deals.forEach(deal => {
+						const el = document.createElement('div');
+						el.className = "p-2 bg-emerald-50/50 dark:bg-slate-800 rounded-lg border border-emerald-100 dark:border-slate-750 flex justify-between items-center";
+						el.innerHTML = `
+						<div>
+							<h5 class="font-bold text-slate-800 dark:text-slate-200">${deal.title}</h5>
+							<span class="text-[9px] text-slate-400 font-mono">${deal.id} - ${deal.date}</span>
+						</div>
+						<p class="font-black text-emerald-600 dark:text-emerald-400">${formatRupiah(deal.amount)}</p>
+						`;
+						dealContainer.appendChild(el);
+					});
+				}
+			}
+			
+			function switchCrmDetailTab(tab) {
+				activeCrmDetailTab = tab;
+				const subtabs = ['activities', 'leads', 'deals'];
+				subtabs.forEach(t => {
+					const el = document.getElementById(`crm-tab-${t}`);
+					const pane = document.getElementById(`crm-pane-${t}`);
+					if (t === tab) {
+						el.className = "flex-1 py-2 text-center border-b-2 border-primary text-primary font-bold";
+						pane.classList.remove('hidden');
+					} else {
+						el.className = "flex-1 py-2 text-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 font-bold";
+						pane.classList.add('hidden');
+					}
+				});
+			}
+			
+			function openCustomerModal(id = null) {
+				const modal = document.getElementById('customer-modal');
+				const title = document.getElementById('customer-modal-title');
+				
+				if (id) {
+					title.innerText = "Edit Profil Pelanggan";
+					const cust = customers.find(c => c.id === String(id));
+					if (cust) {
+						document.getElementById('cust-id').value = cust.id;
+						document.getElementById('cust-name').value = cust.name;
+						document.getElementById('cust-phone').value = cust.phone;
+						document.getElementById('cust-email').value = cust.email || '';
+						document.getElementById('cust-address').value = cust.address || '';
+					}
+				} else {
+					title.innerText = "Tambah Pelanggan Baru";
+					document.getElementById('cust-id').value = '';
+					document.getElementById('cust-name').value = '';
+					document.getElementById('cust-phone').value = '';
+					document.getElementById('cust-email').value = '';
+					document.getElementById('cust-address').value = '';
+				}
+				
+				modal.classList.remove('hidden');
+			}
+			
+			function closeCustomerModal() {
+				document.getElementById('customer-modal').classList.add('hidden');
+			}
+			
+			function saveCustomer(event) {
+				event.preventDefault();
+				const id = document.getElementById('cust-id').value;
+				const name = document.getElementById('cust-name').value.trim();
+				const phone = document.getElementById('cust-phone').value.trim();
+				const email = document.getElementById('cust-email').value.trim();
+				const address = document.getElementById('cust-address').value.trim();
+				
+				if (id) {
+					const idx = customers.findIndex(c => c.id === String(id));
+					if (idx !== -1) {
+						customers[idx].name = name;
+						customers[idx].phone = phone;
+						customers[idx].email = email;
+						customers[idx].address = address;
+						showToast("Profil Pelanggan diperbarui!", "success");
+					}
+				} else {
+					customers.push({
+						id: 'CUST-' + Date.now(),
+						name: name,
+						phone: phone,
+						email: email,
+						address: address,
+						balance: 0,
+						activities: [{
+							date: new Date().toLocaleString('id-ID'),
+							text: "Pelanggan baru terdaftar di sistem CRM."
+						}],
+						leads: [],
+						deals: []
+					});
+					showToast("Pelanggan baru berhasil ditambahkan!", "success");
+				}
+				
+				saveCustomersState();
+				closeCustomerModal();
+				renderCustomersList();
+				renderCustomersDetails();
+				renderCustomerDropdowns();
+			}
+			
+			function triggerEditCustomer() {
+				if (selectedCustomerId) openCustomerModal(selectedCustomerId);
+			}
+			
+			function triggerDeleteCustomer() {
+				if (!selectedCustomerId) return;
+				const cust = customers.find(c => c.id === selectedCustomerId);
+				if (!cust) return;
+				
+				openConfirmModal(
+					"Hapus Data Pelanggan",
+					`Apakah Anda yakin ingin menghapus pelanggan "${cust.name}" dari CRM? Semua log histori akan terhapus.`,
+					() => {
+						customers = customers.filter(c => c.id !== selectedCustomerId);
+						selectedCustomerId = null;
+						saveCustomersState();
+						renderCustomersList();
+						renderCustomersDetails();
+						renderCustomerDropdowns();
+						showToast("Pelanggan berhasil dihapus!", "success");
+					}
+				);
+			}
+			
+			// --- SISTEM PENULISAN CATATAN/LEAD BARU CRM ---
+			function openCrmAddModal(type) {
+				const modal = document.getElementById('crm-add-modal');
+				const title = document.getElementById('crm-add-modal-title');
+				document.getElementById('crm-add-type').value = type;
+				
+				if (type === 'activity') {
+					title.innerText = "Tambah Catatan Kegiatan";
+					document.getElementById('crm-add-form-activity').classList.remove('hidden');
+					document.getElementById('crm-add-form-lead').classList.add('hidden');
+					document.getElementById('crm-act-text').value = '';
+				} else {
+					title.innerText = "Tambah Peluang Baru (Lead)";
+					document.getElementById('crm-add-form-activity').classList.add('hidden');
+					document.getElementById('crm-add-form-lead').classList.remove('hidden');
+					document.getElementById('crm-lead-title').value = '';
+					document.getElementById('crm-lead-value').value = 0;
+					document.getElementById('crm-lead-status').value = 'Prospect';
+				}
+				
+				modal.classList.remove('hidden');
+			}
+			
+			function closeCrmAddModal() {
+				document.getElementById('crm-add-modal').classList.add('hidden');
+			}
+			
+			function saveCrmAdd(event) {
+				event.preventDefault();
+				if (!selectedCustomerId) return;
+				
+				const cust = customers.find(c => c.id === selectedCustomerId);
+				if (!cust) return;
+				
+				const type = document.getElementById('crm-add-type').value;
+				const dateStr = new Date().toLocaleString('id-ID');
+				
+				if (type === 'activity') {
+					const text = document.getElementById('crm-act-text').value.trim();
+					if (!text) return;
+					cust.activities.unshift({ date: dateStr, text: text });
+					showToast("Catatan kegiatan disimpan!", "success");
+				} else {
+					const title = document.getElementById('crm-lead-title').value.trim();
+					const value = parseFloat(document.getElementById('crm-lead-value').value) || 0;
+					const status = document.getElementById('crm-lead-status').value;
+					if (!title) return;
+					
+					cust.leads.unshift({
+						id: 'LEAD-' + Date.now(),
+						title: title,
+						value: value,
+						status: status
+					});
+					
+					if (status === 'Won') {
+						cust.deals.unshift({
+							id: 'DEAL-' + Date.now(),
+							title: title,
+							amount: value,
+							date: dateStr
+						});
+					}
+					
+					cust.activities.unshift({
+						date: dateStr,
+						text: `Menambah peluang penjualan "${title}" senilai ${formatRupiah(value)} dengan status: ${status}`
+					});
+					
+					showToast("Peluang penjualan (lead) berhasil disimpan!", "success");
+				}
+				
+				saveCustomersState();
+				closeCrmAddModal();
+				renderCustomersDetails();
+			}
+			
+			function triggerPayDebt() {
+				if (!selectedCustomerId) return;
+				const cust = customers.find(c => c.id === selectedCustomerId);
+				if (!cust || cust.balance <= 0) return;
+				
+				openConfirmModal(
+					"Konfirmasi Pelunasan Cicilan / Piutang",
+					`Apakah Anda ingin melunasi seluruh piutang kasbon "${cust.name}" sebesar ${formatRupiah(cust.balance)}?`,
+					() => {
+						const dateStr = new Date().toLocaleString('id-ID');
+						cust.activities.unshift({
+							date: dateStr,
+							text: `Melakukan pelunasan piutang kasbon sebesar ${formatRupiah(cust.balance)} (Lunas).`
+						});
+						cust.balance = 0;
+						saveCustomersState();
+						renderCustomersDetails();
+						showToast("Selesai melakukan pelunasan!", "success");
+					}
+				);
+			}
+			
+			// --- SISTEM EXCEL CRM PELANGGAN ---
+			function exportCustomersExcel() {
+				if (customers.length === 0) {
+					showToast("Tidak ada data pelanggan untuk diekspor!", "error");
+					return;
+				}
+				const mapExport = customers.map(c => ({
+					"ID Pelanggan": c.id,
+					"Nama Lengkap": c.name,
+					"No. Telepon": c.phone,
+					"Email": c.email || '',
+					"Alamat": c.address || '',
+					"Sisa Kasbon / Piutang (Rp)": c.balance
+				}));
+				
+				const ws = XLSX.utils.json_to_sheet(mapExport);
+				const wb = XLSX.utils.book_new();
+				XLSX.utils.book_append_sheet(wb, ws, "CRM Pelanggan");
+				XLSX.writeFile(wb, "CRM_Pelanggan_Database.xlsx");
+				showToast("Sukses mengekspor CRM ke Excel!", "success");
+			}
+			
+			function importCustomersExcel(event) {
+				const file = event.target.files[0];
+				if (!file) return;
+				
+				const r = new FileReader();
+				r.onload = function(e) {
+					try {
+						const data = new Uint8Array(e.target.result);
+						const wb = XLSX.read(data, { type: 'array' });
+						const sheetName = wb.SheetNames[0];
+						const sheet = wb.Sheets[sheetName];
+						const json = XLSX.utils.sheet_to_json(sheet);
+						
+						if (json.length === 0) {
+							showToast("Data berkas Excel kosong!", "error");
+							return;
+						}
+						
+						let importedList = [];
+						json.forEach((row, i) => {
+							const name = row["Nama Lengkap"] || row["Nama"] || "Tanpa Nama";
+							const phone = row["No. Telepon"] || row["Telepon"] || row["Phone"] || "-";
+							const email = row["Email"] || row["Alamat Email"] || "";
+							const address = row["Alamat"] || row["Alamat Lengkap"] || "";
+							const balance = parseFloat(row["Sisa Kasbon / Piutang (Rp)"] || row["Piutang"] || row["Kasbon"] || 0);
+							
+							importedList.push({
+								id: 'CUST-' + (Date.now() + i),
+								name: String(name),
+								phone: String(phone),
+								email: String(email),
+								address: String(address),
+								balance: balance,
+								activities: [{
+									date: new Date().toLocaleString('id-ID'),
+									text: "Diimpor dari berkas Excel eksternal."
+								}],
+								leads: [],
+								deals: []
+							});
+						});
+						
+						customers = [...customers, ...importedList];
+						saveCustomersState();
+						renderCustomersList();
+						renderCustomersDetails();
+						renderCustomerDropdowns();
+						showToast(`Selesai mengimpor ${importedList.length} pelanggan baru!`, "success");
+					} catch (err) {
+						showToast("Kesalahan membaca format berkas excel!", "error");
+						console.error(err);
+					}
+				};
+				r.readAsArrayBuffer(file);
+				event.target.value = '';
+			}
+			
+			// --- REKAP & PETTY CASH (KAS KECIL) VALIDATION ---
+			function updateTutupOverview() {
+				const sumTx = transactions.length;
+				const revenue = transactions.reduce((acc, curr) => acc + curr.total, 0);
+				
+				// Hitung pendapatan tunai saja untuk digabungkan dengan kas awal laci
+				const cashIncome = transactions.reduce((acc, curr) => {
+					return curr.paymentMethod === 'Tunai' ? acc + curr.total : acc;
+				}, 0);
+				
+				const expectedInDrawer = settings.startingCash + cashIncome;
+				
+				document.getElementById('summary-tx-count').innerText = sumTx;
+				document.getElementById('summary-revenue').innerText = formatRupiah(revenue);
+				document.getElementById('summary-drawer-cash').innerText = formatRupiah(expectedInDrawer);
+				
+				renderRekapTables();
+			}
+			
+			function switchRekapTab(tab) {
+				activeRekapTab = tab;
+				
+				const btnRincian = document.getElementById('tab-rekap-rincian');
+				const btnRekap = document.getElementById('tab-rekap-rekap');
+				
+				if (tab === 'rincian') {
+					btnRincian.className = "w-1/2 py-2 text-center border-b-2 border-primary font-bold text-xs text-primary transition-all";
+					btnRekap.className = "w-1/2 py-2 text-center border-b-2 border-transparent font-bold text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all";
+				} else {
+					btnRekap.className = "w-1/2 py-2 text-center border-b-2 border-primary font-bold text-xs text-primary transition-all";
+					btnRincian.className = "w-1/2 py-2 text-center border-b-2 border-transparent font-bold text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all";
+				}
+				
+				renderRekapTables();
+			}
+			
+			function renderRekapTables() {
+				const container = document.getElementById('rekap-container');
+				
+				if (activeRekapTab === 'rincian') {
+					if (transactions.length === 0) {
+						container.innerHTML = `
+						<div class="p-8 text-center text-slate-400 dark:text-slate-500 text-xs">
+							<i class="fas fa-history text-2xl mb-1.5"></i>
+							<p>Belum ada rincian transaksi terekam pada sesi ini.</p>
+						</div>
+						`;
+						return;
+					}
+					
+					let rows = transactions.map(tx => `
+					<tr class="hover:bg-slate-50 dark:hover:bg-slate-750/30 text-xs">
+						<td class="px-4 py-2.5 text-slate-500 dark:text-slate-400 font-mono text-[10px]">${tx.id}</td>
+						<td class="px-4 py-2.5 text-slate-500 dark:text-slate-400 text-[10px]">${tx.date}</td>
+						<td class="px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200">${tx.customerName || 'Umum'}</td>
+						<td class="px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200">${tx.paymentMethod}</td>
+						<td class="px-4 py-2.5 text-right font-black text-slate-900 dark:text-slate-100">${formatRupiah(tx.total)}</td>
+						<td class="px-4 py-2.5 text-slate-500 dark:text-slate-400">${tx.cashier}</td>
+						<td class="px-4 py-2.5 text-slate-500 dark:text-slate-400 truncate max-w-xs" title="${tx.items.map(i => `${i.name} (${i.quantity})`).join(', ')}">
+							${tx.items.map(i => `${i.name} (${i.quantity} ${i.unit})`).join(', ')}
+						</td>
+					</tr>
+					`).join('');
+					
+					container.innerHTML = `
+					<table class="min-w-full divide-y divide-slate-150 dark:divide-slate-700 text-left text-xs">
+						<thead class="bg-slate-50 dark:bg-slate-800 font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0">
+							<tr>
+								<th class="px-4 py-2">ID Transaksi</th>
+								<th class="px-4 py-2">Waktu</th>
+								<th class="px-4 py-2">Pelanggan</th>
+								<th class="px-4 py-2">Metode</th>
+								<th class="px-4 py-2 text-right">Total</th>
+								<th class="px-4 py-2">Petugas</th>
+								<th class="px-4 py-2">Detail Item</th>
+							</tr>
+						</thead>
+						<tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
+							${rows}
+						</tbody>
+					</table>
+					`;
+				} else {
+					const summaryObj = {};
+					transactions.forEach(t => {
+						t.items.forEach(i => {
+							if (!summaryObj[i.code]) {
+								summaryObj[i.code] = {
+									code: i.code,
+									name: i.name,
+									qty: 0,
+									unit: i.unit,
+									revenue: 0
+								};
+							}
+							summaryObj[i.code].qty += i.quantity;
+							summaryObj[i.code].revenue += i.price * i.quantity;
+						});
+					});
+					
+					const data = Object.values(summaryObj);
+					if (data.length === 0) {
+						container.innerHTML = `
+						<div class="p-8 text-center text-slate-400 dark:text-slate-500 text-xs">
+							<i class="fas fa-chart-line text-2xl mb-1.5"></i>
+							<p>Belum ada rekap produk terjual pada sesi ini.</p>
+						</div>
+						`;
+						return;
+					}
+					
+					let rows = data.map(item => `
+					<tr class="hover:bg-slate-50 dark:hover:bg-slate-750/30 text-xs">
+						<td class="px-4 py-2.5 font-mono font-bold text-slate-600 dark:text-slate-400">${item.code}</td>
+						<td class="px-4 py-2.5 font-bold text-slate-800 dark:text-slate-100">${item.name}</td>
+						<td class="px-4 py-2.5 text-center font-bold text-slate-600 dark:text-slate-400">${item.qty} ${item.unit}</td>
+						<td class="px-4 py-2.5 text-right font-black text-primary dark:text-blue-400">${formatRupiah(item.revenue)}</td>
+					</tr>
+					`).join('');
+					
+					container.innerHTML = `
+					<table class="min-w-full divide-y divide-slate-150 dark:divide-slate-700 text-left text-xs">
+						<thead class="bg-slate-50 dark:bg-slate-800 font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0">
+							<tr>
+								<th class="px-4 py-2">Kode</th>
+								<th class="px-4 py-2">Nama Layanan / Barang</th>
+								<th class="px-4 py-2 text-center">Volume Terjual</th>
+								<th class="px-4 py-2 text-right">Pendapatan Kotor</th>
+							</tr>
+						</thead>
+						<tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
+							${rows}
+						</tbody>
+					</table>
+					`;
+				}
+			}
+			
+			function endOfDay() {
+				if (transactions.length === 0) {
+					showToast("Tidak ada riwayat transaksi pada sesi shift ini.", "error");
+					return;
+				}
+				
+				const cashIncome = transactions.reduce((acc, curr) => {
+					return curr.paymentMethod === 'Tunai' ? acc + curr.total : acc;
+				}, 0);
+				
+				// Konversi riwayat ke bentuk workbook excel ganda
+				const wb = XLSX.utils.book_new();
+				
+				// Sheet 1: Rincian Lengkap
+				const sheetRincian = transactions.map((t, index) => ({
+					"No": index + 1,
+					"ID Transaksi": t.id,
+					"Waktu": t.date,
+					"Pelanggan": t.customerName || 'Umum',
+					"Kasir / Petugas": t.cashier,
+					"Metode": t.paymentMethod,
+					"Mode Pajak": t.taxMode,
+					"Subtotal Kotor (Rp)": t.subtotal,
+					"Dasar Pajak DPP (Rp)": t.subtotalDPP,
+					"Diskon Item (Rp)": t.itemDiscount,
+					"Pajak Item PPN (Rp)": t.itemTax,
+					"Potongan Diskon Global (Rp)": t.globalDiscount,
+					"Biaya Tambah Global (Rp)": t.globalTax,
+					"Total Akhir (Rp)": t.total,
+					"Uang Diterima (Rp)": t.paidAmount,
+					"Kembalian (Rp)": t.changeAmount,
+					"Ringkasan Belanja": t.items.map(i => `${i.name} (${i.quantity} ${i.unit})`).join(', ')
+				}));
+				const wsRincian = XLSX.utils.json_to_sheet(sheetRincian);
+				XLSX.utils.book_append_sheet(wb, wsRincian, "Rincian Transaksi Sesi");
+				
+				// Sheet 2: Ringkasan per Layanan / Katalog
+				const mapRekap = {};
+				transactions.forEach(t => {
+					t.items.forEach(i => {
+						if (!mapRekap[i.code]) {
+							mapRekap[i.code] = {
+								"Kode": i.code,
+								"Nama Layanan/Barang": i.name,
+								"Kuantitas Terjual": 0,
+								"Satuan": i.unit,
+								"Total Pendapatan (Rp)": 0
+							};
+						}
+						mapRekap[i.code]["Kuantitas Terjual"] += i.quantity;
+						mapRekap[i.code]["Total Pendapatan (Rp)"] += i.price * i.quantity;
+					});
+				});
+				const wsRekap = XLSX.utils.json_to_sheet(Object.values(mapRekap));
+				XLSX.utils.book_append_sheet(wb, wsRekap, "Rekap Penjualan Layanan");
+				
+				// Sheet 3: Rekonsiliasi Kas Laci (Buka Kas vs Tutup Kas)
+				const expectedInDrawer = settings.startingCash + cashIncome;
+				const cashDrawerReport = [
+					{ "Metrik Kas Laci": "Modal Awal Fisik Laci (Petty Cash)", "Jumlah Nominal": settings.startingCash },
+					{ "Metrik Kas Laci": "Total Pendapatan Tunai Sesi Ini", "Jumlah Nominal": cashIncome },
+					{ "Metrik Kas Laci": "Ekspektasi Uang Tunai di Laci Kas", "Jumlah Nominal": expectedInDrawer },
+					{ "Metrik Kas Laci": "Petugas Kasir Penutup Shift", "Jumlah Nominal": settings.username }
+				];
+				const wsDrawer = XLSX.utils.json_to_sheet(cashDrawerReport);
+				XLSX.utils.book_append_sheet(wb, wsDrawer, "Rekonsiliasi Kas Laci");
+				
+				// Simpan Berkas Excel
+				const todayDate = new Date().toISOString().split('T')[0];
+				XLSX.writeFile(wb, `Rekap_TutupShift_PoS_${todayDate}.xlsx`);
+				showToast("Berkas Rekap Shift Berhasil Diunduh!", "success");
+				
+				// Reset transaksi sesi ini karena shift resmi ditutup
+				openConfirmModal(
+					"Mulai Sesi Shift Baru?",
+					"Apakah Anda ingin membersihkan riwayat transaksi sesi ini untuk membuka lembaran shift baru?",
+					() => {
+						transactions = [];
+						saveTransactionState();
+						updateTutupOverview();
+						showToast("Shift ditutup secara resmi. Sesi baru siap dimulai!", "success");
+					}
+				);
+			}
+			
+			// --- SISTEM SETELAN ---
+			function loadSettingsToForm() {
+				document.getElementById('set-business-name').value = settings.businessName;
+				document.getElementById('set-address').value = settings.address;
+				document.getElementById('set-contact').value = settings.contact;
+				document.getElementById('set-username').value = settings.username;
+				document.getElementById('set-notes').value = settings.notes;
+				document.getElementById('set-tax-mode').value = settings.taxMode || "exclusive";
+				document.getElementById('set-default-tax').value = settings.defaultTaxRate !== undefined ? settings.defaultTaxRate : 0;
+				
+				const freeModeEl = document.getElementById('set-free-mode');
+				if (freeModeEl) {
+					freeModeEl.checked = settings.freeMode;
+				}
+				
+				const startingCashEl = document.getElementById('set-starting-cash');
+				if (startingCashEl) {
+					startingCashEl.value = settings.startingCash;
+				}
+				
+				const paperSizeEl = document.getElementById('set-paper-size');
+				if (paperSizeEl) {
+					paperSizeEl.value = settings.paperSize;
+				}
+				
+				const bizNameEl = document.getElementById('header-business-name');
+				if (bizNameEl) {
+					bizNameEl.innerText = settings.businessName;
+				}
+				
+				const cashierNameEl = document.getElementById('header-cashier-name');
+				if (cashierNameEl) {
+					cashierNameEl.innerText = settings.username;
+				}
+				
+				document.title = settings.businessName;
+			}
+			
+			function saveSettings(event) {
+				event.preventDefault();
+				settings.businessName = document.getElementById('set-business-name').value;
+				settings.address = document.getElementById('set-address').value;
+				settings.contact = document.getElementById('set-contact').value;
+				settings.username = document.getElementById('set-username').value;
+				settings.notes = document.getElementById('set-notes').value;
+				settings.startingCash = parseFloat(document.getElementById('set-starting-cash').value) || 0;
+				settings.paperSize = document.getElementById('set-paper-size').value;
+				settings.taxMode = document.getElementById('set-tax-mode').value;
+				settings.defaultTaxRate = parseFloat(document.getElementById('set-default-tax').value) || 0;
+				
+				document.getElementById('header-business-name').innerText = settings.businessName;
+				document.getElementById('header-cashier-name').innerText = settings.username;
+				document.title = settings.businessName;
+				
+				saveSettingsState();
+				calculateCartTotal();
+				updateTutupOverview();
+				showToast("Perubahan setelan aplikasi disimpan!", "success");
+			}
+			
+			function toggleFreeModeSetting(checked) {
+				settings.freeMode = checked;
+				saveSettingsState();
+				if (checked) {
+					showToast("Mode Layanan Publik Aktif!", "info");
+				} else {
+					showToast("Mode Pembayaran Standar Aktif!", "info");
+				}
+			}
+			
+			// --- DATA DEMO DENGAN PERHITUNGAN DISKON & PAJAK MATANG ---
+			function loadDemoData() {
+				openConfirmModal(
+					"Muat Data Demo",
+					"Apakah Anda yakin ingin memuat data dummy untuk pengetesan? Tindakan ini akan menimpa database lokal Anda.",
+					() => {
+						catalog = [
+							{ id: "demo-1", category: "Jasa", code: "SRV01", name: "Layanan Frontdesk Kamar Standar", price: 250000, discount: 5, taxRate: 11, qty: 999, unit: "Hari" },
+							{ id: "demo-2", category: "Jasa", code: "SRV02", name: "Sewa Ruang Meeting VIP", price: 1500000, discount: 10, taxRate: 11, qty: 10, unit: "Paket" },
+							{ id: "demo-3", category: "Barang", code: "BRG01", name: "Kopi Arabika Hitam Seduh", price: 20000, discount: 0, taxRate: 10, qty: 150, unit: "Gelas" },
+							{ id: "demo-4", category: "Barang", code: "BRG02", name: "Air Mineral Botol Dingin 600ml", price: 5000, discount: 0, taxRate: 0, qty: 200, unit: "Botol" }
+						];
+						
+						customers = [
+							{
+								id: "CUST-1001",
+								name: "Rian Hendrawan",
+								phone: "081234567890",
+								email: "rian@gmail.com",
+								address: "Jl. Merdeka No. 45, Pontianak",
+								balance: 150000,
+								activities: [
+									{ date: new Date().toLocaleString('id-ID'), text: "Mencatat kasbon piutang awal senilai Rp150.000." },
+									{ date: new Date().toLocaleString('id-ID'), text: "Pelanggan demo dimasukkan ke dalam database." }
+								],
+								leads: [
+									{ id: "LEAD-1", title: "Sewa Aula Ballroom", value: 5000000, status: "Proposal" }
+								],
+								deals: []
+							},
+							{
+								id: "CUST-1002",
+								name: "Siska Amelia",
+								phone: "085799887766",
+								email: "siska.amelia@yahoo.com",
+								address: "Komp. Bali Agung Blok C-12, Pontianak",
+								balance: 0,
+								activities: [
+									{ date: new Date().toLocaleString('id-ID'), text: "Profil pelanggan berhasil dibuat." }
+								],
+								leads: [],
+								deals: []
+							}
+						];
+						
+						saveCatalogState();
+						saveCustomersState();
+						
+						renderPosItems();
+						renderCatalogTable();
+						renderCustomersList();
+						renderCustomerDropdowns();
+						calculateCartTotal();
+						
+						showToast("Sukses memuat data demo untuk uji coba!", "success");
+					}
+				);
+			}
+			
+			function triggerClearAllData() {
+				openConfirmModal(
+					"Kosongkan Database",
+					"Apakah Anda yakin ingin menghapus SELURUH data katalog, riwayat transaksi harian, dan basis pelanggan di CRM secara permanen? Tindakan ini tidak dapat dibatalkan.",
+					() => {
+						localStorage.removeItem('frontdesk_catalog');
+						localStorage.removeItem('frontdesk_transactions');
+						localStorage.removeItem('frontdesk_customers');
+						localStorage.removeItem('frontdesk_cart');
+						localStorage.removeItem('frontdesk_selected_cust');
+						
+						catalog = [];
+						transactions = [];
+						customers = [];
+						cart = [];
+						selectedCustomerId = null;
+						
+						renderPosItems();
+						renderCatalogTable();
+						renderCustomersList();
+						renderCustomersDetails();
+						renderCustomerDropdowns();
+						renderCart();
+						calculateCartTotal();
+						updateTutupOverview();
+						
+						showToast("Database berhasil dikosongkan!", "success");
+					}
+				);
+			}
+			
+			// --- INISIALISASI PEMUATAN WINDOWS ---
+			window.onload = function() {
+				loadSavedData();
+				loadSettingsToForm();
+				applyTheme();
+				renderPosItems();
+				renderCatalogTable();
+				renderCustomerDropdowns();
+				updateTutupOverview();
+				
+				switchTab('frontdesk');
+				switchMobileSubTab('items');
+				
+				window.addEventListener('beforeunload', function (e) {
+					if (cart.length > 0) {
+						e.preventDefault();
+						e.returnValue = '';
+					}
+				});
+			};
+			
+			function exportSingleCustomerExcel() {
+				if (!selectedCustomerId) {
+					showToast("Silakan pilih pelanggan terlebih dahulu!", "error");
+					return;
+				}
+				
+				const cust = customers.find(c => c.id === selectedCustomerId);
+				if (!cust) return;
+				
+				const wb = XLSX.utils.book_new();
+				
+				// SHEET 1: HISTORI KEGIATAN
+				const dataActivities = cust.activities.map(act => ({
+					"Waktu": act.date,
+					"Catatan Catatan Kasir": act.text
+				}));
+				const wsActivities = dataActivities.length > 0 
+					? XLSX.utils.json_to_sheet(dataActivities)
+					: XLSX.utils.json_to_sheet([{"Pesan": "Belum ada histori kegiatan"}]);
+				XLSX.utils.book_append_sheet(wb, wsActivities, "Histori Kegiatan");
+				
+				// SHEET 2: LEADS (PELUANG)
+				const dataLeads = cust.leads.map(lead => ({
+					"ID Lead": lead.id,
+					"Judul Peluang (Lead)": lead.title,
+					"Estimasi Nilai (Rp)": lead.value,
+					"Status Penawaran": lead.status
+				}));
+				const wsLeads = dataLeads.length > 0 
+					? XLSX.utils.json_to_sheet(dataLeads)
+					: XLSX.utils.json_to_sheet([{"Pesan": "Belum ada data peluang"}]);
+				XLSX.utils.book_append_sheet(wb, wsLeads, "Leads (Peluang)");
+				
+				// SHEET 3: DEALS (TRANSAKSI)
+				const dataDeals = cust.deals.map(deal => ({
+					"ID Transaksi": deal.id,
+					"Judul Deal": deal.title,
+					"Total Nominal (Rp)": deal.amount,
+					"Waktu Berhasil": deal.date
+				}));
+				const wsDeals = dataDeals.length > 0 
+					? XLSX.utils.json_to_sheet(dataDeals)
+					: XLSX.utils.json_to_sheet([{"Pesan": "Belum ada histori deal"}]);
+				XLSX.utils.book_append_sheet(wb, wsDeals, "Deals (Transaksi)");
+				
+				const safeCustomerName = cust.name.replace(/[^a-zA-Z0-9]/g, "_");
+				const fileName = `CRM_Detail_${safeCustomerName}.xlsx`;
+				
+				XLSX.writeFile(wb, fileName);
+				showToast(`Sukses mengekspor data detail ${cust.name}!`, "success");
+			};
+		</script>
+	</body>
+</html>

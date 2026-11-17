@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Komposer</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&family=Noto+Sans+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+
+    <style>
+        body { font-family: 'Noto Sans', sans-serif; }
+        .font-mono { font-family: 'Noto Sans Mono', monospace; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        /* Input Range Styling */
+        input[type=range] { accent-color: #6366f1; }
+        
+        /* Animations */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(225, 29, 72, 0); }
+            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+        }
+        .animate-record { animation: pulse-ring 2s infinite; }
+        
+        .loader {
+            border: 4px solid #1e293b;
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- ICONS (SVG) ---
+        const IconBase = ({ children, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+        const Play = ({ className }) => <IconBase className={className}><polygon points="5 3 19 12 5 21 5 3"/></IconBase>;
+        const Square = ({ className }) => <IconBase className={className}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></IconBase>;
+        const RefreshCcw = ({ className }) => <IconBase className={className}><path d="M3 2v6h6"/><path d="M21 12A9 9 0 0 0 6 5.3L3 8"/><path d="M21 22v-6h-6"/><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"/></IconBase>;
+        const Download = ({ className }) => <IconBase className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></IconBase>;
+        const Music = ({ className }) => <IconBase className={className}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></IconBase>;
+        const Volume2 = ({ className }) => <IconBase className={className}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></IconBase>;
+        const Sliders = ({ className }) => <IconBase className={className}><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/></IconBase>;
+        const GridIcon = ({ className }) => <IconBase className={className}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></IconBase>;
+        const Hand = ({ className }) => <IconBase className={className}><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></IconBase>;
+        const FileText = ({ className }) => <IconBase className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></IconBase>;
+        const Keyboard = ({ className }) => <IconBase className={className}><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><line x1="6" y1="4" x2="6" y2="20"/><line x1="10" y1="4" x2="10" y2="20"/><line x1="14" y1="4" x2="14" y2="20"/><line x1="18" y1="4" x2="18" y2="20"/><line x1="2" y1="12" x2="22" y2="12"/></IconBase>;
+        const WaveformIcon = ({ className }) => <IconBase className={className}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></IconBase>;
+
+        // --- DATA & AUDIO ENGINE (KOMPOSER) ---
+        const NOTE_FREQS = {
+            'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
+            'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+            'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77,
+        };
+        const SCALES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+        const STEPS = 16;
+        const INSTRUMENTS = [
+            { id: 'piano', name: 'Piano', color: 'bg-indigo-500' },
+            { id: 'guitar', name: 'Gitar', color: 'bg-emerald-500' },
+            { id: 'bass', name: 'Bass', color: 'bg-amber-500' },
+            { id: 'drum', name: 'Drum', color: 'bg-rose-500' },
+        ];
+
+        class AudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.masterGain = null;
+                this.dest = null;
+                this.recorder = null;
+                this.chunks = [];
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContextClass();
+                    this.masterGain = this.ctx.createGain();
+                    this.masterGain.gain.value = 0.5;
+                    this.dest = this.ctx.createMediaStreamDestination();
+                    this.masterGain.connect(this.ctx.destination);
+                    this.masterGain.connect(this.dest);
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+            // ... (Fungsi instrumen dipertahankan dari aslinya)
+            playTone(freq, type, duration, startTime = 0) {
+                if (!this.ctx || !this.masterGain) return;
+                const t = startTime || this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(freq, t);
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.5, t + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + duration);
+                osc.connect(gain); gain.connect(this.masterGain);
+                osc.start(t); osc.stop(t + duration);
+            }
+            playPiano(note, time = 0) { this.playTone(NOTE_FREQS[note] || 440, 'triangle', 1.5, time); }
+            playGuitar(note, time = 0) {
+                if (!this.ctx) return;
+                const t = time || this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const filter = this.ctx.createBiquadFilter();
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(NOTE_FREQS[note] || 329.63, t);
+                filter.type = 'lowpass'; filter.frequency.setValueAtTime(2000, t); filter.frequency.exponentialRampToValueAtTime(500, t + 0.4);
+                gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(0.4, t + 0.02); gain.gain.exponentialRampToValueAtTime(0.01, t + 1.0);
+                osc.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
+                osc.start(t); osc.stop(t + 1.0);
+            }
+            playBass(note, time = 0) { this.playTone(NOTE_FREQS[note] || 130.81, 'square', 0.6, time); }
+            playDrum(type, time = 0) {
+                if (!this.ctx) return;
+                const t = time || this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                if (type === 'kick') {
+                    osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
+                    gain.gain.setValueAtTime(0.8, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+                } else if (type === 'snare') {
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, t);
+                    gain.gain.setValueAtTime(0.5, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                } else {
+                    osc.type = 'square'; osc.frequency.setValueAtTime(8000, t);
+                    gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                }
+                osc.connect(gain); gain.connect(this.masterGain);
+                osc.start(t); osc.stop(t + 0.5);
+            }
+            startRecording() {
+                if (!this.dest) return;
+                this.chunks = [];
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+                this.recorder = new MediaRecorder(this.dest.stream, { mimeType });
+                this.recorder.ondataavailable = (e) => this.chunks.push(e.data);
+                this.recorder.start();
+            }
+            stopRecording(onComplete) {
+                if (this.recorder && this.recorder.state !== 'inactive') {
+                    this.recorder.onstop = () => {
+                        const blob = new Blob(this.chunks, { type: 'audio/webm' });
+                        const url = URL.createObjectURL(blob);
+                        onComplete(url, blob); // Mengembalikan Blob untuk Editor Audio
+                    };
+                    this.recorder.stop();
+                }
+            }
+        }
+        const audioEngine = new AudioEngine();
+
+        // --- AUDIO UTILITIES (EDITOR) ---
+        let sharedEditorCtx = null;
+        function getEditorAudioContext() {
+            if (!sharedEditorCtx) {
+                sharedEditorCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (sharedEditorCtx.state === 'suspended') sharedEditorCtx.resume();
+            return sharedEditorCtx;
+        }
+
+        async function decodeAudioFile(arrayBuffer) {
+            const ctx = getEditorAudioContext();
+            return await ctx.decodeAudioData(arrayBuffer);
+        }
+
+        // Utils Encoder (WAV & MP3)
+        function bufferToWave(abuffer, len) {
+            let numOfChan = abuffer.numberOfChannels, length = len * numOfChan * 2 + 44, buffer = new ArrayBuffer(length), view = new DataView(buffer), channels = [], i, sample, offset = 0, pos = 0;
+            const setUint16 = (data) => { view.setUint16(pos, data, true); pos += 2; };
+            const setUint32 = (data) => { view.setUint32(pos, data, true); pos += 4; };
+            setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(abuffer.sampleRate); setUint32(abuffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164); setUint32(length - pos - 4);
+            for(i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+            while(pos < length) {
+                for(i = 0; i < numOfChan; i++) {
+                    sample = Math.max(-1, Math.min(1, channels[i][offset])); 
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767)|0; 
+                    view.setInt16(pos, sample, true); pos += 2;
+                }
+                offset++;
+            }
+            return new Blob([buffer], {type: "audio/wav"});
+        }
+
+        function bufferToMp3(abuffer) {
+            return new Promise((resolve) => {
+                if (typeof lamejs === 'undefined') return resolve(bufferToWave(abuffer, abuffer.length));
+                const channels = abuffer.numberOfChannels;
+                const mp3encoder = new lamejs.Mp3Encoder(channels, abuffer.sampleRate, 128);
+                const mp3Data = [];
+                const left = abuffer.getChannelData(0);
+                const right = channels > 1 ? abuffer.getChannelData(1) : left;
+                const sampleBlockSize = 1152;
+                const leftInt16 = new Int16Array(left.length);
+                const rightInt16 = new Int16Array(right.length);
+                for (let i = 0; i < left.length; i++) {
+                    leftInt16[i] = left[i] < 0 ? left[i] * 32768 : left[i] * 32767;
+                    if (channels > 1) rightInt16[i] = right[i] < 0 ? right[i] * 32768 : right[i] * 32767;
+                }
+                for (let i = 0; i < leftInt16.length; i += sampleBlockSize) {
+                    const leftChunk = leftInt16.subarray(i, i + sampleBlockSize);
+                    const rightChunk = rightInt16.subarray(i, i + sampleBlockSize);
+                    const mp3buf = channels > 1 ? mp3encoder.encodeBuffer(leftChunk, rightChunk) : mp3encoder.encodeBuffer(leftChunk);
+                    if (mp3buf.length > 0) mp3Data.push(mp3buf);
+                }
+                const flushBuf = mp3encoder.flush();
+                if (flushBuf.length > 0) mp3Data.push(flushBuf);
+                resolve(new Blob(mp3Data, { type: 'audio/mp3' }));
+            });
+        }
+
+
+        // --- REACT COMPONENT: WAVEFORM (EDITOR) ---
+        const WaveformCanvas = ({ track, onUpdate }) => {
+            const canvasRef = useRef(null);
+            
+            const draw = () => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+                
+                const width = rect.width;
+                const height = rect.height;
+                const data = track.buffer.getChannelData(0); 
+                const step = Math.ceil(data.length / width);
+                const amp = height / 2;
+
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = '#6366f1'; // Indigo-500
+                
+                for (let i = 0; i < width; i++) {
+                    let min = 1.0; let max = -1.0;
+                    for (let j = 0; j < step; j++) {
+                        const datum = data[(i * step) + j];
+                        if (datum < min) min = datum;
+                        if (datum > max) max = datum;
+                    }
+                    ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
+                }
+
+                const duration = track.buffer.duration;
+                const startX = (track.trimStart / duration) * width;
+                const endX = (track.trimEnd / duration) * width;
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.75)'; // Slate-900 transparan
+                if (startX > 0) ctx.fillRect(0, 0, startX, height);
+                ctx.fillStyle = '#ef4444'; // Red
+                ctx.fillRect(startX - 2, 0, 4, height); 
+                
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+                if (endX < width) ctx.fillRect(endX, 0, width - endX, height);
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(endX - 2, 0, 4, height); 
+            };
+
+            useEffect(() => { draw(); }, [track.buffer, track.trimStart, track.trimEnd]);
+
+            const handleDrag = (e) => {
+                if (e.buttons !== 1) return; // Only trigger if left mouse button is held
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                let newTime = (x / rect.width) * track.buffer.duration;
+                
+                // Determine which handle is closer
+                const startX = (track.trimStart / track.buffer.duration) * rect.width;
+                const endX = (track.trimEnd / track.buffer.duration) * rect.width;
+                
+                if (Math.abs(x - startX) < Math.abs(x - endX)) {
+                    if (newTime < 0) newTime = 0;
+                    if (newTime >= track.trimEnd) newTime = track.trimEnd - 0.1;
+                    onUpdate(track.id, 'trimStart', newTime);
+                } else {
+                    if (newTime > track.buffer.duration) newTime = track.buffer.duration;
+                    if (newTime <= track.trimStart) newTime = track.trimStart + 0.1;
+                    onUpdate(track.id, 'trimEnd', newTime);
+                }
+            };
+
+            return (
+                <canvas 
+                    ref={canvasRef} 
+                    onMouseMove={(e) => {
+                        const rect = canvasRef.current.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const sX = (track.trimStart / track.buffer.duration) * rect.width;
+                        const eX = (track.trimEnd / track.buffer.duration) * rect.width;
+                        canvasRef.current.style.cursor = (Math.abs(x - sX) < 10 || Math.abs(x - eX) < 10) ? 'ew-resize' : 'crosshair';
+                        handleDrag(e);
+                    }}
+                    onMouseDown={handleDrag}
+                    className="w-full h-24 bg-slate-900 rounded-lg border border-slate-700 mt-2" 
+                />
+            );
+        };
+
+        // --- REACT COMPONENT: AUDIO EDITOR TAB ---
+        const AudioEditorTab = ({ tracks, setTracks }) => {
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [loadingText, setLoadingText] = useState("");
+            const [exportFormat, setExportFormat] = useState('wav');
+            const activeSourcesRef = useRef([]);
+			const [playingIndividual, setPlayingIndividual] = useState({});
+			const individualSourcesRef = useRef({});		
+
+            const handleFileUpload = async (e) => {
+                const files = e.target.files;
+                if (!files.length) return;
+                setLoadingText("Memproses Audio...");
+                
+                const newTracks = [];
+                for (const file of files) {
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const audioBuffer = await decodeAudioFile(arrayBuffer.slice(0));
+                        newTracks.push({
+                            id: 'track_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                            name: file.name,
+                            buffer: audioBuffer,
+                            offset: 0, trimStart: 0, trimEnd: audioBuffer.duration,
+                            volume: 1, fadeIn: 0, fadeOut: 0
+                        });
+                    } catch (err) { console.error(err); }
+                }
+                setTracks(prev => [...prev, ...newTracks]);
+                setLoadingText("");
+                e.target.value = '';
+            };
+
+            const updateTrackParam = (id, param, value) => {
+                setTracks(prev => prev.map(t => {
+                    if (t.id !== id) return t;
+                    let val = parseFloat(value);
+                    if (isNaN(val) || val < 0) val = 0;
+                    if (param === 'trimStart' && val >= t.buffer.duration) val = t.buffer.duration - 0.1;
+                    if (param === 'trimEnd' && val > t.buffer.duration) val = t.buffer.duration;
+                    if (param === 'trimStart' && val >= t.trimEnd) val = t.trimEnd - 0.1;
+                    if (param === 'trimEnd' && val <= t.trimStart) val = t.trimStart + 0.1;
+                    return { ...t, [param]: val };
+                }));
+            };
+
+            const removeTrack = (id) => setTracks(prev => prev.filter(t => t.id !== id));
+
+            const calculateTotalDuration = () => {
+                let max = 0;
+                tracks.forEach(t => {
+                    const end = t.offset + Math.max(0, t.trimEnd - t.trimStart);
+                    if (end > max) max = end;
+                });
+                return max;
+            };
+
+            const playAll = () => {
+                if (tracks.length === 0) return;
+                stopAll();
+                const ctx = getEditorAudioContext();
+                setIsPlaying(true);
+                
+                tracks.forEach(track => {
+                    const source = ctx.createBufferSource();
+                    source.buffer = track.buffer;
+                    const gainNode = ctx.createGain();
+                    
+                    const playDuration = track.trimEnd - track.trimStart;
+                    if (playDuration <= 0) return;
+
+                    const startTime = ctx.currentTime + track.offset;
+                    gainNode.gain.setValueAtTime(0, Math.max(0, startTime));
+                    
+                    const fadeInEnd = startTime + track.fadeIn;
+                    if (track.fadeIn > 0) gainNode.gain.linearRampToValueAtTime(track.volume, Math.min(fadeInEnd, startTime + playDuration));
+                    else gainNode.gain.setValueAtTime(track.volume, startTime);
+
+                    const fadeOutStart = startTime + playDuration - track.fadeOut;
+                    if (track.fadeOut > 0 && fadeOutStart > startTime) {
+                        gainNode.gain.setValueAtTime(track.volume, Math.max(startTime, fadeOutStart));
+                        gainNode.gain.linearRampToValueAtTime(0, startTime + playDuration);
+                    }
+
+                    source.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+                    source.start(startTime, track.trimStart, playDuration);
+                    activeSourcesRef.current.push(source);
+                });
+
+                setTimeout(() => { stopAll(); }, calculateTotalDuration() * 1000 + 100);
+            };
+
+            const stopAll = () => {
+                activeSourcesRef.current.forEach(src => { try { src.stop(); } catch(e){} src.disconnect(); });
+                activeSourcesRef.current = [];
+                setIsPlaying(false);
+            };
+			
+			
+			const togglePlayTrack = (track) => {
+			const ctx = getEditorAudioContext();
+			
+			// Jika track ini sedang diputar, hentikan
+			if (playingIndividual[track.id]) {
+				const source = individualSourcesRef.current[track.id];
+				if (source) {
+					try { source.stop(); } catch(e){}
+					source.disconnect();
+				}
+				setPlayingIndividual(prev => ({ ...prev, [track.id]: false }));
+				return;
+			}
+
+			// Buat source baru untuk memutar track secara terisolasi
+			const source = ctx.createBufferSource();
+			source.buffer = track.buffer;
+			const gainNode = ctx.createGain();
+			
+			const playDuration = track.trimEnd - track.trimStart;
+			if (playDuration <= 0) return;
+
+			// Untuk preview, putar seketika (abaikan offset timeline)
+			const startTime = ctx.currentTime;
+			
+			gainNode.gain.setValueAtTime(0, startTime);
+			
+			// Terapkan Fade In / Out & Volume untuk preview
+			if (track.fadeIn > 0) {
+				gainNode.gain.linearRampToValueAtTime(track.volume, Math.min(startTime + track.fadeIn, startTime + playDuration));
+			} else {
+				gainNode.gain.setValueAtTime(track.volume, startTime);
+			}
+
+			if (track.fadeOut > 0 && playDuration - track.fadeOut > 0) {
+				gainNode.gain.setValueAtTime(track.volume, Math.max(startTime, startTime + playDuration - track.fadeOut));
+				gainNode.gain.linearRampToValueAtTime(0, startTime + playDuration);
+			}
+
+			source.connect(gainNode);
+			gainNode.connect(ctx.destination);
+			
+			source.start(startTime, track.trimStart, playDuration);
+			
+			individualSourcesRef.current[track.id] = source;
+			setPlayingIndividual(prev => ({ ...prev, [track.id]: true }));
+
+			// Reset tombol saat audio selesai
+			source.onended = () => {
+				setPlayingIndividual(prev => ({ ...prev, [track.id]: false }));
+			};
+			};
+			
+			
+            const exportAudio = async () => {
+                if (tracks.length === 0) return;
+                setLoadingText("Mengekspor Audio...");
+                try {
+                    const totalDur = calculateTotalDuration();
+                    const sampleRate = tracks[0].buffer.sampleRate;
+                    const offlineCtx = new OfflineAudioContext(2, sampleRate * totalDur, sampleRate);
+
+                    tracks.forEach(track => {
+                        const source = offlineCtx.createBufferSource();
+                        source.buffer = track.buffer;
+                        const gainNode = offlineCtx.createGain();
+                        
+                        const playDur = track.trimEnd - track.trimStart;
+                        if (playDur <= 0) return;
+                        const startTime = track.offset;
+                        
+                        gainNode.gain.setValueAtTime(0, startTime);
+                        if (track.fadeIn > 0) gainNode.gain.linearRampToValueAtTime(track.volume, Math.min(startTime + track.fadeIn, startTime + playDur));
+                        else gainNode.gain.setValueAtTime(track.volume, startTime);
+
+                        if (track.fadeOut > 0 && (startTime + playDur - track.fadeOut) > startTime) {
+                            gainNode.gain.setValueAtTime(track.volume, Math.max(startTime, startTime + playDur - track.fadeOut));
+                            gainNode.gain.linearRampToValueAtTime(0, startTime + playDur);
+                        }
+
+                        source.connect(gainNode); gainNode.connect(offlineCtx.destination);
+                        source.start(startTime, track.trimStart, playDur);
+                    });
+
+                    const renderedBuffer = await offlineCtx.startRendering();
+                    const blob = exportFormat === 'mp3' ? await bufferToMp3(renderedBuffer) : bufferToWave(renderedBuffer, renderedBuffer.length);
+                    
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `Studio_Export_${Date.now()}.${exportFormat}`;
+                    a.click();
+                } catch(e) { console.error(e); alert("Gagal mengekspor!"); }
+                setLoadingText("");
+            };
+
+            return (
+                <div className="space-y-6 animate-fade-in relative">
+                    {/* Loader Overlay */}
+                    {loadingText && (
+                        <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl">
+                            <div className="loader mb-4"></div>
+                            <p className="text-indigo-300 font-medium">{loadingText}</p>
+                        </div>
+                    )}
+
+                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-indigo-400">
+                                <WaveformIcon className="w-6 h-6" /> Multi-Track Editor
+                            </h2>
+                            <p className="text-sm text-slate-400 mt-1">Gabung, potong, dan atur waktu audio Anda.</p>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                            <label className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg cursor-pointer transition flex items-center gap-2 text-sm font-medium">
+                                <i className="fas fa-upload"></i> Tambah Audio
+                                <input type="file" accept="audio/*" multiple className="hidden" onChange={handleFileUpload} />
+                            </label>
+                            <button onClick={isPlaying ? stopAll : playAll} className={`px-4 py-2 rounded-lg transition flex items-center gap-2 text-sm font-medium ${isPlaying ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
+                                <i className={`fas ${isPlaying ? 'fa-stop' : 'fa-play'}`}></i> {isPlaying ? 'Berhenti' : 'Mainkan Semua'}
+                            </button>
+                            <div className="flex bg-indigo-600 rounded-lg overflow-hidden">
+                                <select value={exportFormat} onChange={e => setExportFormat(e.target.value)} className="bg-indigo-700 text-white px-3 py-2 outline-none border-r border-indigo-500 text-sm">
+                                    <option value="wav">WAV</option>
+                                    <option value="mp3">MP3</option>
+                                </select>
+                                <button onClick={exportAudio} className="hover:bg-indigo-500 text-white px-4 py-2 transition text-sm font-medium flex items-center gap-2">
+                                    <Download className="w-4 h-4"/> Ekspor
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        {tracks.length === 0 ? (
+                            <div className="text-center py-16 bg-slate-800/50 rounded-2xl border border-dashed border-slate-700">
+                                <i className="fas fa-music text-4xl text-slate-600 mb-4"></i>
+                                <h3 className="text-lg font-medium text-slate-300">Belum ada Track</h3>
+                                <p className="text-slate-500 text-sm mt-1">Tambahkan audio atau rekam dari tab Sequencer.</p>
+                            </div>
+                        ) : (
+                            tracks.map((track, i) => (
+                                <div key={track.id} className="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-md">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="font-semibold text-slate-200 flex items-center gap-2">
+                                            <span className="bg-indigo-500 text-xs px-2 py-0.5 rounded-full text-white">#{i + 1}</span>
+                                            {track.name}
+                                        </h4>
+                                        <div className="flex items-center gap-2">
+											<button 
+												onClick={() => togglePlayTrack(track)} 
+												className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${playingIndividual[track.id] ? 'bg-rose-500 text-white' : 'bg-slate-700 text-emerald-400 hover:bg-slate-600'}`}
+												title="Preview Track">
+												<i className={`fas ${playingIndividual[track.id] ? 'fa-stop' : 'fa-play'}`}></i>
+											</button>
+											<button 
+												onClick={() => removeTrack(track.id)} 
+												className="w-8 h-8 flex items-center justify-center bg-slate-700 text-slate-400 hover:text-rose-400 hover:bg-slate-600 rounded-lg transition-colors"
+												title="Hapus Track">
+												<i className="fas fa-trash"></i>
+											</button>
+										</div>
+                                    </div>
+                                    
+                                    <WaveformCanvas track={track} onUpdate={updateTrackParam} />
+                                    
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                        <div className="bg-slate-900 p-3 rounded-lg border border-slate-700/50">
+                                            <label className="text-[10px] text-slate-400 uppercase tracking-wider block mb-2"><i className="fas fa-volume-up"></i> Volume</label>
+                                            <input type="range" min="0" max="2" step="0.1" value={track.volume} onChange={(e) => updateTrackParam(track.id, 'volume', e.target.value)} className="w-full" />
+                                        </div>
+                                        <div className="bg-slate-900 p-3 rounded-lg border border-slate-700/50">
+                                            <label className="text-[10px] text-slate-400 uppercase tracking-wider block mb-2"><i className="fas fa-clock"></i> Mulai di (s)</label>
+                                            <input type="number" min="0" step="0.5" value={track.offset} onChange={(e) => updateTrackParam(track.id, 'offset', e.target.value)} className="w-full bg-slate-800 text-white rounded px-2 py-1 text-sm outline-none border border-slate-600 focus:border-indigo-500" />
+                                        </div>
+                                        <div className="bg-slate-900 p-3 rounded-lg border border-slate-700/50">
+                                            <label className="text-[10px] text-slate-400 uppercase tracking-wider block mb-2"><i className="fas fa-cut"></i> Potong (Awal - Akhir)</label>
+                                            <div className="flex gap-2">
+                                                <input type="number" step="0.5" value={Number(track.trimStart).toFixed(2)} onChange={(e) => updateTrackParam(track.id, 'trimStart', e.target.value)} className="w-1/2 bg-slate-800 text-white rounded px-2 py-1 text-sm outline-none border border-slate-600 focus:border-indigo-500" />
+                                                <input type="number" step="0.5" value={Number(track.trimEnd).toFixed(2)} onChange={(e) => updateTrackParam(track.id, 'trimEnd', e.target.value)} className="w-1/2 bg-slate-800 text-white rounded px-2 py-1 text-sm outline-none border border-slate-600 focus:border-indigo-500" />
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-900 p-3 rounded-lg border border-slate-700/50">
+                                            <label className="text-[10px] text-slate-400 uppercase tracking-wider block mb-2"><i className="fas fa-sliders-h"></i> Fade In / Out</label>
+                                            <div className="flex gap-2">
+                                                <input type="number" min="0" step="0.5" value={track.fadeIn} onChange={(e) => updateTrackParam(track.id, 'fadeIn', e.target.value)} className="w-1/2 bg-slate-800 text-white rounded px-2 py-1 text-sm outline-none border border-slate-600 focus:border-indigo-500" placeholder="In"/>
+                                                <input type="number" min="0" step="0.5" value={track.fadeOut} onChange={(e) => updateTrackParam(track.id, 'fadeOut', e.target.value)} className="w-1/2 bg-slate-800 text-white rounded px-2 py-1 text-sm outline-none border border-slate-600 focus:border-indigo-500" placeholder="Out"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP (GABUNGAN) ---
+        function KomposerStudio() {
+            const [activeTab, setActiveTab] = useState('sequencer');
+            const [grid, setGrid] = useState(Array(4).fill(null).map(() => Array(STEPS).fill(null)));
+            const [bpm, setBpm] = useState(120);
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [currentStep, setCurrentStep] = useState(0);
+            const [selectedNote, setSelectedNote] = useState('C');
+            const [selectedOctave, setSelectedOctave] = useState(4);
+            const [isRecording, setIsRecording] = useState(false);
+            
+            const [recordedUrl, setRecordedUrl] = useState(null);
+            const [recordedBlob, setRecordedBlob] = useState(null); // Menyimpan blob untuk Editor
+
+            const [textInput, setTextInput] = useState('');
+            const [editorTracks, setEditorTracks] = useState([]); // Shared Editor State
+
+            const stepRef = useRef(0);
+            const intervalRef = useRef(null);
+
+            const handleInteraction = () => audioEngine.init();
+
+            // Sequencer Logic
+            const toggleCell = (row, col) => {
+                handleInteraction();
+                const newGrid = [...grid];
+                const currentRow = [...newGrid[row]];
+                if (row === 3) { 
+                    if (!currentRow[col]) currentRow[col] = 'kick';
+                    else if (currentRow[col] === 'kick') currentRow[col] = 'snare';
+                    else if (currentRow[col] === 'snare') currentRow[col] = 'hihat';
+                    else currentRow[col] = null;
+                    if (currentRow[col]) audioEngine.playDrum(currentRow[col]);
+                } else { 
+                    if (currentRow[col]) currentRow[col] = null;
+                    else {
+                        let octave = selectedOctave;
+                        if (row === 2) octave = 3; 
+                        const noteName = `${selectedNote}${octave}`;
+                        currentRow[col] = noteName;
+                        if (row === 0) audioEngine.playPiano(noteName);
+                        if (row === 1) audioEngine.playGuitar(noteName);
+                        if (row === 2) audioEngine.playBass(noteName);
+                    }
+                }
+                newGrid[row] = currentRow; setGrid(newGrid);
+            };
+
+            // Playback Loop
+            useEffect(() => {
+                if (isPlaying && activeTab !== 'editor') {
+                    const msPerBeat = (60000 / bpm) / 4;
+                    intervalRef.current = window.setInterval(() => {
+                        const now = audioEngine.ctx ? audioEngine.ctx.currentTime : 0;
+                        const step = stepRef.current;
+                        if (grid[0][step]) audioEngine.playPiano(grid[0][step], now);
+                        if (grid[1][step]) audioEngine.playGuitar(grid[1][step], now);
+                        if (grid[2][step]) audioEngine.playBass(grid[2][step], now);
+                        if (grid[3][step]) audioEngine.playDrum(grid[3][step], now);
+                        setCurrentStep(step);
+                        stepRef.current = (step + 1) % STEPS;
+                    }, msPerBeat);
+                } else {
+                    if (intervalRef.current) clearInterval(intervalRef.current);
+                }
+                return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+            }, [isPlaying, bpm, grid, activeTab]);
+
+            const togglePlay = () => {
+                handleInteraction();
+                if (isPlaying) {
+                    setIsPlaying(false); stepRef.current = 0; setCurrentStep(0);
+                    if (isRecording) stopRecord();
+                } else setIsPlaying(true);
+            };
+
+            const stopRecord = () => {
+                setIsRecording(false); setIsPlaying(false);
+                audioEngine.stopRecording((url, blob) => {
+                    setRecordedUrl(url);
+                    setRecordedBlob(blob);
+                });
+            };
+
+            const toggleRecord = () => {
+                handleInteraction();
+                if (isRecording) stopRecord();
+                else {
+                    setIsPlaying(true); setIsRecording(true);
+                    setRecordedUrl(null); setRecordedBlob(null);
+                    audioEngine.startRecording();
+                }
+            };
+
+            const clearGrid = () => {
+                setGrid(Array(4).fill(null).map(() => Array(STEPS).fill(null)));
+                setIsPlaying(false); setCurrentStep(0); stepRef.current = 0;
+            };
+
+            const parseTextToGrid = () => {
+                handleInteraction();
+                const cleanText = textInput.toLowerCase().replace(/[^a-z0-9\s-]/g, '');
+                const tokens = cleanText.split(/\s+/);
+                const newGrid = [...grid];
+                const melodyRow = new Array(STEPS).fill(null);
+                let stepIndex = 0;
+                tokens.forEach(token => {
+                    if (stepIndex >= STEPS) return;
+                    const noteMatch = token.match(/([cdefgab])([345])?/); 
+                    if (noteMatch) {
+                        melodyRow[stepIndex] = `${noteMatch[1].toUpperCase()}${noteMatch[2] || '5'}`;
+                        stepIndex++;
+                    } else if (token === '0' || token === '-') stepIndex++;
+                });
+                newGrid[0] = melodyRow; setGrid(newGrid); setActiveTab('sequencer');
+            };
+
+            // Jembatan: Komposer -> Editor
+            const sendToEditor = async () => {
+                if (!recordedBlob) return;
+                const arrayBuffer = await recordedBlob.arrayBuffer();
+                const audioBuffer = await decodeAudioFile(arrayBuffer);
+                const newTrack = {
+                    id: 'track_komposer_' + Date.now(),
+                    name: 'Rekaman_Komposer.webm',
+                    buffer: audioBuffer,
+                    offset: 0, trimStart: 0, trimEnd: audioBuffer.duration,
+                    volume: 1, fadeIn: 0, fadeOut: 0
+                };
+                setEditorTracks(prev => [...prev, newTrack]);
+                setActiveTab('editor'); // Pindah ke tab editor secara otomatis
+            };
+
+            return (
+                <div className="flex flex-col font-sans h-full min-h-screen">
+					{/* HEADER UTAMA */}
+					<div className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 shadow-md">
+						{/* HAPUS class 'justify-between' dan tambahkan 'w-full' */}
+						<div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-4 w-full">
+							
+							{/* SISI KIRI (LOGO) - Dibungkus dengan flex-1 agar ukurannya seimbang dengan sisi kanan */}
+							<div className="flex-1 flex justify-center md:justify-start w-full">
+								<div className="flex items-center gap-3">
+									<div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg shadow-lg">
+										<Music className="w-6 h-6 text-white" />
+									</div>
+									<div>
+										<h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-rose-400 leading-tight">
+											Komposer
+										</h1>
+										<p className="text-[10px] text-slate-400">Audio Maker & Editor</p>
+									</div>
+								</div>
+							</div>
+
+							{/* SISI TENGAH (TABS) - Akan selalu di tengah karena dihimpit oleh dua flex-1 */}
+							<div className="flex bg-slate-800 rounded-lg p-1 shadow-inner overflow-x-auto w-full md:w-auto shrink-0">
+								{[ 
+									{ id: 'sequencer', icon: <GridIcon className="w-4 h-4"/>, label: 'Sequencer' },
+									{ id: 'live', icon: <Keyboard className="w-4 h-4"/>, label: 'Live' },
+									{ id: 'text', icon: <FileText className="w-4 h-4"/>, label: 'Teks' },
+									{ id: 'editor', icon: <WaveformIcon className="w-4 h-4"/>, label: 'Editor Audio' }
+								].map(tab => (
+									<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
+										{tab.icon} {tab.label}
+									</button>
+								))}
+							</div>
+
+							{/* SISI KANAN (KONTROL BPM) - Dibungkus dengan flex-1 agar ukurannya seimbang dengan sisi kiri */}
+							<div className="flex-1 flex justify-center md:justify-end w-full">
+								{activeTab !== 'editor' && (
+									<div className="flex items-center gap-2 bg-slate-800 p-1.5 rounded-lg border border-slate-700">
+										<div className="flex items-center gap-2 px-2 border-r border-slate-700 pr-3">
+											<Sliders className="w-3 h-3 text-slate-400" />
+											<input type="number" value={bpm} onChange={(e) => setBpm(Number(e.target.value))} className="w-12 bg-transparent text-sm text-center focus:outline-none" min="60" max="240" />
+											<span className="text-[10px] text-slate-500">BPM</span>
+										</div>
+										<button onClick={togglePlay} className={`p-2 rounded-md transition-colors ${isPlaying ? 'bg-rose-500 text-white' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}>
+											{isPlaying ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
+										</button>
+									</div>
+								)}
+							</div>
+
+						</div>
+					</div>
+
+                    {/* KONTEN */}
+                    <div className="flex-1 p-4 md:p-6 max-w-6xl mx-auto w-full mb-20">
+                        {activeTab === 'sequencer' && (
+                            <div className="space-y-6 animate-fade-in">
+                                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-wrap gap-4 items-center justify-between shadow-lg">
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-sm font-medium text-slate-400 flex items-center gap-2"><Hand className="w-4 h-4" /> Kuas Nada:</span>
+                                        <div className="flex bg-slate-800 rounded-lg p-1">
+                                            {SCALES.map(note => (
+                                                <button key={note} onClick={() => setSelectedNote(note)} className={`w-8 h-8 rounded text-sm font-bold transition-all ${selectedNote === note ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:bg-slate-700'}`}>{note}</button>
+                                            ))}
+                                        </div>
+                                        <div className="flex bg-slate-800 rounded-lg p-1">
+                                            {[3, 4, 5].map(oct => (
+                                                <button key={oct} onClick={() => setSelectedOctave(oct)} className={`px-3 h-8 rounded text-xs font-mono transition-all ${selectedOctave === oct ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:bg-slate-700'}`}>Oct {oct}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button onClick={clearGrid} className="text-xs text-slate-500 hover:text-rose-400 flex items-center gap-1"><RefreshCcw className="w-3 h-3" /> Bersihkan</button>
+                                </div>
+
+                                <div className="bg-slate-800 rounded-2xl p-4 shadow-xl border border-slate-700 overflow-x-auto">
+                                    <div className="min-w-[700px]">
+                                        <div className="flex mb-2 ml-24">
+                                            {Array.from({ length: STEPS }).map((_, i) => (
+                                                <div key={i} className="flex-1 flex justify-center">
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${currentStep === i ? 'bg-white shadow-[0_0_10px_white]' : 'bg-slate-700'}`} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {grid.map((row, rowIdx) => (
+                                            <div key={rowIdx} className="flex items-center gap-4 mb-2">
+                                                <div className={`w-24 h-10 rounded-lg flex items-center justify-center text-xs font-bold ${INSTRUMENTS[rowIdx].color} text-white shadow`}>{INSTRUMENTS[rowIdx].name}</div>
+                                                <div className="flex-1 flex gap-1">
+												{row.map((cell, colIdx) => {
+													const isActive = cell !== null;
+													return (
+														<button 
+															key={colIdx} 
+															onClick={() => toggleCell(rowIdx, colIdx)} 
+															/* --- UBAH CLASSNAME DI BAWAH INI --- */
+															className={`flex-1 min-w-0 overflow-hidden h-10 rounded text-[10px] font-mono flex items-center justify-center transition-all border ${
+																isActive 
+																	? `${INSTRUMENTS[rowIdx].color} text-white border-black/20 border-b-2` 
+																	: 'bg-slate-900 border-slate-700 hover:bg-slate-700'
+															} ${currentStep === colIdx ? 'brightness-125 z-10 scale-105' : ''}`}
+														>
+															{isActive && (rowIdx === 3 ? (cell === 'kick' ? 'K' : cell === 'snare' ? 'S' : 'H') : cell)}
+														</button>
+													);
+												})}
+											</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'live' && (
+                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-rose-400"><Music className="w-5 h-5" /> Drumpad</h3>
+                                    <div className="grid grid-cols-2 gap-4 h-64">
+                                        <button onMouseDown={() => { handleInteraction(); audioEngine.playDrum('kick'); }} className="bg-slate-700 hover:bg-rose-500 hover:text-white rounded-xl text-slate-300 font-bold text-xl shadow-[0_4px_0_0_rgba(0,0,0,0.3)] active:translate-y-1 transition-all">KICK</button>
+                                        <button onMouseDown={() => { handleInteraction(); audioEngine.playDrum('snare'); }} className="bg-slate-700 hover:bg-rose-400 hover:text-white rounded-xl text-slate-300 font-bold text-xl shadow-[0_4px_0_0_rgba(0,0,0,0.3)] active:translate-y-1 transition-all">SNARE</button>
+                                        <button onMouseDown={() => { handleInteraction(); audioEngine.playDrum('hihat'); }} className="bg-slate-700 hover:bg-amber-400 hover:text-black rounded-xl text-slate-300 font-bold text-xl shadow-[0_4px_0_0_rgba(0,0,0,0.3)] active:translate-y-1 transition-all">HIHAT</button>
+                                        <button onMouseDown={() => { handleInteraction(); audioEngine.playDrum('snare'); audioEngine.playDrum('kick'); }} className="bg-slate-700 hover:bg-indigo-500 hover:text-white rounded-xl text-slate-300 font-bold text-xl shadow-[0_4px_0_0_rgba(0,0,0,0.3)] active:translate-y-1 transition-all">CRASH</button>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-emerald-400"><Keyboard className="w-5 h-5" /> Easy Piano</h3>
+                                    <div className="flex h-64 gap-2 items-end justify-center bg-black/20 p-4 rounded-xl">
+                                        {['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'].map((note) => (
+                                            <button key={note} onMouseDown={() => { handleInteraction(); audioEngine.playPiano(note); }} className="flex-1 h-full bg-slate-100 hover:bg-emerald-300 active:bg-emerald-500 rounded-b-lg relative shadow-md active:scale-95 transition-transform">
+                                                <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-slate-900 font-bold text-sm">{note.replace(/\d/, '')}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'text' && (
+                            <div className="max-w-2xl mx-auto bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                                <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-indigo-400"><FileText className="w-5 h-5" /> Mode Teks</h3>
+                                <p className="text-sm text-slate-400 mb-4">Ketik notasi untuk mengisi Piano Sequencer. Contoh: <code className="bg-slate-900 px-1 rounded text-rose-300">c d e f g a b c5</code></p>
+                                <textarea value={textInput} onChange={(e) => setTextInput(e.target.value)} className="w-full h-32 bg-slate-900 border border-slate-600 rounded-lg p-4 font-mono text-lg text-emerald-400 focus:outline-none focus:border-indigo-500 mb-4" placeholder="Ketik not..." />
+                                <button onClick={parseTextToGrid} className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+                                    <Music className="w-4 h-4" /> Konversi ke Sequencer
+                                </button>
+                            </div>
+                        )}
+
+                        {/* TAB BARU: AUDIO EDITOR */}
+                        {activeTab === 'editor' && (
+                            <AudioEditorTab tracks={editorTracks} setTracks={setEditorTracks} />
+                        )}
+                    </div>
+
+                    {/* FOOTER REKAMAN (Hanya muncul jika bukan di mode Editor) */}
+                    {activeTab !== 'editor' && (
+                        <div className="bg-slate-900 border-t border-slate-800 p-4 fixed bottom-0 w-full z-40">
+                            <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                                <button onClick={toggleRecord} disabled={isPlaying && !isRecording} className={`flex items-center justify-center gap-2 px-6 py-3 md:py-2 w-full md:w-auto rounded-full font-bold transition-all shadow-lg ${isRecording ? 'bg-rose-600 text-white animate-record' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+                                    <Volume2 className="w-5 h-5 md:w-4 md:h-4" /> {isRecording ? 'Berhenti Merekam' : 'Mulai Rekam Lagu'}
+                                </button>
+                                
+                                {recordedUrl && (
+                                    <div className="flex gap-4 items-center animate-fade-in w-full md:w-auto">
+                                        <button onClick={sendToEditor} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition shadow">
+                                            <WaveformIcon className="w-4 h-4" /> Kirim ke Editor Audio
+                                        </button>
+                                        <a href={recordedUrl} download="Hasil_Komposer.webm" className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-emerald-400 px-5 py-2 rounded-lg text-sm transition">
+                                            <Download className="w-4 h-4" /> Unduh Raw
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<KomposerStudio />);
+    </script>
+</body>
+</html>

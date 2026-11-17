@@ -1,0 +1,3337 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BackOffice</title>
+  
+  <!-- Inter & Plus Jakarta Sans Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS (xlsx) for full Excel import/export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Clean custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f4f4f5;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #d4d4d8;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a1a1aa;
+    }
+    
+    /* Print Mode Styles */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-modal-container, #print-modal-container * {
+        visibility: visible;
+      }
+      #print-modal-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 12px;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-zinc-50 text-zinc-900 font-sans min-h-screen flex flex-col antialiased selection:bg-zinc-900 selection:text-white">
+
+  <!-- Top Global Navigation Bar -->
+  <header class="bg-white border-b border-zinc-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      
+      <!-- Brand & Workspace Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center text-white font-bold shadow-sm shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7zm0 4h16M10 4v16" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <!-- Click-to-edit Title -->
+            <button id="app-title-display" class="font-bold text-base tracking-tight text-zinc-900 cursor-pointer hover:text-zinc-600 transition flex items-center gap-1.5 focus:outline-none" title="Klik untuk ubah nama aplikasi">
+              <span id="app-title-text">BackOffice</span>
+              <svg id="app-title-edit-icon" class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+            <span id="file-status-pill" data-builder-only="true" class="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200">
+              In-Memory
+            </span>
+          </div>
+          <p id="file-name-display" data-builder-only="true" class="text-xs text-zinc-500 truncate max-w-[200px] sm:max-w-xs">Data Master: Belum terhubung file fisik</p>
+        </div>
+      </div>
+
+      <!-- Workspace Actions -->
+      <div id="header-actions" class="flex items-center gap-2">
+        <!-- Direct File Export / Sync -->
+        <button id="btn-sync-file" data-builder-only="true" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-950 text-white hover:bg-zinc-800 transition shadow-sm active:scale-95">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+          </svg>
+          <span id="btn-sync-label">Ekspor Master</span>
+        </button>
+
+        <!-- Opsi Dropdown -->
+        <div class="relative inline-block text-left" id="master-dropdown-wrapper" data-builder-only="true">
+          <button id="btn-master-menu" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            <span>Opsi</span>
+            <svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          <div id="master-dropdown-menu" class="hidden absolute right-0 mt-2 w-56 rounded-xl bg-white border border-zinc-200 shadow-xl py-1.5 z-40 text-xs">
+            <label class="flex items-center gap-2 px-3 py-2 text-zinc-700 hover:bg-zinc-50 cursor-pointer">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <span>Buka File Excel (.xlsx)</span>
+              <input type="file" id="input-open-excel" accept=".xlsx,.xls" class="hidden">
+            </label>
+            <button id="btn-export-excel" class="w-full text-left flex items-center gap-2 px-3 py-2 text-zinc-700 hover:bg-zinc-50">
+              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Download Master Excel</span>
+            </button>
+            <button id="btn-open-direct-file" class="w-full text-left flex items-center gap-2 px-3 py-2 text-zinc-700 hover:bg-zinc-50">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+              </svg>
+              <span>Hubungkan File Disk (Live Sync)</span>
+            </button>
+            <div class="h-px bg-zinc-100 my-1"></div>
+            <button id="btn-export-standalone-trigger" class="w-full text-left flex items-center gap-2 px-3 py-2 text-zinc-700 hover:bg-zinc-50">
+              <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+              </svg>
+              <span>Ekspor Standalone HTML</span>
+            </button>
+            <button id="btn-reset-sample" class="w-full text-left flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Muat Ulang Template Contoh</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace Area -->
+  <div class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row gap-6">
+    
+    <!-- Sidebar: Modules / Worksheet List -->
+    <aside class="w-full md:w-64 shrink-0 flex flex-col gap-3">
+      <div class="flex items-center justify-between px-1">
+        <h2 class="text-xs font-bold text-zinc-500 uppercase tracking-wider">Modul (Worksheets)</h2>
+        <button id="btn-add-module" data-builder-only="true" class="inline-flex items-center gap-1 text-xs font-semibold text-zinc-900 hover:text-black transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Baru</span>
+        </button>
+      </div>
+
+      <!-- Module Navigation Buttons List -->
+      <nav id="module-nav-list" class="flex flex-row md:flex-col gap-1.5 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
+        <!-- Rendered by JS -->
+      </nav>
+
+      <!-- Quick Tips Card (Builder Only) -->
+      <div id="tip-card" data-builder-only="true" class="hidden md:block mt-auto p-3.5 bg-white rounded-xl border border-zinc-200 text-xs text-zinc-500 shadow-sm leading-relaxed">
+        <div class="flex items-center gap-1.5 text-zinc-800 font-semibold mb-1">
+          <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Struktur Worksheet</span>
+        </div>
+        Tiap modul mewakili satu sheet. Konfigurasi kolom dan formula otomatis tersimpan rapi dalam berkas Excel saat Anda memilih <em>Ekspor Master</em>.
+      </div>
+    </aside>
+
+    <!-- Main Content Canvas -->
+    <main class="flex-1 flex flex-col min-w-0 bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+      
+      <!-- Module Header & Controls -->
+      <div class="p-4 sm:p-6 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/50">
+        <div class="flex items-center gap-3">
+          <span id="active-mod-icon" class="text-3xl p-2 bg-white rounded-xl border border-zinc-200 shadow-xs">📦</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 id="active-mod-name" class="text-lg sm:text-xl font-bold tracking-tight text-zinc-900">Nama Modul</h1>
+              <span id="active-mod-sheet" class="text-xs px-2 py-0.5 rounded-md bg-zinc-200/70 font-mono text-zinc-700">Sheet: NamaSheet</span>
+            </div>
+            <p id="active-mod-desc" class="text-xs text-zinc-500 mt-0.5">Kelola data baris, entri transaksi, dan ekspor data.</p>
+          </div>
+        </div>
+
+        <!-- Module Configuration Actions (Builder Only) -->
+        <div id="module-builder-actions" data-builder-only="true" class="flex flex-wrap items-center gap-2">
+          <button id="btn-open-form-builder" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition shadow-xs">
+            <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>Form Builder</span>
+          </button>
+
+          <button id="btn-open-connect" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition shadow-xs">
+            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            <span>Connect & Formula</span>
+          </button>
+
+          <button id="btn-edit-module" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition shadow-xs" title="Konfigurasi Modul">
+            <svg class="w-3.5 h-3.5 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>Konfigurasi Modul</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Aggregations Banner (Totals, Sums, Averages) -->
+      <div id="aggregation-bar" class="px-4 sm:px-6 py-2.5 bg-zinc-100/60 border-b border-zinc-200 flex flex-wrap items-center gap-3 text-xs">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- CRUD-EI Controls Toolbar -->
+      <div class="p-4 border-b border-zinc-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <!-- Search Filter -->
+        <div class="relative w-full sm:w-72">
+          <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </span>
+          <input type="text" id="search-input" placeholder="Cari di semua kolom..." class="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-zinc-200 bg-white placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition">
+        </div>
+
+        <!-- Integrated Data Actions -->
+        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
+          <label class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 cursor-pointer shadow-xs transition">
+            <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <span>Impor CSV</span>
+            <input type="file" id="input-import-csv" accept=".csv" class="hidden">
+          </label>
+          
+          <button id="btn-export-csv" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 shadow-xs transition">
+            <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>Ekspor CSV</span>
+          </button>
+
+          <!-- Primary Tambah Data Button -->
+          <button id="btn-add-record" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-lg bg-zinc-950 text-white hover:bg-zinc-800 transition shadow-sm active:scale-95">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Tambah Data</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Interactive Data Table Container -->
+      <div class="flex-1 overflow-x-auto relative">
+        <table id="data-table" class="w-full text-left text-xs border-collapse">
+          <thead class="bg-zinc-50 text-zinc-700 font-semibold border-b border-zinc-200 select-none">
+            <tr id="table-head-row">
+              <!-- Rendered by JS -->
+            </tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-zinc-100 text-zinc-800">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+        
+        <!-- Empty State UI -->
+        <div id="table-empty-state" class="hidden py-16 flex flex-col items-center justify-center text-center px-4">
+          <div class="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 mb-3">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+          </div>
+          <h3 class="text-sm font-semibold text-zinc-900">Belum ada baris data</h3>
+          <p class="text-xs text-zinc-500 mt-1 max-w-sm">Klik tombol "Tambah Data" untuk menginput baris baru atau gunakan opsi impor file CSV.</p>
+        </div>
+      </div>
+
+      <!-- Table Footer: Pagination & Record Count -->
+      <div class="p-3 border-t border-zinc-200 bg-zinc-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500">
+        <div id="table-count-info">Menampilkan 0 baris data</div>
+        <div class="flex items-center gap-2">
+          <label for="rows-per-page" class="text-zinc-500">Per halaman:</label>
+          <select id="rows-per-page" class="bg-white border border-zinc-200 rounded px-2 py-1 text-xs">
+            <option value="10">10</option>
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          <div class="flex items-center gap-1 ml-2">
+            <button id="btn-prev-page" class="p-1 rounded border border-zinc-200 bg-white hover:bg-zinc-50 disabled:opacity-40">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <span id="page-indicator" class="px-2 font-medium text-zinc-700">1 / 1</span>
+            <button id="btn-next-page" class="p-1 rounded border border-zinc-200 bg-white hover:bg-zinc-50 disabled:opacity-40">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- MODAL: Edit App Title (Builder Only) -->
+  <div id="modal-edit-title" data-builder-only="true" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-sm w-full p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-zinc-900">Ubah Nama Aplikasi</h3>
+        <button class="btn-close-modal text-zinc-400 hover:text-zinc-600 p-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <form id="form-edit-title" class="space-y-4 text-xs">
+        <div>
+          <label class="block text-zinc-600 mb-1 font-medium">Nama Aplikasi</label>
+          <input type="text" id="input-app-title" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-xs focus:outline-none focus:border-zinc-900" required>
+        </div>
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" class="btn-close-modal px-3.5 py-1.5 border border-zinc-200 rounded-lg text-zinc-700 hover:bg-zinc-50">Batal</button>
+          <button type="submit" class="px-3.5 py-1.5 bg-zinc-950 text-white rounded-lg hover:bg-zinc-800 font-medium">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Create / Edit Record Form -->
+  <div id="modal-record" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/50">
+        <div>
+          <h3 id="record-modal-title" class="font-bold text-base text-zinc-900">Tambah Data</h3>
+          <p class="text-xs text-zinc-500" id="record-modal-subtitle">Isi data formulir sesuai kolom modul.</p>
+        </div>
+        <button class="btn-close-modal text-zinc-400 hover:text-zinc-600 p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <!-- Dynamic Form Content Container -->
+      <form id="record-form" class="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+        <!-- Rendered by JS dynamically based on module fields -->
+      </form>
+
+      <div class="px-6 py-3 border-t border-zinc-200 bg-zinc-50 flex items-center justify-end gap-2">
+        <button type="button" class="btn-close-modal px-4 py-2 text-xs font-medium rounded-lg border border-zinc-200 text-zinc-700 hover:bg-white transition">Batal</button>
+        <button type="submit" form="record-form" class="px-4 py-2 text-xs font-medium rounded-lg bg-zinc-950 text-white hover:bg-zinc-800 transition shadow-sm">Simpan Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Form Builder (Builder Only) -->
+  <div id="modal-form-builder" data-builder-only="true" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/50">
+        <div>
+          <h3 class="font-bold text-base text-zinc-900">Form Builder & Kolom Excel</h3>
+          <p class="text-xs text-zinc-500">Tentukan header Excel, tipe input data, batas digit, dan format tampilan.</p>
+        </div>
+        <button class="btn-close-modal text-zinc-400 hover:text-zinc-600 p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto flex-1 text-xs space-y-4">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-semibold text-zinc-700">Daftar Kolom Aktif</span>
+            <button id="btn-add-new-field" class="inline-flex items-center gap-1 text-xs text-indigo-600 font-semibold hover:underline">
+              + Tambah Kolom Baru
+            </button>
+          </div>
+          <div id="builder-fields-list" class="space-y-2 border border-zinc-200 rounded-xl p-3 bg-zinc-50/60 max-h-72 overflow-y-auto">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <div id="field-editor-panel" class="hidden border border-zinc-300 rounded-xl p-4 bg-white shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 id="field-editor-title" class="font-bold text-zinc-900 text-xs">Konfigurasi Kolom</h4>
+            <button id="btn-cancel-field-edit" class="text-zinc-400 hover:text-zinc-600 text-xs">Tutup</button>
+          </div>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-zinc-600 mb-1 font-medium">Judul Header</label>
+              <input type="text" id="fe-label" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs" placeholder="cth: Tanggal Registrasi">
+            </div>
+            <div>
+              <label class="block text-zinc-600 mb-1 font-medium">Key Teknis (Unik)</label>
+              <input type="text" id="fe-key" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs" placeholder="cth: tgl_registrasi">
+            </div>
+            <div>
+              <label class="block text-zinc-600 mb-1 font-medium">Tipe Format Isian</label>
+              <select id="fe-type" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs bg-white">
+                <option value="text">Teks Bebas</option>
+                <option value="number">Angka (Mata Uang/Kuantitas)</option>
+                <option value="date">Tanggal (YYYY-MM-DD)</option>
+                <option value="time">Waktu (HH:mm)</option>
+                <option value="datetime">Tanggal & Waktu</option>
+                <option value="percentage">Persentase (%)</option>
+                <option value="select">Dropdown Pilihan (Single Select)</option>
+                <option value="radio">Pilihan Radio</option>
+                <option value="checkbox">Checkbox (Ya / Tidak)</option>
+                <option value="textarea">Catatan / Teks Panjang</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-zinc-600 mb-1 font-medium">Batas Maksimal Digit / Karakter</label>
+              <input type="number" id="fe-maxlength" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs" placeholder="Kosongkan jika tidak dibatasi">
+            </div>
+          </div>
+
+          <div id="fe-options-wrapper" class="hidden">
+            <label class="block text-zinc-600 mb-1 font-medium">Opsi Dropdown / Radio (Pisahkan dengan koma)</label>
+            <input type="text" id="fe-options" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs" placeholder="cth: Kasir, Gudang, Admin, Kurir">
+          </div>
+
+          <div class="flex items-center gap-4 pt-1">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="fe-required" class="rounded border-zinc-300">
+              <span class="text-zinc-700">Wajib Diisi (Required)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="fe-primary" class="rounded border-zinc-300">
+              <span class="text-zinc-700">Kunci Utama (ID / Unique)</span>
+            </label>
+          </div>
+
+          <div class="pt-2 flex justify-end gap-2">
+            <button id="btn-save-field" class="px-3 py-1.5 bg-zinc-900 text-white rounded-lg text-xs hover:bg-zinc-800">Terapkan Kolom</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-zinc-200 bg-zinc-50 flex items-center justify-end">
+        <button class="btn-close-modal px-4 py-2 text-xs font-medium rounded-lg bg-zinc-950 text-white hover:bg-zinc-800">Selesai & Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Connect & Lookup Engine (Builder Only) -->
+  <div id="modal-connect" data-builder-only="true" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/50">
+        <div>
+          <h3 class="font-bold text-base text-zinc-900">Connect, Lookup & Formula</h3>
+          <p class="text-xs text-zinc-500">Hubungkan data antar sheet atau tentukan formula kalkulasi otomatis.</p>
+        </div>
+        <button class="btn-close-modal text-zinc-400 hover:text-zinc-600 p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto flex-1 text-xs space-y-5">
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-zinc-800">Aturan Relasi / Formula Terpasang</span>
+            <button id="btn-add-connect-rule" class="text-xs font-semibold text-emerald-600 hover:underline">+ Aturan Baru</button>
+          </div>
+          <div id="connect-rules-list" class="space-y-2 border border-zinc-200 rounded-xl p-3 bg-zinc-50/60 max-h-48 overflow-y-auto">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <div id="connect-rule-panel" class="hidden border border-zinc-300 rounded-xl p-4 bg-white shadow-sm space-y-3">
+          <h4 class="font-bold text-zinc-900 text-xs">Konfigurasi Lookup / Formula Baru</h4>
+          
+          <div>
+            <label class="block text-zinc-600 mb-1 font-medium">Tipe Kalkulasi / Relasi</label>
+            <select id="cr-type" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs bg-white">
+              <option value="lookup">Lookup Data Sheet Lain (VLOOKUP)</option>
+              <option value="arithmetic">Formula Matematika Baris ([A] * [B])</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-zinc-600 mb-1 font-medium">Tuliskan Hasil ke Kolom Target</label>
+            <select id="cr-target-field" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs bg-white"></select>
+          </div>
+
+          <div id="cr-lookup-params" class="space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label class="block text-zinc-600 mb-1">Ambil dari Modul</label>
+                <select id="cr-source-mod" class="w-full px-2 py-1.5 border border-zinc-200 rounded-lg text-xs bg-white"></select>
+              </div>
+              <div>
+                <label class="block text-zinc-600 mb-1">Kunci Modul Ini</label>
+                <select id="cr-local-key" class="w-full px-2 py-1.5 border border-zinc-200 rounded-lg text-xs bg-white"></select>
+              </div>
+              <div>
+                <label class="block text-zinc-600 mb-1">Kolom yang Diambil</label>
+                <select id="cr-return-field" class="w-full px-2 py-1.5 border border-zinc-200 rounded-lg text-xs bg-white"></select>
+              </div>
+            </div>
+          </div>
+
+          <div id="cr-formula-params" class="hidden space-y-2">
+            <label class="block text-zinc-600 font-medium">Ekspresi Rumus</label>
+            <input type="text" id="cr-expression" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs font-mono" placeholder="cth: [qty] * [harga] - [diskon]">
+          </div>
+
+          <div class="pt-2 flex justify-end gap-2">
+            <button id="btn-cancel-rule" class="px-3 py-1.5 border border-zinc-200 rounded-lg text-xs text-zinc-600">Batal</button>
+            <button id="btn-save-rule" class="px-3 py-1.5 bg-zinc-900 text-white rounded-lg text-xs hover:bg-zinc-800">Simpan Aturan</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-zinc-200 bg-zinc-50 flex items-center justify-end">
+        <button class="btn-close-modal px-4 py-2 text-xs font-medium rounded-lg bg-zinc-950 text-white hover:bg-zinc-800">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Module Config (Builder Only) -->
+  <div id="modal-module-edit" data-builder-only="true" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-sm w-full overflow-hidden flex flex-col">
+      <div class="px-6 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/50">
+        <h3 id="module-modal-title" class="font-bold text-sm text-zinc-900">Konfigurasi Modul</h3>
+        <button class="btn-close-modal text-zinc-400 hover:text-zinc-600 p-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <form id="form-module-edit" class="p-6 space-y-4 text-xs">
+        <div>
+          <label class="block text-zinc-600 mb-1 font-medium">Ikon Emoji</label>
+          <input type="text" id="me-icon" class="w-16 px-3 py-1.5 text-center text-lg border border-zinc-200 rounded-lg" value="📁" maxlength="2">
+        </div>
+        <div>
+          <label class="block text-zinc-600 mb-1 font-medium">Nama Singkat Modul</label>
+          <input type="text" id="me-name" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs" required placeholder="cth: Kasir Penjualan">
+        </div>
+        <div>
+          <label class="block text-zinc-600 mb-1 font-medium">Nama Worksheet Excel</label>
+          <input type="text" id="me-sheet" class="w-full px-3 py-1.5 border border-zinc-200 rounded-lg text-xs font-mono" required placeholder="cth: Penjualan">
+        </div>
+
+        <div class="pt-2 flex justify-between items-center">
+          <button type="button" id="btn-delete-module" class="text-rose-600 hover:underline text-xs">Hapus Modul</button>
+          <div class="flex gap-2">
+            <button type="button" class="btn-close-modal px-3 py-1.5 border border-zinc-200 rounded-lg text-zinc-600">Batal</button>
+            <button type="submit" class="px-3 py-1.5 bg-zinc-950 text-white rounded-lg hover:bg-zinc-800">Simpan</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Standalone Export Options (Builder Only) -->
+  <div id="modal-export-standalone" data-builder-only="true" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-sm w-full p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-sm text-zinc-900">Ekspor Standalone HTML</h3>
+        <button class="btn-close-modal text-zinc-400 hover:text-zinc-600 p-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed">
+        File HTML mandiri akan dibuat ringkas tanpa kode builder dan siap dipakai langsung di browser perangkat lain.
+      </p>
+      <div class="pt-1 text-xs">
+        <label class="flex items-start gap-2.5 cursor-pointer p-2.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 transition">
+          <input type="checkbox" id="check-export-include-data" class="mt-0.5 rounded border-zinc-300">
+          <div>
+            <span class="font-medium text-zinc-800 block">Sertakan baris data saat ini</span>
+            <span class="text-[11px] text-zinc-500">Jika tidak dicentang, file akan bersih tanpa data sampel (hanya skema kolom dan modul).</span>
+          </div>
+        </label>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn-close-modal px-3.5 py-1.5 border border-zinc-200 rounded-lg text-zinc-700 hover:bg-zinc-50 text-xs">Batal</button>
+        <button id="btn-proceed-standalone-export" class="px-3.5 py-1.5 bg-zinc-950 text-white rounded-lg hover:bg-zinc-800 text-xs font-medium">Unduh HTML</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Print Invoice / Record Slip Preview -->
+  <div id="modal-print" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-zinc-200 flex items-center justify-between no-print">
+        <h3 class="font-bold text-sm text-zinc-900">Cetak Dokumen / Struk</h3>
+        <button class="btn-close-modal text-zinc-400 hover:text-zinc-600 p-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <!-- Printable Area -->
+      <div id="print-modal-container" class="p-6 overflow-y-auto flex-1 font-mono text-xs text-zinc-800 space-y-4">
+        <!-- Rendered by JS -->
+      </div>
+
+      <div class="px-6 py-3 border-t border-zinc-200 bg-zinc-50 flex items-center justify-end gap-2 no-print">
+        <button class="btn-close-modal px-3 py-1.5 border border-zinc-200 rounded-lg text-zinc-600 text-xs">Tutup</button>
+        <button onclick="window.print()" class="px-4 py-1.5 bg-zinc-950 text-white rounded-lg text-xs hover:bg-zinc-800">Cetak Sekarang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM CONFIRMATION MODAL -->
+  <div id="modal-confirm" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+      <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+      </div>
+      <div>
+        <h4 id="confirm-title" class="font-bold text-sm text-zinc-900">Konfirmasi Aksi</h4>
+        <p id="confirm-message" class="text-xs text-zinc-500 mt-1">Apakah Anda yakin ingin melanjutkan tindakan ini?</p>
+      </div>
+      <div class="flex items-center justify-center gap-2 pt-2">
+        <button id="btn-confirm-cancel" class="px-4 py-2 border border-zinc-200 rounded-lg text-xs font-medium text-zinc-700 hover:bg-zinc-50">Batal</button>
+        <button id="btn-confirm-proceed" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-xs font-medium hover:bg-rose-700">Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER (High z-index to stay above modals) -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <script>
+    /* ==========================================================================
+       1. CORE STATE MANAGEMENT & SEED DATA
+       ========================================================================== */
+
+    const DEFAULT_SEED_STATE = {
+      config: {
+        appName: "Toko Mandiri",
+        themeMode: "clean-white",
+        accent: "#09090b"
+      },
+      modules: [
+        {
+          id: "mod_produk",
+          name: "Katalog Produk",
+          sheetName: "Produk",
+          icon: "📦",
+          fields: [
+            { key: "sku", label: "SKU / Kode", type: "text", required: true, isPrimaryKey: true, maxLength: 10 },
+            { key: "nama_produk", label: "Nama Produk", type: "text", required: true },
+            { key: "kategori", label: "Kategori", type: "select", options: ["Makanan", "Minuman", "Elektronik", "Jasa"] },
+            { key: "harga_jual", label: "Harga Jual (Rp)", type: "number", required: true },
+            { key: "stok", label: "Stok Tersedia", type: "number", required: true }
+          ],
+          data: [
+            { sku: "PRD-001", nama_produk: "Kopi Arabika 250g", kategori: "Minuman", harga_jual: 65000, stok: 45 },
+            { sku: "PRD-002", nama_produk: "Cokelat Artisan Bar", kategori: "Makanan", harga_jual: 35000, stok: 120 },
+            { sku: "PRD-003", nama_produk: "Tumbler Stainless 500ml", kategori: "Elektronik", harga_jual: 110000, stok: 18 }
+          ],
+          rules: []
+        },
+        {
+          id: "mod_pelanggan",
+          name: "Data Pelanggan",
+          sheetName: "Pelanggan",
+          icon: "👥",
+          fields: [
+            { key: "id_pelanggan", label: "ID Pelanggan", type: "text", required: true, isPrimaryKey: true },
+            { key: "nama", label: "Nama Pelanggan", type: "text", required: true },
+            { key: "telepon", label: "No. WhatsApp", type: "text", maxLength: 15 },
+            { key: "level", label: "Member Level", type: "select", options: ["Reguler", "Gold", "VIP"] }
+          ],
+          data: [
+            { id_pelanggan: "CUST-01", nama: "Budi Santoso", telepon: "081234567890", level: "VIP" },
+            { id_pelanggan: "CUST-02", nama: "Siti Rahma", telepon: "085678901234", level: "Gold" },
+            { id_pelanggan: "CUST-03", nama: "Ahmad Fauzi", telepon: "087890123456", level: "Reguler" }
+          ],
+          rules: []
+        },
+        {
+          id: "mod_transaksi",
+          name: "Kasir & Penjualan",
+          sheetName: "Penjualan",
+          icon: "🧾",
+          fields: [
+            { key: "no_nota", label: "No. Nota", type: "text", required: true, isPrimaryKey: true },
+            { key: "tanggal", label: "Tanggal Transaksi", type: "date", required: true },
+            { key: "id_pelanggan", label: "ID Pelanggan", type: "text", required: true },
+            { key: "nama_pelanggan", label: "Nama Pelanggan", type: "text" },
+            { key: "sku_produk", label: "SKU Produk", type: "text", required: true },
+            { key: "nama_produk", label: "Nama Barang", type: "text" },
+            { key: "harga", label: "Harga Satuan", type: "number", required: true },
+            { key: "qty", label: "Jumlah (Qty)", type: "number", required: true },
+            { key: "total", label: "Total Pembayaran", type: "number" }
+          ],
+          data: [
+            { no_nota: "TRX-1001", tanggal: "2025-05-10", id_pelanggan: "CUST-01", nama_pelanggan: "Budi Santoso", sku_produk: "PRD-001", nama_produk: "Kopi Arabika 250g", harga: 65000, qty: 2, total: 130000 },
+            { no_nota: "TRX-1002", tanggal: "2025-05-11", id_pelanggan: "CUST-02", nama_pelanggan: "Siti Rahma", sku_produk: "PRD-002", nama_produk: "Cokelat Artisan Bar", harga: 35000, qty: 3, total: 105000 }
+          ],
+          rules: [
+            {
+              id: "rule_1",
+              type: "lookup",
+              targetField: "nama_pelanggan",
+              sourceModuleId: "mod_pelanggan",
+              localKey: "id_pelanggan",
+              returnField: "nama"
+            },
+            {
+              id: "rule_2",
+              type: "lookup",
+              targetField: "nama_produk",
+              sourceModuleId: "mod_produk",
+              localKey: "sku_produk",
+              returnField: "nama_produk"
+            },
+            {
+              id: "rule_3",
+              type: "lookup",
+              targetField: "harga",
+              sourceModuleId: "mod_produk",
+              localKey: "sku_produk",
+              returnField: "harga_jual"
+            },
+            {
+              id: "rule_4",
+              type: "arithmetic",
+              targetField: "total",
+              expression: "[qty] * [harga]"
+            }
+          ]
+        }
+      ],
+      activeModuleId: "mod_transaksi"
+    };
+
+    let AppState = JSON.parse(JSON.stringify(DEFAULT_SEED_STATE));
+    let isDirty = false;
+    let fileHandle = null;
+    let editingRecordIndex = null;
+    let tableCurrentPage = 1;
+    let tableRowsPerPage = 25;
+    let searchQuery = "";
+    let sortColumn = null;
+    let sortDirection = 'asc';
+
+    /* ==========================================================================
+       2. PERSISTENCE & AUTO CACHE
+       ========================================================================== */
+
+    const STORAGE_KEY = 'backoffice_master_session';
+
+    function saveStateToCache() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState));
+        isDirty = true;
+        updateFileStatusPill();
+      } catch (err) {
+        console.warn("Storage quota exceeded or private mode", err);
+      }
+    }
+
+    function loadStateFromCache() {
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && Array.isArray(parsed.modules)) {
+            AppState = parsed;
+            if (!AppState.activeModuleId && AppState.modules.length > 0) {
+              AppState.activeModuleId = AppState.modules[0].id;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Gagal memuat cache", err);
+      }
+    }
+
+    function updateFileStatusPill() {
+      const pill = document.getElementById('file-status-pill');
+      if (!pill) return;
+
+      if (fileHandle) {
+        pill.textContent = isDirty ? "Perubahan Belum Disimpan" : "Tersinkron ke Disk";
+        pill.className = isDirty 
+          ? "text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"
+          : "text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
+      } else {
+        pill.textContent = isDirty ? "In-Memory (Belum Disimpan)" : "In-Memory (Tersimpan)";
+        pill.className = isDirty
+          ? "text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200"
+          : "text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200";
+      }
+    }
+
+    window.addEventListener('beforeunload', (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = 'Terdapat data yang belum diekspor. Yakin ingin keluar?';
+        return e.returnValue;
+      }
+    });
+
+    /* ==========================================================================
+       3. NAVIGATION & ACTIVE MODULE VIEW
+       ========================================================================== */
+
+    function getActiveModule() {
+      return AppState.modules.find(m => m.id === AppState.activeModuleId) || AppState.modules[0];
+    }
+
+    function renderModuleNavigation() {
+      const nav = document.getElementById('module-nav-list');
+      if (!nav) return;
+      nav.innerHTML = '';
+
+      AppState.modules.forEach(mod => {
+        const isActive = mod.id === AppState.activeModuleId;
+        const btn = document.createElement('button');
+        btn.className = `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left shrink-0 md:shrink border ${
+          isActive 
+            ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm' 
+            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100 hover:border-zinc-300'
+        }`;
+        
+        btn.innerHTML = `
+          <span class="text-base">${mod.icon || '📁'}</span>
+          <span class="truncate flex-1">${escapeHtml(mod.name)}</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded-md ${isActive ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-100 text-zinc-500'} font-mono">${mod.data ? mod.data.length : 0}</span>
+        `;
+
+        btn.onclick = () => {
+          AppState.activeModuleId = mod.id;
+          tableCurrentPage = 1;
+          searchQuery = "";
+          const searchInput = document.getElementById('search-input');
+          if (searchInput) searchInput.value = "";
+          renderModuleNavigation();
+          renderActiveModuleView();
+          saveStateToCache();
+        };
+
+        nav.appendChild(btn);
+      });
+    }
+
+    function renderActiveModuleView() {
+      const mod = getActiveModule();
+      if (!mod) return;
+
+      const titleText = document.getElementById('app-title-text');
+      if (titleText) titleText.textContent = AppState.config.appName || 'BackOffice';
+
+      document.getElementById('active-mod-icon').textContent = mod.icon || '📁';
+      document.getElementById('active-mod-name').textContent = mod.name;
+      document.getElementById('active-mod-sheet').textContent = `Sheet: ${mod.sheetName}`;
+      
+      renderAggregationsBar(mod);
+      renderTable();
+    }
+
+    /* ==========================================================================
+       4. DYNAMIC TABLE & AGGREGATIONS
+       ========================================================================== */
+
+    function getFilteredAndSortedData(mod) {
+      if (!mod.data) mod.data = [];
+      let list = [...mod.data];
+
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase();
+        list = list.filter(row => {
+          return Object.values(row).some(val => 
+            String(val !== null && val !== undefined ? val : '').toLowerCase().includes(q)
+          );
+        });
+      }
+
+      if (sortColumn) {
+        const fieldDef = mod.fields.find(f => f.key === sortColumn);
+        const fieldType = fieldDef ? fieldDef.type : 'text';
+
+        list.sort((a, b) => {
+          let valA = a[sortColumn];
+          let valB = b[sortColumn];
+          if (valA === undefined || valA === null) valA = '';
+          if (valB === undefined || valB === null) valB = '';
+
+          if (fieldType === 'number') {
+            const numA = Number(valA) || 0;
+            const numB = Number(valB) || 0;
+            return sortDirection === 'asc' ? numA - numB : numB - numA;
+          }
+          if (fieldType === 'date' || fieldType === 'datetime') {
+            const timeA = valA ? new Date(valA).getTime() : 0;
+            const timeB = valB ? new Date(valB).getTime() : 0;
+            return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+          }
+          if (fieldType === 'time') {
+            return sortDirection === 'asc'
+              ? String(valA).localeCompare(String(valB))
+              : String(valB).localeCompare(String(valA));
+          }
+          return sortDirection === 'asc'
+            ? String(valA).localeCompare(String(valB))
+            : String(valB).localeCompare(String(valA));
+        });
+      }
+
+      return list;
+    }
+
+    function formatCellValue(val, type) {
+      if (val === undefined || val === null || val === '') return '<span class="text-zinc-300">-</span>';
+      
+      if (type === 'number') {
+        const num = Number(val);
+        return isNaN(num) ? escapeHtml(val) : `<span class="font-mono">${num.toLocaleString('id-ID')}</span>`;
+      }
+      if (type === 'percentage') {
+        return `<span class="font-mono">${escapeHtml(val)}%</span>`;
+      }
+      if (type === 'checkbox') {
+        return val ? '<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold text-[10px]">Ya</span>' : '<span class="px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 text-[10px]">Tidak</span>';
+      }
+      if (type === 'date') {
+        if (typeof val === 'string' && val.includes('-')) {
+          const parts = val.split('T')[0].split('-');
+          if (parts.length === 3) {
+            const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            if (!isNaN(d.getTime())) {
+              return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+            }
+          }
+        }
+        const d = new Date(val);
+        return !isNaN(d.getTime()) ? d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : escapeHtml(String(val));
+      }
+      if (type === 'time') {
+        return `<span class="font-mono">${escapeHtml(String(val))}</span>`;
+      }
+      if (type === 'datetime') {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) {
+          const datePart = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+          const hours = String(d.getHours()).padStart(2, '0');
+          const mins = String(d.getMinutes()).padStart(2, '0');
+          return `${datePart}, <span class="font-mono text-zinc-500">${hours}:${mins}</span>`;
+        }
+        return escapeHtml(String(val));
+      }
+      return escapeHtml(String(val));
+    }
+
+    function renderAggregationsBar(mod) {
+      const bar = document.getElementById('aggregation-bar');
+      bar.innerHTML = '';
+
+      const countBadge = document.createElement('div');
+      countBadge.className = 'flex items-center gap-1.5 px-3 py-1 bg-white border border-zinc-200 rounded-lg text-zinc-700 font-medium shadow-xs';
+      countBadge.innerHTML = `<span class="text-zinc-400">Total Baris:</span> <strong class="font-bold text-zinc-900">${mod.data ? mod.data.length : 0}</strong>`;
+      bar.appendChild(countBadge);
+
+      if (!mod.data || mod.data.length === 0) return;
+
+      const numericFields = mod.fields.filter(f => f.type === 'number');
+      numericFields.slice(0, 3).forEach(f => {
+        const values = mod.data
+          .map(d => Number(d[f.key]))
+          .filter(v => !isNaN(v) && Number.isFinite(v));
+
+        if (values.length > 0) {
+          const sum = values.reduce((acc, curr) => acc + curr, 0);
+          const avg = sum / values.length;
+
+          const statBadge = document.createElement('div');
+          statBadge.className = 'flex items-center gap-2 px-3 py-1 bg-white border border-zinc-200 rounded-lg text-zinc-700 text-xs shadow-xs';
+          statBadge.innerHTML = `
+            <span class="text-zinc-500 font-medium">${escapeHtml(f.label)}:</span>
+            <span title="Total Sum" class="font-mono font-semibold text-zinc-900">Σ ${sum.toLocaleString('id-ID')}</span>
+            <span class="text-zinc-300">|</span>
+            <span title="Rata-rata" class="font-mono text-zinc-500">Ø ${Math.round(avg).toLocaleString('id-ID')}</span>
+          `;
+          bar.appendChild(statBadge);
+        }
+      });
+    }
+
+    function renderTable() {
+      const mod = getActiveModule();
+      const filteredData = getFilteredAndSortedData(mod);
+      const totalRows = filteredData.length;
+
+      const totalPages = Math.ceil(totalRows / tableRowsPerPage) || 1;
+      if (tableCurrentPage > totalPages) tableCurrentPage = totalPages;
+      if (tableCurrentPage < 1) tableCurrentPage = 1;
+
+      const startIndex = (tableCurrentPage - 1) * tableRowsPerPage;
+      const pagedData = filteredData.slice(startIndex, startIndex + tableRowsPerPage);
+
+      // Render Header
+      const headRow = document.getElementById('table-head-row');
+      headRow.innerHTML = '';
+
+      const thNum = document.createElement('th');
+      thNum.className = 'py-3 px-3 text-zinc-500 w-12 text-center';
+      thNum.textContent = '#';
+      headRow.appendChild(thNum);
+
+      mod.fields.forEach(f => {
+        const th = document.createElement('th');
+        th.className = 'py-3 px-4 font-semibold text-zinc-700 cursor-pointer hover:bg-zinc-100 transition truncate';
+        const isSorted = sortColumn === f.key;
+        th.innerHTML = `
+          <div class="flex items-center gap-1.5">
+            <span>${escapeHtml(f.label)}</span>
+            <span class="text-[10px] text-zinc-400 font-normal">
+              ${isSorted ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+            </span>
+          </div>
+        `;
+        th.onclick = () => {
+          if (sortColumn === f.key) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            sortColumn = f.key;
+            sortDirection = 'asc';
+          }
+          renderTable();
+        };
+        headRow.appendChild(th);
+      });
+
+      const thAction = document.createElement('th');
+      thAction.className = 'py-3 px-4 text-right text-zinc-500 w-28';
+      thAction.textContent = 'Aksi';
+      headRow.appendChild(thAction);
+
+      // Render Body
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+
+      const emptyState = document.getElementById('table-empty-state');
+      if (pagedData.length === 0) {
+        emptyState.classList.remove('hidden');
+      } else {
+        emptyState.classList.add('hidden');
+      }
+
+      pagedData.forEach((row, idx) => {
+        const originalIndex = mod.data.indexOf(row);
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-zinc-50/80 transition group';
+
+        const tdNum = document.createElement('td');
+        tdNum.className = 'py-2.5 px-3 text-center text-zinc-400 font-mono text-[11px]';
+        tdNum.textContent = startIndex + idx + 1;
+        tr.appendChild(tdNum);
+
+        mod.fields.forEach(f => {
+          const td = document.createElement('td');
+          td.className = 'py-2.5 px-4 truncate max-w-xs';
+          const rawVal = row[f.key];
+          td.innerHTML = formatCellValue(rawVal, f.type);
+          tr.appendChild(td);
+        });
+
+        const tdAct = document.createElement('td');
+        tdAct.className = 'py-2.5 px-4 text-right whitespace-nowrap space-x-1';
+        tdAct.innerHTML = `
+          <button title="Cetak Dokumen" class="btn-print-row p-1 text-zinc-400 hover:text-zinc-800 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+          </button>
+          <button title="Ubah Baris" class="btn-edit-row p-1 text-zinc-400 hover:text-zinc-900 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+          </button>
+          <button title="Hapus Baris" class="btn-delete-row p-1 text-zinc-400 hover:text-rose-600 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          </button>
+        `;
+
+        tdAct.querySelector('.btn-print-row').onclick = () => openPrintRecordModal(row, mod);
+        tdAct.querySelector('.btn-edit-row').onclick = () => openRecordModal(originalIndex);
+        tdAct.querySelector('.btn-delete-row').onclick = () => {
+          showConfirmModal({
+            title: "Hapus Baris Data?",
+            message: `Baris ini akan dihapus dari sheet ${mod.sheetName}.`,
+            onConfirm: () => {
+              mod.data.splice(originalIndex, 1);
+              saveStateToCache();
+              renderTable();
+              renderModuleNavigation();
+              renderAggregationsBar(mod);
+              showToast("Baris data berhasil dihapus", "info");
+            }
+          });
+        };
+
+        tr.appendChild(tdAct);
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('table-count-info').textContent = `Menampilkan ${totalRows === 0 ? 0 : startIndex + 1}-${Math.min(startIndex + tableRowsPerPage, totalRows)} dari total ${totalRows} baris`;
+      document.getElementById('page-indicator').textContent = `${tableCurrentPage} / ${totalPages}`;
+      document.getElementById('btn-prev-page').disabled = tableCurrentPage <= 1;
+      document.getElementById('btn-next-page').disabled = tableCurrentPage >= totalPages;
+    }
+
+    /* ==========================================================================
+       5. CONNECT & FORMULA EVALUATION ENGINE
+       ========================================================================== */
+
+    function evaluateFormulaExpression(expr, row, fields) {
+      if (!expr) return 0;
+      let evaluatedExpr = expr;
+      fields.forEach(f => {
+        const val = Number(row[f.key]) || 0;
+        evaluatedExpr = evaluatedExpr.split(`[${f.key}]`).join(val);
+      });
+
+      // Strict whitelist check for safe mathematical characters
+      if (/^[0-9+\-*/().%\s]+$/.test(evaluatedExpr)) {
+        try {
+          const calc = Function(`'use strict'; return (${evaluatedExpr})`)();
+          if (typeof calc === 'number' && Number.isFinite(calc)) {
+            return Math.round((calc + Number.EPSILON) * 100) / 100;
+          }
+          return 0;
+        } catch (e) {
+          return 0;
+        }
+      }
+      return 0;
+    }
+
+    function applyConnectRules(row, mod) {
+      if (!mod.rules || mod.rules.length === 0) return row;
+      const updatedRow = { ...row };
+
+      mod.rules.forEach(rule => {
+        try {
+          if (rule.type === 'lookup') {
+            const targetMod = AppState.modules.find(m => m.id === rule.sourceModuleId);
+            if (targetMod && targetMod.data) {
+              const localVal = String(updatedRow[rule.localKey] || '').trim().toLowerCase();
+              if (localVal) {
+                const primaryKey = targetMod.fields.find(f => f.isPrimaryKey)?.key || targetMod.fields[0]?.key;
+                const match = targetMod.data.find(d => String(d[primaryKey] || '').trim().toLowerCase() === localVal);
+                if (match && match[rule.returnField] !== undefined) {
+                  updatedRow[rule.targetField] = match[rule.returnField];
+                }
+              }
+            }
+          } else if (rule.type === 'arithmetic') {
+            updatedRow[rule.targetField] = evaluateFormulaExpression(rule.expression, updatedRow, mod.fields);
+          }
+        } catch (err) {
+          console.warn("Connect rule evaluation error", err);
+        }
+      });
+
+      return updatedRow;
+    }
+
+    /* Live update calculation inside open modal form */
+    function evaluateModalLiveRules(mod, form) {
+      if (!mod.rules || mod.rules.length === 0 || !form) return;
+      
+      const currentValues = {};
+      mod.fields.forEach(field => {
+        const el = form.elements[field.key];
+        if (!el) return;
+        if (field.type === 'checkbox') {
+          currentValues[field.key] = el.checked;
+        } else if (field.type === 'number') {
+          currentValues[field.key] = el.value === '' ? 0 : Number(el.value);
+        } else {
+          currentValues[field.key] = el.value;
+        }
+      });
+
+      mod.rules.forEach(rule => {
+        const targetInput = form.elements[rule.targetField];
+        if (!targetInput) return;
+
+        if (rule.type === 'lookup') {
+          const targetMod = AppState.modules.find(m => m.id === rule.sourceModuleId);
+          if (targetMod && targetMod.data) {
+            const localVal = String(currentValues[rule.localKey] || '').trim().toLowerCase();
+            if (localVal) {
+              const primaryKey = targetMod.fields.find(f => f.isPrimaryKey)?.key || targetMod.fields[0]?.key;
+              const match = targetMod.data.find(d => String(d[primaryKey] || '').trim().toLowerCase() === localVal);
+              if (match && match[rule.returnField] !== undefined) {
+                targetInput.value = match[rule.returnField];
+                currentValues[rule.targetField] = match[rule.returnField];
+              }
+            }
+          }
+        } else if (rule.type === 'arithmetic') {
+          const calculated = evaluateFormulaExpression(rule.expression, currentValues, mod.fields);
+          targetInput.value = calculated;
+          currentValues[rule.targetField] = calculated;
+        }
+      });
+    }
+
+    /* ==========================================================================
+       6. RECORD CRUD MODAL
+       ========================================================================== */
+
+    function openRecordModal(index = null) {
+      const mod = getActiveModule();
+      editingRecordIndex = index;
+      const isEdit = index !== null;
+      const record = isEdit ? mod.data[index] : {};
+
+      document.getElementById('record-modal-title').textContent = isEdit ? `Ubah Data (${mod.name})` : `Tambah Data Baru (${mod.name})`;
+      document.getElementById('record-modal-subtitle').textContent = `Worksheet: ${mod.sheetName}`;
+
+      const form = document.getElementById('record-form');
+      form.innerHTML = '';
+
+      const ruleTargetFields = (mod.rules || []).map(r => r.targetField);
+
+      mod.fields.forEach(field => {
+        const val = record[field.key] !== undefined ? record[field.key] : '';
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.className = 'space-y-1';
+
+        const isCalculatedTarget = ruleTargetFields.includes(field.key);
+
+        const label = document.createElement('label');
+        label.className = 'block font-medium text-zinc-700';
+        label.innerHTML = `${escapeHtml(field.label)} ${field.required ? '<span class="text-rose-500">*</span>' : ''} ${isCalculatedTarget ? '<span class="text-[10px] text-indigo-600 font-mono font-normal ml-1 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">Auto</span>' : ''}`;
+        fieldWrapper.appendChild(label);
+
+        let inputEl;
+
+        if (field.type === 'select') {
+          inputEl = document.createElement('select');
+          inputEl.className = 'w-full px-3 py-2 border border-zinc-200 rounded-lg bg-white focus:outline-none focus:border-zinc-900';
+          const defaultOpt = document.createElement('option');
+          defaultOpt.value = '';
+          defaultOpt.textContent = '-- Pilih --';
+          inputEl.appendChild(defaultOpt);
+          (field.options || []).forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt;
+            if (String(val) === String(opt)) o.selected = true;
+            inputEl.appendChild(o);
+          });
+        } else if (field.type === 'textarea') {
+          inputEl = document.createElement('textarea');
+          inputEl.rows = 3;
+          inputEl.className = 'w-full px-3 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:border-zinc-900';
+          inputEl.value = val;
+        } else if (field.type === 'checkbox') {
+          const checkWrapper = document.createElement('div');
+          checkWrapper.className = 'flex items-center gap-2 pt-1';
+          inputEl = document.createElement('input');
+          inputEl.type = 'checkbox';
+          inputEl.className = 'rounded border-zinc-300 text-zinc-900 focus:ring-0';
+          inputEl.checked = Boolean(val);
+          checkWrapper.appendChild(inputEl);
+          const span = document.createElement('span');
+          span.className = 'text-zinc-600';
+          span.textContent = 'Aktif / Ya';
+          checkWrapper.appendChild(span);
+          fieldWrapper.appendChild(checkWrapper);
+        } else {
+          inputEl = document.createElement('input');
+          let inputType = 'text';
+          if (field.type === 'number') inputType = 'number';
+          else if (field.type === 'date') inputType = 'date';
+          else if (field.type === 'time') inputType = 'time';
+          else if (field.type === 'datetime') inputType = 'datetime-local';
+          inputEl.type = inputType;
+          inputEl.className = 'w-full px-3 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:border-zinc-900';
+          
+          if (field.type === 'datetime' && val) {
+            inputEl.value = String(val).replace(' ', 'T').substring(0, 16);
+          } else {
+            inputEl.value = val;
+          }
+          if (field.maxLength) inputEl.maxLength = field.maxLength;
+        }
+
+        if (isCalculatedTarget) {
+          inputEl.readOnly = true;
+          inputEl.classList.add('bg-zinc-100', 'cursor-not-allowed', 'text-zinc-600');
+        }
+
+        if (field.type !== 'checkbox') {
+          if (field.required && !isCalculatedTarget) inputEl.required = true;
+          inputEl.name = field.key;
+          fieldWrapper.appendChild(inputEl);
+        } else {
+          inputEl.name = field.key;
+        }
+
+        form.appendChild(fieldWrapper);
+      });
+
+      // Bind live evaluation listener on modal inputs
+      form.oninput = () => evaluateModalLiveRules(mod, form);
+      form.onchange = () => evaluateModalLiveRules(mod, form);
+
+      // Perform initial evaluation for prefilled fields
+      evaluateModalLiveRules(mod, form);
+
+      document.getElementById('modal-record').classList.remove('hidden');
+    }
+
+    /* Submitting and validating Primary Key uniqueness */
+    document.getElementById('record-form').onsubmit = (e) => {
+      e.preventDefault();
+      const mod = getActiveModule();
+      const form = e.target;
+      let record = {};
+
+      mod.fields.forEach(field => {
+        const input = form.elements[field.key];
+        if (!input) return;
+        if (field.type === 'checkbox') {
+          record[field.key] = input.checked;
+        } else if (field.type === 'number') {
+          record[field.key] = input.value === '' ? null : Number(input.value);
+        } else {
+          record[field.key] = input.value;
+        }
+      });
+
+      // Apply Connect rules prior to persistence
+      record = applyConnectRules(record, mod);
+
+      // Primary Key duplicate check
+      const pkField = mod.fields.find(f => f.isPrimaryKey);
+      if (pkField) {
+        const pkVal = String(record[pkField.key] || '').trim();
+        if (!pkVal) {
+          showToast(`Kolom Kunci Utama [${pkField.label}] harus diisi!`, "error");
+          return;
+        }
+        const isDuplicate = mod.data.some((row, idx) => {
+          if (editingRecordIndex !== null && idx === editingRecordIndex) return false;
+          return String(row[pkField.key] || '').trim().toLowerCase() === pkVal.toLowerCase();
+        });
+        if (isDuplicate) {
+          showToast(`Nilai "${pkVal}" pada kolom [${pkField.label}] sudah terdaftar pada baris lain!`, "error");
+          return;
+        }
+      }
+
+      if (editingRecordIndex !== null) {
+        mod.data[editingRecordIndex] = record;
+        showToast("Baris data berhasil diperbarui", "success");
+      } else {
+        mod.data.push(record);
+        showToast("Data baru berhasil ditambahkan", "success");
+      }
+
+      saveStateToCache();
+      renderTable();
+      renderModuleNavigation();
+      renderAggregationsBar(mod);
+      closeAllModals();
+    };
+
+    /* ==========================================================================
+       7. FORM BUILDER (BUILDER ONLY)
+       ========================================================================== */
+
+    let editingFieldKey = null;
+
+    function openFormBuilderModal() {
+      const mod = getActiveModule();
+      renderBuilderFieldsList(mod);
+      document.getElementById('field-editor-panel').classList.add('hidden');
+      document.getElementById('modal-form-builder').classList.remove('hidden');
+    }
+
+    function renderBuilderFieldsList(mod) {
+      const container = document.getElementById('builder-fields-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      mod.fields.forEach((f, idx) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between p-2.5 bg-white border border-zinc-200 rounded-lg text-xs';
+        item.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded bg-zinc-100 text-zinc-500 font-mono text-[10px] flex items-center justify-center font-bold">${idx + 1}</span>
+            <div>
+              <span class="font-bold text-zinc-900">${escapeHtml(f.label)}</span>
+              <span class="font-mono text-[10px] text-zinc-400 ml-1.5">[${escapeHtml(f.key)}]</span>
+              <div class="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-500">
+                <span class="px-1.5 py-0.2 bg-zinc-100 rounded text-zinc-600 font-mono">${f.type}</span>
+                ${f.required ? '<span class="text-rose-500 font-semibold">• Wajib</span>' : ''}
+                ${f.isPrimaryKey ? '<span class="text-indigo-600 font-semibold">• Kunci Utama</span>' : ''}
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button class="btn-fe-edit p-1 text-zinc-500 hover:text-zinc-900 font-medium">Ubah</button>
+            <button class="btn-fe-delete p-1 text-rose-500 hover:text-rose-700 font-medium">Hapus</button>
+          </div>
+        `;
+
+        item.querySelector('.btn-fe-edit').onclick = () => showFieldEditor(f);
+        item.querySelector('.btn-fe-delete').onclick = () => {
+          if (mod.fields.length <= 1) {
+            showToast("Modul harus memiliki minimal 1 kolom", "error");
+            return;
+          }
+          showConfirmModal({
+            title: "Hapus Kolom?",
+            message: `Menghapus kolom "${f.label}" akan menyembunyikan nilainya dari sheet ${mod.sheetName}.`,
+            onConfirm: () => {
+              // Clean up orphan rules referencing this field
+              mod.rules = (mod.rules || []).filter(r => {
+                if (r.targetField === f.key || r.localKey === f.key) return false;
+                if (r.expression && r.expression.includes(`[${f.key}]`)) return false;
+                return true;
+              });
+
+              AppState.modules.forEach(otherMod => {
+                if (otherMod.id !== mod.id && otherMod.rules) {
+                  otherMod.rules = otherMod.rules.filter(r => !(r.sourceModuleId === mod.id && r.returnField === f.key));
+                }
+              });
+
+              mod.fields.splice(idx, 1);
+              saveStateToCache();
+              renderBuilderFieldsList(mod);
+              renderTable();
+              showToast("Kolom dihapus", "info");
+            }
+          });
+        };
+
+        container.appendChild(item);
+      });
+    }
+
+    function showFieldEditor(field = null) {
+      const panel = document.getElementById('field-editor-panel');
+      if (!panel) return;
+      panel.classList.remove('hidden');
+
+      if (field) {
+        editingFieldKey = field.key;
+        document.getElementById('field-editor-title').textContent = `Ubah Kolom: ${field.label}`;
+        document.getElementById('fe-label').value = field.label;
+        document.getElementById('fe-key').value = field.key;
+        document.getElementById('fe-key').disabled = true;
+        document.getElementById('fe-type').value = field.type;
+        document.getElementById('fe-maxlength').value = field.maxLength || '';
+        document.getElementById('fe-options').value = (field.options || []).join(', ');
+        document.getElementById('fe-required').checked = Boolean(field.required);
+        document.getElementById('fe-primary').checked = Boolean(field.isPrimaryKey);
+      } else {
+        editingFieldKey = null;
+        document.getElementById('field-editor-title').textContent = "Tambah Kolom Baru";
+        document.getElementById('fe-label').value = '';
+        document.getElementById('fe-key').value = '';
+        document.getElementById('fe-key').disabled = false;
+        document.getElementById('fe-type').value = 'text';
+        document.getElementById('fe-maxlength').value = '';
+        document.getElementById('fe-options').value = '';
+        document.getElementById('fe-required').checked = false;
+        document.getElementById('fe-primary').checked = false;
+      }
+
+      toggleOptionsField();
+    }
+
+    function toggleOptionsField() {
+      const typeEl = document.getElementById('fe-type');
+      if (!typeEl) return;
+      const type = typeEl.value;
+      const optsWrapper = document.getElementById('fe-options-wrapper');
+      if (type === 'select' || type === 'radio') {
+        optsWrapper.classList.remove('hidden');
+      } else {
+        optsWrapper.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('fe-label')?.addEventListener('input', (e) => {
+      if (!editingFieldKey) {
+        const autoKey = e.target.value
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+        document.getElementById('fe-key').value = autoKey;
+      }
+    });
+
+    document.getElementById('fe-type')?.addEventListener('change', toggleOptionsField);
+    document.getElementById('btn-add-new-field')?.addEventListener('click', () => showFieldEditor(null));
+    document.getElementById('btn-cancel-field-edit')?.addEventListener('click', () => {
+      document.getElementById('field-editor-panel')?.classList.add('hidden');
+    });
+
+    document.getElementById('btn-save-field')?.addEventListener('click', () => {
+      const mod = getActiveModule();
+      const label = document.getElementById('fe-label').value.trim();
+      let key = document.getElementById('fe-key').value.trim();
+      const type = document.getElementById('fe-type').value;
+      const maxLength = document.getElementById('fe-maxlength').value ? Number(document.getElementById('fe-maxlength').value) : null;
+      const optionsRaw = document.getElementById('fe-options').value;
+      const required = document.getElementById('fe-required').checked;
+      const isPrimaryKey = document.getElementById('fe-primary').checked;
+
+      if (!label) {
+        showToast("Judul kolom harus diisi", "error");
+        return;
+      }
+      if (!key) {
+        key = label.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      }
+
+      const options = (type === 'select' || type === 'radio')
+        ? optionsRaw.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+
+      if (editingFieldKey) {
+        const idx = mod.fields.findIndex(f => f.key === editingFieldKey);
+        if (idx !== -1) {
+          mod.fields[idx] = { ...mod.fields[idx], label, type, maxLength, options, required, isPrimaryKey };
+        }
+      } else {
+        if (mod.fields.some(f => f.key === key)) {
+          showToast(`Key kolom "${key}" sudah digunakan`, "error");
+          return;
+        }
+        mod.fields.push({ key, label, type, maxLength, options, required, isPrimaryKey });
+      }
+
+      saveStateToCache();
+      renderBuilderFieldsList(mod);
+      renderTable();
+      document.getElementById('field-editor-panel').classList.add('hidden');
+      showToast("Konfigurasi kolom disimpan", "success");
+    });
+
+    /* ==========================================================================
+       8. CONNECT & LOOKUP MANAGER (BUILDER ONLY)
+       ========================================================================== */
+
+    function openConnectModal() {
+      const mod = getActiveModule();
+      renderConnectRulesList(mod);
+      document.getElementById('connect-rule-panel').classList.add('hidden');
+      document.getElementById('modal-connect').classList.remove('hidden');
+    }
+
+    function renderConnectRulesList(mod) {
+      const list = document.getElementById('connect-rules-list');
+      if (!list) return;
+      list.innerHTML = '';
+
+      if (!mod.rules || mod.rules.length === 0) {
+        list.innerHTML = '<p class="text-zinc-400 py-3 text-center">Belum ada aturan relasi lookup atau formula pada modul ini.</p>';
+        return;
+      }
+
+      mod.rules.forEach((r, idx) => {
+        const item = document.createElement('div');
+        item.className = 'p-2.5 bg-white border border-zinc-200 rounded-lg text-xs flex items-center justify-between';
+        
+        let desc = '';
+        if (r.type === 'lookup') {
+          const foreign = AppState.modules.find(m => m.id === r.sourceModuleId);
+          desc = `<strong>Lookup:</strong> Isi <code>[${r.targetField}]</code> dari <code>${foreign ? foreign.name : 'Unknown'}.${r.returnField}</code> jika cocok dengan <code>[${r.localKey}]</code>`;
+        } else {
+          desc = `<strong>Formula:</strong> <code>[${r.targetField}] = ${escapeHtml(r.expression)}</code>`;
+        }
+
+        item.innerHTML = `
+          <div class="text-zinc-700 leading-relaxed">${desc}</div>
+          <button class="btn-del-rule text-rose-500 hover:text-rose-700 p-1 font-semibold ml-2">Hapus</button>
+        `;
+
+        item.querySelector('.btn-del-rule').onclick = () => {
+          mod.rules.splice(idx, 1);
+          saveStateToCache();
+          renderConnectRulesList(mod);
+          showToast("Aturan relasi dihapus", "info");
+        };
+
+        list.appendChild(item);
+      });
+    }
+
+    document.getElementById('btn-add-connect-rule')?.addEventListener('click', () => {
+      const mod = getActiveModule();
+      const panel = document.getElementById('connect-rule-panel');
+      panel.classList.remove('hidden');
+
+      const targetSelect = document.getElementById('cr-target-field');
+      targetSelect.innerHTML = '';
+      mod.fields.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.key;
+        opt.textContent = `${f.label} (${f.key})`;
+        targetSelect.appendChild(opt);
+      });
+
+      const localKeySelect = document.getElementById('cr-local-key');
+      localKeySelect.innerHTML = '';
+      mod.fields.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.key;
+        opt.textContent = `${f.label} (${f.key})`;
+        localKeySelect.appendChild(opt);
+      });
+
+      const sourceModSelect = document.getElementById('cr-source-mod');
+      sourceModSelect.innerHTML = '';
+      const otherModules = AppState.modules.filter(m => m.id !== mod.id);
+      if (otherModules.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Tidak ada sheet lain';
+        sourceModSelect.appendChild(opt);
+      } else {
+        otherModules.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = `${m.icon} ${m.name}`;
+          sourceModSelect.appendChild(opt);
+        });
+      }
+
+      populateForeignReturnFields();
+    });
+
+    function populateForeignReturnFields() {
+      const foreignId = document.getElementById('cr-source-mod')?.value;
+      const foreignMod = AppState.modules.find(m => m.id === foreignId);
+      const retSelect = document.getElementById('cr-return-field');
+      if (!retSelect) return;
+      retSelect.innerHTML = '';
+
+      if (foreignMod && foreignMod.fields) {
+        foreignMod.fields.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f.key;
+          opt.textContent = `${f.label} (${f.key})`;
+          retSelect.appendChild(opt);
+        });
+      }
+    }
+
+    document.getElementById('cr-source-mod')?.addEventListener('change', populateForeignReturnFields);
+    document.getElementById('cr-type')?.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'lookup') {
+        document.getElementById('cr-lookup-params')?.classList.remove('hidden');
+        document.getElementById('cr-formula-params')?.classList.add('hidden');
+      } else {
+        document.getElementById('cr-lookup-params')?.classList.add('hidden');
+        document.getElementById('cr-formula-params')?.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('btn-cancel-rule')?.addEventListener('click', () => {
+      document.getElementById('connect-rule-panel')?.classList.add('hidden');
+    });
+
+    document.getElementById('btn-save-rule')?.addEventListener('click', () => {
+      const mod = getActiveModule();
+      if (!mod.rules) mod.rules = [];
+
+      const type = document.getElementById('cr-type').value;
+      const targetField = document.getElementById('cr-target-field').value;
+
+      if (type === 'lookup') {
+        const sourceModuleId = document.getElementById('cr-source-mod').value;
+        const localKey = document.getElementById('cr-local-key').value;
+        const returnField = document.getElementById('cr-return-field').value;
+
+        if (!sourceModuleId) {
+          showToast("Pilih modul referensi sumber", "error");
+          return;
+        }
+
+        mod.rules.push({
+          id: 'rule_' + Date.now(),
+          type: 'lookup',
+          targetField,
+          sourceModuleId,
+          localKey,
+          returnField
+        });
+      } else {
+        const expression = document.getElementById('cr-expression').value.trim();
+        if (!expression) {
+          showToast("Masukkan ekspresi rumus", "error");
+          return;
+        }
+
+        mod.rules.push({
+          id: 'rule_' + Date.now(),
+          type: 'arithmetic',
+          targetField,
+          expression
+        });
+      }
+
+      saveStateToCache();
+      renderConnectRulesList(mod);
+      document.getElementById('connect-rule-panel').classList.add('hidden');
+      showToast("Aturan relasi berhasil dipasang", "success");
+    });
+
+    /* ==========================================================================
+       9. EXCEL MASTER IMPORT / EXPORT
+       ========================================================================== */
+
+    function exportMasterExcel() {
+      try {
+        const wb = XLSX.utils.book_new();
+
+        AppState.modules.forEach(mod => {
+          const exportData = [];
+
+          if (mod.data && mod.data.length > 0) {
+            mod.data.forEach(row => {
+              const rowObj = {};
+              mod.fields.forEach(f => {
+                rowObj[f.label] = row[f.key] !== undefined && row[f.key] !== null ? row[f.key] : '';
+              });
+              exportData.push(rowObj);
+            });
+          } else {
+            const emptyHeader = {};
+            mod.fields.forEach(f => { emptyHeader[f.label] = ''; });
+            exportData.push(emptyHeader);
+          }
+
+          const ws = XLSX.utils.json_to_sheet(exportData);
+          XLSX.utils.book_append_sheet(wb, ws, mod.sheetName.substring(0, 31));
+        });
+
+        const schemaMetadata = {
+          config: AppState.config,
+          modulesMetadata: AppState.modules.map(m => ({
+            id: m.id,
+            name: m.name,
+            sheetName: m.sheetName,
+            icon: m.icon,
+            fields: m.fields,
+            rules: m.rules
+          }))
+        };
+
+        const wsSchema = XLSX.utils.json_to_sheet([{
+          METADATA_VERSION: "1.0",
+          PAYLOAD_JSON: JSON.stringify(schemaMetadata)
+        }]);
+        XLSX.utils.book_append_sheet(wb, wsSchema, "_app_schema");
+
+        const fileName = (AppState.config.appName || 'BackOffice').replace(/[^a-zA-Z0-9_-]/g, '_') + '_Master.xlsx';
+        XLSX.writeFile(wb, fileName);
+        
+        isDirty = false;
+        updateFileStatusPill();
+        showToast("Master Excel berhasil diekspor", "success");
+      } catch (err) {
+        console.error("Gagal ekspor Excel", err);
+        showToast("Gagal mengekspor file Excel", "error");
+      }
+    }
+
+    async function handleExcelImport(file) {
+      try {
+        const data = await file.arrayBuffer();
+        // Parse with cellDates to safely convert Excel date serials
+        const wb = XLSX.read(data, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
+
+        let loadedMetadata = null;
+
+        if (wb.SheetNames.includes('_app_schema')) {
+          const schemaSheet = wb.Sheets['_app_schema'];
+          const schemaRows = XLSX.utils.sheet_to_json(schemaSheet);
+          if (schemaRows.length > 0 && schemaRows[0].PAYLOAD_JSON) {
+            loadedMetadata = JSON.parse(schemaRows[0].PAYLOAD_JSON);
+          }
+        }
+
+        const newModules = [];
+
+        wb.SheetNames.forEach(sheetName => {
+          if (sheetName === '_app_schema') return;
+
+          const ws = wb.Sheets[sheetName];
+          const rawRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+          let modMeta = null;
+          if (loadedMetadata && loadedMetadata.modulesMetadata) {
+            modMeta = loadedMetadata.modulesMetadata.find(m => m.sheetName === sheetName);
+          }
+
+          if (modMeta) {
+            const mappedData = rawRows.map(row => {
+              const mappedRow = {};
+              modMeta.fields.forEach(f => {
+                let val = row[f.label] !== undefined ? row[f.label] : row[f.key];
+                if (val instanceof Date) {
+                  if (f.type === 'datetime') {
+                    val = val.toISOString().slice(0, 16);
+                  } else {
+                    const y = val.getFullYear();
+                    const m = String(val.getMonth() + 1).padStart(2, '0');
+                    const d = String(val.getDate()).padStart(2, '0');
+                    val = `${y}-${m}-${d}`;
+                  }
+                }
+                mappedRow[f.key] = val;
+              });
+              return mappedRow;
+            });
+
+            newModules.push({
+              ...modMeta,
+              data: mappedData
+            });
+          } else {
+            const detectedHeaders = rawRows.length > 0 ? Object.keys(rawRows[0]) : ['ID', 'Keterangan'];
+            const fields = detectedHeaders.map(h => ({
+              key: h.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+              label: h,
+              type: 'text'
+            }));
+
+            const mappedData = rawRows.map(row => {
+              const mappedRow = {};
+              fields.forEach(f => {
+                let val = row[f.label] !== undefined ? row[f.label] : '';
+                if (val instanceof Date) {
+                  const y = val.getFullYear();
+                  const m = String(val.getMonth() + 1).padStart(2, '0');
+                  const d = String(val.getDate()).padStart(2, '0');
+                  val = `${y}-${m}-${d}`;
+                }
+                mappedRow[f.key] = val;
+              });
+              return mappedRow;
+            });
+
+            newModules.push({
+              id: 'mod_' + Math.random().toString(36).substr(2, 6),
+              name: sheetName,
+              sheetName: sheetName,
+              icon: '📊',
+              fields,
+              data: mappedData,
+              rules: []
+            });
+          }
+        });
+
+        if (newModules.length > 0) {
+          AppState.modules = newModules;
+          AppState.activeModuleId = newModules[0].id;
+          if (loadedMetadata && loadedMetadata.config) {
+            AppState.config = { ...AppState.config, ...loadedMetadata.config };
+          }
+          AppState.fileName = file.name;
+          const fileNameDisplay = document.getElementById('file-name-display');
+          if (fileNameDisplay) fileNameDisplay.textContent = `Master: ${file.name}`;
+          
+          isDirty = false;
+          saveStateToCache();
+          renderModuleNavigation();
+          renderActiveModuleView();
+          showToast(`Berhasil memuat ${newModules.length} sheet dari berkas Excel`, "success");
+        }
+      } catch (err) {
+        console.error("Gagal membaca berkas Excel", err);
+        showToast("Format file Excel tidak dapat dibaca", "error");
+      }
+    }
+
+    /* ==========================================================================
+       10. LIVE DISK SYNC
+       ========================================================================== */
+
+    async function connectDirectFile() {
+      if (!window.showOpenFilePicker) {
+        showToast("Browser tidak mendukung File System Access. Gunakan Ekspor biasa.", "info");
+        return;
+      }
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{
+            description: 'Excel Spreadsheet',
+            accept: {
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
+            }
+          }]
+        });
+
+        fileHandle = handle;
+        const file = await fileHandle.getFile();
+        await handleExcelImport(file);
+        const fileNameDisplay = document.getElementById('file-name-display');
+        if (fileNameDisplay) fileNameDisplay.textContent = `Live Sync: ${file.name}`;
+        
+        const syncLabel = document.getElementById('btn-sync-label');
+        if (syncLabel) syncLabel.textContent = "Simpan ke File";
+        
+        updateFileStatusPill();
+        showToast(`Terkoneksi langsung ke berkas ${file.name}`, "success");
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error(err);
+          showToast("Gagal menghubungkan berkas lokal", "error");
+        }
+      }
+    }
+
+    async function syncDirectToFile() {
+      if (!fileHandle) {
+        exportMasterExcel();
+        return;
+      }
+      try {
+        const wb = XLSX.utils.book_new();
+        AppState.modules.forEach(mod => {
+          const exportData = [];
+          if (mod.data && mod.data.length > 0) {
+            mod.data.forEach(row => {
+              const rowObj = {};
+              mod.fields.forEach(f => {
+                rowObj[f.label] = row[f.key] !== undefined && row[f.key] !== null ? row[f.key] : '';
+              });
+              exportData.push(rowObj);
+            });
+          } else {
+            const emptyHeader = {};
+            mod.fields.forEach(f => { emptyHeader[f.label] = ''; });
+            exportData.push(emptyHeader);
+          }
+          const ws = XLSX.utils.json_to_sheet(exportData);
+          XLSX.utils.book_append_sheet(wb, ws, mod.sheetName.substring(0, 31));
+        });
+
+        const schemaMetadata = {
+          config: AppState.config,
+          modulesMetadata: AppState.modules.map(m => ({
+            id: m.id,
+            name: m.name,
+            sheetName: m.sheetName,
+            icon: m.icon,
+            fields: m.fields,
+            rules: m.rules
+          }))
+        };
+        const wsSchema = XLSX.utils.json_to_sheet([{
+          METADATA_VERSION: "1.0",
+          PAYLOAD_JSON: JSON.stringify(schemaMetadata)
+        }]);
+        XLSX.utils.book_append_sheet(wb, wsSchema, "_app_schema");
+
+        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        
+        const writable = await fileHandle.createWritable();
+        await writable.write(excelBuffer);
+        await writable.close();
+
+        isDirty = false;
+        updateFileStatusPill();
+        showToast("Perubahan data tersinkronisasi ke berkas Excel", "success");
+      } catch (err) {
+        console.error("Gagal sinkronisasi file", err);
+        showToast("Gagal menyimpan ke berkas lokal. Mengunduh manual...", "error");
+        exportMasterExcel();
+      }
+    }
+
+    /* ==========================================================================
+       11. LEAN STANDALONE HTML GENERATION ENGINE (BUG-FIXED)
+       ========================================================================== */
+
+    function generateStandaloneScript(cleanState) {
+      // Injects state directly and binds self-contained operational handlers
+      return `
+    let AppState = ${JSON.stringify(cleanState)};
+    let editingRecordIndex = null;
+    let tableCurrentPage = 1;
+    let tableRowsPerPage = 25;
+    let searchQuery = "";
+    let sortColumn = null;
+    let sortDirection = 'asc';
+
+    const STORAGE_KEY = 'backoffice_op_' + (AppState.config.appName || 'app').replace(/[^a-zA-Z0-9]/g, '_');
+
+    function saveStateToCache() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState));
+      } catch (err) {
+        console.warn("Storage quota exceeded", err);
+      }
+    }
+
+    function loadStateFromCache() {
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && Array.isArray(parsed.modules)) {
+            if (AppState.exportTimestamp && parsed.exportTimestamp && parsed.exportTimestamp < AppState.exportTimestamp) {
+              return;
+            }
+            AppState = parsed;
+          }
+        }
+      } catch (err) {
+        console.error("Gagal memuat cache", err);
+      }
+    }
+
+    function getActiveModule() {
+      return AppState.modules.find(m => m.id === AppState.activeModuleId) || AppState.modules[0];
+    }
+
+    function renderModuleNavigation() {
+      const nav = document.getElementById('module-nav-list');
+      if (!nav) return;
+      nav.innerHTML = '';
+
+      AppState.modules.forEach(mod => {
+        const isActive = mod.id === AppState.activeModuleId;
+        const btn = document.createElement('button');
+        btn.className = 'flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left shrink-0 md:shrink border ' + (
+          isActive 
+            ? 'bg-zinc-900 text-white border-zinc-900 shadow-sm' 
+            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100 hover:border-zinc-300'
+        );
+        
+        btn.innerHTML = '<span class="text-base">' + (mod.icon || '📁') + '</span>' +
+          '<span class="truncate flex-1">' + escapeHtml(mod.name) + '</span>' +
+          '<span class="text-[10px] px-1.5 py-0.5 rounded-md ' + (isActive ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-100 text-zinc-500') + ' font-mono">' + (mod.data ? mod.data.length : 0) + '</span>';
+
+        btn.onclick = () => {
+          AppState.activeModuleId = mod.id;
+          tableCurrentPage = 1;
+          searchQuery = "";
+          const searchInput = document.getElementById('search-input');
+          if (searchInput) searchInput.value = "";
+          renderModuleNavigation();
+          renderActiveModuleView();
+          saveStateToCache();
+        };
+
+        nav.appendChild(btn);
+      });
+    }
+
+    function renderActiveModuleView() {
+      const mod = getActiveModule();
+      if (!mod) return;
+
+      const titleText = document.getElementById('app-title-text');
+      if (titleText) titleText.textContent = AppState.config.appName || 'BackOffice';
+
+      document.getElementById('active-mod-icon').textContent = mod.icon || '📁';
+      document.getElementById('active-mod-name').textContent = mod.name;
+      document.getElementById('active-mod-sheet').textContent = 'Sheet: ' + mod.sheetName;
+      
+      renderAggregationsBar(mod);
+      renderTable();
+    }
+
+    function getFilteredAndSortedData(mod) {
+      if (!mod.data) mod.data = [];
+      let list = [...mod.data];
+
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase();
+        list = list.filter(row => {
+          return Object.values(row).some(val => 
+            String(val !== null && val !== undefined ? val : '').toLowerCase().includes(q)
+          );
+        });
+      }
+
+      if (sortColumn) {
+        const fieldDef = mod.fields.find(f => f.key === sortColumn);
+        const fieldType = fieldDef ? fieldDef.type : 'text';
+
+        list.sort((a, b) => {
+          let valA = a[sortColumn];
+          let valB = b[sortColumn];
+          if (valA === undefined || valA === null) valA = '';
+          if (valB === undefined || valB === null) valB = '';
+
+          if (fieldType === 'number') {
+            const numA = Number(valA) || 0;
+            const numB = Number(valB) || 0;
+            return sortDirection === 'asc' ? numA - numB : numB - numA;
+          }
+          if (fieldType === 'date' || fieldType === 'datetime') {
+            const timeA = valA ? new Date(valA).getTime() : 0;
+            const timeB = valB ? new Date(valB).getTime() : 0;
+            return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+          }
+          if (fieldType === 'time') {
+            return sortDirection === 'asc'
+              ? String(valA).localeCompare(String(valB))
+              : String(valB).localeCompare(String(valA));
+          }
+          return sortDirection === 'asc'
+            ? String(valA).localeCompare(String(valB))
+            : String(valB).localeCompare(String(valA));
+        });
+      }
+
+      return list;
+    }
+
+    function formatCellValue(val, type) {
+      if (val === undefined || val === null || val === '') return '<span class="text-zinc-300">-</span>';
+      
+      if (type === 'number') {
+        const num = Number(val);
+        return isNaN(num) ? escapeHtml(val) : '<span class="font-mono">' + num.toLocaleString('id-ID') + '</span>';
+      }
+      if (type === 'percentage') {
+        return '<span class="font-mono">' + escapeHtml(val) + '%</span>';
+      }
+      if (type === 'checkbox') {
+        return val ? '<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold text-[10px]">Ya</span>' : '<span class="px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 text-[10px]">Tidak</span>';
+      }
+      if (type === 'date') {
+        if (typeof val === 'string' && val.includes('-')) {
+          const parts = val.split('T')[0].split('-');
+          if (parts.length === 3) {
+            const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            if (!isNaN(d.getTime())) {
+              return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+            }
+          }
+        }
+        const d = new Date(val);
+        return !isNaN(d.getTime()) ? d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : escapeHtml(String(val));
+      }
+      if (type === 'time') {
+        return '<span class="font-mono">' + escapeHtml(String(val)) + '</span>';
+      }
+      if (type === 'datetime') {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) {
+          const datePart = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+          const hours = String(d.getHours()).padStart(2, '0');
+          const mins = String(d.getMinutes()).padStart(2, '0');
+          return datePart + ', <span class="font-mono text-zinc-500">' + hours + ':' + mins + '</span>';
+        }
+        return escapeHtml(String(val));
+      }
+      return escapeHtml(String(val));
+    }
+
+    function renderAggregationsBar(mod) {
+      const bar = document.getElementById('aggregation-bar');
+      bar.innerHTML = '';
+
+      const countBadge = document.createElement('div');
+      countBadge.className = 'flex items-center gap-1.5 px-3 py-1 bg-white border border-zinc-200 rounded-lg text-zinc-700 font-medium shadow-xs';
+      countBadge.innerHTML = '<span class="text-zinc-400">Total Baris:</span> <strong class="font-bold text-zinc-900">' + (mod.data ? mod.data.length : 0) + '</strong>';
+      bar.appendChild(countBadge);
+
+      if (!mod.data || mod.data.length === 0) return;
+
+      const numericFields = mod.fields.filter(f => f.type === 'number');
+      numericFields.slice(0, 3).forEach(f => {
+        const values = mod.data
+          .map(d => Number(d[f.key]))
+          .filter(v => !isNaN(v) && Number.isFinite(v));
+
+        if (values.length > 0) {
+          const sum = values.reduce((acc, curr) => acc + curr, 0);
+          const avg = sum / values.length;
+
+          const statBadge = document.createElement('div');
+          statBadge.className = 'flex items-center gap-2 px-3 py-1 bg-white border border-zinc-200 rounded-lg text-zinc-700 text-xs shadow-xs';
+          statBadge.innerHTML = 
+            '<span class="text-zinc-500 font-medium">' + escapeHtml(f.label) + ':</span>' +
+            '<span title="Total Sum" class="font-mono font-semibold text-zinc-900">Σ ' + sum.toLocaleString('id-ID') + '</span>' +
+            '<span class="text-zinc-300">|</span>' +
+            '<span title="Rata-rata" class="font-mono text-zinc-500">Ø ' + Math.round(avg).toLocaleString('id-ID') + '</span>';
+          bar.appendChild(statBadge);
+        }
+      });
+    }
+
+    function renderTable() {
+      const mod = getActiveModule();
+      const filteredData = getFilteredAndSortedData(mod);
+      const totalRows = filteredData.length;
+
+      const totalPages = Math.ceil(totalRows / tableRowsPerPage) || 1;
+      if (tableCurrentPage > totalPages) tableCurrentPage = totalPages;
+      if (tableCurrentPage < 1) tableCurrentPage = 1;
+
+      const startIndex = (tableCurrentPage - 1) * tableRowsPerPage;
+      const pagedData = filteredData.slice(startIndex, startIndex + tableRowsPerPage);
+
+      const headRow = document.getElementById('table-head-row');
+      headRow.innerHTML = '';
+
+      const thNum = document.createElement('th');
+      thNum.className = 'py-3 px-3 text-zinc-500 w-12 text-center';
+      thNum.textContent = '#';
+      headRow.appendChild(thNum);
+
+      mod.fields.forEach(f => {
+        const th = document.createElement('th');
+        th.className = 'py-3 px-4 font-semibold text-zinc-700 cursor-pointer hover:bg-zinc-100 transition truncate';
+        const isSorted = sortColumn === f.key;
+        th.innerHTML = 
+          '<div class="flex items-center gap-1.5">' +
+            '<span>' + escapeHtml(f.label) + '</span>' +
+            '<span class="text-[10px] text-zinc-400 font-normal">' +
+              (isSorted ? (sortDirection === 'asc' ? '▲' : '▼') : '↕') +
+            '</span>' +
+          '</div>';
+        th.onclick = () => {
+          if (sortColumn === f.key) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            sortColumn = f.key;
+            sortDirection = 'asc';
+          }
+          renderTable();
+        };
+        headRow.appendChild(th);
+      });
+
+      const thAction = document.createElement('th');
+      thAction.className = 'py-3 px-4 text-right text-zinc-500 w-28';
+      thAction.textContent = 'Aksi';
+      headRow.appendChild(thAction);
+
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+
+      const emptyState = document.getElementById('table-empty-state');
+      if (pagedData.length === 0) {
+        emptyState.classList.remove('hidden');
+      } else {
+        emptyState.classList.add('hidden');
+      }
+
+      pagedData.forEach((row, idx) => {
+        const originalIndex = mod.data.indexOf(row);
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-zinc-50/80 transition group';
+
+        const tdNum = document.createElement('td');
+        tdNum.className = 'py-2.5 px-3 text-center text-zinc-400 font-mono text-[11px]';
+        tdNum.textContent = startIndex + idx + 1;
+        tr.appendChild(tdNum);
+
+        mod.fields.forEach(f => {
+          const td = document.createElement('td');
+          td.className = 'py-2.5 px-4 truncate max-w-xs';
+          const rawVal = row[f.key];
+          td.innerHTML = formatCellValue(rawVal, f.type);
+          tr.appendChild(td);
+        });
+
+        const tdAct = document.createElement('td');
+        tdAct.className = 'py-2.5 px-4 text-right whitespace-nowrap space-x-1';
+        tdAct.innerHTML = 
+          '<button title="Cetak Dokumen" class="btn-print-row p-1 text-zinc-400 hover:text-zinc-800 transition">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>' +
+          '</button>' +
+          '<button title="Ubah Baris" class="btn-edit-row p-1 text-zinc-400 hover:text-zinc-900 transition">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>' +
+          '</button>' +
+          '<button title="Hapus Baris" class="btn-delete-row p-1 text-zinc-400 hover:text-rose-600 transition">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>' +
+          '</button>';
+
+        tdAct.querySelector('.btn-print-row').onclick = () => openPrintRecordModal(row, mod);
+        tdAct.querySelector('.btn-edit-row').onclick = () => openRecordModal(originalIndex);
+        tdAct.querySelector('.btn-delete-row').onclick = () => {
+          showConfirmModal({
+            title: "Hapus Baris Data?",
+            message: "Baris ini akan dihapus dari sheet " + mod.sheetName + ".",
+            onConfirm: () => {
+              mod.data.splice(originalIndex, 1);
+              saveStateToCache();
+              renderTable();
+              renderModuleNavigation();
+              renderAggregationsBar(mod);
+              showToast("Baris data berhasil dihapus", "info");
+            }
+          });
+        };
+
+        tr.appendChild(tdAct);
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('table-count-info').textContent = 'Menampilkan ' + (totalRows === 0 ? 0 : startIndex + 1) + '-' + Math.min(startIndex + tableRowsPerPage, totalRows) + ' dari total ' + totalRows + ' baris';
+      document.getElementById('page-indicator').textContent = tableCurrentPage + ' / ' + totalPages;
+      document.getElementById('btn-prev-page').disabled = tableCurrentPage <= 1;
+      document.getElementById('btn-next-page').disabled = tableCurrentPage >= totalPages;
+    }
+
+    function evaluateFormulaExpression(expr, row, fields) {
+      if (!expr) return 0;
+      let evaluatedExpr = expr;
+      fields.forEach(f => {
+        const val = Number(row[f.key]) || 0;
+        evaluatedExpr = evaluatedExpr.split('[' + f.key + ']').join(val);
+      });
+
+      if (/^[0-9+\\-*/().%\\s]+$/.test(evaluatedExpr)) {
+        try {
+          const calc = Function("'use strict'; return (" + evaluatedExpr + ")")();
+          if (typeof calc === 'number' && Number.isFinite(calc)) {
+            return Math.round((calc + Number.EPSILON) * 100) / 100;
+          }
+          return 0;
+        } catch (e) {
+          return 0;
+        }
+      }
+      return 0;
+    }
+
+    function applyConnectRules(row, mod) {
+      if (!mod.rules || mod.rules.length === 0) return row;
+      const updatedRow = { ...row };
+
+      mod.rules.forEach(rule => {
+        try {
+          if (rule.type === 'lookup') {
+            const targetMod = AppState.modules.find(m => m.id === rule.sourceModuleId);
+            if (targetMod && targetMod.data) {
+              const localVal = String(updatedRow[rule.localKey] || '').trim().toLowerCase();
+              if (localVal) {
+                const primaryKey = targetMod.fields.find(f => f.isPrimaryKey)?.key || targetMod.fields[0]?.key;
+                const match = targetMod.data.find(d => String(d[primaryKey] || '').trim().toLowerCase() === localVal);
+                if (match && match[rule.returnField] !== undefined) {
+                  updatedRow[rule.targetField] = match[rule.returnField];
+                }
+              }
+            }
+          } else if (rule.type === 'arithmetic') {
+            updatedRow[rule.targetField] = evaluateFormulaExpression(rule.expression, updatedRow, mod.fields);
+          }
+        } catch (err) {
+          console.warn("Connect rule evaluation error", err);
+        }
+      });
+
+      return updatedRow;
+    }
+
+    function evaluateModalLiveRules(mod, form) {
+      if (!mod.rules || mod.rules.length === 0 || !form) return;
+      const currentValues = {};
+      mod.fields.forEach(field => {
+        const el = form.elements[field.key];
+        if (!el) return;
+        if (field.type === 'checkbox') {
+          currentValues[field.key] = el.checked;
+        } else if (field.type === 'number') {
+          currentValues[field.key] = el.value === '' ? 0 : Number(el.value);
+        } else {
+          currentValues[field.key] = el.value;
+        }
+      });
+
+      mod.rules.forEach(rule => {
+        const targetInput = form.elements[rule.targetField];
+        if (!targetInput) return;
+
+        if (rule.type === 'lookup') {
+          const targetMod = AppState.modules.find(m => m.id === rule.sourceModuleId);
+          if (targetMod && targetMod.data) {
+            const localVal = String(currentValues[rule.localKey] || '').trim().toLowerCase();
+            if (localVal) {
+              const primaryKey = targetMod.fields.find(f => f.isPrimaryKey)?.key || targetMod.fields[0]?.key;
+              const match = targetMod.data.find(d => String(d[primaryKey] || '').trim().toLowerCase() === localVal);
+              if (match && match[rule.returnField] !== undefined) {
+                targetInput.value = match[rule.returnField];
+                currentValues[rule.targetField] = match[rule.returnField];
+              }
+            }
+          }
+        } else if (rule.type === 'arithmetic') {
+          const calculated = evaluateFormulaExpression(rule.expression, currentValues, mod.fields);
+          targetInput.value = calculated;
+          currentValues[rule.targetField] = calculated;
+        }
+      });
+    }
+
+    function openRecordModal(index = null) {
+      const mod = getActiveModule();
+      editingRecordIndex = index;
+      const isEdit = index !== null;
+      const record = isEdit ? mod.data[index] : {};
+
+      document.getElementById('record-modal-title').textContent = isEdit ? 'Ubah Data (' + mod.name + ')' : 'Tambah Data Baru (' + mod.name + ')';
+      document.getElementById('record-modal-subtitle').textContent = 'Worksheet: ' + mod.sheetName;
+
+      const form = document.getElementById('record-form');
+      form.innerHTML = '';
+      const ruleTargetFields = (mod.rules || []).map(r => r.targetField);
+
+      mod.fields.forEach(field => {
+        const val = record[field.key] !== undefined ? record[field.key] : '';
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.className = 'space-y-1';
+        const isCalculatedTarget = ruleTargetFields.includes(field.key);
+
+        const label = document.createElement('label');
+        label.className = 'block font-medium text-zinc-700';
+        label.innerHTML = escapeHtml(field.label) + (field.required ? ' <span class="text-rose-500">*</span>' : '') + (isCalculatedTarget ? ' <span class="text-[10px] text-indigo-600 font-mono font-normal ml-1 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">Auto</span>' : '');
+        fieldWrapper.appendChild(label);
+
+        let inputEl;
+
+        if (field.type === 'select') {
+          inputEl = document.createElement('select');
+          inputEl.className = 'w-full px-3 py-2 border border-zinc-200 rounded-lg bg-white focus:outline-none focus:border-zinc-900';
+          const defaultOpt = document.createElement('option');
+          defaultOpt.value = '';
+          defaultOpt.textContent = '-- Pilih --';
+          inputEl.appendChild(defaultOpt);
+          (field.options || []).forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt;
+            if (String(val) === String(opt)) o.selected = true;
+            inputEl.appendChild(o);
+          });
+        } else if (field.type === 'textarea') {
+          inputEl = document.createElement('textarea');
+          inputEl.rows = 3;
+          inputEl.className = 'w-full px-3 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:border-zinc-900';
+          inputEl.value = val;
+        } else if (field.type === 'checkbox') {
+          const checkWrapper = document.createElement('div');
+          checkWrapper.className = 'flex items-center gap-2 pt-1';
+          inputEl = document.createElement('input');
+          inputEl.type = 'checkbox';
+          inputEl.className = 'rounded border-zinc-300 text-zinc-900 focus:ring-0';
+          inputEl.checked = Boolean(val);
+          checkWrapper.appendChild(inputEl);
+          const span = document.createElement('span');
+          span.className = 'text-zinc-600';
+          span.textContent = 'Aktif / Ya';
+          checkWrapper.appendChild(span);
+          fieldWrapper.appendChild(checkWrapper);
+        } else {
+          inputEl = document.createElement('input');
+          let inputType = 'text';
+          if (field.type === 'number') inputType = 'number';
+          else if (field.type === 'date') inputType = 'date';
+          else if (field.type === 'time') inputType = 'time';
+          else if (field.type === 'datetime') inputType = 'datetime-local';
+          inputEl.type = inputType;
+          inputEl.className = 'w-full px-3 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:border-zinc-900';
+          if (field.type === 'datetime' && val) {
+            inputEl.value = String(val).replace(' ', 'T').substring(0, 16);
+          } else {
+            inputEl.value = val;
+          }
+          if (field.maxLength) inputEl.maxLength = field.maxLength;
+        }
+
+        if (isCalculatedTarget) {
+          inputEl.readOnly = true;
+          inputEl.classList.add('bg-zinc-100', 'cursor-not-allowed', 'text-zinc-600');
+        }
+
+        if (field.type !== 'checkbox') {
+          if (field.required && !isCalculatedTarget) inputEl.required = true;
+          inputEl.name = field.key;
+          fieldWrapper.appendChild(inputEl);
+        } else {
+          inputEl.name = field.key;
+        }
+
+        form.appendChild(fieldWrapper);
+      });
+
+      form.oninput = () => evaluateModalLiveRules(mod, form);
+      form.onchange = () => evaluateModalLiveRules(mod, form);
+      evaluateModalLiveRules(mod, form);
+
+      document.getElementById('modal-record').classList.remove('hidden');
+    }
+
+    document.getElementById('record-form').onsubmit = (e) => {
+      e.preventDefault();
+      const mod = getActiveModule();
+      const form = e.target;
+      let record = {};
+
+      mod.fields.forEach(field => {
+        const input = form.elements[field.key];
+        if (!input) return;
+        if (field.type === 'checkbox') {
+          record[field.key] = input.checked;
+        } else if (field.type === 'number') {
+          record[field.key] = input.value === '' ? null : Number(input.value);
+        } else {
+          record[field.key] = input.value;
+        }
+      });
+
+      record = applyConnectRules(record, mod);
+
+      const pkField = mod.fields.find(f => f.isPrimaryKey);
+      if (pkField) {
+        const pkVal = String(record[pkField.key] || '').trim();
+        if (!pkVal) {
+          showToast('Kolom Kunci Utama [' + pkField.label + '] harus diisi!', 'error');
+          return;
+        }
+        const isDuplicate = mod.data.some((row, idx) => {
+          if (editingRecordIndex !== null && idx === editingRecordIndex) return false;
+          return String(row[pkField.key] || '').trim().toLowerCase() === pkVal.toLowerCase();
+        });
+        if (isDuplicate) {
+          showToast('Nilai "' + pkVal + '" pada kolom [' + pkField.label + '] sudah terdaftar pada baris lain!', 'error');
+          return;
+        }
+      }
+
+      if (editingRecordIndex !== null) {
+        mod.data[editingRecordIndex] = record;
+        showToast("Baris data berhasil diperbarui", "success");
+      } else {
+        mod.data.push(record);
+        showToast("Data baru berhasil ditambahkan", "success");
+      }
+
+      saveStateToCache();
+      renderTable();
+      renderModuleNavigation();
+      renderAggregationsBar(mod);
+      closeAllModals();
+    };
+
+    function exportCleanExcel() {
+      try {
+        const wb = XLSX.utils.book_new();
+        AppState.modules.forEach(mod => {
+          const exportData = [];
+          if (mod.data && mod.data.length > 0) {
+            mod.data.forEach(row => {
+              const rowObj = {};
+              mod.fields.forEach(f => {
+                rowObj[f.label] = row[f.key] !== undefined && row[f.key] !== null ? row[f.key] : '';
+              });
+              exportData.push(rowObj);
+            });
+          } else {
+            const emptyHeader = {};
+            mod.fields.forEach(f => { emptyHeader[f.label] = ''; });
+            exportData.push(emptyHeader);
+          }
+          const ws = XLSX.utils.json_to_sheet(exportData);
+          const safeSheetName = (mod.sheetName || mod.name || 'Sheet').substring(0, 31);
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+        });
+
+        const fileName = (AppState.config.appName || 'Data').replace(/[^a-zA-Z0-9_-]/g, '_') + '.xlsx';
+        XLSX.writeFile(wb, fileName);
+        showToast("File Excel berhasil diunduh", "success");
+      } catch (err) {
+        console.error("Gagal ekspor Excel", err);
+        showToast("Gagal mengekspor file Excel", "error");
+      }
+    }
+
+    function exportModuleCSV() {
+      const mod = getActiveModule();
+      if (!mod.data || mod.data.length === 0) {
+        showToast("Tidak ada data untuk diekspor ke CSV", "info");
+        return;
+      }
+      try {
+        const exportData = mod.data.map(row => {
+          const obj = {};
+          mod.fields.forEach(f => {
+            obj[f.label] = row[f.key] !== undefined && row[f.key] !== null ? row[f.key] : '';
+          });
+          return obj;
+        });
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const csvContent = XLSX.utils.sheet_to_csv(ws);
+        const blob = new Blob(["\\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = (mod.sheetName || 'Data').replace(/[^a-zA-Z0-9_-]/g, '_') + '_Export.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showToast("Data modul diekspor ke CSV", "success");
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal mengekspor CSV", "error");
+      }
+    }
+
+    function importModuleCSV(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target.result;
+          const wb = XLSX.read(text, { type: 'string' });
+          const firstSheet = wb.Sheets[wb.SheetNames[0]];
+          const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+          if (!rawRows || rawRows.length === 0) {
+            showToast("Berkas CSV tidak memiliki baris data", "error");
+            return;
+          }
+
+          const mod = getActiveModule();
+          const detectedKeys = Object.keys(rawRows[0]);
+          let count = 0;
+
+          rawRows.forEach(rawRow => {
+            const row = {};
+            mod.fields.forEach(f => {
+              const matchedHeader = detectedKeys.find(k => 
+                k.trim().toLowerCase() === f.label.trim().toLowerCase() ||
+                k.trim().toLowerCase() === f.key.trim().toLowerCase()
+              );
+              let val = matchedHeader ? rawRow[matchedHeader] : '';
+              if (f.type === 'number') {
+                row[f.key] = val !== '' ? Number(val) || 0 : null;
+              } else if (f.type === 'checkbox') {
+                row[f.key] = String(val).toLowerCase() === 'true' || String(val) === '1' || String(val).toLowerCase() === 'ya';
+              } else {
+                row[f.key] = val !== undefined && val !== null ? String(val) : '';
+              }
+            });
+            const applied = applyConnectRules(row, mod);
+            mod.data.push(applied);
+            count++;
+          });
+
+          saveStateToCache();
+          renderTable();
+          renderAggregationsBar(mod);
+          renderModuleNavigation();
+          showToast("Berhasil mengimpor " + count + " baris CSV", "success");
+        } catch (err) {
+          console.error(err);
+          showToast("Gagal memproses berkas CSV", "error");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function openPrintRecordModal(row, mod) {
+      const container = document.getElementById('print-modal-container');
+      let rowsHtml = '';
+      mod.fields.forEach(f => {
+        const val = row[f.key] !== undefined && row[f.key] !== null ? row[f.key] : '-';
+        rowsHtml += 
+          '<div class="flex justify-between py-1 border-b border-dashed border-zinc-200">' +
+            '<span class="text-zinc-500">' + escapeHtml(f.label) + ':</span>' +
+            '<span class="font-bold text-zinc-900">' + formatCellValue(val, f.type) + '</span>' +
+          '</div>';
+      });
+
+      container.innerHTML = 
+        '<div class="text-center pb-3 border-b-2 border-zinc-900">' +
+          '<h2 class="text-base font-bold uppercase tracking-wider">' + escapeHtml(AppState.config.appName) + '</h2>' +
+          '<p class="text-[11px] text-zinc-500">Dokumen Bukti / Ringkasan Data</p>' +
+          '<div class="text-[10px] text-zinc-400 mt-1">Dicetak: ' + new Date().toLocaleString('id-ID') + '</div>' +
+        '</div>' +
+        '<div class="space-y-1.5 py-2">' + rowsHtml + '</div>' +
+        '<div class="text-center pt-4 border-t border-dashed border-zinc-300 text-[10px] text-zinc-400">' +
+          'Dokumen Digital BackOffice' +
+        '</div>';
+
+      document.getElementById('modal-print').classList.remove('hidden');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      
+      const icons = {
+        success: '<svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>',
+        error: '<svg class="w-4 h-4 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>',
+        info: '<svg class="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>'
+      };
+
+      const borders = {
+        success: 'border-zinc-800 bg-zinc-950 text-white',
+        error: 'border-rose-900 bg-zinc-950 text-rose-100',
+        info: 'border-zinc-800 bg-zinc-950 text-white'
+      };
+
+      toast.className = 'px-3.5 py-2.5 rounded-xl text-xs font-medium border shadow-2xl flex items-center gap-2.5 transform transition-all duration-200 translate-y-2 opacity-0 pointer-events-auto ' + (borders[type] || borders.info);
+      toast.innerHTML = (icons[type] || icons.info) + '<span>' + escapeHtml(message) + '</span>';
+
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 200);
+      }, 3200);
+    }
+
+    let confirmCallback = null;
+
+    function showConfirmModal({ title, message, onConfirm }) {
+      document.getElementById('confirm-title').textContent = title || "Konfirmasi";
+      document.getElementById('confirm-message').textContent = message || "Lanjutkan tindakan ini?";
+      confirmCallback = onConfirm;
+      document.getElementById('modal-confirm').classList.remove('hidden');
+    }
+
+    document.getElementById('btn-confirm-cancel').onclick = () => {
+      document.getElementById('modal-confirm').classList.add('hidden');
+      confirmCallback = null;
+    };
+
+    document.getElementById('btn-confirm-proceed').onclick = () => {
+      document.getElementById('modal-confirm').classList.add('hidden');
+      if (confirmCallback) {
+        confirmCallback();
+        confirmCallback = null;
+      }
+    };
+
+    function closeAllModals() {
+      document.querySelectorAll('#modal-record, #modal-print, #modal-confirm').forEach(el => {
+        el.classList.add('hidden');
+      });
+    }
+
+    document.querySelectorAll('.btn-close-modal').forEach(btn => {
+      btn.onclick = closeAllModals;
+    });
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    document.getElementById('btn-export-excel-standalone')?.addEventListener('click', exportCleanExcel);
+    document.getElementById('btn-export-csv')?.addEventListener('click', exportModuleCSV);
+    document.getElementById('input-import-csv')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) importModuleCSV(file);
+      e.target.value = '';
+    });
+    document.getElementById('btn-add-record')?.addEventListener('click', () => openRecordModal(null));
+
+    document.getElementById('search-input')?.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      tableCurrentPage = 1;
+      renderTable();
+    });
+
+    document.getElementById('rows-per-page')?.addEventListener('change', (e) => {
+      tableRowsPerPage = Number(e.target.value);
+      tableCurrentPage = 1;
+      renderTable();
+    });
+
+    document.getElementById('btn-prev-page')?.addEventListener('click', () => {
+      if (tableCurrentPage > 1) {
+        tableCurrentPage--;
+        renderTable();
+      }
+    });
+
+    document.getElementById('btn-next-page')?.addEventListener('click', () => {
+      tableCurrentPage++;
+      renderTable();
+    });
+
+    window.addEventListener('load', () => {
+      loadStateFromCache();
+      renderModuleNavigation();
+      renderActiveModuleView();
+    });
+      `;
+    }
+
+    /* Fixing Standalone HTML Export DOM manipulation and Script serialization */
+    function executeExportStandaloneHTML(includeData) {
+      try {
+        const cloneDoc = document.documentElement.cloneNode(true);
+
+        // 1. Remove all builder-only elements from DOM safely
+        cloneDoc.querySelectorAll('[data-builder-only="true"]').forEach(el => el.remove());
+
+        // 2. Adjust Header Actions for Standalone mode
+        const headerActions = cloneDoc.querySelector('#header-actions');
+        if (headerActions) {
+          headerActions.innerHTML = `
+            <button id="btn-export-excel-standalone" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-lg bg-zinc-950 text-white hover:bg-zinc-800 transition shadow-sm active:scale-95">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Ekspor Excel</span>
+            </button>
+          `;
+        }
+
+        // 3. Make title display static (non-builder)
+        const editIcon = cloneDoc.querySelector('#app-title-edit-icon');
+        if (editIcon) editIcon.remove();
+        const titleBtn = cloneDoc.querySelector('#app-title-display');
+        if (titleBtn) {
+          titleBtn.removeAttribute('title');
+          titleBtn.classList.remove('cursor-pointer', 'hover:text-zinc-600');
+          titleBtn.classList.add('cursor-default');
+        }
+
+        // 4. Strip builder scripts from clone body
+        const bodyEl = cloneDoc.querySelector('body');
+        if (!bodyEl) throw new Error("Body element not found in clone");
+        bodyEl.querySelectorAll('script').forEach(s => s.remove());
+
+        // 5. Build clean export state
+        const exportState = JSON.parse(JSON.stringify(AppState));
+        exportState.exportTimestamp = Date.now();
+        if (!includeData) {
+          exportState.modules.forEach(m => {
+            m.data = [];
+          });
+        }
+
+        // 6. Inject the lightweight standalone operational script into body
+        const standaloneScriptEl = document.createElement('script');
+        standaloneScriptEl.textContent = generateStandaloneScript(exportState);
+        bodyEl.appendChild(standaloneScriptEl);
+
+        // 7. Generate clean standalone HTML
+        const htmlString = '<!DOCTYPE html>\n' + cloneDoc.outerHTML;
+
+        const blob = new Blob([htmlString], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeName = (AppState.config.appName || 'BackOffice').replace(/[^a-zA-Z0-9_-]/g, '_');
+        a.download = `${safeName}_Operasional.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        closeAllModals();
+        showToast("Berkas Standalone HTML berhasil diekspor", "success");
+      } catch (err) {
+        console.error("Gagal mengekspor standalone HTML", err);
+        showToast("Gagal mengekspor Standalone HTML", "error");
+      }
+    }
+
+    /* ==========================================================================
+       12. CSV UTILITIES (ROBUST SHEETJS PARSING)
+       ========================================================================== */
+
+    function exportModuleCSV() {
+      const mod = getActiveModule();
+      if (!mod.data || mod.data.length === 0) {
+        showToast("Tidak ada data untuk diekspor ke CSV", "info");
+        return;
+      }
+      try {
+        const exportData = mod.data.map(row => {
+          const obj = {};
+          mod.fields.forEach(f => {
+            obj[f.label] = row[f.key] !== undefined && row[f.key] !== null ? row[f.key] : '';
+          });
+          return obj;
+        });
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const csvContent = XLSX.utils.sheet_to_csv(ws);
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${(mod.sheetName || 'Data').replace(/[^a-zA-Z0-9_-]/g, '_')}_Export.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showToast("Data modul diekspor ke CSV", "success");
+      } catch (err) {
+        console.error("Gagal ekspor CSV", err);
+        showToast("Gagal mengekspor berkas CSV", "error");
+      }
+    }
+
+    function importModuleCSV(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target.result;
+          const wb = XLSX.read(text, { type: 'string' });
+          const firstSheet = wb.Sheets[wb.SheetNames[0]];
+          const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+          if (!rawRows || rawRows.length === 0) {
+            showToast("Berkas CSV tidak memiliki baris data", "error");
+            return;
+          }
+
+          const mod = getActiveModule();
+          const detectedKeys = Object.keys(rawRows[0]);
+          let count = 0;
+
+          rawRows.forEach(rawRow => {
+            const row = {};
+            mod.fields.forEach(f => {
+              const matchedHeader = detectedKeys.find(k => 
+                k.trim().toLowerCase() === f.label.trim().toLowerCase() ||
+                k.trim().toLowerCase() === f.key.trim().toLowerCase()
+              );
+              let val = matchedHeader ? rawRow[matchedHeader] : '';
+              if (f.type === 'number') {
+                row[f.key] = val !== '' ? Number(val) || 0 : null;
+              } else if (f.type === 'checkbox') {
+                row[f.key] = String(val).toLowerCase() === 'true' || String(val) === '1' || String(val).toLowerCase() === 'ya';
+              } else {
+                row[f.key] = val !== undefined && val !== null ? String(val) : '';
+              }
+            });
+            const applied = applyConnectRules(row, mod);
+            mod.data.push(applied);
+            count++;
+          });
+
+          saveStateToCache();
+          renderTable();
+          renderAggregationsBar(mod);
+          renderModuleNavigation();
+          showToast(`Berhasil mengimpor ${count} baris CSV`, "success");
+        } catch (err) {
+          console.error(err);
+          showToast("Gagal memproses berkas CSV", "error");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    /* ==========================================================================
+       13. PRINT RECORD SLIP GENERATOR
+       ========================================================================== */
+
+    function openPrintRecordModal(row, mod) {
+      const container = document.getElementById('print-modal-container');
+      
+      let rowsHtml = '';
+      mod.fields.forEach(f => {
+        const val = row[f.key] !== undefined && row[f.key] !== null ? row[f.key] : '-';
+        rowsHtml += `
+          <div class="flex justify-between py-1 border-b border-dashed border-zinc-200">
+            <span class="text-zinc-500">${escapeHtml(f.label)}:</span>
+            <span class="font-bold text-zinc-900">${formatCellValue(val, f.type)}</span>
+          </div>
+        `;
+      });
+
+      container.innerHTML = `
+        <div class="text-center pb-3 border-b-2 border-zinc-900">
+          <h2 class="text-base font-bold uppercase tracking-wider">${escapeHtml(AppState.config.appName)}</h2>
+          <p class="text-[11px] text-zinc-500">Dokumen Bukti / Ringkasan Data</p>
+          <div class="text-[10px] text-zinc-400 mt-1">Dicetak: ${new Date().toLocaleString('id-ID')}</div>
+        </div>
+
+        <div class="space-y-1.5 py-2">
+          ${rowsHtml}
+        </div>
+
+        <div class="text-center pt-4 border-t border-dashed border-zinc-300 text-[10px] text-zinc-400">
+          Dokumen Digital BackOffice
+        </div>
+      `;
+
+      document.getElementById('modal-print').classList.remove('hidden');
+    }
+
+    /* ==========================================================================
+       14. CUSTOM MODALS & TOAST NOTIFICATIONS
+       ========================================================================== */
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      
+      const icons = {
+        success: `<svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`,
+        error: `<svg class="w-4 h-4 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>`,
+        info: `<svg class="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+      };
+
+      const borders = {
+        success: 'border-zinc-800 bg-zinc-950 text-white',
+        error: 'border-rose-900 bg-zinc-950 text-rose-100',
+        info: 'border-zinc-800 bg-zinc-950 text-white'
+      };
+
+      toast.className = `px-3.5 py-2.5 rounded-xl text-xs font-medium border shadow-2xl flex items-center gap-2.5 transform transition-all duration-200 translate-y-2 opacity-0 pointer-events-auto ${borders[type] || borders.info}`;
+      toast.innerHTML = `${icons[type] || icons.info}<span>${escapeHtml(message)}</span>`;
+
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 200);
+      }, 3200);
+    }
+
+    let confirmCallback = null;
+
+    function showConfirmModal({ title, message, onConfirm }) {
+      document.getElementById('confirm-title').textContent = title || "Konfirmasi";
+      document.getElementById('confirm-message').textContent = message || "Lanjutkan tindakan ini?";
+      confirmCallback = onConfirm;
+      document.getElementById('modal-confirm').classList.remove('hidden');
+    }
+
+    document.getElementById('btn-confirm-cancel').onclick = () => {
+      document.getElementById('modal-confirm').classList.add('hidden');
+      confirmCallback = null;
+    };
+
+    document.getElementById('btn-confirm-proceed').onclick = () => {
+      document.getElementById('modal-confirm').classList.add('hidden');
+      if (confirmCallback) {
+        confirmCallback();
+        confirmCallback = null;
+      }
+    };
+
+    function closeAllModals() {
+      document.querySelectorAll('#modal-record, #modal-form-builder, #modal-connect, #modal-module-edit, #modal-print, #modal-confirm, #modal-edit-title, #modal-export-standalone').forEach(el => {
+        el.classList.add('hidden');
+      });
+    }
+
+    document.querySelectorAll('.btn-close-modal').forEach(btn => {
+      btn.onclick = closeAllModals;
+    });
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /* ==========================================================================
+       15. EVENT BINDINGS & BOOTSTRAP INITIALIZATION
+       ========================================================================== */
+
+    const masterMenuBtn = document.getElementById('btn-master-menu');
+    const masterDropdownMenu = document.getElementById('master-dropdown-menu');
+
+    if (masterMenuBtn && masterDropdownMenu) {
+      masterMenuBtn.onclick = (e) => {
+        e.stopPropagation();
+        masterDropdownMenu.classList.toggle('hidden');
+      };
+
+      window.addEventListener('click', (e) => {
+        if (!masterDropdownMenu.contains(e.target) && e.target !== masterMenuBtn) {
+          masterDropdownMenu.classList.add('hidden');
+        }
+      });
+    }
+
+    // Direct Title Edit Modal (Builder Only)
+    const appTitleBtn = document.getElementById('app-title-display');
+    if (appTitleBtn) {
+      appTitleBtn.onclick = () => {
+        const inputTitle = document.getElementById('input-app-title');
+        if (inputTitle) {
+          inputTitle.value = AppState.config.appName || '';
+          document.getElementById('modal-edit-title')?.classList.remove('hidden');
+          inputTitle.focus();
+        }
+      };
+    }
+
+    document.getElementById('form-edit-title')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = document.getElementById('input-app-title').value.trim();
+      if (val) {
+        AppState.config.appName = val;
+        saveStateToCache();
+        renderActiveModuleView();
+        closeAllModals();
+        showToast("Nama aplikasi diperbarui", "success");
+      }
+    });
+
+    // Excel & Standalone Export Triggers
+    document.getElementById('btn-sync-file')?.addEventListener('click', syncDirectToFile);
+    document.getElementById('btn-export-excel')?.addEventListener('click', () => {
+      masterDropdownMenu?.classList.add('hidden');
+      exportMasterExcel();
+    });
+    document.getElementById('btn-open-direct-file')?.addEventListener('click', () => {
+      masterDropdownMenu?.classList.add('hidden');
+      connectDirectFile();
+    });
+
+    // Standalone modal triggers
+    document.getElementById('btn-export-standalone-trigger')?.addEventListener('click', () => {
+      masterDropdownMenu?.classList.add('hidden');
+      document.getElementById('modal-export-standalone')?.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-proceed-standalone-export')?.addEventListener('click', () => {
+      const includeData = document.getElementById('check-export-include-data').checked;
+      executeExportStandaloneHTML(includeData);
+    });
+
+    document.getElementById('btn-reset-sample')?.addEventListener('click', () => {
+      masterDropdownMenu?.classList.add('hidden');
+      showConfirmModal({
+        title: "Muat Ulang Template Contoh?",
+        message: "Data saat ini akan ditimpa dengan template default toko.",
+        onConfirm: () => {
+          AppState = JSON.parse(JSON.stringify(DEFAULT_SEED_STATE));
+          fileHandle = null;
+          isDirty = false;
+          saveStateToCache();
+          renderModuleNavigation();
+          renderActiveModuleView();
+          updateFileStatusPill();
+          showToast("Template contoh berhasil dimuat", "info");
+        }
+      });
+    });
+
+    document.getElementById('input-open-excel')?.addEventListener('change', (e) => {
+      masterDropdownMenu?.classList.add('hidden');
+      const file = e.target.files[0];
+      if (file) handleExcelImport(file);
+      e.target.value = '';
+    });
+
+    // CSV Buttons
+    document.getElementById('btn-export-csv')?.addEventListener('click', exportModuleCSV);
+    document.getElementById('input-import-csv')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) importModuleCSV(file);
+      e.target.value = '';
+    });
+
+    // Record CRUD & Builder Triggers
+    document.getElementById('btn-add-record')?.addEventListener('click', () => openRecordModal(null));
+    document.getElementById('btn-open-form-builder')?.addEventListener('click', openFormBuilderModal);
+    document.getElementById('btn-open-connect')?.addEventListener('click', openConnectModal);
+
+    // Live search filter
+    document.getElementById('search-input')?.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      tableCurrentPage = 1;
+      renderTable();
+    });
+
+    // Rows per page
+    document.getElementById('rows-per-page')?.addEventListener('change', (e) => {
+      tableRowsPerPage = Number(e.target.value);
+      tableCurrentPage = 1;
+      renderTable();
+    });
+
+    document.getElementById('btn-prev-page')?.addEventListener('click', () => {
+      if (tableCurrentPage > 1) {
+        tableCurrentPage--;
+        renderTable();
+      }
+    });
+
+    document.getElementById('btn-next-page')?.addEventListener('click', () => {
+      tableCurrentPage++;
+      renderTable();
+    });
+
+    // Module management: Add
+    document.getElementById('btn-add-module')?.addEventListener('click', () => {
+      document.getElementById('module-modal-title').textContent = "Tambah Modul Baru";
+      document.getElementById('me-icon').value = "📁";
+      document.getElementById('me-name').value = "";
+      document.getElementById('me-sheet').value = "";
+      document.getElementById('btn-delete-module').classList.add('hidden');
+      document.getElementById('modal-module-edit').dataset.editId = "";
+      document.getElementById('modal-module-edit').classList.remove('hidden');
+    });
+
+    // Module management: Edit
+    document.getElementById('btn-edit-module')?.addEventListener('click', () => {
+      const mod = getActiveModule();
+      document.getElementById('module-modal-title').textContent = `Pengaturan Modul: ${mod.name}`;
+      document.getElementById('me-icon').value = mod.icon || "📁";
+      document.getElementById('me-name').value = mod.name;
+      document.getElementById('me-sheet').value = mod.sheetName;
+      document.getElementById('btn-delete-module').classList.remove('hidden');
+      document.getElementById('modal-module-edit').dataset.editId = mod.id;
+      document.getElementById('modal-module-edit').classList.remove('hidden');
+    });
+
+    document.getElementById('form-module-edit')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const editId = document.getElementById('modal-module-edit').dataset.editId;
+      const icon = document.getElementById('me-icon').value.trim() || "📁";
+      const name = document.getElementById('me-name').value.trim();
+      const sheetName = document.getElementById('me-sheet').value.trim().replace(/[^a-zA-Z0-9_\-\s]/g, '');
+
+      if (editId) {
+        const mod = AppState.modules.find(m => m.id === editId);
+        if (mod) {
+          mod.icon = icon;
+          mod.name = name;
+          mod.sheetName = sheetName;
+        }
+      } else {
+        const newMod = {
+          id: 'mod_' + Date.now(),
+          name,
+          sheetName,
+          icon,
+          fields: [
+            { key: 'id', label: 'ID', type: 'text', required: true, isPrimaryKey: true },
+            { key: 'keterangan', label: 'Keterangan', type: 'text' }
+          ],
+          data: [],
+          rules: []
+        };
+        AppState.modules.push(newMod);
+        AppState.activeModuleId = newMod.id;
+      }
+
+      saveStateToCache();
+      renderModuleNavigation();
+      renderActiveModuleView();
+      closeAllModals();
+      showToast("Modul berhasil disimpan", "success");
+    });
+
+    document.getElementById('btn-delete-module')?.addEventListener('click', () => {
+      if (AppState.modules.length <= 1) {
+        showToast("Minimal harus memiliki 1 modul aktif", "error");
+        return;
+      }
+      const editId = document.getElementById('modal-module-edit').dataset.editId;
+      showConfirmModal({
+        title: "Hapus Modul & Sheet?",
+        message: "Semua data baris pada modul ini akan terhapus.",
+        onConfirm: () => {
+          // Clean up any rules across other modules referencing this deleted module
+          AppState.modules.forEach(otherMod => {
+            if (otherMod.rules) {
+              otherMod.rules = otherMod.rules.filter(r => r.sourceModuleId !== editId);
+            }
+          });
+
+          AppState.modules = AppState.modules.filter(m => m.id !== editId);
+          AppState.activeModuleId = AppState.modules[0].id;
+          saveStateToCache();
+          renderModuleNavigation();
+          renderActiveModuleView();
+          closeAllModals();
+          showToast("Modul berhasil dihapus", "info");
+        }
+      });
+    });
+
+    // App Initialization
+    window.addEventListener('load', () => {
+      loadStateFromCache();
+      renderModuleNavigation();
+      renderActiveModuleView();
+      updateFileStatusPill();
+    });
+  </script>
+</body>
+</html>

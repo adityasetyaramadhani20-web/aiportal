@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="id">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>RecPPAT</title>
+		<!-- Tailwind CSS -->
+		<script src="https://cdn.tailwindcss.com"></script>
+		<!-- SheetJS for Excel/CSV Export/Import -->
+		<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+		<!-- Phosphor Icons -->
+		<script src="https://unpkg.com/@phosphor-icons/web"></script>
+		
+		<style>
+			/* Custom Scrollbar */
+			::-webkit-scrollbar { width: 8px; height: 8px; }
+			::-webkit-scrollbar-track { background: #f1f5f9; }
+			::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+			::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+			
+			.toast-enter { animation: slideIn 0.3s forwards; }
+			.toast-exit { animation: fadeOut 0.3s forwards; }
+			@keyframes slideIn { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+			@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+		</style>
+	</head>
+	<body class="bg-slate-50 text-slate-800 font-sans pb-20">
+		
+		<!-- Navbar -->
+		<nav class="bg-blue-900 text-white shadow-md sticky top-0 z-50">
+			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="flex justify-between h-16 items-center">
+					<div class="flex items-center gap-2">
+						<i class="ph ph-files text-3xl text-blue-300"></i>
+						<span class="font-bold text-xl tracking-wide">RecPPAT</span>
+					</div>
+					<div class="flex gap-3">
+					</div>
+				</div>
+			</div>
+		</nav>
+		
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+			
+			<!-- Header Actions (Import/Export) -->
+			<div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+				<h1 class="text-2xl font-bold text-slate-700">Form Perekaman Laporan Bulanan</h1>
+				<div class="flex gap-2">
+					<!-- Bersihkan Cache -->
+					<button onclick="clearCache()" class="text-sm bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md shadow-sm flex items-center gap-2 transition">
+						<i class="ph ph-trash"></i> Bersihkan Cache
+					</button>
+					<!-- Import Button (Hidden Input) -->
+					<input type="file" id="importFile" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleImport(event)">
+					<button onclick="document.getElementById('importFile').click()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md shadow-sm flex items-center gap-2 transition">
+						<i class="ph ph-upload-simple"></i> Impor Data
+					</button>
+					
+					<!-- Export Dropdown -->
+					<div class="relative group">
+						<button class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md shadow-sm flex items-center gap-2 transition">
+							<i class="ph ph-download-simple"></i> Ekspor <i class="ph ph-caret-down text-xs"></i>
+						</button>
+						<div class="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg hidden group-hover:block border border-slate-200 z-10">
+							<a href="#" onclick="exportData('xlsx')" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Excel (.xlsx)</a>
+							<a href="#" onclick="exportData('csv')" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">CSV (.csv)</a>
+							<a href="#" onclick="exportData('xml')" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 border-t border-slate-100">XML (.xml)</a>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+				
+				<!-- LEFT COLUMN: Forms -->
+				<div class="lg:col-span-8 space-y-6">
+					
+					<!-- PANEL 1: SURAT MASUK (Master) -->
+					<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+						<div class="bg-slate-100 border-b border-slate-200 px-6 py-4 flex items-center gap-2">
+							<i class="ph ph-envelope-open text-xl text-blue-600"></i>
+							<h2 class="font-semibold text-lg text-slate-800">1. Data Surat Masuk (Master)</h2>
+						</div>
+						<div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+							<div>
+								<label class="block text-xs font-medium text-slate-500 mb-1">Nomor Surat</label>
+								<input type="text" id="m_nomor_surat" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Nomor Surat">
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-slate-500 mb-1">No. Bukti Penerimaan</label>
+								<input type="text" id="m_no_bukti" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="No. Bukti">
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-slate-500 mb-1">Nama Notaris / PPAT</label>
+								<input type="text" id="m_nama_notaris" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Nama Lengkap">
+							</div>
+							<div class="md:col-span-3">
+								<label class="block text-xs font-medium text-slate-500 mb-1">Alamat Kantor</label>
+								<input type="text" id="m_alamat" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Alamat lengkap...">
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-slate-500 mb-1">Seksi</label>
+								<input type="text" id="m_seksi" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-slate-500 mb-1">Jenis Register</label>
+								<input type="text" id="m_jenis_register" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-slate-500 mb-1">Tanggal Pengiriman</label>
+								<input type="date" id="m_tgl_pengiriman" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-slate-500 mb-1">Bulan Laporan</label>
+								<select id="m_bulan" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+									<option value="Januari">Januari</option><option value="Februari">Februari</option><option value="Maret">Maret</option>
+									<option value="April">April</option><option value="Mei">Mei</option><option value="Juni">Juni</option>
+									<option value="Juli">Juli</option><option value="Agustus">Agustus</option><option value="September">September</option>
+									<option value="Oktober">Oktober</option><option value="November">November</option><option value="Desember">Desember</option>
+								</select>
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-slate-500 mb-1">Tahun Laporan</label>
+								<input type="number" id="m_tahun" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" value="2026">
+							</div>
+						</div>
+					</div>
+					
+					<!-- PANEL 2: DATA AKTA (Detail) -->
+					<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+						<div class="bg-slate-100 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+							<div class="flex items-center gap-2">
+								<i class="ph ph-file-text text-xl text-emerald-600"></i>
+								<h2 class="font-semibold text-lg text-slate-800">2. Input Data Akta / Transaksi</h2>
+							</div>
+							<button onclick="clearDetailForm()" class="text-xs text-slate-500 hover:text-slate-800 underline">Reset Form Akta</button>
+						</div>
+						
+						<div class="p-6 space-y-6">
+							<!-- Info Akta -->
+							<div>
+								<h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b">Informasi Dokumen</h3>
+								<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+									<div class="md:col-span-1">
+										<label class="block text-xs font-medium text-slate-500 mb-1">Nomor Akta <span class="text-red-500">*</span></label>
+										<input type="text" id="d_no_akta" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+									</div>
+									<div class="md:col-span-1">
+										<label class="block text-xs font-medium text-slate-500 mb-1">Tanggal Akta <span class="text-red-500">*</span></label>
+										<input type="date" id="d_tgl_akta" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+									</div>
+									<div class="md:col-span-1">
+										<label class="block text-xs font-medium text-slate-500 mb-1">Jenis Transaksi</label>
+										<select id="d_jenis_transaksi" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+											<option value="">-- Pilih --</option>
+											<option value="Jual Beli">Jual Beli</option>
+											<option value="Hibah">Hibah</option>
+											<option value="APHT">APHT</option>
+											<option value="APHB">APHB</option>
+											<option value="SKMHT">SKMHT</option>
+											<option value="Lainnya">Lainnya</option>
+										</select>
+									</div>
+									<div class="md:col-span-1">
+										<label class="block text-xs font-medium text-slate-500 mb-1">Harga Transaksi (Rp)</label>
+										<input type="number" id="d_harga" class="w-full border border-slate-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-right font-mono" placeholder="0">
+									</div>
+								</div>
+							</div>
+							
+							<!-- Pihak Terlibat -->
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+								<div class="bg-red-50/50 p-4 rounded-lg border border-red-100">
+									<h3 class="text-sm font-bold text-red-600 uppercase tracking-wider mb-3"><i class="ph ph-user-minus"></i> Penjual / Pemberi</h3>
+									<div class="space-y-3">
+										<div><label class="block text-xs text-slate-500 mb-1">NIK/NPWP</label><input type="text" id="d_nik_penjual" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none"></div>
+										<div><label class="block text-xs text-slate-500 mb-1">Nama</label><input type="text" id="d_nama_penjual" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none"></div>
+										<div><label class="block text-xs text-slate-500 mb-1">Alamat</label><input type="text" id="d_alamat_penjual" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none"></div>
+										<div><label class="block text-xs text-slate-500 mb-1">Geotagging</label><input type="text" id="d_geo_penjual" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none" placeholder="Lat, Long"></div>
+									</div>
+								</div>
+								<div class="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100">
+									<h3 class="text-sm font-bold text-emerald-600 uppercase tracking-wider mb-3"><i class="ph ph-user-plus"></i> Pembeli / Penerima</h3>
+									<div class="space-y-3">
+										<div><label class="block text-xs text-slate-500 mb-1">NIK/NPWP</label><input type="text" id="d_nik_pembeli" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none"></div>
+										<div><label class="block text-xs text-slate-500 mb-1">Nama</label><input type="text" id="d_nama_pembeli" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none"></div>
+										<div><label class="block text-xs text-slate-500 mb-1">Alamat</label><input type="text" id="d_alamat_pembeli" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none"></div>
+										<div><label class="block text-xs text-slate-500 mb-1">Geotagging</label><input type="text" id="d_geo_pembeli" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none" placeholder="Lat, Long"></div>
+									</div>
+								</div>
+							</div>
+							
+							<!-- Objek Pajak -->
+							<div>
+								<h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b">Objek Pajak & Luas</h3>
+								<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+									<div class="md:col-span-2">
+										<label class="block text-xs font-medium text-slate-500 mb-1">No. Dokumen / Sertifikat</label>
+										<input type="text" id="d_no_dokumen" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none">
+									</div>
+									<div class="md:col-span-2">
+										<label class="block text-xs font-medium text-slate-500 mb-1">NOP (Nomor Objek Pajak)</label>
+										<input type="text" id="d_nop" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none">
+									</div>
+									<div class="md:col-span-1">
+										<label class="block text-xs font-medium text-slate-500 mb-1">Nilai NJOP (Rp)</label>
+										<input type="number" id="d_nilai_njop" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none text-right font-mono" placeholder="0">
+									</div>										
+									<div class="md:col-span-3">
+										<label class="block text-xs font-medium text-slate-500 mb-1">Letak Tanah & Bangunan</label>
+										<input type="text" id="d_letak" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none">
+									</div>
+									<div class="md:col-span-1">
+										<label class="block text-xs font-medium text-slate-500 mb-1">Luas Tanah (m²)</label>
+										<input type="number" id="d_luas_tanah" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none font-mono" placeholder="0">
+									</div>
+									<div class="md:col-span-1">
+										<label class="block text-xs font-medium text-slate-500 mb-1">Luas Bangunan (m²)</label>
+										<input type="number" id="d_luas_bangunan" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none font-mono" placeholder="0">
+									</div>
+									<div class="md:col-span-2">
+										<label class="block text-xs font-medium text-indigo-500 mb-1">Total Luas (Otomatis)</label>
+										<input type="text" id="d_luas_total" class="w-full border border-indigo-200 bg-indigo-50 rounded-md p-2 text-sm font-mono text-indigo-700" readonly placeholder="0 m²">
+									</div>
+								</div>
+							</div>
+							
+							<!-- Setoran Pajak -->
+							<div>
+								<h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b">Setoran SSP & SSB</h3>
+								<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+									<div>
+										<label class="block text-xs font-medium text-slate-500 mb-1">Tanggal SSP</label>
+										<input type="date" id="d_tgl_ssp" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none">
+									</div>
+									<div>
+										<label class="block text-xs font-medium text-slate-500 mb-1">Nilai SSP (Rp)</label>
+										<input type="number" id="d_nilai_ssp" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none text-right font-mono" placeholder="0">
+									</div>
+									<div>
+										<label class="block text-xs font-medium text-slate-500 mb-1">Tanggal SSB</label>
+										<input type="date" id="d_tgl_ssb" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none">
+									</div>
+									<div>
+										<label class="block text-xs font-medium text-slate-500 mb-1">Nilai SSB (Rp)</label>
+										<input type="number" id="d_nilai_ssb" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none text-right font-mono" placeholder="0">
+									</div>								
+									<div class="md:col-span-2">
+										<label class="block text-xs font-medium text-slate-500 mb-1">Keterangan Tambahan</label>
+										<input type="text" id="d_keterangan" class="w-full border border-slate-300 rounded-md p-2 text-sm outline-none">
+									</div>
+									<div class="md:col-span-2 flex flex-col justify-end">
+										<div class="bg-indigo-50 border border-indigo-100 rounded p-2 flex justify-between items-center text-sm">
+											<span class="text-indigo-800">Kalkulasi CoreTax:</span>
+											<span id="preview_coretax" class="font-bold text-xl">-</span>
+										</div>
+									</div>
+								</div>
+							</div>
+							
+							<!-- Uraian Otomatis -->
+							<div>
+								<div class="flex justify-between items-center mb-2">
+									<h3 class="text-sm font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-2">
+										<i class="ph ph-magic-wand"></i> Uraian Dokumen
+									</h3>
+									<!-- Tombol Buat Uraian Baru Ditambahkan Di Sini -->
+									<button type="button" onclick="forceGenerateUraian()" class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-medium px-3 py-1.5 rounded-md flex items-center gap-1.5 transition">
+										<i class="ph ph-arrows-clockwise text-sm"></i> Buat / Reset Uraian
+									</button>
+								</div>
+								<textarea id="d_uraian" rows="10" class="w-full border border-indigo-200 bg-indigo-50/30 rounded-md p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none leading-relaxed"></textarea>
+								<p class="text-xs text-slate-400 mt-1">Uraian digenerate secara otomatis untuk data baru. Klik tombol <b>"Buat / Reset Uraian"</b> saat mengedit data impor untuk membuat uraian secara instan.</p>
+							</div>
+							
+							<!-- Actions Button -->
+							<div class="flex justify-end pt-4 border-t border-slate-200 gap-3">
+								<button id="btn_cancel_edit" onclick="cancelEdit()" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-4 py-2.5 rounded-md shadow-sm transition">
+									Batal Edit
+								</button>
+								<button id="btn_submit_akta" onclick="addAkta()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-2.5 rounded-md shadow-sm flex items-center gap-2 transition">
+									<i id="icon_submit_akta" class="ph ph-plus-circle text-lg"></i> <span id="text_submit_akta">Tambahkan Akta ke Daftar</span>
+								</button>
+							</div>
+						</div>
+					</div>
+					
+				</div>
+				
+				<!-- RIGHT COLUMN: Preview & Calculations -->
+				<div class="lg:col-span-4 space-y-6">
+					
+					<!-- Preview List -->
+					<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden sticky top-24">
+						<div class="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
+							<div class="flex items-center gap-2">
+								<i class="ph ph-list-bullets text-xl"></i>
+								<h2 class="font-semibold">Daftar Akta Tersimpan</h2>
+							</div>
+							<span id="badge_count" class="bg-emerald-500 text-xs px-2 py-1 rounded-full font-bold">0</span>
+						</div>
+						
+						<div class="p-0 max-h-[600px] overflow-y-auto" id="list_akta_container">
+							<!-- Empty State -->
+							<div id="empty_state" class="p-8 text-center text-slate-400">
+								<i class="ph ph-empty text-4xl mb-2 opacity-50"></i>
+								<p class="text-sm">Belum ada data akta ditambahkan. Silakan isi form di samping.</p>
+							</div>
+							
+							<!-- List Item Template (Will be injected by JS) -->
+							<ul id="list_akta" class="divide-y divide-slate-100"></ul>
+						</div>
+						
+						<div class="p-4 bg-slate-50 border-t border-slate-200">
+							<div class="flex justify-between items-center mb-1 text-sm">
+								<span class="text-slate-500">Total Nilai Transaksi:</span>
+								<span id="sum_transaksi" class="font-bold font-mono">Rp 0</span>
+							</div>
+							<div class="flex justify-between items-center text-sm">
+								<span class="text-slate-500">Total Potensi SSP:</span>
+								<span id="sum_potensi" class="font-bold text-red-600 font-mono">Rp 0</span>
+							</div>
+						</div>
+					</div>
+				</div>
+				
+			</div>
+		</div>
+		
+		<!-- Toast Notification Container -->
+		<div id="toast_container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+		
+		<script>
+			// --- STATE MANAGEMENT & CACHING ---
+			const CACHE_KEY = 'recppat_cache';
+			let state = {
+				master: {},
+				aktas: [] // Array of detail objects
+			};
+			let editingAktaId = null; // Menyimpan ID akta yang sedang diedit
+			
+			// --- DOM Elements ---
+			const inputsMaster = [
+            'm_nomor_surat', 'm_no_bukti', 'm_nama_notaris', 'm_alamat', 
+            'm_seksi', 'm_jenis_register', 'm_tgl_pengiriman', 'm_bulan', 'm_tahun'
+			];
+			
+			const inputsDetail = [
+            'd_no_akta', 'd_tgl_akta', 'd_jenis_transaksi', 'd_harga',
+            'd_nik_penjual', 'd_nama_penjual', 'd_alamat_penjual', 'd_geo_penjual',
+            'd_nik_pembeli', 'd_nama_pembeli', 'd_alamat_pembeli', 'd_geo_pembeli',
+            'd_no_dokumen', 'd_nop', 'd_letak', 'd_luas_tanah', 'd_luas_bangunan',
+            'd_tgl_ssp', 'd_nilai_ssp', 'd_tgl_ssb', 'd_nilai_ssb', 'd_nilai_njop', 'd_keterangan', 'd_uraian'
+			];
+			
+			// --- INITIALIZATION ---
+			document.addEventListener('DOMContentLoaded', () => {
+				loadCache();
+				setupAutoCalculations();
+				renderList();
+			});
+			
+			function setupAutoCalculations() {
+				// Master inputs listener to trigger Uraian generation and save cache
+				inputsMaster.forEach(id => {
+					const el = document.getElementById(id);
+					if(el) {
+						el.addEventListener('input', () => {
+							saveMasterToState();
+							if (!editingAktaId) generateUraian(); // Jangan auto-generate jika sedang edit untuk cegah timpa manual
+						});
+					}
+				});
+				
+				// Detail inputs listener
+				inputsDetail.forEach(id => {
+					const el = document.getElementById(id);
+					if(el && id !== 'd_uraian') { // Don't trigger on manual uraian edit
+						el.addEventListener('input', () => {
+							calculateLuas();
+							calculateCoreTaxPreview();
+							if (!editingAktaId) generateUraian();
+						});
+					}
+				});
+			}
+			
+			// --- CORE LOGIC & CALCULATIONS ---
+			
+			function parseNum(val) {
+				const n = parseFloat(val);
+				return isNaN(n) ? 0 : n;
+			}
+			
+			function formatRp(num) {
+				return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
+			}
+			
+			function formatDateIndo(dateStr) {
+				if (!dateStr) return "[TANGGAL]";
+				const d = new Date(dateStr);
+				if (isNaN(d)) return "[TANGGAL]";
+				return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+			}
+			
+			function getVal(id, placeholder = '') {
+				const val = document.getElementById(id)?.value?.trim();
+				return val ? val : (placeholder ? `[${placeholder}]` : '');
+			}
+			
+			function calculateLuas() {
+				const lt = parseNum(document.getElementById('d_luas_tanah').value);
+				const lb = parseNum(document.getElementById('d_luas_bangunan').value);
+				document.getElementById('d_luas_total').value = `${lt + lb} m²`;
+			}
+			
+			// Returns object with tax calculation results
+			function doTaxCalculation(harga, nilai_ssp) {
+				const pph_final = harga * 0.025; // 2.5%
+				
+				let status_transaksi = 'Ada Transaksi';
+				if (harga === 0 && nilai_ssp === 0) status_transaksi = 'Tidak Ada Nilai Transaksi';
+				else if (nilai_ssp === 0) status_transaksi = 'Belum Ada SSP';
+				
+				let potensi = 0;
+				if (nilai_ssp === 0) potensi = pph_final;
+				else if (nilai_ssp < pph_final) potensi = pph_final - nilai_ssp;
+				
+				let coretax = '❌';
+				if (potensi === 0) coretax = '❌';
+				else if (potensi < 1000000) coretax = '✔';
+				else coretax = '✔✔';
+				
+				return { pph_final, status_transaksi, potensi, coretax };
+			}
+			
+			function calculateCoreTaxPreview() {
+				const harga = parseNum(document.getElementById('d_harga').value);
+				const ssp = parseNum(document.getElementById('d_nilai_ssp').value);
+				const calc = doTaxCalculation(harga, ssp);
+				
+				const pEl = document.getElementById('preview_coretax');
+				pEl.textContent = calc.coretax;
+				pEl.className = `font-bold text-xl ${calc.coretax === '❌' ? 'text-red-500' : (calc.coretax === '✔' ? 'text-emerald-500' : 'text-amber-500')}`;
+			}
+			
+			function generateUraian() {
+				// Master
+				const notaris = getVal('m_nama_notaris', 'Nama Notaris / PPAT');
+				const no_surat = getVal('m_nomor_surat', 'Nomor Surat');
+				const almt_ppat = getVal('m_alamat', 'Alamat Notaris/PPAT');
+				const tgl_kirim = formatDateIndo(document.getElementById('m_tgl_pengiriman').value);
+				const bln_lap = document.getElementById('m_bulan').value || '[Bulan]';
+				const thn_lap = getVal('m_tahun', 'Tahun');
+				
+				// Detail
+				const jenis = getVal('d_jenis_transaksi', 'Jenis Transaksi');
+				const almt_penjual = getVal('d_alamat_penjual', 'Alamat Penjual');
+				const almt_pembeli = getVal('d_alamat_pembeli', 'Alamat Pembeli');
+				const no_dok = getVal('d_no_dokumen', 'Nomor Dokumen Tanah/Bangunan');
+				const letak = getVal('d_letak', 'Letak Tanah & Bangunan');				
+				const lt = parseNum(document.getElementById('d_luas_tanah').value);
+				const lb = parseNum(document.getElementById('d_luas_bangunan').value);		
+				const luas_tot = lt + lb;
+				const nm_penjual = getVal('d_nama_penjual', 'Nama Penjual / Pemberi');
+				const nm_pembeli = getVal('d_nama_pembeli', 'Nama Pembeli / Penerima');
+				const harga = formatRp(parseNum(document.getElementById('d_harga').value));
+				const no_akta = getVal('d_no_akta', 'Nomor Akta');
+				
+				const nop = getVal('d_nop', 'NOP');
+				const tgl_ssp = formatDateIndo(document.getElementById('d_tgl_ssp').value);
+				const n_ssp = formatRp(parseNum(document.getElementById('d_nilai_ssp').value));
+				const tgl_ssb = formatDateIndo(document.getElementById('d_tgl_ssb').value);
+				const n_ssb = formatRp(parseNum(document.getElementById('d_nilai_ssb').value));
+				const n_njop = formatRp(parseNum(document.getElementById('d_nilai_njop').value));				
+				const ket = getVal('d_keterangan', 'Keterangan');
+				
+				const tmpl = `Transaksi ${jenis} atas tanah dan/atau bangunan di ${letak} (${no_dok}) dengan luas total ${luas_tot} m2, yang dilakukan oleh ${nm_penjual} selaku pemberi kepada ${nm_pembeli} selaku penerima dengan harga transaksi senilai ${harga}, sesuai akta nomor ${no_akta} bulan ${bln_lap} ${thn_lap} tanggal ${tgl_kirim} dengan surat pengantar dari Notaris/PPAT/Pengirim Surat a.n. ${notaris} nomor ${no_surat}
+				
+NOP : ${nop}
+NJOP : ${n_njop}
+Tanggal SSP : ${tgl_ssp}
+Nilai SSP : ${n_ssp}
+Tanggal SSB : ${tgl_ssb}
+Nilai SSB : ${n_ssb}
+
+Keterangan:
+Alamat Penjual : ${almt_penjual}
+Alamat Pembeli : ${almt_pembeli}
+Alamat Notaris/PPAT : ${almt_ppat}
+${ket}`;
+				
+				document.getElementById('d_uraian').value = tmpl;
+			}
+
+			// FUNGSI BARU: Untuk trigger secara manual melalui tombol "Buat Uraian"
+			function forceGenerateUraian() {
+				generateUraian();
+				showToast('Uraian berhasil dibuat/diperbarui berdasarkan isian form saat ini.', 'success');
+			}
+			
+			// --- CRUD ACTIONS ---
+			
+			function saveMasterToState() {
+				let m = {};
+				inputsMaster.forEach(id => m[id] = document.getElementById(id).value);
+				state.master = m;
+				saveCache();
+			}
+			
+			function addAkta() {
+				// Minimal validation
+				const no_akta = document.getElementById('d_no_akta').value.trim();
+				const tgl_akta = document.getElementById('d_tgl_akta').value;
+				
+				if (!no_akta || !tgl_akta) {
+					showToast('Nomor Akta dan Tanggal Akta wajib diisi!', 'error');
+					return;
+				}
+				
+				// Gather data, keep existing ID if editing
+				let akta = { id: editingAktaId ? editingAktaId : Date.now() }; 
+				inputsDetail.forEach(id => akta[id] = document.getElementById(id).value);
+				
+				// Do internal calculations to store
+				const calc = doTaxCalculation(parseNum(akta.d_harga), parseNum(akta.d_nilai_ssp));
+				akta._calc_luas = parseNum(akta.d_luas_tanah) + parseNum(akta.d_luas_bangunan);
+				akta._calc_pph = calc.pph_final;
+				akta._calc_status = calc.status_transaksi;
+				akta._calc_potensi = calc.potensi;
+				akta._calc_coretax = calc.coretax;
+				
+				if (editingAktaId) {
+					// Update jika dalam mode edit
+					const index = state.aktas.findIndex(a => a.id === editingAktaId);
+					if (index !== -1) state.aktas[index] = akta;
+					showToast('Perubahan akta berhasil disimpan', 'success');
+				} else {
+					// Tambah baru
+					state.aktas.unshift(akta); 
+					showToast('Akta berhasil ditambahkan', 'success');
+				}
+				
+				saveMasterToState(); 
+				renderList();
+				clearDetailForm();
+			}
+
+			function editAkta(id) {
+				const akta = state.aktas.find(a => a.id === id);
+				if(!akta) return;
+
+				// Isi form dengan data akta
+				inputsDetail.forEach(key => {
+					const el = document.getElementById(key);
+					if(el && akta[key] !== undefined) {
+						el.value = akta[key];
+					}
+				});
+
+				// Update kalkulasi visual
+				calculateLuas();
+				calculateCoreTaxPreview();
+
+				// Set state edit
+				editingAktaId = id;
+
+				// Ubah tampilan tombol form
+				document.getElementById('text_submit_akta').textContent = 'Simpan Perubahan';
+				document.getElementById('icon_submit_akta').className = 'ph ph-floppy-disk text-lg';
+				document.getElementById('btn_submit_akta').className = 'bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-md shadow-sm flex items-center gap-2 transition';
+				document.getElementById('btn_cancel_edit').classList.remove('hidden');
+
+				// Scroll ke atas (fokus ke form)
+				document.getElementById('d_no_akta').focus();
+				window.scrollTo({ top: 0, behavior: 'smooth' });
+			}
+
+			function cancelEdit() {
+				clearDetailForm();
+			}
+			
+			function deleteAkta(id) {
+				if(confirm('Hapus data akta ini?')) {
+					state.aktas = state.aktas.filter(a => a.id !== id);
+					if (editingAktaId === id) cancelEdit(); // Batalkan edit jika data yang dihapus sedang diedit
+					renderList();
+					saveCache();
+					showToast('Akta dihapus', 'info');
+				}
+			}
+			
+			function clearDetailForm() {
+				inputsDetail.forEach(id => {
+					const el = document.getElementById(id);
+					if (el) {
+						if (el.tagName === 'SELECT') el.selectedIndex = 0;
+						else el.value = '';
+					}
+				});
+				document.getElementById('d_luas_total').value = '';
+				document.getElementById('preview_coretax').textContent = '-';
+
+				// Reset status edit
+				editingAktaId = null;
+				
+				const btnSubmit = document.getElementById('btn_submit_akta');
+				if (btnSubmit) {
+					document.getElementById('text_submit_akta').textContent = 'Tambahkan Akta ke Daftar';
+					document.getElementById('icon_submit_akta').className = 'ph ph-plus-circle text-lg';
+					btnSubmit.className = 'bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-2.5 rounded-md shadow-sm flex items-center gap-2 transition';
+					document.getElementById('btn_cancel_edit').classList.add('hidden');
+				}
+			}
+			
+			// --- UI RENDERING ---
+			
+			function renderList() {
+				const container = document.getElementById('list_akta');
+				const empty = document.getElementById('empty_state');
+				const badge = document.getElementById('badge_count');
+				
+				container.innerHTML = '';
+				badge.textContent = state.aktas.length;
+				
+				if (state.aktas.length === 0) {
+					empty.style.display = 'block';
+					} else {
+					empty.style.display = 'none';
+					
+					let sumTrans = 0;
+					let sumPotensi = 0;
+					
+					state.aktas.forEach(akta => {
+						sumTrans += parseNum(akta.d_harga);
+						sumPotensi += akta._calc_potensi;
+						
+						const li = document.createElement('li');
+						li.className = 'p-4 hover:bg-slate-50 transition border-l-4 border-transparent hover:border-emerald-500 group';
+						
+						let ctColor = 'bg-slate-200 text-slate-700';
+						if(akta._calc_coretax === '❌') ctColor = 'bg-red-100 text-red-700';
+						if(akta._calc_coretax === '✔') ctColor = 'bg-emerald-100 text-emerald-700';
+						if(akta._calc_coretax === '✔✔') ctColor = 'bg-amber-100 text-amber-700';
+						
+						li.innerHTML = `
+                        <div class="flex justify-between items-start">
+							<div>
+								<div class="flex items-center gap-2 mb-1">
+									<span class="font-bold text-slate-800">${akta.d_no_akta}</span>
+									<span class="text-xs text-slate-400">&bull; ${formatDateIndo(akta.d_tgl_akta)}</span>
+									<span class="px-2 py-0.5 rounded text-[10px] font-bold ${ctColor}">${akta._calc_coretax}</span>
+								</div>
+								<div class="text-xs text-slate-600 mb-1">
+									<span class="text-red-600">${akta.d_nama_penjual || '[-]'}</span> 
+									<i class="ph ph-arrow-right mx-1 inline-block translate-y-[2px]"></i> 
+									<span class="text-emerald-600">${akta.d_nama_pembeli || '[-]'}</span>
+								</div>
+								<div class="text-sm font-mono mt-2">
+									<span class="text-slate-500">Harga:</span> ${formatRp(parseNum(akta.d_harga))} | 
+									<span class="text-slate-500">Potensi SSP:</span> <span class="text-red-500">${formatRp(akta._calc_potensi)}</span>
+								</div>
+							</div>
+							
+							<div class="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition">
+								<button onclick="editAkta(${akta.id})" class="text-slate-400 hover:text-blue-600 p-1 rounded transition bg-slate-100 hover:bg-blue-50" title="Edit Akta">
+									<i class="ph ph-pencil-simple text-lg"></i>
+								</button>
+								<button onclick="deleteAkta(${akta.id})" class="text-slate-400 hover:text-red-600 p-1 rounded transition bg-slate-100 hover:bg-red-50" title="Hapus Akta">
+									<i class="ph ph-trash text-lg"></i>
+								</button>
+							</div>
+                        </div>
+						`;
+						container.appendChild(li);
+					});
+					
+					document.getElementById('sum_transaksi').textContent = formatRp(sumTrans);
+					document.getElementById('sum_potensi').textContent = formatRp(sumPotensi);
+				}
+			}
+			
+			// --- CACHING & TOAST ---
+			
+			function saveCache() {
+				localStorage.setItem(CACHE_KEY, JSON.stringify(state));
+			}
+			
+			function loadCache() {
+				const cached = localStorage.getItem(CACHE_KEY);
+				if (cached) {
+					try {
+						state = JSON.parse(cached);
+						// Populate Master
+						if (state.master) {
+							inputsMaster.forEach(id => {
+								if (state.master[id] && document.getElementById(id)) {
+									document.getElementById(id).value = state.master[id];
+								}
+							});
+						}
+						if(!state.aktas) state.aktas = [];
+						} catch (e) {
+						console.error('Failed to parse cache');
+						state = { master: {}, aktas: [] };
+					}
+				}
+			}
+			
+			function clearCache() {
+				if(confirm('Yakin ingin membersihkan semua data di form dan daftar akta?')) {
+					localStorage.removeItem(CACHE_KEY);
+					state = { master: {}, aktas: [] };
+					
+					inputsMaster.forEach(id => document.getElementById(id).value = '');
+					clearDetailForm();
+					renderList();
+					showToast('Cache dibersihkan', 'info');
+				}
+			}
+			
+			function showToast(msg, type = 'info') {
+				const t = document.createElement('div');
+				let colors = 'bg-slate-800 text-white';
+				let icon = 'ph-info';
+				
+				if(type === 'success') { colors = 'bg-emerald-600 text-white'; icon = 'ph-check-circle'; }
+				if(type === 'error') { colors = 'bg-red-600 text-white'; icon = 'ph-warning-circle'; }
+				
+				t.className = `${colors} px-4 py-3 rounded shadow-lg flex items-center gap-2 text-sm font-medium toast-enter max-w-xs`;
+				t.innerHTML = `<i class="ph ${icon} text-lg"></i> ${msg}`;
+				
+				const container = document.getElementById('toast_container');
+				container.appendChild(t);
+				
+				setTimeout(() => {
+					t.classList.replace('toast-enter', 'toast-exit');
+					setTimeout(() => t.remove(), 300);
+				}, 3000);
+			}
+			
+			// --- EXPORT & IMPORT (SHEETJS) ---
+			
+			function generateFlatData() {
+				// Flatten Master and Detail for Excel/CSV
+				return state.aktas.map(akta => {
+					return {
+						// Master Info
+						'Nomor Surat': state.master.m_nomor_surat,
+						'Bulan Laporan': state.master.m_bulan,
+						'Tahun Laporan': state.master.m_tahun,
+						'Nama Notaris/PPAT': state.master.m_nama_notaris,
+						'Tanggal Pengiriman': state.master.m_tgl_pengiriman,
+						
+						// Akta Info
+						'Nomor Akta': akta.d_no_akta,
+						'Tanggal Akta': akta.d_tgl_akta,
+						'Jenis Transaksi': akta.d_jenis_transaksi,
+						
+						// Pihak
+						'Nama Penjual': akta.d_nama_penjual,
+						'Nama Pembeli': akta.d_nama_pembeli,
+						
+						// Objek & Kalkulasi
+						'Luas Total (m2)': akta._calc_luas,
+						'Harga Transaksi': parseNum(akta.d_harga),
+						
+						// Pajak
+						'Nilai SSP': parseNum(akta.d_nilai_ssp),
+						'PPh Final (2.5%)': akta._calc_pph,
+						'Potensi SSP': akta._calc_potensi,
+						'Input CoreTax': akta._calc_coretax,
+						
+						// Uraian
+						'Uraian': akta.d_uraian,
+						
+						// Info Lainnya
+						'Alamat Notaris/PPAT': state.master.m_alamat,
+						'Seksi Penginput': state.master.m_seksi,
+						'Jenis Register': state.master.m_jenis_register,
+						'Nomor Bukti Penerimaan Surat': state.master.m_no_bukti, 
+						'NIK Penjual': akta.d_nik_penjual,
+						'NIK Pembeli': akta.d_nik_pembeli,
+						'Alamat Penjual': akta.d_alamat_penjual,
+						'Alamat Pembeli': akta.d_alamat_pembeli,
+						'Geotagging Penjual': akta.d_geo_penjual,
+						'Geotagging Pembeli': akta.d_geo_pembeli,
+						'Nomor Dokumen': akta.d_no_dokumen,
+						'NOP': akta.d_nop,
+						'Letak': akta.d_letak,
+						'Luas Tanah': parseNum(akta.d_luas_tanah),
+						'Luas Bangunan': parseNum(akta.d_luas_bangunan),
+						'Tanggal SSP': akta.d_tgl_ssp,
+						'Tanggal SSB': akta.d_tgl_ssb,
+						'Nilai SSB': parseNum(akta.d_nilai_ssb),
+						'Nilai NJOP': parseNum(akta.d_nilai_njop),						
+						'Keterangan': akta.d_keterangan
+					};
+				});
+			}
+			
+			function exportData(format) {
+				if (state.aktas.length === 0) {
+					showToast('Tidak ada data untuk diekspor', 'error');
+					return;
+				}
+				
+				const fileName = `Rekap_PPAT_${state.master.m_bulan || 'Bulan'}_${state.master.m_tahun || 'Tahun'}_${state.master.m_nama_notaris || 'PPAT'}`;
+				
+				if (format === 'xlsx' || format === 'csv') {
+					const flatData = generateFlatData();
+					const ws = XLSX.utils.json_to_sheet(flatData);
+					const wb = XLSX.utils.book_new();
+					XLSX.utils.book_append_sheet(wb, ws, "Laporan PPAT");
+					XLSX.writeFile(wb, `${fileName}.${format}`);
+					showToast(`Berhasil ekspor ke ${format.toUpperCase()}`, 'success');
+				} 
+				else if (format === 'xml') {
+					// Manual Simple XML Generation
+					let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<LaporanPPAT>\n`;
+					xml += `  <SuratMasuk>\n`;
+					for(let k in state.master) { xml += `    <${k}>${escapeXml(state.master[k])}</${k}>\n`; }
+					xml += `  </SuratMasuk>\n  <DaftarAkta>\n`;
+					
+					state.aktas.forEach(akta => {
+						xml += `    <Akta id="${akta.id}">\n`;
+						for(let k in akta) {
+							if(k !== 'id') xml += `      <${k}>${escapeXml(String(akta[k]))}</${k}>\n`;
+						}
+						xml += `    </Akta>\n`;
+					});
+					xml += `  </DaftarAkta>\n</LaporanPPAT>`;
+					
+					const blob = new Blob([xml], {type: "application/xml"});
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = `${fileName}.xml`;
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					URL.revokeObjectURL(url);
+					showToast('Berhasil ekspor ke XML', 'success');
+				}
+			}
+			
+			function escapeXml(unsafe) {
+				if(!unsafe) return '';
+				return unsafe.replace(/[<>&'"]/g, function (c) {
+					switch (c) {
+						case '<': return '&lt;';
+						case '>': return '&gt;';
+						case '&': return '&amp;';
+						case '\'': return '&apos;';
+						case '"': return '&quot;';
+					}
+				});
+			}
+			
+			function handleImport(e) {
+				const file = e.target.files[0];
+				if (!file) return;
+				
+				const reader = new FileReader();
+				reader.onload = function(event) {
+					try {
+						const data = new Uint8Array(event.target.result);
+						const workbook = XLSX.read(data, {type: 'array'});
+						const firstSheetName = workbook.SheetNames[0];
+						const worksheet = workbook.Sheets[firstSheetName];
+						const json = XLSX.utils.sheet_to_json(worksheet);
+						
+						if (json.length > 0) {
+							// Very basic mapper from the Flat layout we generated
+							// In a real app, validation is needed here.
+							
+							// Grab Master from first row
+							const first = json[0];
+							document.getElementById('m_nomor_surat').value = first['Nomor Surat'] || '';
+							document.getElementById('m_bulan').value = first['Bulan Laporan'] || 'Januari';
+							document.getElementById('m_tahun').value = first['Tahun Laporan'] || '2026';
+							document.getElementById('m_nama_notaris').value = first['Nama Notaris/PPAT'] || '';
+							document.getElementById('m_alamat').value = first['Alamat Notaris/PPAT'] || '';
+							document.getElementById('m_jenis_register').value = first['Jenis Register'] || '';
+							document.getElementById('m_no_bukti').value = first['Nomor Bukti Penerimaan Surat'] || '';
+							document.getElementById('m_tgl_pengiriman').value = first['Tanggal Pengiriman'] || '';						
+							document.getElementById('m_seksi').value = first['Seksi Penginput'] || '';						
+							saveMasterToState();
+							
+							// Map Aktas
+							json.forEach(row => {
+								let akta = { id: Date.now() + Math.random() };
+								akta.d_no_akta = row['Nomor Akta'] || '';
+								akta.d_tgl_akta = row['Tanggal Akta'] || '';
+								akta.d_jenis_transaksi = row['Jenis Transaksi'] || '';
+								akta.d_nama_penjual = row['Nama Penjual'] || '';
+								akta.d_nama_pembeli = row['Nama Pembeli'] || '';
+								akta.d_harga = row['Harga Transaksi'] || 0;
+								akta.d_nilai_ssp = row['Nilai SSP'] || 0;
+								akta.d_nik_penjual = row['NIK Penjual'] || '';
+								akta.d_nik_pembeli = row['NIK Pembeli'] || '';
+								akta.d_alamat_penjual = row['Alamat Penjual'] || '';
+								akta.d_alamat_pembeli = row['Alamat Pembeli'] || '';
+								akta.d_geo_penjual = row['Geotagging Penjual'] || '';
+								akta.d_geo_pembeli = row['Geotagging Pembeli'] || '';
+								akta.d_no_dokumen = row['Nomor Dokumen'] || '';
+								akta.d_nop = row['NOP'] || '';
+								akta.d_letak = row['Letak'] || '';
+								akta.d_luas_tanah = row['Luas Tanah'] || 0;
+								akta.d_luas_bangunan = row['Luas Bangunan'] || 0;
+								akta.d_tgl_ssp = row['Tanggal SSP'] || '';
+								akta.d_tgl_ssb = row['Tanggal SSB'] || '';
+								akta.d_nilai_ssb = row['Nilai SSB'] || 0;
+								akta.d_nilai_njop = row['Nilai NJOP'] || 0;								
+								akta.d_keterangan = row['Keterangan'] || '';
+								akta.d_uraian = row['Uraian'] || '';
+								
+								const calc = doTaxCalculation(parseNum(akta.d_harga), parseNum(akta.d_nilai_ssp));
+								akta._calc_luas = row['Luas Total (m2)'] || 0;
+								akta._calc_pph = calc.pph_final;
+								akta._calc_potensi = calc.potensi;
+								akta._calc_coretax = calc.coretax;
+
+								state.aktas.push(akta);
+							});
+							
+							saveCache();
+							renderList();
+							showToast(`Berhasil mengimpor ${json.length} baris data`, 'success');
+						}
+						} catch(err) {
+						console.error(err);
+						showToast('Gagal memproses file. Pastikan format sesuai.', 'error');
+					}
+					
+					// reset input file
+					document.getElementById('importFile').value = '';
+				};
+				reader.readAsArrayBuffer(file);
+			}
+			
+		</script>
+	</body>
+</html>

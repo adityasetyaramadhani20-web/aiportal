@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChartMaker</title>
+    
+    <!-- External CDN Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+
+        /* Custom Scrollbar for clean UI */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .tab-btn.active {
+            border-bottom-color: #2563eb;
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        .preview-tab.active {
+            background-color: var(--theme-navy, #0a2b5c);
+            color: var(--theme-gold, #f0b90b);
+        }
+
+        .modal-backdrop {
+            background-color: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(2px);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white border-b border-slate-800 px-5 py-3 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-sm">
+                <i class="fa-solid fa-chart-column text-sm"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base tracking-tight leading-none">ChartMaker</h1>
+                <p class="text-[11px] text-slate-400 mt-0.5">HTML5 Dashboard Builder & Standalone Exporter</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button id="btnReset" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md transition flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+            <button id="btnLoadSample" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md transition flex items-center gap-1.5">
+                <i class="fa-solid fa-database"></i> Load Sample
+            </button>
+            <div class="h-4 w-px bg-slate-700 mx-1"></div>
+            <button id="btnExportJSON" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md transition flex items-center gap-1.5">
+                <i class="fa-solid fa-download"></i> Save Config
+            </button>
+            <label class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md transition cursor-pointer flex items-center gap-1.5">
+                <i class="fa-solid fa-upload"></i> Load Config
+                <input type="file" id="inputJSON" accept=".json" class="hidden">
+            </label>
+            <button id="btnExportHTML" class="px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-md shadow-sm transition flex items-center gap-1.5">
+                <i class="fa-solid fa-file-export"></i> Export HTML5
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Workspace -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- Sidebar / Builder Controls Panel -->
+        <aside class="w-[380px] bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden">
+            
+            <!-- Step Navigation Tabs -->
+            <div class="flex border-b border-slate-200 bg-slate-50 text-xs">
+                <button class="tab-btn active flex-1 py-2.5 text-center font-medium text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition" data-tab="tab-data">
+                    <i class="fa-solid fa-file-csv block text-sm mb-1"></i> Data
+                </button>
+                <button class="tab-btn flex-1 py-2.5 text-center font-medium text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition" data-tab="tab-header">
+                    <i class="fa-solid fa-heading block text-sm mb-1"></i> Header
+                </button>
+                <button class="tab-btn flex-1 py-2.5 text-center font-medium text-slate-600 hover:text-slate-900 border-b-2 border-transparent transition" data-tab="tab-pages">
+                    <i class="fa-solid fa-cubes block text-sm mb-1"></i> Pages & Cards
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-5">
+
+                <!-- TAB 1: DATA SOURCE -->
+                <div id="tab-data" class="tab-content space-y-4">
+                    <div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">1. Unggah File Data</h2>
+                        <p class="text-xs text-slate-500">Dukung format CSV atau XLSX/Excel.</p>
+                    </div>
+
+                    <div id="dropzone" class="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-lg p-5 text-center cursor-pointer transition">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 mb-2"></i>
+                        <p class="text-xs font-semibold text-slate-700">Klik atau Drag & Drop file di sini</p>
+                        <p class="text-[11px] text-slate-400 mt-1">.csv, .xlsx, .xls</p>
+                        <input type="file" id="fileInput" accept=".csv, .xlsx, .xls" class="hidden">
+                    </div>
+
+                    <div id="dataSummary" class="hidden bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-500">Status Data:</span>
+                            <span class="font-semibold text-emerald-600 flex items-center gap-1">
+                                <i class="fa-solid fa-circle-check"></i> Terisi
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-500">Jumlah Baris:</span>
+                            <span id="rowCount" class="font-mono font-semibold text-slate-700">0</span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-500">Jumlah Kolom:</span>
+                            <span id="colCount" class="font-mono font-semibold text-slate-700">0</span>
+                        </div>
+                        <div class="pt-2 border-t border-slate-200">
+                            <p class="text-[11px] font-semibold text-slate-600 mb-1">Daftar Kolom Terdeteksi:</p>
+                            <div id="colTags" class="flex flex-wrap gap-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: HEADER & BRANDING CONFIG -->
+                <div id="tab-header" class="tab-content hidden space-y-4">
+                    <div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">2. Kustomisasi Branding & Header</h2>
+                        <p class="text-xs text-slate-500">Atur identitas instansi, judul, dan tema warna.</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Judul Utama Dashboard</label>
+                            <input type="text" id="cfgTitle" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Contoh: Dashboard Kinerja Capaian IKU">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Sub-Judul / Konteks</label>
+                            <input type="text" id="cfgSubtitle" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Contoh: Monitoring Rapat Pembahasan DKO">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Instansi</label>
+                                <input type="text" id="cfgOrg" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Kanwil DJP Kalbar">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Info Periode</label>
+                                <input type="text" id="cfgPeriod" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="TW II 2026">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Warna Utama (Primary)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="color" id="cfgColorNavy" value="#0a2b5c" class="w-8 h-8 rounded border border-slate-300 cursor-pointer">
+                                    <input type="text" id="cfgColorNavyText" value="#0a2b5c" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded font-mono">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Warna Aksen (Accent)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="color" id="cfgColorGold" value="#d4a017" class="w-8 h-8 rounded border border-slate-300 cursor-pointer">
+                                    <input type="text" id="cfgColorGoldText" value="#d4a017" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded font-mono">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Teks Badge Logo (Opsional)</label>
+                            <input type="text" id="cfgLogoText" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="DJP">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Atau Upload Logo Gambar (Base64)</label>
+                            <input type="file" id="cfgLogoFile" accept="image/*" class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: PAGES & WIDGET BUILDER -->
+                <div id="tab-pages" class="tab-content hidden space-y-4">
+                    <div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">3. Struktur Dashboard & Widget</h2>
+                        <p class="text-xs text-slate-500">Kelola halaman tab dan tambahkan/edit komponen grafik.</p>
+                    </div>
+
+                    <!-- Page Tabs Manager -->
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-semibold text-slate-700">Daftar Halaman Dashboard</label>
+                            <button id="btnAddPage" class="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                                <i class="fa-solid fa-plus"></i> Tambah Halaman
+                            </button>
+                        </div>
+                        <div id="pagesList" class="space-y-1.5"></div>
+                    </div>
+
+                    <hr class="border-slate-200">
+
+                    <!-- Widget Creator & Editor Form -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3" id="widgetFormContainer">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-slate-800 flex items-center gap-1.5" id="formWidgetHeading">
+                                <i class="fa-solid fa-chart-pie text-blue-600"></i> Tambah Widget
+                            </h3>
+                            <button id="btnCancelEditWidget" class="hidden text-[11px] text-rose-600 font-semibold hover:underline">
+                                <i class="fa-solid fa-xmark"></i> Batal Edit
+                            </button>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Judul Widget / Grafik</label>
+                            <input type="text" id="wTitle" class="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 focus:outline-none" placeholder="Contoh: Realisasi Capaian per Wilayah">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Tipe Tampilan</label>
+                                <select id="wType" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white">
+                                    <option value="kpi">KPI Card (Angka Besar)</option>
+                                    <option value="bar">Bar Chart</option>
+                                    <option value="line">Line Chart</option>
+                                    <option value="pie">Pie / Donut Chart</option>
+                                    <option value="table">Data Table (1 Kategori)</option>
+                                    <option value="infotable">Info Table (Multi-Kategori)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Ukuran Widget</label>
+                                <select id="wSize" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white">
+                                    <option value="half">Setengah (1/2)</option>
+                                    <option value="full">Penuh (Full)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Fungsi Agregasi</label>
+                                <select id="wAgg" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white">
+                                    <option value="SUM">SUM (Jumlah)</option>
+                                    <option value="AVG">AVERAGE (Rata-rata)</option>
+                                    <option value="MAX">MAX (Maksimum)</option>
+                                    <option value="MIN">MIN (Minimum)</option>
+                                    <option value="COUNT">COUNT (Jumlah Baris)</option>
+                                    <option value="MEDIAN">MEDIAN (Nilai Tengah)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Sumbu Y / Nilai Ukur</label>
+                                <select id="wValueCol" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white"></select>
+                            </div>
+                        </div>
+
+                        <!-- Single Category Selector -->
+                        <div id="wSingleGroupContainer">
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Sumbu X / Kategori Utama</label>
+                            <select id="wGroupCol" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white"></select>
+                        </div>
+
+                        <!-- Multi-Category Selector for Info Table -->
+                        <div id="wMultiGroupContainer" class="hidden">
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pilih Kategori (Bisa Banyak)</label>
+                            <div id="wMultiGroupCheckboxes" class="max-h-28 overflow-y-auto border border-slate-300 bg-white rounded p-2 space-y-1">
+                                <!-- Dynamic Checkboxes -->
+                            </div>
+                        </div>
+
+                        <button id="btnSaveWidget" class="w-full py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded shadow-sm transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-plus-circle" id="btnSaveWidgetIcon"></i> <span id="btnSaveWidgetText">Tambahkan Widget</span>
+                        </button>
+                    </div>
+
+                    <!-- Current Page Widgets List -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Daftar Widget di Halaman Ini</label>
+                        <div id="widgetsList" class="space-y-1.5"></div>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Live Preview Area -->
+        <main class="flex-1 bg-slate-200/70 flex flex-col overflow-hidden relative">
+            
+            <div class="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between text-xs font-medium text-slate-500 shrink-0">
+                <span class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Pratinjau Langsung (Live Preview)
+                </span>
+                <span class="text-[11px] text-slate-400">Tampilan hasil ekspor akan persis seperti ini</span>
+            </div>
+
+            <!-- Preview Container Canvas -->
+            <div class="flex-1 overflow-y-auto p-4 md:p-6" id="previewCanvas">
+                
+                <div class="max-w-6xl mx-auto space-y-4">
+                    
+                    <!-- Preview Header Bar -->
+                    <div id="prevHeader" class="rounded-xl overflow-hidden shadow-lg border-b-4 text-white relative transition-all" style="background: linear-gradient(135deg, #0a2b5c 0%, #071d3f 100%); border-bottom-color: #d4a017;">
+                        <div class="p-4 md:p-5 flex items-center gap-3 relative z-10">
+                            <div id="prevLogoBox" class="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center font-extrabold text-slate-900 text-lg shadow-md shrink-0">
+                                DJP
+                            </div>
+                            <div>
+                                <h1 id="prevTitle" class="text-base md:text-lg font-bold leading-tight text-white">Dashboard IKU — Kanwil DJP Kalimantan Barat</h1>
+                                <p id="prevSubtitle" class="text-xs text-blue-200 mt-0.5">Monitoring Capaian IKU · Rapat Pembahasan DKO</p>
+                            </div>
+                            <div class="ml-auto text-right text-[11px] text-blue-200 hidden sm:block leading-tight">
+                                <div id="prevOrg" class="font-semibold text-white">Direktorat Jenderal Pajak</div>
+                                <div id="prevPeriod" class="text-amber-300 font-medium mt-0.5">TW II 2026</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preview Tab Navigation -->
+                    <div id="prevTabNav" class="bg-slate-900 rounded-xl p-1 shadow border border-slate-800 flex items-center gap-1 overflow-x-auto">
+                        <!-- Dynamic page tabs injected here -->
+                    </div>
+
+                    <!-- Preview Active Page Content Area -->
+                    <div id="prevContent" class="space-y-4">
+                        <!-- Dynamic widgets rendered here -->
+                    </div>
+
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Custom Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+    <script>
+        // Default initial application state (EMPTY BY DEFAULT)
+        let state = {
+            branding: {
+                title: "Dashboard Kinerja — Kanwil DJP Kalimantan Barat",
+                subtitle: "Monitoring Capaian IKU & Realisasi Target",
+                org: "Direktorat Jenderal Pajak",
+                period: "TW II 2026",
+                colorNavy: "#0a2b5c",
+                colorGold: "#d4a017",
+                logoText: "DJP",
+                logoBase64: ""
+            },
+            data: [],
+            columns: [],
+            activePageId: "p1",
+            editingWidgetId: null,
+            pages: [
+                {
+                    id: "p1",
+                    title: "Capaian Utama & KPI",
+                    widgets: []
+                }
+            ]
+        };
+
+        let chartInstances = {};
+
+        const sampleData = [
+            { "Kanwil": "Kanwil DJP Kalbar", "KPP": "KPP Pratama Pontianak Barat", "PPM_Target": 292570, "PPM_Real": 140714, "IKU_PPM": 99.2, "AR_Count": 23 },
+            { "Kanwil": "Kanwil DJP Kalbar", "KPP": "KPP Pratama Singkawang", "PPM_Target": 285957, "PPM_Real": 94118, "IKU_PPM": 120.0, "AR_Count": 20 },
+            { "Kanwil": "Kanwil DJP Kalbar", "KPP": "KPP Pratama Ketapang", "PPM_Target": 448638, "PPM_Real": 255935, "IKU_PPM": 113.3, "AR_Count": 18 },
+            { "Kanwil": "Kanwil DJP Kalbar", "KPP": "KPP Pratama Kubu Raya", "PPM_Target": 233927, "PPM_Real": 45215, "IKU_PPM": 112.3, "AR_Count": 20 },
+            { "Kanwil": "Kanwil DJP Kalbar", "KPP": "KPP Pratama Sanggau", "PPM_Target": 635213, "PPM_Real": 337506, "IKU_PPM": 120.0, "AR_Count": 18 },
+            { "Kanwil": "Kanwil DJP Kalbar", "KPP": "KPP Pratama Sintang", "PPM_Target": 150675, "PPM_Real": 97694, "IKU_PPM": 120.0, "AR_Count": 16 },
+            { "Kanwil": "Kanwil DJP Kalbar", "KPP": "KPP Pratama Pontianak Timur", "PPM_Target": 485905, "PPM_Real": 555984, "IKU_PPM": 94.5, "AR_Count": 24 }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initEvents();
+            // Start with EMPTY state defaults
+            renderAll();
+        });
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto px-4 py-2.5 rounded-lg shadow-lg text-xs font-semibold text-white transition-all transform translate-y-2 opacity-0 flex items-center gap-2 ${
+                type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-slate-800'
+            }`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info'}"></i> ${msg}`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function initEvents() {
+            // Sidebar Navigation Tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                    btn.classList.add('active');
+                    document.getElementById(btn.dataset.tab).classList.remove('hidden');
+                });
+            });
+
+            // Drag & Drop File Upload
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+
+            dropzone.addEventListener('click', () => fileInput.click());
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('border-blue-500', 'bg-blue-50/50');
+            });
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('border-blue-500', 'bg-blue-50/50');
+            });
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('border-blue-500', 'bg-blue-50/50');
+                if (e.dataTransfer.files.length) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                }
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) handleFileUpload(e.target.files[0]);
+            });
+
+            // Header Config Inputs Binding
+            bindHeaderInputs();
+
+            // Toggle Widget Display Type Inputs (Single vs Multi Category)
+            document.getElementById('wType').addEventListener('change', (e) => {
+                const isInfoTable = e.target.value === 'infotable';
+                document.getElementById('wSingleGroupContainer').classList.toggle('hidden', isInfoTable);
+                document.getElementById('wMultiGroupContainer').classList.toggle('hidden', !isInfoTable);
+            });
+
+            // Page & Widget Events
+            document.getElementById('btnAddPage').addEventListener('click', addPage);
+            document.getElementById('btnSaveWidget').addEventListener('click', saveWidget);
+            document.getElementById('btnCancelEditWidget').addEventListener('click', cancelEditWidget);
+
+            // Global Actions
+            document.getElementById('btnLoadSample').addEventListener('click', loadSampleData);
+            document.getElementById('btnReset').addEventListener('click', resetApp);
+            document.getElementById('btnExportHTML').addEventListener('click', exportStandaloneHTML);
+            document.getElementById('btnExportJSON').addEventListener('click', exportJSONConfig);
+            document.getElementById('inputJSON').addEventListener('change', importJSONConfig);
+        }
+
+        function handleFileUpload(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext === 'csv') {
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    dynamicTyping: true,
+                    complete: (results) => {
+                        processParsedData(results.data);
+                        showToast(`CSV Berhasil diimpor (${results.data.length} baris)`, 'success');
+                    }
+                });
+            } else if (ext === 'xlsx' || ext === 'xls') {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const workbook = XLSX.read(e.target.result, { type: 'binary' });
+                    const firstSheet = workbook.SheetNames[0];
+                    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
+                    processParsedData(rows);
+                    showToast(`Excel Berhasil diimpor (${rows.length} baris)`, 'success');
+                };
+                reader.readAsBinaryString(file);
+            } else {
+                showToast('Format file tidak didukung', 'error');
+            }
+        }
+
+        function loadSampleData() {
+            processParsedData(sampleData);
+            // Add default sample widgets if empty
+            if (state.pages[0].widgets.length === 0) {
+                state.pages[0].widgets = [
+                    { id: 'w1', title: 'Total Realisasi PPM (Juta Rp)', type: 'kpi', size: 'full', groupCol: 'KPP', valueCol: 'PPM_Real', agg: 'SUM' },
+                    { id: 'w2', title: 'Perbandingan Realisasi PPM per KPP', type: 'bar', size: 'half', groupCol: 'KPP', valueCol: 'PPM_Real', agg: 'SUM' },
+                    { id: 'w3', title: 'Rata-rata IKU PPM per KPP', type: 'line', size: 'half', groupCol: 'KPP', valueCol: 'IKU_PPM', agg: 'AVG' },
+                    { id: 'w4', title: 'Info Table: Capaian per Kanwil & KPP', type: 'infotable', size: 'full', groupCols: ['Kanwil', 'KPP'], valueCol: 'PPM_Real', agg: 'SUM' }
+                ];
+            }
+            renderAll();
+            showToast('Data sampel berhasil dimuat', 'success');
+        }
+
+        function processParsedData(data) {
+            if (!data || !data.length) return;
+            state.data = data;
+            state.columns = Object.keys(data[0]);
+
+            // Update UI Summary
+            document.getElementById('dataSummary').classList.remove('hidden');
+            document.getElementById('rowCount').textContent = data.length.toLocaleString('id');
+            document.getElementById('colCount').textContent = state.columns.length;
+            document.getElementById('colTags').innerHTML = state.columns.map(c => `<span class="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded font-mono text-[10px]">${c}</span>`).join('');
+
+            // Update Single Select Options
+            const groupSelect = document.getElementById('wGroupCol');
+            const valueSelect = document.getElementById('wValueCol');
+            groupSelect.innerHTML = state.columns.map(c => `<option value="${c}">${c}</option>`).join('');
+            valueSelect.innerHTML = state.columns.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            // Update Multi Checkbox List for Info Table
+            const multiCheckContainer = document.getElementById('wMultiGroupCheckboxes');
+            multiCheckContainer.innerHTML = state.columns.map((c, idx) => `
+                <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-50 p-0.5 rounded">
+                    <input type="checkbox" value="${c}" class="wGroupColsCheck rounded text-blue-600 focus:ring-blue-500" ${idx === 0 ? 'checked' : ''}>
+                    <span>${c}</span>
+                </label>
+            `).join('');
+
+            renderAll();
+        }
+
+        function bindHeaderInputs() {
+            const b = state.branding;
+            document.getElementById('cfgTitle').value = b.title;
+            document.getElementById('cfgSubtitle').value = b.subtitle;
+            document.getElementById('cfgOrg').value = b.org;
+            document.getElementById('cfgPeriod').value = b.period;
+            document.getElementById('cfgColorNavy').value = b.colorNavy;
+            document.getElementById('cfgColorNavyText').value = b.colorNavy;
+            document.getElementById('cfgColorGold').value = b.colorGold;
+            document.getElementById('cfgColorGoldText').value = b.colorGold;
+            document.getElementById('cfgLogoText').value = b.logoText;
+
+            const update = () => {
+                state.branding.title = document.getElementById('cfgTitle').value;
+                state.branding.subtitle = document.getElementById('cfgSubtitle').value;
+                state.branding.org = document.getElementById('cfgOrg').value;
+                state.branding.period = document.getElementById('cfgPeriod').value;
+                state.branding.colorNavy = document.getElementById('cfgColorNavy').value;
+                state.branding.colorGold = document.getElementById('cfgColorGold').value;
+                state.branding.logoText = document.getElementById('cfgLogoText').value;
+                renderHeaderPreview();
+            };
+
+            ['cfgTitle', 'cfgSubtitle', 'cfgOrg', 'cfgPeriod', 'cfgLogoText'].forEach(id => {
+                document.getElementById(id).addEventListener('input', update);
+            });
+
+            document.getElementById('cfgColorNavy').addEventListener('input', (e) => {
+                document.getElementById('cfgColorNavyText').value = e.target.value;
+                update();
+            });
+            document.getElementById('cfgColorGold').addEventListener('input', (e) => {
+                document.getElementById('cfgColorGoldText').value = e.target.value;
+                update();
+            });
+
+            document.getElementById('cfgLogoFile').addEventListener('change', (e) => {
+                if (e.target.files.length) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        state.branding.logoBase64 = evt.target.result;
+                        renderHeaderPreview();
+                    };
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+            });
+        }
+
+        function aggregateData(rows, groupCol, valueCol, aggType) {
+            if (!rows || !rows.length || !groupCol || !valueCol) return { labels: [], values: [] };
+
+            const groups = {};
+            rows.forEach(row => {
+                const key = row[groupCol] !== undefined && row[groupCol] !== null ? String(row[groupCol]) : 'N/A';
+                const val = parseFloat(row[valueCol]);
+                if (!groups[key]) groups[key] = [];
+                if (!isNaN(val)) groups[key].push(val);
+            });
+
+            const labels = Object.keys(groups);
+            const values = labels.map(key => computeAggValue(groups[key], aggType));
+
+            return { labels, values };
+        }
+
+        function aggregateMultiData(rows, groupCols, valueCol, aggType) {
+            if (!rows || !rows.length || !groupCols || !groupCols.length || !valueCol) return { groupCols: [], rows: [] };
+
+            const groups = {};
+            rows.forEach(row => {
+                const keyArr = groupCols.map(col => (row[col] !== undefined && row[col] !== null) ? String(row[col]) : 'N/A');
+                const key = keyArr.join('|||');
+                const val = parseFloat(row[valueCol]);
+                if (!groups[key]) groups[key] = { keys: keyArr, vals: [] };
+                if (!isNaN(val)) groups[key].vals.push(val);
+            });
+
+            const resultRows = Object.keys(groups).map(k => {
+                const item = groups[k];
+                return {
+                    keys: item.keys,
+                    value: computeAggValue(item.vals, aggType)
+                };
+            });
+
+            return { groupCols, rows: resultRows };
+        }
+
+        function computeAggValue(arr, aggType) {
+            if (!arr || !arr.length) return 0;
+            switch (aggType) {
+                case 'SUM':
+                    return arr.reduce((a, b) => a + b, 0);
+                case 'AVG':
+                    return arr.reduce((a, b) => a + b, 0) / arr.length;
+                case 'MAX':
+                    return Math.max(...arr);
+                case 'MIN':
+                    return Math.min(...arr);
+                case 'COUNT':
+                    return arr.length;
+                case 'MEDIAN':
+                    const sorted = [...arr].sort((a, b) => a - b);
+                    const mid = Math.floor(sorted.length / 2);
+                    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+                default:
+                    return arr.reduce((a, b) => a + b, 0);
+            }
+        }
+
+        function addPage() {
+            const pageId = 'p_' + Date.now();
+            const pageNum = state.pages.length + 1;
+            state.pages.push({
+                id: pageId,
+                title: `Halaman ${pageNum}`,
+                widgets: []
+            });
+            state.activePageId = pageId;
+            renderAll();
+            showToast('Halaman baru ditambahkan', 'success');
+        }
+
+        function removePage(id) {
+            if (state.pages.length <= 1) {
+                showToast('Minimal harus ada 1 halaman', 'error');
+                return;
+            }
+            state.pages = state.pages.filter(p => p.id !== id);
+            if (state.activePageId === id) {
+                state.activePageId = state.pages[0].id;
+            }
+            renderAll();
+            showToast('Halaman dihapus', 'info');
+        }
+
+        function saveWidget() {
+            const page = state.pages.find(p => p.id === state.activePageId);
+            if (!page) return;
+
+            if (!state.columns.length) {
+                showToast('Silakan unggah data atau klik Load Sample terlebih dahulu', 'error');
+                return;
+            }
+
+            const title = document.getElementById('wTitle').value.trim() || 'Widget Tanpa Judul';
+            const type = document.getElementById('wType').value;
+            const size = document.getElementById('wSize').value;
+            const agg = document.getElementById('wAgg').value;
+            const valueCol = document.getElementById('wValueCol').value;
+
+            let groupCol = '';
+            let groupCols = [];
+
+            if (type === 'infotable') {
+                const checked = Array.from(document.querySelectorAll('.wGroupColsCheck:checked')).map(cb => cb.value);
+                if (!checked.length) {
+                    showToast('Pilih minimal 1 kategori untuk Info Table', 'error');
+                    return;
+                }
+                groupCols = checked;
+            } else {
+                groupCol = document.getElementById('wGroupCol').value;
+            }
+
+            if (state.editingWidgetId) {
+                // UPDATE Existing Widget
+                const wIdx = page.widgets.findIndex(w => w.id === state.editingWidgetId);
+                if (wIdx !== -1) {
+                    page.widgets[wIdx] = {
+                        ...page.widgets[wIdx],
+                        title,
+                        type,
+                        size,
+                        agg,
+                        valueCol,
+                        groupCol,
+                        groupCols
+                    };
+                    showToast('Widget berhasil diperbarui', 'success');
+                }
+            } else {
+                // CREATE New Widget
+                page.widgets.push({
+                    id: 'w_' + Date.now(),
+                    title,
+                    type,
+                    size,
+                    agg,
+                    valueCol,
+                    groupCol,
+                    groupCols
+                });
+                showToast('Widget berhasil ditambahkan', 'success');
+            }
+
+            cancelEditWidget();
+            renderAll();
+        }
+
+        function editWidget(widgetId) {
+            const page = state.pages.find(p => p.id === state.activePageId);
+            if (!page) return;
+            const widget = page.widgets.find(w => w.id === widgetId);
+            if (!widget) return;
+
+            state.editingWidgetId = widgetId;
+
+            // Populate Form Fields
+            document.getElementById('wTitle').value = widget.title;
+            document.getElementById('wType').value = widget.type;
+            document.getElementById('wSize').value = widget.size || 'half';
+            document.getElementById('wAgg').value = widget.agg;
+            if (widget.valueCol) document.getElementById('wValueCol').value = widget.valueCol;
+
+            const isInfoTable = widget.type === 'infotable';
+            document.getElementById('wSingleGroupContainer').classList.toggle('hidden', isInfoTable);
+            document.getElementById('wMultiGroupContainer').classList.toggle('hidden', !isInfoTable);
+
+            if (isInfoTable && widget.groupCols) {
+                document.querySelectorAll('.wGroupColsCheck').forEach(cb => {
+                    cb.checked = widget.groupCols.includes(cb.value);
+                });
+            } else if (widget.groupCol) {
+                document.getElementById('wGroupCol').value = widget.groupCol;
+            }
+
+            // Update UI State for Form Header & Buttons
+            document.getElementById('formWidgetHeading').innerHTML = `<i class="fa-solid fa-pen-to-square text-amber-600"></i> Edit Widget`;
+            document.getElementById('btnSaveWidgetText').textContent = 'Simpan Perubahan';
+            document.getElementById('btnSaveWidgetIcon').className = 'fa-solid fa-check-circle';
+            document.getElementById('btnCancelEditWidget').classList.remove('hidden');
+
+            // Scroll form into view
+            document.getElementById('widgetFormContainer').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function cancelEditWidget() {
+            state.editingWidgetId = null;
+            document.getElementById('wTitle').value = '';
+            document.getElementById('formWidgetHeading').innerHTML = `<i class="fa-solid fa-chart-pie text-blue-600"></i> Tambah Widget`;
+            document.getElementById('btnSaveWidgetText').textContent = 'Tambahkan Widget';
+            document.getElementById('btnSaveWidgetIcon').className = 'fa-solid fa-plus-circle';
+            document.getElementById('btnCancelEditWidget').classList.add('hidden');
+        }
+
+        function removeWidget(widgetId) {
+            const page = state.pages.find(p => p.id === state.activePageId);
+            if (!page) return;
+            page.widgets = page.widgets.filter(w => w.id !== widgetId);
+            if (state.editingWidgetId === widgetId) cancelEditWidget();
+            renderAll();
+            showToast('Widget dihapus', 'info');
+        }
+
+        function renderAll() {
+            renderPagesList();
+            renderWidgetsList();
+            renderHeaderPreview();
+            renderPreviewTabNav();
+            renderPreviewWidgets();
+        }
+
+        function renderPagesList() {
+            const container = document.getElementById('pagesList');
+            container.innerHTML = state.pages.map(p => `
+                <div class="flex items-center justify-between p-2 rounded-md ${p.id === state.activePageId ? 'bg-blue-50 border border-blue-300' : 'bg-slate-100 hover:bg-slate-200'} transition">
+                    <input type="text" value="${p.title}" onchange="renamePage('${p.id}', this.value)" class="text-xs font-semibold bg-transparent border-none focus:outline-none w-full mr-2 text-slate-700">
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button onclick="state.activePageId='${p.id}'; renderAll();" class="p-1 text-xs ${p.id === state.activePageId ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600'}">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                        <button onclick="removePage('${p.id}')" class="p-1 text-xs text-slate-400 hover:text-rose-600">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renamePage(id, newTitle) {
+            const p = state.pages.find(x => x.id === id);
+            if (p) p.title = newTitle;
+            renderPreviewTabNav();
+        }
+
+        function renderWidgetsList() {
+            const container = document.getElementById('widgetsList');
+            const page = state.pages.find(p => p.id === state.activePageId);
+            if (!page || !page.widgets.length) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic">Belum ada widget di halaman ini.</p>`;
+                return;
+            }
+
+            container.innerHTML = page.widgets.map(w => {
+                const categoryLabel = w.type === 'infotable' ? (w.groupCols ? w.groupCols.join(', ') : 'Multi') : w.groupCol;
+                const isEditing = state.editingWidgetId === w.id;
+
+                return `
+                <div class="flex items-center justify-between p-2 rounded border text-xs ${isEditing ? 'bg-amber-50 border-amber-300' : 'bg-slate-100 border-slate-200'}">
+                    <div>
+                        <div class="font-semibold text-slate-800 flex items-center gap-1.5">
+                            ${w.title}
+                            <span class="text-[9px] px-1.5 py-0.2 bg-slate-200 text-slate-600 rounded font-bold">${w.size === 'full' ? 'FULL' : '1/2'}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 uppercase">${w.type} · ${w.agg} (${categoryLabel})</div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="editWidget('${w.id}')" class="text-slate-400 hover:text-blue-600 p-1" title="Edit Widget">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button onclick="removeWidget('${w.id}')" class="text-slate-400 hover:text-rose-600 p-1" title="Hapus Widget">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function renderHeaderPreview() {
+            const b = state.branding;
+            const hdr = document.getElementById('prevHeader');
+            hdr.style.background = `linear-gradient(135deg, ${b.colorNavy} 0%, #071d3f 100%)`;
+            hdr.style.borderBottomColor = b.colorGold;
+
+            document.getElementById('prevTitle').textContent = b.title || 'Dashboard Title';
+            document.getElementById('prevSubtitle').textContent = b.subtitle || '';
+            document.getElementById('prevOrg').textContent = b.org || '';
+            document.getElementById('prevPeriod').textContent = b.period || '';
+
+            const logoBox = document.getElementById('prevLogoBox');
+            if (b.logoBase64) {
+                logoBox.innerHTML = `<img src="${b.logoBase64}" class="w-full h-full object-contain rounded-xl">`;
+            } else {
+                logoBox.textContent = b.logoText || 'LOGO';
+            }
+        }
+
+        function renderPreviewTabNav() {
+            const nav = document.getElementById('prevTabNav');
+            nav.innerHTML = state.pages.map(p => `
+                <button onclick="state.activePageId='${p.id}'; renderAll();" class="preview-tab ${p.id === state.activePageId ? 'active' : 'text-slate-400 hover:text-white'} px-4 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap">
+                    ${p.title}
+                </button>
+            `).join('');
+        }
+
+        function renderPreviewWidgets() {
+            const container = document.getElementById('prevContent');
+            const page = state.pages.find(p => p.id === state.activePageId);
+
+            // Destroy previous charts
+            Object.keys(chartInstances).forEach(id => {
+                if (chartInstances[id]) chartInstances[id].destroy();
+            });
+            chartInstances = {};
+
+            if (!state.data || !state.data.length) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-xl p-12 text-center border border-slate-200">
+                        <i class="fa-solid fa-database text-4xl text-slate-300 mb-3 block"></i>
+                        <h3 class="text-sm font-bold text-slate-700 mb-1">Data Masih Kosong</h3>
+                        <p class="text-xs text-slate-400 max-w-md mx-auto mb-4">Unggah file CSV/Excel pada menu Data, atau muat data sampel bawaan untuk melihat animasi grafik.</p>
+                        <button onclick="loadSampleData()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow transition inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-database"></i> Load Data Sampel
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            if (!page || !page.widgets.length) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-xl p-12 text-center border border-slate-200">
+                        <i class="fa-solid fa-chart-line text-3xl text-slate-300 mb-2"></i>
+                        <p class="text-xs font-semibold text-slate-600">Halaman ini belum memiliki widget.</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Gunakan panel sebelah kiri untuk menambahkan grafik, tabel, atau KPI.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="widgetGrid"></div>`;
+            const grid = document.getElementById('widgetGrid');
+
+            page.widgets.forEach(w => {
+                const widgetEl = document.createElement('div');
+                const isFullWidth = w.size === 'full';
+                const gridSpanClass = isFullWidth ? 'col-span-1 md:col-span-2' : 'col-span-1';
+
+                if (w.type === 'kpi') {
+                    const aggregated = aggregateData(state.data, w.groupCol, w.valueCol, w.agg);
+                    widgetEl.className = `${gridSpanClass} bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between`;
+                    const totalVal = aggregated.values.reduce((a, b) => a + b, 0);
+                    const formatted = totalVal.toLocaleString('id', { maximumFractionDigits: 2 });
+                    widgetEl.innerHTML = `
+                        <div>
+                            <span class="text-[10px] font-bold tracking-wider text-slate-400 uppercase">${w.title} (${w.agg})</span>
+                            <div class="text-3xl font-extrabold text-slate-900 mt-1">${formatted}</div>
+                            <span class="text-[11px] text-slate-500 mt-1 block">Berdasarkan ${aggregated.labels.length} kelompok (${w.groupCol})</span>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold shrink-0">
+                            <i class="fa-solid fa-calculator"></i>
+                        </div>
+                    `;
+                    grid.appendChild(widgetEl);
+                } else if (w.type === 'table') {
+                    const aggregated = aggregateData(state.data, w.groupCol, w.valueCol, w.agg);
+                    widgetEl.className = `${gridSpanClass} bg-white rounded-xl p-5 border border-slate-200 shadow-sm`;
+                    let tableHTML = `
+                        <h3 class="text-xs font-bold text-slate-800 mb-3">${w.title}</h3>
+                        <div class="overflow-x-auto max-h-72">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-200 bg-slate-50 sticky top-0">
+                                        <th class="py-2 px-3 font-semibold text-slate-600">${w.groupCol}</th>
+                                        <th class="py-2 px-3 font-semibold text-slate-600 text-right">${w.valueCol} (${w.agg})</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    aggregated.labels.forEach((lbl, idx) => {
+                        const val = aggregated.values[idx].toLocaleString('id', { maximumFractionDigits: 2 });
+                        tableHTML += `
+                            <tr class="border-b border-slate-100 hover:bg-slate-50">
+                                <td class="py-2 px-3 font-medium text-slate-800">${lbl}</td>
+                                <td class="py-2 px-3 text-right font-mono text-slate-700">${val}</td>
+                            </tr>
+                        `;
+                    });
+                    tableHTML += `</tbody></table></div>`;
+                    widgetEl.innerHTML = tableHTML;
+                    grid.appendChild(widgetEl);
+                } else if (w.type === 'infotable') {
+                    // INFO TABLE MULTI-CATEGORY
+                    const multiData = aggregateMultiData(state.data, w.groupCols, w.valueCol, w.agg);
+                    widgetEl.className = `${gridSpanClass} bg-white rounded-xl p-5 border border-slate-200 shadow-sm`;
+                    
+                    let headers = multiData.groupCols.map(c => `<th class="py-2 px-3 font-semibold text-slate-600">${c}</th>`).join('');
+                    let tableHTML = `
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs font-bold text-slate-800">${w.title}</h3>
+                            <span class="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded border border-blue-200">Info Table</span>
+                        </div>
+                        <div class="overflow-x-auto max-h-72">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-200 bg-slate-50 sticky top-0">
+                                        ${headers}
+                                        <th class="py-2 px-3 font-semibold text-slate-600 text-right">${w.valueCol} (${w.agg})</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    multiData.rows.forEach(r => {
+                        let colsHTML = r.keys.map(k => `<td class="py-2 px-3 font-medium text-slate-800">${k}</td>`).join('');
+                        let valFormatted = r.value.toLocaleString('id', { maximumFractionDigits: 2 });
+                        tableHTML += `
+                            <tr class="border-b border-slate-100 hover:bg-slate-50">
+                                ${colsHTML}
+                                <td class="py-2 px-3 text-right font-mono font-semibold text-blue-700">${valFormatted}</td>
+                            </tr>
+                        `;
+                    });
+
+                    tableHTML += `</tbody></table></div>`;
+                    widgetEl.innerHTML = tableHTML;
+                    grid.appendChild(widgetEl);
+                } else {
+                    const aggregated = aggregateData(state.data, w.groupCol, w.valueCol, w.agg);
+                    widgetEl.className = `${gridSpanClass} bg-white rounded-xl p-5 border border-slate-200 shadow-sm`;
+                    const canvasId = `chart_${w.id}`;
+                    widgetEl.innerHTML = `
+                        <h3 class="text-xs font-bold text-slate-800 mb-3">${w.title}</h3>
+                        <div class="h-64 relative">
+                            <canvas id="${canvasId}"></canvas>
+                        </div>
+                    `;
+                    grid.appendChild(widgetEl);
+
+                    // Render Chart.js
+                    setTimeout(() => {
+                        const ctx = document.getElementById(canvasId);
+                        if (!ctx) return;
+
+                        const colors = ['#1d4ed8', '#d4a017', '#1a8a52', '#7c3aed', '#c0392b', '#0284c7', '#ea580c'];
+                        chartInstances[w.id] = new Chart(ctx, {
+                            type: w.type === 'pie' ? 'doughnut' : w.type,
+                            data: {
+                                labels: aggregated.labels,
+                                datasets: [{
+                                    label: `${w.valueCol} (${w.agg})`,
+                                    data: aggregated.values,
+                                    backgroundColor: w.type === 'pie' ? colors : 'rgba(29, 78, 216, 0.85)',
+                                    borderColor: w.type === 'line' ? '#1d4ed8' : '#ffffff',
+                                    borderRadius: w.type === 'bar' ? 6 : 0,
+                                    fill: w.type === 'line' ? false : true
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: w.type === 'pie', position: 'bottom' }
+                                },
+                                scales: w.type !== 'pie' ? {
+                                    y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                                    x: { grid: { display: false } }
+                                } : {}
+                            }
+                        });
+                    }, 50);
+                }
+            });
+        }
+
+        function exportJSONConfig() {
+            const jsonStr = JSON.stringify(state, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `chartmaker_config_${Date.now()}.json`;
+            a.click();
+            showToast('Konfigurasi berhasil diunduh', 'success');
+        }
+
+        function importJSONConfig(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try {
+                    const loadedState = JSON.parse(evt.target.result);
+                    if (loadedState.branding && loadedState.pages) {
+                        state = loadedState;
+                        bindHeaderInputs();
+                        if (state.data && state.data.length) processParsedData(state.data);
+                        renderAll();
+                        showToast('Konfigurasi berhasil dimuat', 'success');
+                    } else {
+                        showToast('Format JSON konfigurasi tidak valid', 'error');
+                    }
+                } catch (err) {
+                    showToast('Gagal membaca file JSON', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function resetApp() {
+            state.data = [];
+            state.columns = [];
+            state.pages = [{ id: 'p1', title: 'Capaian Utama & KPI', widgets: [] }];
+            state.activePageId = 'p1';
+            cancelEditWidget();
+            document.getElementById('dataSummary').classList.add('hidden');
+            renderAll();
+            showToast('Aplikasi direset ke kondisi bersih', 'info');
+        }
+
+        function exportStandaloneHTML() {
+            const b = state.branding;
+            const pagesJSON = JSON.stringify(state.pages);
+            const dataJSON = JSON.stringify(state.data);
+
+            const htmlContent = `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${b.title}</title>
+<script src="https://cdn.tailwindcss.com"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"><\/script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
+  .tab-btn.active { background-color: ${b.colorNavy}; color: ${b.colorGold}; font-weight: 700; }
+</style>
+</head>
+<body class="min-h-screen pb-12">
+
+<header class="shadow-lg border-b-4 text-white sticky top-0 z-50" style="background: linear-gradient(135deg, ${b.colorNavy} 0%, #071d3f 100%); border-bottom-color: ${b.colorGold};">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center font-extrabold text-slate-900 text-lg shadow-md shrink-0">
+        ${b.logoBase64 ? `<img src="${b.logoBase64}" class="w-full h-full object-contain rounded-xl">` : (b.logoText || 'LOGO')}
+      </div>
+      <div>
+        <h1 class="text-base md:text-xl font-bold leading-tight">${b.title}</h1>
+        <p class="text-xs text-blue-200 mt-0.5">${b.subtitle}</p>
+      </div>
+    </div>
+    <div class="text-right text-xs text-blue-200 hidden sm:block">
+      <div class="font-semibold text-white">${b.org}</div>
+      <div class="text-amber-300 font-medium mt-0.5">${b.period}</div>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 mt-6 space-y-6">
+  <div id="tabNav" class="bg-slate-900 rounded-xl p-1.5 shadow border border-slate-800 flex items-center gap-1.5 overflow-x-auto"></div>
+  <div id="pageContent" class="space-y-6"></div>
+</main>
+
+<footer class="text-center text-xs text-slate-400 mt-12 py-6 border-t border-slate-200">
+  <b>${b.org}</b> — Dashboard Monitoring & Analysis Report · Generated with ChartMaker
+</footer>
+
+<script>
+const PAGES = ${pagesJSON};
+const DATA = ${dataJSON};
+let activePageId = PAGES[0] ? PAGES[0].id : null;
+let chartInstances = {};
+
+function aggregateData(rows, groupCol, valueCol, aggType) {
+  if (!rows || !rows.length || !groupCol || !valueCol) return { labels: [], values: [] };
+  const groups = {};
+  rows.forEach(row => {
+    const key = row[groupCol] !== undefined && row[groupCol] !== null ? String(row[groupCol]) : 'N/A';
+    const val = parseFloat(row[valueCol]);
+    if (!groups[key]) groups[key] = [];
+    if (!isNaN(val)) groups[key].push(val);
+  });
+  const labels = Object.keys(groups);
+  const values = labels.map(key => computeAggValue(groups[key], aggType));
+  return { labels, values };
+}
+
+function aggregateMultiData(rows, groupCols, valueCol, aggType) {
+  if (!rows || !rows.length || !groupCols || !groupCols.length || !valueCol) return { groupCols: [], rows: [] };
+  const groups = {};
+  rows.forEach(row => {
+    const keyArr = groupCols.map(col => (row[col] !== undefined && row[col] !== null) ? String(row[col]) : 'N/A');
+    const key = keyArr.join('|||');
+    const val = parseFloat(row[valueCol]);
+    if (!groups[key]) groups[key] = { keys: keyArr, vals: [] };
+    if (!isNaN(val)) groups[key].vals.push(val);
+  });
+  const resultRows = Object.keys(groups).map(k => ({
+    keys: groups[k].keys,
+    value: computeAggValue(groups[k].vals, aggType)
+  }));
+  return { groupCols, rows: resultRows };
+}
+
+function computeAggValue(arr, aggType) {
+  if (!arr || !arr.length) return 0;
+  switch (aggType) {
+    case 'SUM': return arr.reduce((a, b) => a + b, 0);
+    case 'AVG': return arr.reduce((a, b) => a + b, 0) / arr.length;
+    case 'MAX': return Math.max(...arr);
+    case 'MIN': return Math.min(...arr);
+    case 'COUNT': return arr.length;
+    case 'MEDIAN':
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    default: return arr.reduce((a, b) => a + b, 0);
+  }
+}
+
+function renderTabs() {
+  const nav = document.getElementById('tabNav');
+  nav.innerHTML = PAGES.map(p => \`
+    <button onclick="activePageId='\${p.id}'; render();" class="tab-btn \${p.id === activePageId ? 'active' : 'text-slate-400 hover:text-white'} px-4 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap">
+      \${p.title}
+    </button>
+  \`).join('');
+}
+
+function renderWidgets() {
+  const container = document.getElementById('pageContent');
+  const page = PAGES.find(p => p.id === activePageId);
+  Object.keys(chartInstances).forEach(id => { if (chartInstances[id]) chartInstances[id].destroy(); });
+  chartInstances = {};
+
+  if (!page || !page.widgets.length) {
+    container.innerHTML = \`<div class="bg-white rounded-xl p-12 text-center border border-slate-200 text-xs text-slate-500">Tidak ada widget di halaman ini.</div>\`;
+    return;
+  }
+
+  container.innerHTML = \`<div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="widgetGrid"></div>\`;
+  const grid = document.getElementById('widgetGrid');
+
+  page.widgets.forEach(w => {
+    const widgetEl = document.createElement('div');
+    const gridSpanClass = w.size === 'full' ? 'col-span-1 md:col-span-2' : 'col-span-1';
+
+    if (w.type === 'kpi') {
+      const aggregated = aggregateData(DATA, w.groupCol, w.valueCol, w.agg);
+      widgetEl.className = \`\${gridSpanClass} bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between\`;
+      const totalVal = aggregated.values.reduce((a, b) => a + b, 0);
+      widgetEl.innerHTML = \`
+        <div>
+          <span class="text-[10px] font-bold tracking-wider text-slate-400 uppercase">\${w.title} (\${w.agg})</span>
+          <div class="text-3xl font-extrabold text-slate-900 mt-1">\${totalVal.toLocaleString('id', { maximumFractionDigits: 2 })}</div>
+          <span class="text-[11px] text-slate-500 mt-1 block">Berdasarkan \${aggregated.labels.length} kelompok (\${w.groupCol})</span>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+          <i class="fa-solid fa-calculator"></i>
+        </div>
+      \`;
+      grid.appendChild(widgetEl);
+    } else if (w.type === 'table') {
+      const aggregated = aggregateData(DATA, w.groupCol, w.valueCol, w.agg);
+      widgetEl.className = \`\${gridSpanClass} bg-white rounded-xl p-5 border border-slate-200 shadow-sm\`;
+      let tableHTML = \`
+        <h3 class="text-xs font-bold text-slate-800 mb-3">\${w.title}</h3>
+        <div class="overflow-x-auto max-h-72">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50 sticky top-0">
+                <th class="py-2 px-3 font-semibold text-slate-600">\${w.groupCol}</th>
+                <th class="py-2 px-3 font-semibold text-slate-600 text-right">\${w.valueCol} (\${w.agg})</th>
+              </tr>
+            </thead>
+            <tbody>
+      \`;
+      aggregated.labels.forEach((lbl, idx) => {
+        tableHTML += \`
+          <tr class="border-b border-slate-100 hover:bg-slate-50">
+            <td class="py-2 px-3 font-medium text-slate-800">\${lbl}</td>
+            <td class="py-2 px-3 text-right font-mono text-slate-700">\${aggregated.values[idx].toLocaleString('id', { maximumFractionDigits: 2 })}</td>
+          </tr>
+        \`;
+      });
+      tableHTML += \`</tbody></table></div>\`;
+      widgetEl.innerHTML = tableHTML;
+      grid.appendChild(widgetEl);
+    } else if (w.type === 'infotable') {
+      const multiData = aggregateMultiData(DATA, w.groupCols, w.valueCol, w.agg);
+      widgetEl.className = \`\${gridSpanClass} bg-white rounded-xl p-5 border border-slate-200 shadow-sm\`;
+      let headers = multiData.groupCols.map(c => \`<th class="py-2 px-3 font-semibold text-slate-600">\${c}</th>\`).join('');
+      let tableHTML = \`
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-xs font-bold text-slate-800">\${w.title}</h3>
+          <span class="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded border border-blue-200">Info Table</span>
+        </div>
+        <div class="overflow-x-auto max-h-72">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50 sticky top-0">
+                \${headers}
+                <th class="py-2 px-3 font-semibold text-slate-600 text-right">\${w.valueCol} (\${w.agg})</th>
+              </tr>
+            </thead>
+            <tbody>
+      \`;
+      multiData.rows.forEach(r => {
+        let colsHTML = r.keys.map(k => \`<td class="py-2 px-3 font-medium text-slate-800">\${k}</td>\`).join('');
+        tableHTML += \`
+          <tr class="border-b border-slate-100 hover:bg-slate-50">
+            \${colsHTML}
+            <td class="py-2 px-3 text-right font-mono font-semibold text-blue-700">\${r.value.toLocaleString('id', { maximumFractionDigits: 2 })}</td>
+          </tr>
+        \`;
+      });
+      tableHTML += \`</tbody></table></div>\`;
+      widgetEl.innerHTML = tableHTML;
+      grid.appendChild(widgetEl);
+    } else {
+      const aggregated = aggregateData(DATA, w.groupCol, w.valueCol, w.agg);
+      widgetEl.className = \`\${gridSpanClass} bg-white rounded-xl p-5 border border-slate-200 shadow-sm\`;
+      const canvasId = \`chart_\${w.id}\`;
+      widgetEl.innerHTML = \`
+        <h3 class="text-xs font-bold text-slate-800 mb-3">\${w.title}</h3>
+        <div class="h-64 relative">
+          <canvas id="\${canvasId}"></canvas>
+        </div>
+      \`;
+      grid.appendChild(widgetEl);
+
+      setTimeout(() => {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        const colors = ['#1d4ed8', '#d4a017', '#1a8a52', '#7c3aed', '#c0392b', '#0284c7', '#ea580c'];
+        chartInstances[w.id] = new Chart(ctx, {
+          type: w.type === 'pie' ? 'doughnut' : w.type,
+          data: {
+            labels: aggregated.labels,
+            datasets: [{
+              label: \`\${w.valueCol} (\${w.agg})\`,
+              data: aggregated.values,
+              backgroundColor: w.type === 'pie' ? colors : 'rgba(29, 78, 216, 0.85)',
+              borderColor: w.type === 'line' ? '#1d4ed8' : '#ffffff',
+              borderRadius: w.type === 'bar' ? 6 : 0,
+              fill: w.type === 'line' ? false : true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: w.type === 'pie', position: 'bottom' } },
+            scales: w.type !== 'pie' ? { y: { beginAtZero: true }, x: { grid: { display: false } } } : {}
+          }
+        });
+      }, 50);
+    }
+  });
+}
+
+function render() {
+  renderTabs();
+  renderWidgets();
+}
+
+window.onload = render;
+<\/script>
+</body>
+</html>`;
+
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `dashboard_${Date.now()}.html`;
+            a.click();
+            showToast('File HTML5 Standalone berhasil diekspor!', 'success');
+        }
+    </script>
+</body>
+</html>

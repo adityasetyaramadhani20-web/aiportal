@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="id">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+		<title>Kanvas</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+		
+		<!-- Pustaka Eksternal Tambahan -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
+		
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						fontFamily: { sans: ['Inter', 'sans-serif'] },
+						colors: {
+							dark: { 900: '#0f172a', 800: '#1e293b', 700: '#334155' },
+							brand: { 500: '#6366f1', 600: '#4f46e5' }
+						},
+						animation: { 'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite', }
+					}
+				}
+			}
+		</script>
+		<style>
+			body { overscroll-behavior: none; }
+			::-webkit-scrollbar { width: 6px; height: 6px; }
+			::-webkit-scrollbar-track { background: #1e293b; }
+			::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+			
+			.custom-range { -webkit-appearance: none; width: 100%; height: 6px; background: #334155; border-radius: 5px; outline: none; }
+			.custom-range::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; background: #6366f1; border-radius: 50%; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 10px rgba(99, 102, 241, 0.5); transition: transform 0.1s; }
+			.custom-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+			
+			.cursor-pen { cursor: crosshair; } .cursor-eraser { cursor: cell; }
+			.glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+			.tab-btn.active { color: #ffffff; border-bottom: 2px solid #6366f1; }
+			.nav-mode.active { background-color: #4f46e5; color: white; }
+			
+			.checkerboard {
+            background-image: linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+            background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+			}
+			.img-selector-thumb { cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+			.img-selector-thumb.selected { border-color: #6366f1; transform: scale(1.05); }
+			.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+			.custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+		</style>
+	</head>
+	<body class="bg-dark-900 text-slate-200 h-screen w-screen overflow-hidden flex flex-col">
+		
+		<!-- Header -->
+		<header class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-dark-900 z-30 shrink-0">
+			<div class="flex items-center gap-4">
+				<div class="flex items-center gap-2">
+					<div class="w-8 h-8 bg-gradient-to-br from-brand-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+						<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+					</div>
+					<h1 class="text-xl font-bold tracking-tight text-white hidden sm:block">Kanvas</h1>
+				</div>
+				
+				<!-- Mode Switcher -->
+				<div class="hidden md:flex bg-dark-800 rounded-full p-1 border border-gray-700 ml-4">
+					<button onclick="switchMode('editor')" id="nav-editor" class="nav-mode active px-4 py-1.5 rounded-full text-xs font-semibold text-gray-400 hover:text-white transition flex items-center gap-2">
+						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+						Editor
+					</button>
+					<button onclick="switchMode('collage')" id="nav-collage" class="nav-mode px-4 py-1.5 rounded-full text-xs font-semibold text-gray-400 hover:text-white transition flex items-center gap-2">
+						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+						Kolase
+					</button>
+					<button onclick="switchMode('whiteboard')" id="nav-whiteboard" class="nav-mode px-4 py-1.5 rounded-full text-xs font-semibold text-gray-400 hover:text-white transition flex items-center gap-2">
+						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+						Whiteboard
+					</button>
+				</div>
+			</div>
+			
+			<!-- Action Buttons -->
+			<div class="flex gap-2 sm:gap-3" id="header-actions">
+				<!-- Global Action: Toggle Gallery & Upload -->
+				<button onclick="toggleGallery()" class="px-3 sm:px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-full text-sm font-medium transition flex items-center gap-2 border border-gray-700 text-gray-300">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+					<span class="hidden sm:inline">Galeri</span>
+				</button>
+				
+				<label class="cursor-pointer px-3 sm:px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-full text-sm font-medium transition flex items-center gap-2 border border-gray-700 text-gray-300">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+					<span class="hidden sm:inline">Tambah Foto</span>
+					<input type="file" id="upload-input" accept="image/*" multiple class="hidden">
+				</label>
+				
+				<!-- Mode Specific Actions -->
+				<div id="actions-editor" class="flex gap-3">
+					<button id="download-editor-btn" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-full text-sm font-bold shadow-lg shadow-brand-500/20 transition flex items-center gap-2">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+						<span class="hidden sm:inline">Simpan</span>
+					</button>
+				</div>
+				
+				<div id="actions-collage" class="hidden gap-3">
+					<button onclick="downloadCollage()" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-full text-sm font-bold shadow-lg shadow-brand-500/20 transition flex items-center gap-2">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+						<span class="hidden sm:inline">Unduh Kolase</span>
+					</button>
+				</div>
+				
+				<div id="actions-whiteboard" class="hidden gap-3">
+					<button id="clear-board-btn" class="px-4 py-2 text-red-400 hover:text-red-300 font-medium text-sm transition">Hapus</button>
+					<button id="download-board-btn" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-full text-sm font-bold shadow-lg shadow-brand-500/20 transition flex items-center gap-2">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+						<span class="hidden sm:inline">Simpan</span>
+					</button>
+				</div>
+			</div>
+		</header>
+		
+		<!-- MAIN CONTENT WRAPPER -->
+		<main class="flex-1 relative overflow-hidden flex flex-col">
+			
+			<!-- ==================== MODE 1: PHOTO EDITOR ==================== -->
+			<div id="view-editor" class="w-full flex-1 flex overflow-hidden relative">
+				<aside class="w-80 bg-dark-800 border-r border-gray-800 flex flex-col z-10 shadow-xl h-full overflow-hidden shrink-0 pb-16">
+					<!-- Tabs -->
+					<div class="flex border-b border-gray-700 overflow-x-auto custom-scrollbar shrink-0">
+						<button class="px-4 py-3 text-[10px] sm:text-xs font-semibold text-gray-400 hover:text-white transition tab-btn active shrink-0" data-tab="adjust">ADJUST</button>
+						<button class="px-4 py-3 text-[10px] sm:text-xs font-semibold text-gray-400 hover:text-white transition tab-btn shrink-0" data-tab="filters">FILTERS</button>
+						<button class="px-4 py-3 text-[10px] sm:text-xs font-semibold text-gray-400 hover:text-white transition tab-btn shrink-0" data-tab="text">TEXT</button>
+						<button class="px-4 py-3 text-[10px] sm:text-xs font-semibold text-gray-400 hover:text-white transition tab-btn shrink-0" data-tab="size">SIZE</button>
+						<button class="px-4 py-3 text-[10px] sm:text-xs font-semibold text-gray-400 hover:text-white transition tab-btn shrink-0" data-tab="crop">CROP</button>
+						<button class="px-4 py-3 text-[10px] sm:text-xs font-semibold text-gray-400 hover:text-white transition tab-btn shrink-0" data-tab="color">COLOR</button>
+						<button class="px-4 py-3 text-[10px] sm:text-xs font-semibold text-gray-400 hover:text-white transition tab-btn shrink-0" data-tab="split">SPLIT</button>
+					</div>
+					
+					<div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scroll">
+						<!-- Adjust Tab -->
+						<div id="tab-adjust" class="tab-content space-y-5">
+							<div class="control-group"><div class="flex justify-between mb-2"><label class="text-xs text-gray-300">Kecerahan</label><span class="text-xs text-brand-500" id="val-brightness">100%</span></div><input type="range" class="custom-range" id="brightness" min="0" max="200" value="100"></div>
+							<div class="control-group"><div class="flex justify-between mb-2"><label class="text-xs text-gray-300">Kontras</label><span class="text-xs text-brand-500" id="val-contrast">100%</span></div><input type="range" class="custom-range" id="contrast" min="0" max="200" value="100"></div>
+							<div class="control-group"><div class="flex justify-between mb-2"><label class="text-xs text-gray-300">Saturasi</label><span class="text-xs text-brand-500" id="val-saturation">100%</span></div><input type="range" class="custom-range" id="saturation" min="0" max="200" value="100"></div>
+							<div class="control-group"><div class="flex justify-between mb-2"><label class="text-xs text-gray-300">Sepia</label><span class="text-xs text-brand-500" id="val-sepia">0%</span></div><input type="range" class="custom-range" id="sepia" min="0" max="100" value="0"></div>
+							<div class="control-group"><div class="flex justify-between mb-2"><label class="text-xs text-gray-300">Hue</label><span class="text-xs text-brand-500" id="val-hue">0°</span></div><input type="range" class="custom-range" id="hue" min="0" max="360" value="0"></div>
+							<div class="p-3 bg-gray-700/30 rounded-lg space-y-4">
+								<h3 class="text-xs font-bold text-gray-400 uppercase">Efek Khusus</h3>
+								<div class="control-group"><div class="flex justify-between mb-2"><label class="text-xs text-gray-300">Blur</label><span class="text-xs text-brand-500" id="val-blur">0px</span></div><input type="range" class="custom-range" id="blur" min="0" max="20" value="0"></div>
+								<div class="control-group"><div class="flex justify-between mb-2"><label class="text-xs text-gray-300">Pixelate</label><span class="text-xs text-brand-500" id="val-pixelate">0</span></div><input type="range" class="custom-range" id="pixelate" min="0" max="50" value="0" step="1"></div>
+								<div class="control-group"><div class="flex justify-between mb-2"><label class="text-xs text-gray-300">Grayscale</label><span class="text-xs text-brand-500" id="val-grayscale">0%</span></div><input type="range" class="custom-range" id="grayscale" min="0" max="100" value="0"></div>
+								<div class="control-group"><div class="flex justify-between mb-2"><label class="text-xs text-gray-300">Invert</label><span class="text-xs text-brand-500" id="val-invert">0%</span></div><input type="range" class="custom-range" id="invert" min="0" max="100" value="0"></div>
+							</div>
+							<button id="reset-adjust" class="w-full py-2 border border-red-500 text-red-500 rounded-lg text-xs font-bold hover:bg-red-500/10 transition mt-4">Reset Adjustment</button>
+						</div>
+						
+						<div id="tab-filters" class="tab-content hidden grid grid-cols-2 gap-3"></div>
+						
+						<div id="tab-text" class="tab-content hidden space-y-4">
+							<div class="bg-gray-700/50 p-3 rounded-lg"><input type="text" id="text-content" placeholder="Ketik sesuatu..." class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-2 text-sm text-white focus:border-brand-500 outline-none"></div>
+							<div class="grid grid-cols-2 gap-2">
+								<div><label class="text-xs text-gray-400">Ukuran</label><input type="number" id="text-size" value="40" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"></div>
+								<div><label class="text-xs text-gray-400">Warna</label><input type="color" id="text-color" value="#ffffff" class="w-full h-8 bg-transparent cursor-pointer rounded"></div>
+							</div>
+							<div><label class="text-xs text-gray-400">Posisi Y</label><input type="range" id="text-y" class="custom-range" min="0" max="100" value="50"></div>
+							<div><label class="text-xs text-gray-400">Posisi X</label><input type="range" id="text-x" class="custom-range" min="0" max="100" value="50"></div>
+						</div>
+						
+						<div id="tab-size" class="tab-content hidden space-y-4">
+							<div class="bg-gray-700/30 p-4 rounded-xl">
+								<h3 class="text-xs font-bold text-gray-300 uppercase mb-3">Resize (Pixel)</h3>
+								<div class="flex gap-2 items-center mb-2">
+									<input type="number" id="resize-w" placeholder="W" class="w-1/2 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white">
+									<span class="text-gray-500">x</span>
+									<input type="number" id="resize-h" placeholder="H" class="w-1/2 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white">
+								</div>
+								<button id="apply-resize" class="w-full py-2 bg-brand-600 hover:bg-brand-500 rounded text-xs font-bold text-white transition">Terapkan Ukuran</button>
+							</div>
+							<div class="bg-gray-700/30 p-4 rounded-xl">
+								<h3 class="text-xs font-bold text-gray-300 uppercase mb-3">Rotasi</h3>
+								<div class="flex gap-2">
+									<button id="rotate-left" class="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-600 text-gray-300 transition">↺ -90°</button>
+									<button id="rotate-right" class="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-600 text-gray-300 transition">↻ +90°</button>
+								</div>
+							</div>
+							<div class="bg-gray-700/30 p-4 rounded-xl">
+								<h3 class="text-xs font-bold text-gray-300 uppercase mb-3">Flip</h3>
+								<div class="flex gap-2">
+									<button id="flip-h" class="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-600 text-gray-300 transition">↔ Hor</button>
+									<button id="flip-v" class="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-600 text-gray-300 transition">↕ Ver</button>
+								</div>
+							</div>
+						</div>
+						
+						<!-- Crop Tab (Restored Ratios) -->
+						<div id="tab-crop" class="tab-content hidden space-y-4">
+							<label class="text-xs text-gray-400">Rasio Aspek</label>
+							<div class="grid grid-cols-3 gap-2 mb-4">
+								<button onclick="setCropRatio(NaN)" class="py-2 bg-gray-800 hover:bg-brand-600 rounded text-xs text-white border border-gray-600 transition">Bebas</button>
+								<button onclick="setCropRatio(1)" class="py-2 bg-gray-800 hover:bg-brand-600 rounded text-xs text-white border border-gray-600 transition">1:1</button>
+								<button onclick="setCropRatio(4/3)" class="py-2 bg-gray-800 hover:bg-brand-600 rounded text-xs text-white border border-gray-600 transition">4:3</button>
+								<button onclick="setCropRatio(3/4)" class="py-2 bg-gray-800 hover:bg-brand-600 rounded text-xs text-white border border-gray-600 transition">3:4</button>
+								<button onclick="setCropRatio(16/9)" class="py-2 bg-gray-800 hover:bg-brand-600 rounded text-xs text-white border border-gray-600 transition">16:9</button>
+								<button onclick="setCropRatio(9/16)" class="py-2 bg-gray-800 hover:bg-brand-600 rounded text-xs text-white border border-gray-600 transition">9:16</button>
+								<button onclick="setCropRatio(3/2)" class="py-2 bg-gray-800 hover:bg-brand-600 rounded text-xs text-white border border-gray-600 transition">3:2</button>
+								<button onclick="setCropRatio(2/3)" class="py-2 bg-gray-800 hover:bg-brand-600 rounded text-xs text-white border border-gray-600 transition">2:3</button>
+								<button onclick="setCropRatio(21/9)" class="py-2 bg-gray-800 hover:bg-brand-600 rounded text-xs text-white border border-gray-600 transition">21:9</button>
+							</div>
+							<button id="btn-apply-crop" class="w-full py-2 bg-brand-600 hover:bg-brand-500 rounded text-xs font-bold text-white transition">Terapkan & Simpan Baru</button>
+						</div>
+						
+						<!-- Color Tab (Restored Export PNG) -->
+						<div id="tab-color" class="tab-content hidden space-y-4">
+							<button onclick="extractColors()" class="w-full py-2 bg-brand-600 hover:bg-brand-500 rounded text-xs font-bold text-white transition mb-2">Ambil Palet Warna</button>
+							<button onclick="downloadPalette()" id="btn-download-palette" class="w-full py-2 border border-gray-500 text-gray-300 hover:text-white hover:bg-gray-700 rounded text-xs font-bold transition mb-4 hidden flex justify-center gap-2">Unduh Palet (PNG)</button>
+							<div id="palette-container" class="space-y-2">
+								<p class="text-xs text-gray-400 text-center italic">Klik tombol di atas untuk memproses</p>
+							</div>
+						</div>
+						
+						<div id="tab-split" class="tab-content hidden space-y-4">
+							<label class="text-xs text-gray-400">Format Grid</label>
+							<select id="split-format" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-2 text-sm text-white mb-4 outline-none focus:border-brand-500" onchange="updateSplitPreview()">
+								<option value="3x3">3x3 (9 Kotak)</option><option value="3x2">3x2 (6 Kotak)</option><option value="3x1">3x1 (3 Kotak)</option><option value="2x2">2x2 (4 Kotak)</option>
+							</select>
+							<button onclick="processAndDownloadSplit()" class="w-full py-2 bg-brand-600 hover:bg-brand-500 rounded text-xs font-bold text-white transition">Unduh Semua Potongan</button>
+						</div>
+					</div>
+				</aside>
+				
+				<!-- Editor Center -->
+				<div class="flex-1 relative bg-dark-900 overflow-hidden flex items-center justify-center pb-16" id="editor-canvas-wrapper" style="background-image: radial-gradient(#334155 1px, transparent 1px); background-size: 20px 20px;">
+					<div id="placeholder-state" class="text-center p-10 glass-panel rounded-2xl shadow-2xl flex flex-col items-center animate-pulse-slow">
+						<div class="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-gray-600">
+							<svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+						</div>
+						<h2 class="text-2xl font-bold text-white mb-2">Mulai Mengedit</h2>
+						<p class="text-gray-400 mb-6 text-sm">Klik "Galeri" atau "Tambah Foto" di atas.</p>
+					</div>
+					<canvas id="main-canvas" class="shadow-2xl hidden transition-all duration-200 ease-out"></canvas>
+					<div id="cropper-wrapper" class="hidden absolute inset-4 flex items-center justify-center checkerboard rounded-xl overflow-hidden shadow-2xl z-10"><img id="cropper-image" src="" class="max-h-full max-w-full hidden"></div>
+					<div id="split-wrapper" class="hidden absolute inset-4 flex items-center justify-center checkerboard rounded-xl overflow-hidden shadow-2xl z-10"><canvas id="split-canvas" class="max-w-full max-h-[80%] bg-dark-800 shadow-lg border border-gray-600"></canvas></div>
+					<div id="zoom-controls" class="hidden absolute bottom-24 left-1/2 transform -translate-x-1/2 glass-panel px-4 py-2 rounded-full flex items-center gap-4 shadow-xl z-10">
+						<button id="zoom-out" class="text-gray-300 hover:text-white font-bold text-xl">-</button><span class="text-xs font-mono text-brand-500" id="zoom-level">100%</span><button id="zoom-in" class="text-gray-300 hover:text-white font-bold text-xl">+</button>
+						<div class="w-px h-4 bg-gray-600 mx-2"></div><button id="fit-screen" class="text-xs text-gray-300 hover:text-white uppercase font-bold">Fit</button>
+					</div>
+				</div>
+			</div>
+			
+			<!-- ==================== MODE 2: KOLASE ==================== -->
+			<div id="view-collage" class="hidden w-full flex-1 flex flex-col bg-dark-900 overflow-hidden relative">
+				<div class="p-4 bg-dark-800 border-b border-gray-700 flex justify-between items-center z-10">
+					<div class="text-sm text-gray-300">
+						<span class="font-bold text-white">Pembuat Kolase</span> (Menggunakan maks 16 foto dari galeri)
+					</div>
+					<div class="flex gap-2">
+						<select id="collage-cols" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white outline-none" onchange="renderCollage()">
+							<option value="1">1 Kolom</option><option value="2" selected>2 Kolom</option><option value="3">3 Kolom</option><option value="4">4 Kolom</option>
+						</select>
+						<select id="collage-gap" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white outline-none" onchange="renderCollage()">
+							<option value="0">Tanpa Jarak</option><option value="10" selected>Jarak Kecil</option><option value="20">Jarak Sedang</option><option value="40">Jarak Besar</option>
+						</select>
+					</div>
+				</div>
+				<div class="flex-1 flex justify-center items-center checkerboard overflow-auto p-4 pb-24 relative">
+					<canvas id="collage-canvas" class="max-w-full h-auto bg-white shadow-2xl border border-gray-700"></canvas>
+					<div id="collage-empty" class="absolute flex flex-col items-center text-gray-500">
+						<svg class="w-16 h-16 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+						<p>Tambahkan foto ke Galeri terlebih dahulu</p>
+					</div>
+				</div>
+			</div>
+			
+			<!-- ==================== MODE 3: WHITEBOARD ==================== -->
+			<div id="view-whiteboard" class="hidden w-full flex-1 relative bg-white cursor-pen">
+				<canvas id="drawingBoard" class="block touch-none"></canvas>
+				<div class="absolute top-6 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm border border-gray-200 shadow-2xl rounded-2xl p-4 flex flex-col md:flex-row items-center gap-4 w-[90%] md:w-auto max-w-2xl transition-all z-40">
+					<div class="flex items-center gap-2 border-b md:border-b-0 md:border-r border-gray-300 pb-2 md:pb-0 md:pr-4 w-full md:w-auto justify-center">
+						<button id="btnPen" class="p-3 rounded-xl bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition" title="Pensil"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
+						<button id="btnEraser" class="p-3 rounded-xl hover:bg-gray-100 text-gray-600 transition" title="Penghapus"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16C2 15 2 13 3 12L13 2L22 11L20 20Z"></path><path d="M17 17L7 7"></path></svg></button>
+					</div>
+					<div class="flex items-center gap-3 border-b md:border-b-0 md:border-r border-gray-300 pb-2 md:pb-0 md:pr-4 justify-center" id="colorPalette">
+						<button class="w-8 h-8 rounded-full bg-black ring-2 ring-offset-2 ring-indigo-500 transition" data-color="#000000"></button>
+						<button class="w-8 h-8 rounded-full bg-red-500 hover:scale-110 transition" data-color="#EF4444"></button>
+						<button class="w-8 h-8 rounded-full bg-blue-500 hover:scale-110 transition" data-color="#3B82F6"></button>
+						<div class="relative w-8 h-8 group"><input type="color" id="customColor" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"><div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 via-purple-600 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg></div></div>
+					</div>
+					<div class="flex items-center gap-2 w-full md:w-32">
+						<input type="range" id="brushSize" min="1" max="50" value="5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+					</div>
+				</div>
+			</div>
+			
+			<!-- Drawer Galeri (Bawah) -->
+			<div id="gallery-drawer" class="absolute bottom-0 left-0 right-0 h-24 bg-dark-800 border-t border-gray-700 py-2 px-4 shadow-2xl z-50 flex flex-col transition-transform duration-300 transform translate-y-0">
+				<div class="flex justify-between items-center mb-2">
+					<h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Galeri Cache (Klik untuk edit)</h3>
+					<div class="flex gap-4 items-center">
+						<span class="text-xs text-gray-500" id="gallery-count">0 foto</span>
+						<button onclick="toggleGallery()" class="text-gray-400 hover:text-white text-xs">Sembunyikan ▼</button>
+					</div>
+				</div>
+				<div class="flex gap-3 overflow-x-auto pb-2 custom-scrollbar items-center" id="gallery-container">
+					<!-- Thumbnail -->
+					<div class="text-sm text-gray-500 italic">Belum ada foto...</div>
+				</div>
+			</div>
+			
+		</main>
+		
+		<div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-xs shadow-xl opacity-0 transition-opacity duration-300 pointer-events-none z-50 border border-gray-600">Selesai</div>
+		
+		<script>
+			function showToast(msg) {
+				const t = document.getElementById('toast'); t.textContent = msg;
+				t.classList.remove('opacity-0'); setTimeout(() => t.classList.add('opacity-0'), 2000);
+			}
+			
+			// --- NAVIGATION & MODE SWITCHING ---
+			let currentMode = 'editor';
+			const views = { editor: document.getElementById('view-editor'), collage: document.getElementById('view-collage'), whiteboard: document.getElementById('view-whiteboard') };
+			const navBtns = { editor: document.getElementById('nav-editor'), collage: document.getElementById('nav-collage'), whiteboard: document.getElementById('nav-whiteboard') };
+			const actions = { editor: document.getElementById('actions-editor'), collage: document.getElementById('actions-collage'), whiteboard: document.getElementById('actions-whiteboard') };
+			
+			function switchMode(mode) {
+				currentMode = mode;
+				Object.keys(views).forEach(k => {
+					if (k === mode) {
+						views[k].classList.remove('hidden'); navBtns[k].classList.add('active'); 
+						if(actions[k]) { actions[k].classList.remove('hidden'); actions[k].classList.add('flex'); }
+						} else {
+						views[k].classList.add('hidden'); navBtns[k].classList.remove('active'); 
+						if(actions[k]) { actions[k].classList.add('hidden'); actions[k].classList.remove('flex'); }
+					}
+				});
+				if (mode === 'whiteboard') { resizeWhiteboard(); document.body.classList.replace('bg-dark-900', 'bg-white'); } 
+				else { document.body.classList.replace('bg-white', 'bg-dark-900'); }
+				
+				if (mode === 'collage') renderCollage();
+			}
+			
+			function toggleGallery() {
+				const drawer = document.getElementById('gallery-drawer');
+				if (drawer.classList.contains('translate-y-full')) {
+					drawer.classList.remove('translate-y-full'); // Show
+					} else {
+					drawer.classList.add('translate-y-full'); // Hide
+				}
+			}
+			
+			// ==========================================
+			// DATABASE & CACHING (INDEXEDDB)
+			// ==========================================
+			const dbName = "KanvasProDB";
+			let db;
+			let galleryImages = []; // Array of {id, src}
+			
+			function initDB() {
+				return new Promise((resolve, reject) => {
+					const request = indexedDB.open(dbName, 1);
+					request.onupgradeneeded = (e) => {
+						db = e.target.result;
+						if (!db.objectStoreNames.contains('images')) db.createObjectStore('images', { keyPath: 'id' });
+					};
+					request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+					request.onerror = (e) => reject(e);
+				});
+			}
+			function saveImageToDB(imgObj) {
+				if (!db) return; const tx = db.transaction('images', 'readwrite'); tx.objectStore('images').put(imgObj);
+			}
+			function deleteImageFromDB(id) {
+				if (!db) return; const tx = db.transaction('images', 'readwrite'); tx.objectStore('images').delete(id);
+			}
+			function loadImagesFromDB() {
+				return new Promise((resolve) => {
+					if (!db) return resolve([]);
+					const tx = db.transaction('images', 'readonly');
+					const request = tx.objectStore('images').getAll();
+					request.onsuccess = () => resolve(request.result || []);
+				});
+			}
+			
+			// ==========================================
+			// GALLERY & MULTI-UPLOAD LOGIC
+			// ==========================================
+			document.getElementById('upload-input').addEventListener('change', function(e) {
+				const files = e.target.files; if (!files.length) return;
+				document.getElementById('gallery-drawer').classList.remove('translate-y-full'); // Pastikan drawer terbuka
+				
+				Array.from(files).forEach(file => {
+					const reader = new FileReader();
+					reader.onload = (event) => {
+						const id = 'img_' + Date.now() + Math.floor(Math.random() * 1000);
+						const newImg = { id: id, src: event.target.result };
+						galleryImages.push(newImg);
+						saveImageToDB(newImg);
+						renderGalleryUI();
+						
+						if (galleryImages.length === 1 && currentMode === 'editor') loadIntoWorkspace(newImg);
+						if (currentMode === 'collage') renderCollage();
+					};
+					reader.readAsDataURL(file);
+				});
+				this.value = null; 
+			});
+			
+			function renderGalleryUI() {
+				const container = document.getElementById('gallery-container');
+				document.getElementById('gallery-count').innerText = `${galleryImages.length} foto`;
+				if(galleryImages.length === 0) { container.innerHTML = '<div class="text-sm text-gray-500 italic">Belum ada foto...</div>'; return; }
+				
+				container.innerHTML = '';
+				galleryImages.forEach(imgData => {
+					const wrapper = document.createElement('div'); wrapper.className = 'relative flex-shrink-0 group';
+					
+					const img = document.createElement('img'); img.src = imgData.src;
+					img.className = `h-16 w-16 object-cover rounded cursor-pointer img-selector-thumb ${state.image && state.image.id === imgData.id ? 'selected opacity-100' : 'opacity-70 hover:opacity-100'}`;
+					img.onclick = () => { if(currentMode === 'editor') loadIntoWorkspace(imgData); };
+					
+					const delBtn = document.createElement('button');
+					delBtn.innerHTML = '×';
+					delBtn.className = 'absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold hover:bg-red-600 shadow-sm opacity-0 group-hover:opacity-100 transition';
+					delBtn.onclick = (e) => { e.stopPropagation(); deleteFromGallery(imgData.id); };
+					
+					wrapper.appendChild(img); wrapper.appendChild(delBtn); container.appendChild(wrapper);
+				});
+			}
+			
+			function deleteFromGallery(id) {
+				galleryImages = galleryImages.filter(img => img.id !== id);
+				deleteImageFromDB(id);
+				if (state.image && state.image.id === id) {
+					state.image = null; 
+					document.getElementById('main-canvas').classList.add('hidden');
+					document.getElementById('placeholder-state').classList.remove('hidden');
+				}
+				renderGalleryUI();
+				if (currentMode === 'collage') renderCollage();
+			}
+			
+			// ==========================================
+			// EDITOR STATE & LOGIC
+			// ==========================================
+			const tempCanvas = document.createElement('canvas');
+			const state = {
+				image: null, zoom: 1,
+				filters: { brightness: 100, contrast: 100, saturation: 100, blur: 0, sepia: 0, hue: 0, grayscale: 0, invert: 0, pixelate: 0 },
+				transform: { rotate: 0, flipH: 1, flipV: 1 },
+				text: { content: '', size: 40, color: '#ffffff', x: 50, y: 50 }, resize: { w: 0, h: 0 }
+			};
+			const canvas = document.getElementById('main-canvas'); const ctx = canvas.getContext('2d');
+			let cropperInstance = null, currentTab = 'adjust', splitConfig = null, currentPalette = [];
+			
+			function render() {
+				if (!state.image || !state.image.imgElement) return;
+				canvas.width = state.resize.w; canvas.height = state.resize.h;
+				canvas.style.transform = `scale(${state.zoom})`;
+				ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save();
+				ctx.translate(canvas.width / 2, canvas.height / 2);
+				ctx.rotate(state.transform.rotate * Math.PI / 180); ctx.scale(state.transform.flipH, state.transform.flipV);
+				
+				const f = state.filters;
+				ctx.filter = `brightness(${f.brightness}%) contrast(${f.contrast}%) saturate(${f.saturation}%) blur(${f.blur}px) sepia(${f.sepia}%) hue-rotate(${f.hue}deg) grayscale(${f.grayscale}%) invert(${f.invert}%)`;
+				
+				if (f.pixelate > 0) {
+					const size = Math.max(1, f.pixelate * 2);
+					const w = Math.floor(canvas.width / size), h = Math.floor(canvas.height / size);
+					tempCanvas.width = w; tempCanvas.height = h;
+					const tempCtx = tempCanvas.getContext('2d'); tempCtx.drawImage(state.image.imgElement, 0, 0, w, h);
+					ctx.imageSmoothingEnabled = false; ctx.drawImage(tempCanvas, 0, 0, w, h, -canvas.width/2, -canvas.height/2, canvas.width, canvas.height);
+					} else {
+					ctx.imageSmoothingEnabled = true; ctx.drawImage(state.image.imgElement, -canvas.width/2, -canvas.height/2, canvas.width, canvas.height);
+				}
+				ctx.restore();
+				
+				if (state.text.content) {
+					ctx.save(); ctx.font = `bold ${state.text.size}px sans-serif`; ctx.fillStyle = state.text.color;
+					ctx.textAlign = 'center'; ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 4;
+					ctx.fillText(state.text.content, (canvas.width * state.text.x) / 100, (canvas.height * state.text.y) / 100); ctx.restore();
+				}
+			}
+			
+			function loadIntoWorkspace(imgData) {
+				const img = new Image();
+				img.onload = () => {
+					state.image = { id: imgData.id, src: imgData.src, imgElement: img };
+					state.resize.w = img.width; state.resize.h = img.height;
+					document.getElementById('resize-w').value = img.width; document.getElementById('resize-h').value = img.height;
+					state.zoom = calculateFitZoom(img.width, img.height);
+					document.getElementById('placeholder-state').classList.add('hidden');
+					renderGalleryUI(); 
+					
+					if (['adjust', 'filters', 'text', 'size'].includes(currentTab)) {
+						document.getElementById('main-canvas').classList.remove('hidden');
+						document.getElementById('zoom-controls').classList.remove('hidden');
+						document.getElementById('zoom-controls').classList.add('flex');
+						render(); updateZoomDisplay();
+						} else {
+						document.querySelector(`.tab-btn[data-tab="${currentTab}"]`).click();
+					}
+				};
+				img.src = imgData.src;
+			}
+			
+			// Tab Handling
+			document.querySelectorAll('.tab-btn').forEach(btn => {
+				btn.addEventListener('click', () => {
+					document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active', 'text-white', 'border-b-2', 'border-brand-500'));
+					document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+					btn.classList.add('active', 'text-white', 'border-b-2', 'border-brand-500');
+					document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+					currentTab = btn.dataset.tab;
+					
+					document.getElementById('main-canvas').classList.add('hidden');
+					document.getElementById('cropper-wrapper').classList.add('hidden');
+					document.getElementById('split-wrapper').classList.add('hidden');
+					document.getElementById('zoom-controls').classList.add('hidden');
+					
+					if(state.image) {
+						if(currentTab === 'crop') { document.getElementById('cropper-wrapper').classList.remove('hidden'); setupCropper(state.image.src); } 
+						else if (currentTab === 'split') { document.getElementById('split-wrapper').classList.remove('hidden'); setupSplit(state.image.src); } 
+						else {
+							document.getElementById('main-canvas').classList.remove('hidden'); document.getElementById('zoom-controls').classList.remove('hidden'); document.getElementById('zoom-controls').classList.add('flex');
+							if(cropperInstance) { cropperInstance.destroy(); cropperInstance = null; } render();
+						}
+					}
+				});
+			});
+			
+			// Editor Binds
+			function bind(id, cat, key, suffix='') {
+				const el = document.getElementById(id); if(!el) return;
+				el.addEventListener('input', (e) => { state[cat][key] = parseFloat(e.target.value); const disp = document.getElementById(`val-${id}`); if(disp) disp.textContent = e.target.value + suffix; render(); });
+			}
+			['brightness','contrast','saturation','blur','sepia','hue','pixelate','grayscale','invert'].forEach(k => { let suf = '%'; if(k==='blur')suf='px'; if(k==='hue')suf='°'; if(k==='pixelate')suf=''; bind(k, 'filters', k, suf); });
+			document.getElementById('text-content').addEventListener('input', (e) => { state.text.content = e.target.value; render(); });
+			document.getElementById('text-size').addEventListener('input', (e) => { state.text.size = e.target.value; render(); });
+			document.getElementById('text-color').addEventListener('input', (e) => { state.text.color = e.target.value; render(); });
+			bind('text-x', 'text', 'x'); bind('text-y', 'text', 'y');
+			document.getElementById('rotate-left').addEventListener('click', () => { state.transform.rotate -= 90; render(); });
+			document.getElementById('rotate-right').addEventListener('click', () => { state.transform.rotate += 90; render(); });
+			document.getElementById('flip-h').addEventListener('click', () => { state.transform.flipH *= -1; render(); });
+			document.getElementById('flip-v').addEventListener('click', () => { state.transform.flipV *= -1; render(); });
+			document.getElementById('apply-resize').addEventListener('click', () => { const w = parseInt(document.getElementById('resize-w').value), h = parseInt(document.getElementById('resize-h').value); if(w > 0 && h > 0) { state.resize.w = w; state.resize.h = h; render(); showToast(`Diubah ke ${w}x${h}`); } });
+			
+			const presets = { 'Normal': {}, 'Classic B&W': { grayscale: 100 }, 'Sepia': { sepia: 100 }, 'Invert': { invert: 100 }, 'Pixelize': { pixelate: 10 }, 'Vintage': { sepia: 40, contrast: 120, brightness: 90, saturation: 80 }, 'Lomo': { contrast: 140, saturation: 130 }, 'Techno': { invert: 10, hue: 180, contrast: 130 }, 'Cyberpunk': { hue: 280, saturation: 200, contrast: 110 }, 'Night Vision': { hue: 100, brightness: 80, contrast: 120, saturation: 50 }, 'Warm': { hue: 10, sepia: 30, saturation: 110 }, 'Cold': { hue: 200, brightness: 105, saturation: 80 }};
+			const fContainer = document.getElementById('tab-filters');
+			Object.keys(presets).forEach(k => {
+				const d = document.createElement('div'); d.className = "cursor-pointer bg-gray-700 p-2 rounded text-center text-xs hover:bg-brand-600 transition border border-gray-600 hover:border-brand-400"; d.textContent = k;
+				d.onclick = () => {
+					state.filters = { brightness: 100, contrast: 100, saturation: 100, blur: 0, sepia: 0, hue: 0, grayscale: 0, invert: 0, pixelate: 0 };
+					Object.assign(state.filters, presets[k]);
+					['brightness','contrast','saturation','blur','sepia','hue','grayscale','invert','pixelate'].forEach(i => { const el = document.getElementById(i); if(el) { el.value = state.filters[i]; el.dispatchEvent(new Event('input')); } }); render();
+				}; fContainer.appendChild(d);
+			});
+			
+			function calculateFitZoom(w, h) { const wrap = document.getElementById('editor-canvas-wrapper'); return Math.min((wrap.clientWidth-80)/w, (wrap.clientHeight-100)/h, 1); }
+			function updateZoomDisplay() { document.getElementById('zoom-level').textContent = Math.round(state.zoom*100)+'%'; canvas.style.transform = `scale(${state.zoom})`; }
+			document.getElementById('zoom-in').addEventListener('click', ()=>{ state.zoom+=0.1; updateZoomDisplay(); });
+			document.getElementById('zoom-out').addEventListener('click', ()=>{ if(state.zoom>0.1) state.zoom-=0.1; updateZoomDisplay(); });
+			document.getElementById('fit-screen').addEventListener('click', ()=>{ state.zoom = calculateFitZoom(state.resize.w, state.resize.h); updateZoomDisplay(); });
+			
+			document.getElementById('download-editor-btn').addEventListener('click', () => {
+				if(!state.image) return; const link = document.createElement('a'); link.download = `kanvas_edit_${Date.now()}.png`; link.href = canvas.toDataURL(); link.click();
+			});
+			
+			// --- Cropper ---
+			function setupCropper(src) {
+				const cropperImg = document.getElementById('cropper-image'); cropperImg.src = src; cropperImg.classList.remove('hidden');
+				if (cropperInstance) cropperInstance.destroy();
+				setTimeout(() => { cropperInstance = new Cropper(cropperImg, { viewMode: 1, dragMode: 'crop', autoCropArea: 1, guides: true, center: true }); }, 50);
+			}
+			function setCropRatio(ratio) { if (cropperInstance) cropperInstance.setAspectRatio(ratio); }
+			document.getElementById('btn-apply-crop').addEventListener('click', () => {
+				if (!cropperInstance) return; const cropCanvas = cropperInstance.getCroppedCanvas(); if (!cropCanvas) return;
+				const dataUrl = cropCanvas.toDataURL('image/png');
+				const newId = 'img_' + Date.now();
+				const newImg = { id: newId, src: dataUrl };
+				galleryImages.push(newImg); saveImageToDB(newImg); renderGalleryUI(); loadIntoWorkspace(newImg); 
+				showToast('Hasil potong disimpan ke galeri!');
+				document.querySelector('.tab-btn[data-tab="adjust"]').click(); 
+			});
+			
+			// --- Color Palette ---
+			function extractColors() {
+				if (!state.image) return;
+				const container = document.getElementById('palette-container'); const btnDl = document.getElementById('btn-download-palette');
+				container.innerHTML = '<p class="text-xs text-brand-500 text-center">Memproses...</p>'; btnDl.classList.add('hidden'); btnDl.classList.remove('flex');
+				setTimeout(() => {
+					try {
+						const colorThief = new ColorThief(); const colors = colorThief.getPalette(state.image.imgElement, 6);
+						container.innerHTML = ''; currentPalette = [];
+						colors.forEach(rgb => {
+							const hex = '#' + rgb.map(x => { const hx = x.toString(16); return hx.length === 1 ? '0' + hx : hx; }).join('').toUpperCase();
+							currentPalette.push({ hex, rgb });
+							const div = document.createElement('div'); div.className = 'flex items-center gap-2 p-2 bg-gray-800 rounded cursor-pointer hover:bg-gray-700 transition';
+							div.innerHTML = `<div class="w-6 h-6 rounded border border-gray-600" style="background-color: ${hex}"></div><div class="flex-1 text-xs font-mono text-gray-300">${hex}</div>`;
+							div.onclick = () => { navigator.clipboard.writeText(hex); showToast('Warna disalin!'); }; container.appendChild(div);
+						});
+						btnDl.classList.remove('hidden'); btnDl.classList.add('flex');
+					} catch(e) { container.innerHTML = '<p class="text-xs text-red-500 text-center">Gagal mengekstrak warna</p>'; }
+				}, 100);
+			}
+			function downloadPalette() {
+				if (!currentPalette || currentPalette.length === 0) return;
+				const pCanvas = document.createElement('canvas'); const boxSize = 80, padding = 20;
+				pCanvas.width = 400; pCanvas.height = (currentPalette.length * (boxSize + padding)) + padding + 80;
+				const pCtx = pCanvas.getContext('2d');
+				pCtx.fillStyle = '#ffffff'; pCtx.fillRect(0, 0, pCanvas.width, pCanvas.height);
+				pCtx.fillStyle = '#333333'; pCtx.font = 'bold 24px sans-serif'; pCtx.fillText("Palet Warna", padding, 40);
+				currentPalette.forEach((c, i) => {
+					const y = 80 + i * (boxSize + padding);
+					pCtx.fillStyle = c.hex; pCtx.fillRect(padding, y, boxSize, boxSize);
+					pCtx.strokeStyle = '#e2e8f0'; pCtx.lineWidth = 1; pCtx.strokeRect(padding, y, boxSize, boxSize);
+					pCtx.fillStyle = '#1e293b'; pCtx.font = 'bold 24px monospace'; pCtx.fillText(c.hex, padding + boxSize + 20, y + 35);
+					pCtx.fillStyle = '#64748b'; pCtx.font = '16px sans-serif'; pCtx.fillText(`RGB(${c.rgb.join(', ')})`, padding + boxSize + 20, y + 65);
+				});
+				const link = document.createElement('a'); link.download = `palet_warna_${Date.now()}.png`; link.href = pCanvas.toDataURL('image/png'); link.click();
+			}
+			
+			// --- Grid Split ---
+			function setupSplit(src) {
+				const img = new Image(); img.onload = () => { splitConfig = { img: img }; updateSplitPreview(); }; img.src = src;
+			}
+			function updateSplitPreview() {
+				if (!splitConfig || !splitConfig.img) return;
+				const img = splitConfig.img, canvas = document.getElementById('split-canvas'), ctx = canvas.getContext('2d');
+				const format = document.getElementById('split-format').value, [cols, rows] = format.split('x').map(Number);
+				const targetRatio = cols / rows, imgRatio = img.width / img.height;
+				let sWidth = img.width, sHeight = img.height, sx = 0, sy = 0;
+				if (imgRatio > targetRatio) { sWidth = img.height * targetRatio; sx = (img.width - sWidth) / 2; } 
+				else { sHeight = img.width / targetRatio; sy = (img.height - sHeight) / 2; }
+				
+				const previewSize = 400; let cWidth, cHeight;
+				if (targetRatio > 1) { cWidth = previewSize; cHeight = previewSize / targetRatio; } 
+				else { cHeight = previewSize; cWidth = previewSize * targetRatio; }
+				canvas.width = cWidth; canvas.height = cHeight;
+				ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, cWidth, cHeight);
+				ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2;
+				const cellW = cWidth / cols, cellH = cHeight / rows; ctx.beginPath();
+				for (let i = 1; i < cols; i++) { ctx.moveTo(i * cellW, 0); ctx.lineTo(i * cellW, cHeight); }
+				for (let i = 1; i < rows; i++) { ctx.moveTo(0, i * cellH); ctx.lineTo(cWidth, i * cellH); } ctx.stroke();
+				splitConfig = { sx, sy, sWidth, sHeight, cols, rows, img };
+			}
+			function processAndDownloadSplit() {
+				if (!splitConfig) return; const { sx, sy, sWidth, sHeight, cols, rows, img } = splitConfig;
+				const cellW = sWidth / cols, cellH = sHeight / rows;
+				const offCanvas = document.createElement('canvas'); offCanvas.width = cellW; offCanvas.height = cellH;
+				const offCtx = offCanvas.getContext('2d');
+				let index = 1; showToast('Mengizinkan Multiple Downloads...');
+				for (let r = 0; r < rows; r++) {
+					for (let c = 0; c < cols; c++) {
+						offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
+						offCtx.drawImage(img, sx + (c * cellW), sy + (r * cellH), cellW, cellH, 0, 0, offCanvas.width, offCanvas.height);
+						const link = document.createElement('a'); link.download = `split_${cols}x${rows}_${index}.png`; link.href = offCanvas.toDataURL('image/png');
+						setTimeout(() => link.click(), index * 300); index++;
+					}
+				}
+			}
+			
+			// ==========================================
+			// KOLASE LOGIC
+			// ==========================================
+			function drawImageProp(ctx, img, x, y, w, h, offsetX, offsetY) {
+				if (arguments.length === 2) { x = y = 0; w = ctx.canvas.width; h = ctx.canvas.height; }
+				offsetX = typeof offsetX === "number" ? offsetX : 0.5; offsetY = typeof offsetY === "number" ? offsetY : 0.5;
+				if (offsetX < 0) offsetX = 0; if (offsetY < 0) offsetY = 0; if (offsetX > 1) offsetX = 1; if (offsetY > 1) offsetY = 1;
+				let iw = img.width, ih = img.height, r = Math.min(w / iw, h / ih), nw = iw * r, nh = ih * r, cx = 1, cy = 1, cw = 1, ch = 1, ar = 1;
+				if (nw < w) ar = w / nw; if (Math.abs(ar - 1) < 1e-14 && nh < h) ar = h / nh; nw *= ar; nh *= ar;
+				cw = iw / (nw / w); ch = ih / (nh / h); cx = (iw - cw) * offsetX; cy = (ih - ch) * offsetY;
+				if (cx < 0) cx = 0; if (cy < 0) cy = 0; if (cw > iw) cw = iw; if (ch > ih) ch = ih;
+				ctx.drawImage(img, cx, cy, cw, ch,  x, y, w, h);
+			}
+			
+			function renderCollage() {
+				const canvas = document.getElementById('collage-canvas');
+				const emptyState = document.getElementById('collage-empty');
+				if (galleryImages.length === 0) { canvas.classList.add('hidden'); emptyState.style.display = 'flex'; return; }
+				canvas.classList.remove('hidden'); emptyState.style.display = 'none';
+				
+				const ctx = canvas.getContext('2d');
+				const imagesToDraw = galleryImages.slice(0, 16);
+				const cols = parseInt(document.getElementById('collage-cols').value);
+				const gap = parseInt(document.getElementById('collage-gap').value);
+				const rows = Math.ceil(imagesToDraw.length / cols);
+				const cellWidth = 400, cellHeight = 400;
+				canvas.width = (cols * cellWidth) + (gap * (cols + 1));
+				canvas.height = (rows * cellHeight) + (gap * (rows + 1));
+				ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+				
+				let loadedImagesCount = 0; const htmlImages = [];
+				imagesToDraw.forEach((imgData, index) => {
+					const img = new Image();
+					img.onload = () => { htmlImages[index] = img; loadedImagesCount++; if (loadedImagesCount === imagesToDraw.length) drawAllToCanvas(); };
+					img.src = imgData.src;
+				});
+				function drawAllToCanvas() {
+					htmlImages.forEach((img, index) => {
+						if (!img) return; const r = Math.floor(index / cols), c = index % cols;
+						const x = gap + (c * (cellWidth + gap)), y = gap + (r * (cellHeight + gap));
+						drawImageProp(ctx, img, x, y, cellWidth, cellHeight);
+					});
+				}
+			}
+			function downloadCollage() {
+				if(galleryImages.length === 0) return;
+				const canvas = document.getElementById('collage-canvas'); const link = document.createElement('a');
+				link.download = `kolase_${Date.now()}.png`; link.href = canvas.toDataURL('image/png'); link.click();
+			}
+			
+			
+			// ==========================================
+			// WHITEBOARD LOGIC
+			// ==========================================
+			const wbCanvas = document.getElementById('drawingBoard'); const wbCtx = wbCanvas.getContext('2d');
+			let isDrawing = false, lastX=0, lastY=0, brushColor='#000000', brushSize=5, isEraser=false;
+			
+			function resizeWhiteboard() {
+				const wrapper = document.getElementById('view-whiteboard'); if(wrapper.clientWidth === 0) return; 
+				const temp = document.createElement('canvas'); temp.width = wbCanvas.width; temp.height = wbCanvas.height;
+				if(wbCanvas.width>0) temp.getContext('2d').drawImage(wbCanvas,0,0);
+				wbCanvas.width = wrapper.clientWidth; wbCanvas.height = wrapper.clientHeight;
+				wbCtx.lineJoin = 'round'; wbCtx.lineCap = 'round';
+				if(temp.width>0) wbCtx.drawImage(temp,0,0);
+			}
+			window.addEventListener('resize', () => { if(currentMode === 'whiteboard') resizeWhiteboard(); });
+			function getCoords(e) {
+				const rect = wbCanvas.getBoundingClientRect(); let cx, cy;
+				if(e.touches && e.touches.length>0) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; } else { cx = e.clientX; cy = e.clientY; } return [cx - rect.left, cy - rect.top];
+			}
+			function startDraw(e) { isDrawing=true; [lastX, lastY] = getCoords(e); }
+			function moveDraw(e) {
+				if(!isDrawing) return; e.preventDefault(); const [cx, cy] = getCoords(e);
+				wbCtx.beginPath(); wbCtx.moveTo(lastX, lastY); wbCtx.lineTo(cx, cy);
+				if(isEraser) { wbCtx.globalCompositeOperation='destination-out'; wbCtx.lineWidth=brushSize*3; } else { wbCtx.globalCompositeOperation='source-over'; wbCtx.strokeStyle=brushColor; wbCtx.lineWidth=brushSize; }
+				wbCtx.stroke(); [lastX, lastY] = [cx, cy];
+			}
+			function stopDraw() { isDrawing=false; wbCtx.beginPath(); }
+			wbCanvas.addEventListener('mousedown', startDraw); wbCanvas.addEventListener('mousemove', moveDraw); wbCanvas.addEventListener('mouseup', stopDraw); wbCanvas.addEventListener('mouseout', stopDraw);
+			wbCanvas.addEventListener('touchstart', startDraw, {passive:false}); wbCanvas.addEventListener('touchmove', moveDraw, {passive:false}); wbCanvas.addEventListener('touchend', stopDraw);
+			
+			const colorBtns = document.querySelectorAll('#colorPalette button'), btnPen = document.getElementById('btnPen'), btnEraser = document.getElementById('btnEraser');
+			function setTool(tool) {
+				isEraser = (tool === 'eraser'); const wrapper = document.getElementById('view-whiteboard');
+				if(isEraser) { btnEraser.classList.add('bg-indigo-100','text-indigo-700'); btnPen.classList.remove('bg-indigo-100','text-indigo-700'); wrapper.classList.replace('cursor-pen', 'cursor-eraser'); showToast('Penghapus Aktif'); } 
+				else { btnPen.classList.add('bg-indigo-100','text-indigo-700'); btnEraser.classList.remove('bg-indigo-100','text-indigo-700'); wrapper.classList.replace('cursor-eraser', 'cursor-pen'); showToast('Pensil Aktif'); }
+			}
+			colorBtns.forEach(btn => { btn.addEventListener('click', () => { brushColor = btn.dataset.color; setTool('pen'); colorBtns.forEach(b => { b.classList.remove('ring-2','ring-offset-2'); }); btn.classList.add('ring-2','ring-offset-2'); }); });
+			document.getElementById('customColor').addEventListener('input', (e) => { brushColor = e.target.value; setTool('pen'); }); document.getElementById('brushSize').addEventListener('input', (e) => brushSize = e.target.value);
+			btnPen.addEventListener('click', () => setTool('pen')); btnEraser.addEventListener('click', () => setTool('eraser'));
+			document.getElementById('clear-board-btn').addEventListener('click', () => {
+				if (confirm('Apakah Anda yakin ingin menghapus seluruh coretan di papan?')) {
+					wbCtx.clearRect(0, 0, wbCanvas.width, wbCanvas.height);
+					showToast('Papan dibersihkan');
+				}
+			});
+			document.getElementById('download-board-btn').addEventListener('click', () => {
+				const t = document.createElement('canvas'); t.width = wbCanvas.width; t.height = wbCanvas.height; const tctx = t.getContext('2d'); tctx.fillStyle = '#ffffff'; tctx.fillRect(0,0,t.width,t.height); tctx.drawImage(wbCanvas,0,0);
+				const l = document.createElement('a'); l.download = `kanvas_draw_${Date.now()}.png`; l.href = t.toDataURL(); l.click();
+			});
+			
+			// ==========================================
+			// INITIALIZATION
+			// ==========================================
+			window.addEventListener('load', () => {
+				initDB().then(() => loadImagesFromDB()).then(images => {
+					if (images && images.length > 0) {
+						galleryImages = images;
+						renderGalleryUI();
+						loadIntoWorkspace(images[images.length - 1]); // Load gambar terakhir
+					}
+				}).catch(err => console.error("DB Error:", err));
+			});
+			
+		</script>
+	</body>
+</html>

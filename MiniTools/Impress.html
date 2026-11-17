@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Impress</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    /* Mencegah scrollbar default yang jelek di area playlist */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.5);
+    }
+    /* Animasi transisi visual presentasi */
+    .crossfade {
+      transition: opacity 0.8s ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen overflow-x-hidden">
+
+  <div id="presenter-view" class="hidden fixed inset-0 w-full h-full bg-black flex items-center justify-center overflow-hidden select-none">
+    <div id="presenter-placeholder" class="text-center z-10 transition-opacity duration-500 max-w-lg px-6">
+      <div class="inline-flex items-center justify-center p-4 bg-indigo-600/20 text-indigo-400 rounded-full mb-6 border border-indigo-500/30 animate-pulse">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+      </div>
+      <h1 class="text-3xl font-extrabold tracking-tight text-white mb-2">Impress Screen</h1>
+      <p class="text-slate-400 text-sm">Layar ini siap menampilkan presentasi Anda secara bersih. Atur konten dari Laman Kontrol utama Anda.</p>
+      <div class="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500 bg-slate-900/80 py-2 px-3 rounded-full border border-slate-800">
+        <span class="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
+        <span>Terhubung & Menunggu Sinyal...</span>
+      </div>
+    </div>
+
+    <div id="presenter-image-container" class="absolute inset-0 w-full h-full hidden">
+      <img id="presenter-img-1" class="absolute inset-0 w-full h-full object-contain crossfade opacity-0" src="" alt="Presentation Visual 1">
+      <img id="presenter-img-2" class="absolute inset-0 w-full h-full object-contain crossfade opacity-0" src="" alt="Presentation Visual 2">
+    </div>
+
+    <div id="presenter-video-container" class="absolute inset-0 w-full h-full hidden">
+      <video id="presenter-video" class="w-full h-full object-contain" playsinline></video>
+    </div>
+
+    <audio id="presenter-audio" class="hidden"></audio>
+
+    <div id="presenter-sync-indicator" class="absolute bottom-4 right-4 bg-black/0 px-3 py-1 rounded text-xs text-slate-400 opacity-0 transition-opacity duration-300">
+    </div>
+  </div>
+
+
+  <div id="control-view" class="block min-h-screen flex flex-col">
+    <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 sticky top-0 z-40 shadow-lg">
+      <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-xl shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-300 bg-clip-text text-transparent">Impress</h1>
+            <p class="text-xs text-indigo-400/80 font-medium">Professional Media & Music Presenter</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div id="conn-status" class="flex items-center gap-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300">
+            <span class="relative flex h-2 w-2">
+              <span id="conn-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span id="conn-dot" class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+            </span>
+            <span id="conn-text">Layar Presentasi Terputus</span>
+          </div>
+
+          <button onclick="openPresenterWindow()" class="group flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20">
+            <span>Buka Layar Presentasi</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <section class="lg:col-span-5 flex flex-col gap-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <span class="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </span>
+              Galeri Visual
+            </h2>
+            <span class="text-xs text-slate-400" id="visual-count">0 File</span>
+          </div>
+
+          <label class="group relative flex flex-col items-center justify-center border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-950 hover:bg-slate-900/50 p-6 rounded-xl cursor-pointer transition-all duration-200 text-center">
+            <input type="file" id="visual-upload" multiple accept="image/*,video/*" class="hidden" onchange="handleVisualUpload(event)">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-500 group-hover:text-indigo-400 transition-colors mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span class="text-sm font-semibold text-slate-300">Pilih Foto atau Video</span>
+            <span class="text-xs text-slate-500 mt-1">Mendukung MP4, WebM, PNG, JPG, GIF</span>
+          </label>
+
+          <div class="mt-4 pt-4 border-t border-slate-800/60 grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1.5 font-medium">Interval Slideshow (Detik)</label>
+              <div class="relative flex items-center">
+                <input type="number" id="slideshow-interval" min="1" max="120" value="5" onchange="updateSlideshowInterval(this.value)" class="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg py-1.5 px-3 text-sm font-bold text-center text-white outline-none transition-all">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1.5 font-medium">Penskalaan Layar</label>
+              <select id="visual-fit" onchange="updateVisualFit(this.value)" class="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg py-1.5 px-3 text-sm text-white font-medium outline-none transition-all">
+                <option value="contain" selected>Sesuai Bingkai (Contain)</option>
+                <option value="cover">Penuhi Layar (Cover)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm flex-1 flex flex-col min-h-[300px]">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-sm font-bold text-slate-300">Daftar Putar Visual</h3>
+            <button onclick="clearVisualPlaylist()" class="text-xs text-rose-400 hover:text-rose-300 font-semibold transition-colors flex items-center gap-1">
+              Hapus Semua
+            </button>
+          </div>
+
+          <div id="visual-empty-state" class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-950/50 rounded-xl border border-slate-800/40">
+            <p class="text-sm text-slate-500">Belum ada media visual yang diunggah.</p>
+          </div>
+
+          <div id="visual-list" class="flex-1 space-y-2 overflow-y-auto max-h-[350px] custom-scrollbar hidden">
+            </div>
+        </div>
+      </section>
+
+      <section class="lg:col-span-4 flex flex-col gap-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col">
+          <h2 class="text-base font-bold text-white flex items-center gap-2 mb-4">
+            <span class="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </span>
+            Monitor Monitor & Kontrol Utama
+          </h2>
+
+          <div class="relative aspect-video w-full bg-black rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center group">
+            <div id="live-preview-empty" class="text-center p-4">
+              <span class="text-xs text-slate-600 block">Tidak ada visual aktif</span>
+            </div>
+            
+            <img id="live-preview-img" class="hidden w-full h-full object-contain" src="" alt="Pratinjau Foto">
+            <video id="live-preview-video" class="hidden w-full h-full object-contain" muted loop></video>
+
+            <span id="live-preview-badge" class="absolute top-2 left-2 bg-black/80 border border-slate-800 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded text-indigo-400 hidden">
+              PHOTO
+            </span>
+          </div>
+
+          <div class="mt-4 bg-slate-950 p-3 rounded-xl border border-slate-850">
+            <div class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Sedang Ditampilkan:</div>
+            <div id="live-visual-title" class="text-sm font-bold text-white truncate mt-0.5">Tidak ada konten</div>
+            <div id="live-visual-sub" class="text-xs text-slate-400 mt-1 flex justify-between">
+              <span>Status: Siap</span>
+              <span id="slideshow-status-badge" class="text-indigo-400 font-medium">Slideshow Berhenti</span>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-4">
+            <div class="flex items-center justify-center gap-3">
+              <button onclick="prevVisual()" title="Sebelumnya" class="p-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
+                </svg>
+              </button>
+
+              <button onclick="toggleSlideshow()" id="slideshow-play-btn" title="Mainkan/Jeda Slideshow" class="p-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-lg shadow-indigo-600/10 transition-all transform active:scale-95">
+                <svg id="slideshow-play-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                </svg>
+                <svg id="slideshow-pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+              </button>
+
+              <button onclick="nextVisual()" title="Berikutnya" class="p-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-850">
+              <span class="text-xs text-slate-400 font-medium">Ulangi Seluruh Galeri (Loop)</span>
+              <button onclick="toggleVisualLoop()" id="visual-loop-btn" class="w-12 h-6 flex items-center bg-slate-800 rounded-full p-1 cursor-pointer transition-colors duration-200">
+                <div class="bg-white w-4 h-4 rounded-full shadow-md transform translate-x-0 transition-transform duration-200" id="visual-loop-toggle"></div>
+              </button>
+            </div>
+
+            <div class="p-3.5 bg-slate-950 border border-indigo-500/10 text-slate-400 text-xs rounded-xl flex items-start gap-2.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p class="leading-relaxed">
+                <strong class="text-slate-300">Tips:</strong> Pastikan setelan pop-up browser mengizinkan pembukaan tab baru agar Laman Presentasi dapat tampil dengan benar.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lg:col-span-3 flex flex-col gap-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col min-h-[480px]">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <span class="p-1.5 bg-violet-500/10 text-violet-400 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
+              </span>
+              Musik Latar
+            </h2>
+            <span class="text-xs text-slate-400" id="music-count">0 Lagu</span>
+          </div>
+
+          <label class="group relative flex flex-col items-center justify-center border border-dashed border-slate-800 hover:border-violet-500/50 bg-slate-950 hover:bg-slate-900/50 p-4 rounded-xl cursor-pointer transition-all duration-200 text-center mb-4">
+            <input type="file" id="music-upload" multiple accept="audio/*" class="hidden" onchange="handleMusicUpload(event)">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-500 group-hover:text-violet-400 transition-colors mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span class="text-xs font-semibold text-slate-300">Tambahkan Musik</span>
+          </label>
+
+          <div id="music-empty-state" class="flex-1 flex flex-col items-center justify-center p-6 text-center bg-slate-950/50 rounded-xl border border-slate-800/40">
+            <p class="text-xs text-slate-500">Tidak ada lagu yang dimuat.</p>
+          </div>
+
+          <div id="music-list" class="flex-1 space-y-1.5 overflow-y-auto max-h-[220px] custom-scrollbar hidden">
+            </div>
+
+          <div class="mt-4 pt-4 border-t border-slate-800/60 space-y-4">
+            <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-850/60">
+              <span class="text-[10px] text-slate-500 uppercase tracking-widest block font-bold">Lagu Saat Ini</span>
+              <div id="active-music-title" class="text-xs font-semibold text-slate-300 truncate mt-0.5">Berhenti / Kosong</div>
+            </div>
+
+            <div class="flex items-center justify-center gap-2">
+              <button onclick="prevMusic()" class="p-2 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors border border-slate-850">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
+                </svg>
+              </button>
+
+              <button onclick="toggleMusic()" id="music-play-btn" class="p-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl shadow-md transition-colors">
+                <svg id="music-play-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                </svg>
+                <svg id="music-pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+              </button>
+
+              <button onclick="nextMusic()" class="p-2 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors border border-slate-850">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z" />
+                </svg>
+              </button>
+
+              <button onclick="toggleMusicLoop()" id="music-loop-btn" class="p-2 bg-slate-950 hover:bg-slate-800 text-slate-400 rounded-lg transition-colors border border-slate-850" title="Ulangi Musik">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15H9m3 0l-3-3m3 3l-3 3" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-slate-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0c4.142 4.142 4.142 10.858 0 15a1 1 0 11-1.414-1.414 8 8 0 000-12.172 1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </span>
+              <input type="range" id="music-volume" min="0" max="1" step="0.05" value="0.7" oninput="changeVolume(this.value)" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500">
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="bg-slate-900 border-t border-slate-800 py-3 px-6 text-center text-xs text-slate-500">
+      <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+        <span>Impress &copy; 2026 - Semua Media Diproses di Browser Lokal (IndexedDB Cached).</span>
+        <span>Aman &middot; Cepat &middot; Handal</span>
+      </div>
+    </footer>
+  </div>
+
+
+  <script>
+    // Penentuan Rute (Apakah halaman ini bertindak sebagai Presenter atau Controller?)
+    const params = new URLSearchParams(window.location.search);
+    const IS_PRESENTER_VIEW = params.has('presenter');
+
+    // Inisialisasi BroadcastChannel untuk komunikasi antar-tab yang stabil
+    const channel = new BroadcastChannel('impress_presentation_channel');
+
+    // State Manajemen Aplikasi (Hanya diaktifkan penuh di Laman Kontrol)
+    let state = {
+      visuals: [],       // Array file visual: { id, name, type, src, fileBlob }
+      music: [],         // Array file musik: { id, name, src, fileBlob }
+      activeVisualIdx: -1,
+      activeMusicIdx: -1,
+      slideshowInterval: 5, // dalam detik
+      isSlideshowPlaying: false,
+      isVisualLoop: true,
+      isMusicPlaying: false,
+      isMusicLoop: false,
+      musicVolume: 0.7,
+      visualFit: 'contain' // 'contain' atau 'cover'
+    };
+
+    // Objek Interval Slideshow Global
+    let slideshowTimer = null;
+
+    // Deteksi keberadaan tab Presenter
+    let presenterHeartbeatTimer = null;
+    let isPresenterConnected = false;
+
+    // ==========================================
+    // INTEGRASI INDEXEDDB (MANAJEMEN CACHE DATA BINER)
+    // ==========================================
+    let db = null;
+    function initIndexedDB(callback) {
+      if (IS_PRESENTER_VIEW) {
+        if(callback) callback();
+        return; // Presenter tidak menyimpan data, hanya menerima sinyal
+      }
+      
+      const request = indexedDB.open("ImpressCacheDB", 1);
+      
+      request.onupgradeneeded = function(e) {
+        db = e.target.result;
+        if (!db.objectStoreNames.contains("stateStore")) {
+          db.createObjectStore("stateStore", { keyPath: "key" });
+        }
+      };
+
+      request.onsuccess = function(e) {
+        db = e.target.result;
+        if(callback) callback();
+      };
+
+      request.onerror = function(e) {
+        console.error("Gagal membuka IndexedDB. Progres tidak akan di-cache.", e);
+        if(callback) callback();
+      };
+    }
+
+    function saveStateToCache() {
+      if (!db) return;
+      
+      // Bersihkan data lama agar tidak menumpuk struktur ObjectURL yang usang
+      // Kita hanya menyimpan file aslinya (Blob) dan konfigurasi kontrol
+      const cleanVisuals = state.visuals.map(item => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        fileBlob: item.fileBlob
+      }));
+
+      const cleanMusic = state.music.map(item => ({
+        id: item.id,
+        name: item.name,
+        fileBlob: item.fileBlob
+      }));
+
+      const dataToSave = {
+        key: "app_state",
+        visuals: cleanVisuals,
+        music: cleanMusic,
+        activeVisualIdx: state.activeVisualIdx,
+        activeMusicIdx: state.activeMusicIdx,
+        slideshowInterval: state.slideshowInterval,
+        isVisualLoop: state.isVisualLoop,
+        musicVolume: state.musicVolume,
+        visualFit: state.visualFit
+      };
+
+      const transaction = db.transaction(["stateStore"], "readwrite");
+      const store = transaction.objectStore("stateStore");
+      store.put(dataToSave);
+    }
+
+    function loadStateFromCache() {
+      if (!db) return;
+
+      const transaction = db.transaction(["stateStore"], "readonly");
+      const store = transaction.objectStore("stateStore");
+      const request = store.get("app_state");
+
+      request.onsuccess = function(e) {
+        const cachedData = e.target.result;
+        if (!cachedData) return;
+
+        // Restore konfigurasi dasar
+        state.slideshowInterval = cachedData.slideshowInterval || 5;
+        state.isVisualLoop = cachedData.isVisualLoop !== undefined ? cachedData.isVisualLoop : true;
+        state.musicVolume = cachedData.musicVolume !== undefined ? cachedData.musicVolume : 0.7;
+        state.visualFit = cachedData.visualFit || 'contain';
+        state.activeVisualIdx = cachedData.activeVisualIdx !== undefined ? cachedData.activeVisualIdx : -1;
+        state.activeMusicIdx = cachedData.activeMusicIdx !== undefined ? cachedData.activeMusicIdx : -1;
+
+        // Generate kembali ObjectURL dari Blob/File yang disimpan
+        if (cachedData.visuals) {
+          state.visuals = cachedData.visuals.map(item => ({
+            ...item,
+            src: URL.createObjectURL(item.fileBlob)
+          }));
+        }
+        if (cachedData.music) {
+          state.music = cachedData.music.map(item => ({
+            ...item,
+            src: URL.createObjectURL(item.fileBlob)
+          }));
+        }
+
+        // Sinkronisasi komponen UI input kontrol dengan data cache
+        document.getElementById('slideshow-interval').value = state.slideshowInterval;
+        document.getElementById('visual-fit').value = state.visualFit;
+        document.getElementById('music-volume').value = state.musicVolume;
+
+        // Sinkronisasi visual loop toggle switch UI
+        const toggle = document.getElementById('visual-loop-toggle');
+        const btn = document.getElementById('visual-loop-btn');
+        if (state.isVisualLoop) {
+          toggle.className = "bg-white w-4 h-4 rounded-full shadow-md transform translate-x-6 transition-transform duration-200";
+          btn.className = "w-12 h-6 flex items-center bg-indigo-600 rounded-full p-1 cursor-pointer transition-colors duration-200";
+        } else {
+          toggle.className = "bg-white w-4 h-4 rounded-full shadow-md transform translate-x-0 transition-transform duration-200";
+          btn.className = "w-12 h-6 flex items-center bg-slate-800 rounded-full p-1 cursor-pointer transition-colors duration-200";
+        }
+
+        // Sinkronisasi tombol musik loop UI
+        const mBtn = document.getElementById('music-loop-btn');
+        if (state.isMusicLoop) {
+          mBtn.className = "p-2 bg-violet-600/30 text-violet-400 rounded-lg transition-colors border border-violet-500/30";
+        }
+
+        // Render ulang daftar putar
+        updateVisualPlaylistUI();
+        updateMusicPlaylistUI();
+
+        // Putar ulang media aktif terakhir jika ada
+        if (state.activeVisualIdx !== -1 && state.visuals.length > 0) {
+          selectVisual(state.activeVisualIdx);
+        }
+        if (state.activeMusicIdx !== -1 && state.music.length > 0) {
+          selectMusic(state.activeMusicIdx, false); // Dimuat tetapi jangan langsung dimainkan otomatis demi kebijakan browser
+        }
+      };
+    }
+
+    // Panggil Inisialisasi Database saat aplikasi dimulai
+    window.addEventListener('DOMContentLoaded', () => {
+      initIndexedDB(() => {
+        if (!IS_PRESENTER_VIEW) {
+          loadStateFromCache();
+        }
+      });
+    });
+
+
+    // ==========================================
+    // LOGIKA KHUSUS: LAMAN PRESENTASI
+    // ==========================================
+    if (IS_PRESENTER_VIEW) {
+      document.getElementById('presenter-view').classList.remove('hidden');
+      document.getElementById('control-view').classList.add('hidden');
+
+      // Ambil elemen DOM Presentasi
+      const presenterPlaceholder = document.getElementById('presenter-placeholder');
+      const imageContainer = document.getElementById('presenter-image-container');
+      const img1 = document.getElementById('presenter-img-1');
+      const img2 = document.getElementById('presenter-img-2');
+      const videoContainer = document.getElementById('presenter-video-container');
+      const presenterVideo = document.getElementById('presenter-video');
+      const presenterAudio = document.getElementById('presenter-audio');
+      const syncIndicator = document.getElementById('presenter-sync-indicator');
+
+      let currentActiveImg = 1; // Melacak img element mana yang sedang active opacity-100
+
+      // Dengarkan instruksi dari Laman Kontrol
+      channel.onmessage = function(event) {
+        const msg = event.data;
+        
+        switch (msg.type) {
+          case 'HEARTBEAT_PING':
+            channel.postMessage({ type: 'HEARTBEAT_PONG' });
+            break;
+
+          case 'SYNC_VISUAL_FIT':
+            applyVisualFit(msg.fit);
+            break;
+
+          case 'PLAY_VISUAL':
+            displayMedia(msg.media, msg.fit);
+            break;
+
+          case 'CLEAR_VISUAL_PLAYBACK':
+            clearPresenterVisuals();
+            break;
+
+          case 'PLAY_MUSIC':
+            playPresenterAudio(msg.musicSrc, msg.volume, msg.loop);
+            break;
+
+          case 'CONTROL_MUSIC_PLAYBACK':
+            if (msg.action === 'play') {
+              presenterAudio.play().catch(err => console.log('Audio autoplay blocked, silakan klik layar dahulu.', err));
+            } else if (msg.action === 'pause') {
+              presenterAudio.pause();
+            } else if (msg.action === 'stop') {
+              presenterAudio.pause();
+              presenterAudio.src = '';
+            }
+            break;
+
+          case 'SET_MUSIC_VOLUME':
+            presenterAudio.volume = msg.volume;
+            break;
+
+          case 'SET_MUSIC_LOOP':
+            presenterAudio.loop = msg.loop;
+            break;
+        }
+
+        // Tampilkan indikator aksi sukses
+        flashSyncIndicator();
+      };
+
+      // Auto-next track ketika audio lagu berakhir
+      presenterAudio.onended = function() {
+        channel.postMessage({ type: 'PRESENTER_MUSIC_ENDED' });
+      };
+
+      // Auto-next visual ketika video berakhir (jika slideshow atau video autoplay berikutnya menyala)
+      presenterVideo.onended = function() {
+        channel.postMessage({ type: 'PRESENTER_VIDEO_ENDED' });
+      };
+
+      function displayMedia(media, fit) {
+        presenterPlaceholder.classList.add('opacity-0');
+        setTimeout(() => presenterPlaceholder.classList.add('hidden'), 500);
+
+        applyVisualFit(fit);
+
+        if (media.type.startsWith('image/')) {
+          // Pause & Sembunyikan video
+          presenterVideo.pause();
+          videoContainer.classList.add('hidden');
+          imageContainer.classList.remove('hidden');
+
+          // Teknik Crossfade mulus menggunakan dua tag gambar bergantian
+          if (currentActiveImg === 1) {
+            img2.src = media.src;
+            img2.onload = function() {
+              img2.className = "absolute inset-0 w-full h-full object-" + fit + " crossfade opacity-100";
+              img1.className = "absolute inset-0 w-full h-full object-" + fit + " crossfade opacity-0";
+              currentActiveImg = 2;
+            }
+          } else {
+            img1.src = media.src;
+            img1.onload = function() {
+              img1.className = "absolute inset-0 w-full h-full object-" + fit + " crossfade opacity-100";
+              img2.className = "absolute inset-0 w-full h-full object-" + fit + " crossfade opacity-0";
+              currentActiveImg = 1;
+            }
+          }
+
+        } else if (media.type.startsWith('video/')) {
+          // Sembunyikan gambar
+          imageContainer.classList.add('hidden');
+          videoContainer.classList.remove('hidden');
+
+          presenterVideo.src = media.src;
+          presenterVideo.load();
+          presenterVideo.play().catch(err => {
+            console.log("Autoplay video dicegah oleh browser. Interaksi di layar ini diperlukan terlebih dahulu.", err);
+          });
+        }
+      }
+
+      function applyVisualFit(fit) {
+        // Terapkan penyesuaian CSS
+        const fitClass = fit === 'cover' ? 'cover' : 'contain';
+        img1.style.objectFit = fitClass;
+        img2.style.objectFit = fitClass;
+        presenterVideo.style.objectFit = fitClass;
+      }
+
+      function playPresenterAudio(src, volume, loop) {
+        presenterAudio.src = src;
+        presenterAudio.volume = volume;
+        presenterAudio.loop = loop;
+        presenterAudio.load();
+        presenterAudio.play().catch(err => {
+          console.log("Autoplay audio tertahan browser.", err);
+        });
+      }
+
+      function clearPresenterVisuals() {
+        presenterVideo.pause();
+        presenterVideo.src = '';
+        img1.src = '';
+        img2.src = '';
+        img1.className = "absolute inset-0 w-full h-full crossfade opacity-0";
+        img2.className = "absolute inset-0 w-full h-full crossfade opacity-0";
+        imageContainer.classList.add('hidden');
+        videoContainer.classList.add('hidden');
+        presenterPlaceholder.classList.remove('hidden');
+        setTimeout(() => presenterPlaceholder.classList.remove('opacity-0'), 50);
+      }
+
+      function flashSyncIndicator() {
+        syncIndicator.classList.remove('opacity-0');
+        setTimeout(() => syncIndicator.classList.add('opacity-0'), 1500);
+      }
+
+      // Beritahu pengendali bahwa presenter tab telah siap / terhubung
+      setInterval(() => {
+        channel.postMessage({ type: 'PRESENTER_READY' });
+      }, 1000);
+    }
+
+
+    // ==========================================
+    // LOGIKA UTAMA: LAMAN KONTROL (ADMIN PANEL)
+    // ==========================================
+    if (!IS_PRESENTER_VIEW) {
+      // Monitor pesan balik dari Presenter
+      channel.onmessage = function(event) {
+        const msg = event.data;
+
+        if (msg.type === 'PRESENTER_READY' || msg.type === 'HEARTBEAT_PING' || msg.type === 'HEARTBEAT_PONG') {
+          setPresenterConnectionState(true);
+        }
+
+        if (msg.type === 'PRESENTER_MUSIC_ENDED') {
+          // Putar lagu berikutnya otomatis saat lagu di Presenter selesai
+          nextMusic();
+        }
+
+        if (msg.type === 'PRESENTER_VIDEO_ENDED') {
+          // Ketika video di layar presentasi tamat, picu visual berikutnya jika slideshow menyala
+          if (state.isSlideshowPlaying) {
+            nextVisual();
+          }
+        }
+      };
+
+      // Jalankan sistem ping berkala untuk memeriksa koneksi tab presentasi
+      setInterval(() => {
+        channel.postMessage({ type: 'HEARTBEAT_PING' });
+        // Jika dalam 2 detik tidak ada respons Pong, set sebagai terputus
+        presenterHeartbeatTimer = setTimeout(() => {
+          if (isPresenterConnected) {
+            setPresenterConnectionState(false);
+          }
+        }, 1500);
+      }, 3000);
+    }
+
+    function setPresenterConnectionState(connected) {
+      clearTimeout(presenterHeartbeatTimer);
+      isPresenterConnected = connected;
+
+      const connStatus = document.getElementById('conn-status');
+      const connPing = document.getElementById('conn-ping');
+      const connDot = document.getElementById('conn-dot');
+      const connText = document.getElementById('conn-text');
+
+      if (connected) {
+        connStatus.className = "flex items-center gap-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300";
+        connPing.className = "animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75";
+        connDot.className = "relative inline-flex rounded-full h-2 w-2 bg-emerald-500";
+        connText.innerText = "Layar Presentasi Terhubung";
+      } else {
+        connStatus.className = "flex items-center gap-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300";
+        connPing.className = "animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75";
+        connDot.className = "relative inline-flex rounded-full h-2 w-2 bg-rose-500";
+        connText.innerText = "Layar Presentasi Terputus";
+      }
+    }
+
+    function openPresenterWindow() {
+      // Membuka jendela presentasi baru di browser yang sama
+      const presenterUrl = window.location.pathname + '?presenter=true';
+      window.open(presenterUrl, 'ImpressPresenterWindow', 'width=1280,height=720,menubar=no,toolbar=no,location=no,status=no');
+    }
+
+    // ==========================================
+    // MANAJEMEN UNGGAH DAN MANIPULASI FILE
+    // ==========================================
+    function handleVisualUpload(event) {
+      const files = event.target.files;
+      if (!files.length) return;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileUrl = URL.createObjectURL(file);
+        
+        state.visuals.push({
+          id: 'v-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+          name: file.name,
+          type: file.type,
+          src: fileUrl,
+          fileBlob: file // Simpan file blob asli untuk cache IndexedDB
+        });
+      }
+
+      updateVisualPlaylistUI();
+      // Set media aktif jika sebelumnya kosong
+      if (state.activeVisualIdx === -1 && state.visuals.length > 0) {
+        selectVisual(0);
+      } else {
+        saveStateToCache();
+      }
+      // Reset input agar file yang sama bisa diupload ulang jika perlu
+      event.target.value = '';
+    }
+
+    function handleMusicUpload(event) {
+      const files = event.target.files;
+      if (!files.length) return;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileUrl = URL.createObjectURL(file);
+
+        state.music.push({
+          id: 'm-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+          name: file.name,
+          src: fileUrl,
+          fileBlob: file // Simpan file blob asli untuk cache IndexedDB
+        });
+      }
+
+      updateMusicPlaylistUI();
+      if (state.activeMusicIdx === -1 && state.music.length > 0) {
+        selectMusic(0, false); // select but do not autoplay instantly
+      } else {
+        saveStateToCache();
+      }
+      event.target.value = '';
+    }
+
+    // ==========================================
+    // RENDER INTERFACE PENGGUNA (DOM MANIPULASI)
+    // ==========================================
+    function updateVisualPlaylistUI() {
+      const emptyState = document.getElementById('visual-empty-state');
+      const visualList = document.getElementById('visual-list');
+      const visualCountBadge = document.getElementById('visual-count');
+
+      visualCountBadge.innerText = `${state.visuals.length} File`;
+
+      if (state.visuals.length === 0) {
+        emptyState.classList.remove('hidden');
+        visualList.classList.add('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      visualList.classList.remove('hidden');
+      visualList.innerHTML = '';
+
+      state.visuals.forEach((item, index) => {
+        const isActive = index === state.activeVisualIdx;
+        const activeClass = isActive ? 'border-indigo-600 bg-indigo-950/40' : 'border-slate-800/80 bg-slate-950/40 hover:bg-slate-900/40';
+        const isVideo = item.type.startsWith('video/');
+        
+        // Buat Thumbnail Pratinjau Mikro
+        let previewHTML = '';
+        if (isVideo) {
+          previewHTML = `
+            <div class="relative w-12 h-12 bg-black rounded-lg border border-slate-800 overflow-hidden flex items-center justify-center flex-shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>`;
+        } else {
+          previewHTML = `
+            <div class="w-12 h-12 rounded-lg border border-slate-800 overflow-hidden bg-black flex-shrink-0">
+              <img src="${item.src}" class="w-full h-full object-cover" alt="mini-prev">
+            </div>`;
+        }
+
+        const itemEl = document.createElement('div');
+        itemEl.className = `flex items-center gap-3 p-2.5 rounded-xl border ${activeClass} transition-all duration-200 group`;
+        itemEl.innerHTML = `
+          ${previewHTML}
+          <div class="flex-1 min-w-0 cursor-pointer" onclick="selectVisual(${index})">
+            <p class="text-xs font-bold text-slate-200 truncate">${item.name}</p>
+            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">${isVideo ? 'Video' : 'Foto'}</span>
+          </div>
+          <div class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onclick="moveVisual(${index}, -1)" class="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800" title="Naikkan">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
+              </svg>
+            </button>
+            <button onclick="moveVisual(${index}, 1)" class="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800" title="Turunkan">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+              </svg>
+            </button>
+            <button onclick="deleteVisual(${index})" class="p-1 text-rose-400 hover:text-rose-300 rounded hover:bg-rose-950/40" title="Hapus">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        `;
+        visualList.appendChild(itemEl);
+      });
+    }
+
+    function updateMusicPlaylistUI() {
+      const emptyState = document.getElementById('music-empty-state');
+      const musicList = document.getElementById('music-list');
+      const musicCountBadge = document.getElementById('music-count');
+
+      musicCountBadge.innerText = `${state.music.length} Lagu`;
+
+      if (state.music.length === 0) {
+        emptyState.classList.remove('hidden');
+        musicList.classList.add('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      musicList.classList.remove('hidden');
+      musicList.innerHTML = '';
+
+      state.music.forEach((item, index) => {
+        const isActive = index === state.activeMusicIdx;
+        const activeClass = isActive ? 'border-violet-600 bg-violet-950/30' : 'border-slate-800/80 bg-slate-950/40 hover:bg-slate-900/40';
+
+        const itemEl = document.createElement('div');
+        itemEl.className = `flex items-center gap-2 p-2 rounded-lg border ${activeClass} transition-all duration-200 group`;
+        itemEl.innerHTML = `
+          <div class="flex-shrink-0 cursor-pointer text-violet-400" onclick="selectMusic(${index}, true)">
+            ${isActive && state.isMusicPlaying ? `
+              <span class="flex h-6 w-6 relative items-center justify-center">
+                <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-violet-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-violet-500"></span>
+              </span>
+            ` : `
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 opacity-60 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              </svg>
+            `}
+          </div>
+          <div class="flex-1 min-w-0 cursor-pointer" onclick="selectMusic(${index}, true)">
+            <p class="text-xs font-semibold text-slate-300 truncate">${item.name}</p>
+          </div>
+          <button onclick="deleteMusic(${index})" class="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/20 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="Hapus Lagu">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        `;
+        musicList.appendChild(itemEl);
+      });
+    }
+
+    // ==========================================
+    // LOGIKA NAVIGASI KONTEN (PENGENDALI UTAMA)
+    // ==========================================
+    function selectVisual(index) {
+      if (index < 0 || index >= state.visuals.length) return;
+      
+      state.activeVisualIdx = index;
+      const media = state.visuals[index];
+
+      // Update UI Laman Kontrol
+      updateVisualPlaylistUI();
+      
+      // Update Live Preview Panel di Admin
+      const previewImg = document.getElementById('live-preview-img');
+      const previewVideo = document.getElementById('live-preview-video');
+      const previewBadge = document.getElementById('live-preview-badge');
+      const liveTitle = document.getElementById('live-visual-title');
+      const previewEmpty = document.getElementById('live-preview-empty');
+
+      previewEmpty.classList.add('hidden');
+      previewBadge.classList.remove('hidden');
+      liveTitle.innerText = media.name;
+
+      if (media.type.startsWith('image/')) {
+        previewVideo.classList.add('hidden');
+        previewVideo.pause();
+        previewImg.classList.remove('hidden');
+        previewImg.src = media.src;
+        previewBadge.innerText = "FOTO";
+      } else if (media.type.startsWith('video/')) {
+        previewImg.classList.add('hidden');
+        previewVideo.classList.remove('hidden');
+        previewVideo.src = media.src;
+        previewVideo.play().catch(() => {});
+        previewBadge.innerText = "VIDEO";
+      }
+
+      // Terapkan penyesuaian visual lokal pada monitor control panel saat ini
+      previewImg.style.objectFit = state.visualFit;
+      previewVideo.style.objectFit = state.visualFit;
+
+      // Transmisikan ke layar Presenter
+      channel.postMessage({
+        type: 'PLAY_VISUAL',
+        media: media,
+        fit: state.visualFit
+      });
+
+      saveStateToCache();
+    }
+
+    function deleteVisual(index) {
+      // Jika yang dihapus adalah visual aktif, matikan penayangan presentasi
+      if (index === state.activeVisualIdx) {
+        state.activeVisualIdx = -1;
+        document.getElementById('live-preview-img').classList.add('hidden');
+        document.getElementById('live-preview-video').classList.add('hidden');
+        document.getElementById('live-preview-badge').classList.add('hidden');
+        document.getElementById('live-preview-empty').classList.remove('hidden');
+        document.getElementById('live-visual-title').innerText = "Tidak ada konten";
+        
+        channel.postMessage({ type: 'CLEAR_VISUAL_PLAYBACK' });
+      }
+
+      // Revoke ObjectURL untuk mencegah memory leak
+      URL.revokeObjectURL(state.visuals[index].src);
+      state.visuals.splice(index, 1);
+
+      // Koreksi index aktif jika bergeser
+      if (state.activeVisualIdx > index) {
+        state.activeVisualIdx--;
+      } else if (state.activeVisualIdx >= state.visuals.length) {
+        state.activeVisualIdx = state.visuals.length - 1;
+      }
+
+      updateVisualPlaylistUI();
+      if (state.activeVisualIdx !== -1) {
+        selectVisual(state.activeVisualIdx);
+      } else {
+        saveStateToCache();
+      }
+    }
+
+    function clearVisualPlaylist() {
+      stopSlideshow();
+      state.visuals.forEach(v => URL.revokeObjectURL(v.src));
+      state.visuals = [];
+      state.activeVisualIdx = -1;
+      
+      document.getElementById('live-preview-img').classList.add('hidden');
+      document.getElementById('live-preview-video').classList.add('hidden');
+      document.getElementById('live-preview-badge').classList.add('hidden');
+      document.getElementById('live-preview-empty').classList.remove('hidden');
+      document.getElementById('live-visual-title').innerText = "Tidak ada konten";
+      
+      channel.postMessage({ type: 'CLEAR_VISUAL_PLAYBACK' });
+      updateVisualPlaylistUI();
+      saveStateToCache();
+    }
+
+    function moveVisual(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= state.visuals.length) return;
+
+      // Swap elements
+      const temp = state.visuals[index];
+      state.visuals[index] = state.visuals[targetIndex];
+      state.visuals[targetIndex] = temp;
+
+      // Pertahankan penanda aktif
+      if (state.activeVisualIdx === index) {
+        state.activeVisualIdx = targetIndex;
+      } else if (state.activeVisualIdx === targetIndex) {
+        state.activeVisualIdx = index;
+      }
+
+      updateVisualPlaylistUI();
+      saveStateToCache();
+    }
+
+    function nextVisual() {
+      if (state.visuals.length === 0) return;
+      let nextIdx = state.activeVisualIdx + 1;
+      
+      if (nextIdx >= state.visuals.length) {
+        if (state.isVisualLoop) {
+          nextIdx = 0;
+        } else {
+          stopSlideshow();
+          return;
+        }
+      }
+      selectVisual(nextIdx);
+    }
+
+    function prevVisual() {
+      if (state.visuals.length === 0) return;
+      let prevIdx = state.activeVisualIdx - 1;
+
+      if (prevIdx < 0) {
+        if (state.isVisualLoop) {
+          prevIdx = state.visuals.length - 1;
+        } else {
+          return;
+        }
+      }
+      selectVisual(prevIdx);
+    }
+
+    // ==========================================
+    // SISTEM SLIDESHOW OTOMATIS
+    // ==========================================
+    function toggleSlideshow() {
+      if (state.visuals.length === 0) return;
+
+      if (state.isSlideshowPlaying) {
+        stopSlideshow();
+      } else {
+        startSlideshow();
+      }
+    }
+
+    function startSlideshow() {
+      if (state.visuals.length === 0) return;
+      state.isSlideshowPlaying = true;
+      
+      // Update UI tombol
+      document.getElementById('slideshow-play-icon').classList.add('hidden');
+      document.getElementById('slideshow-pause-icon').classList.remove('hidden');
+      document.getElementById('slideshow-status-badge').innerText = "Slideshow Berjalan";
+      document.getElementById('slideshow-status-badge').className = "text-emerald-400 font-bold animate-pulse";
+
+      // Jalankan interval pemutaran
+      clearInterval(slideshowTimer);
+      slideshowTimer = setInterval(() => {
+        // Jika sedang memutar video, biarkan video selesai terlebih dahulu di presenter (didukung lewat pesan event video ended)
+        const currentMedia = state.visuals[state.activeVisualIdx];
+        if (currentMedia && currentMedia.type.startsWith('video/')) {
+          // Do nothing, biarkan event PRESENTER_VIDEO_ENDED yang memicu selanjutnya
+          return;
+        }
+        nextVisual();
+      }, state.slideshowInterval * 1000);
+    }
+
+    function stopSlideshow() {
+      state.isSlideshowPlaying = false;
+      
+      document.getElementById('slideshow-play-icon').classList.remove('hidden');
+      document.getElementById('slideshow-pause-icon').classList.add('hidden');
+      document.getElementById('slideshow-status-badge').innerText = "Slideshow Berhenti";
+      document.getElementById('slideshow-status-badge').className = "text-indigo-400 font-medium";
+
+      clearInterval(slideshowTimer);
+    }
+
+    function updateSlideshowInterval(val) {
+      const parsed = parseInt(val);
+      if (parsed > 0) {
+        state.slideshowInterval = parsed;
+        // Jika slideshow sedang berjalan, restart interval agar langsung menerapkan perubahan detik
+        if (state.isSlideshowPlaying) {
+          startSlideshow();
+        }
+        saveStateToCache();
+      }
+    }
+
+    function updateVisualFit(fitValue) {
+      state.visualFit = fitValue;
+      channel.postMessage({
+        type: 'SYNC_VISUAL_FIT',
+        fit: fitValue
+      });
+
+      // Terapkan penyesuaian visual lokal pada monitor control panel
+      const previewImg = document.getElementById('live-preview-img');
+      const previewVideo = document.getElementById('live-preview-video');
+      previewImg.style.objectFit = fitValue;
+      previewVideo.style.objectFit = fitValue;
+
+      saveStateToCache();
+    }
+
+    function toggleVisualLoop() {
+      state.isVisualLoop = !state.isVisualLoop;
+      const toggle = document.getElementById('visual-loop-toggle');
+      const btn = document.getElementById('visual-loop-btn');
+
+      if (state.isVisualLoop) {
+        toggle.className = "bg-white w-4 h-4 rounded-full shadow-md transform translate-x-6 transition-transform duration-200";
+        btn.className = "w-12 h-6 flex items-center bg-indigo-600 rounded-full p-1 cursor-pointer transition-colors duration-200";
+      } else {
+        toggle.className = "bg-white w-4 h-4 rounded-full shadow-md transform translate-x-0 transition-transform duration-200";
+        btn.className = "w-12 h-6 flex items-center bg-slate-800 rounded-full p-1 cursor-pointer transition-colors duration-200";
+      }
+
+      saveStateToCache();
+    }
+
+    // ==========================================
+    // SISTEM PLAYLIST MUSIK KONTROL TERPISAH
+    // ==========================================
+    function selectMusic(index, startPlaying = true) {
+      if (index < 0 || index >= state.music.length) return;
+
+      state.activeMusicIdx = index;
+      const track = state.music[index];
+
+      // Update Teks Aktif
+      document.getElementById('active-music-title').innerText = track.name;
+      updateMusicPlaylistUI();
+
+      if (startPlaying) {
+        state.isMusicPlaying = true;
+        updateMusicControlsUI(true);
+
+        channel.postMessage({
+          type: 'PLAY_MUSIC',
+          musicSrc: track.src,
+          volume: state.musicVolume,
+          loop: state.isMusicLoop
+        });
+      }
+
+      saveStateToCache();
+    }
+
+    function toggleMusic() {
+      if (state.music.length === 0) return;
+
+      if (state.activeMusicIdx === -1) {
+        selectMusic(0, true);
+        return;
+      }
+
+      state.isMusicPlaying = !state.isMusicPlaying;
+      updateMusicControlsUI(state.isMusicPlaying);
+
+      channel.postMessage({
+        type: 'CONTROL_MUSIC_PLAYBACK',
+        action: state.isMusicPlaying ? 'play' : 'pause'
+      });
+
+      updateMusicPlaylistUI();
+    }
+
+    function stopMusic() {
+      state.isMusicPlaying = false;
+      updateMusicControlsUI(false);
+      channel.postMessage({
+        type: 'CONTROL_MUSIC_PLAYBACK',
+        action: 'stop'
+      });
+      updateMusicPlaylistUI();
+    }
+
+    function nextMusic() {
+      if (state.music.length === 0) return;
+      let nextIdx = state.activeMusicIdx + 1;
+
+      if (nextIdx >= state.music.length) {
+        nextIdx = 0; // Otomatis loop ke playlist musik awal
+      }
+      selectMusic(nextIdx, true);
+    }
+
+    function prevMusic() {
+      if (state.music.length === 0) return;
+      let prevIdx = state.activeMusicIdx - 1;
+
+      if (prevIdx < 0) {
+        prevIdx = state.music.length - 1;
+      }
+      selectMusic(prevIdx, true);
+    }
+
+    function deleteMusic(index) {
+      if (index === state.activeMusicIdx) {
+        state.activeMusicIdx = -1;
+        document.getElementById('active-music-title').innerText = "Berhenti / Kosong";
+        stopMusic();
+      }
+
+      URL.revokeObjectURL(state.music[index].src);
+      state.music.splice(index, 1);
+
+      if (state.activeMusicIdx > index) {
+        state.activeMusicIdx--;
+      } else if (state.activeMusicIdx >= state.music.length) {
+        state.activeMusicIdx = state.music.length - 1;
+      }
+
+      updateMusicPlaylistUI();
+      if (state.activeMusicIdx !== -1) {
+        selectMusic(state.activeMusicIdx, false);
+      } else {
+        saveStateToCache();
+      }
+    }
+
+    function changeVolume(volume) {
+      state.musicVolume = parseFloat(volume);
+      channel.postMessage({
+        type: 'SET_MUSIC_VOLUME',
+        volume: state.musicVolume
+      });
+      saveStateToCache();
+    }
+
+    function toggleMusicLoop() {
+      state.isMusicLoop = !state.isMusicLoop;
+      const btn = document.getElementById('music-loop-btn');
+
+      if (state.isMusicLoop) {
+        btn.className = "p-2 bg-violet-600/30 text-violet-400 rounded-lg transition-colors border border-violet-500/30";
+      } else {
+        btn.className = "p-2 bg-slate-950 hover:bg-slate-800 text-slate-400 rounded-lg transition-colors border border-slate-850";
+      }
+
+      channel.postMessage({
+        type: 'SET_MUSIC_LOOP',
+        loop: state.isMusicLoop
+      });
+    }
+
+    function updateMusicControlsUI(isPlaying) {
+      const playIcon = document.getElementById('music-play-icon');
+      const pauseIcon = document.getElementById('music-pause-icon');
+
+      if (isPlaying) {
+        playIcon.classList.add('hidden');
+        pauseIcon.classList.remove('hidden');
+      } else {
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>

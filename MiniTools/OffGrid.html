@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>OffGrid</title>
+  <style>
+    /* ==========================================================================
+       SISTEM DESAIN & VARIABEL
+       ========================================================================== */
+    :root {
+      --bg: #090c10; --surface: #161b22; --surface-hl: #21262d; --border: #30363d;
+      --text-main: #c9d1d9; --text-muted: #8b949e; 
+      --accent: #f59e0b; --accent-hover: #d97706;
+      --danger: #f85149; --danger-bg: rgba(248, 81, 73, 0.1);
+      --success: #2ea043; --success-bg: rgba(46, 160, 67, 0.1);
+      --cyan: #38bdf8; --cyan-bg: rgba(56, 189, 248, 0.1);
+      --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background-color: var(--bg); color: var(--text-main); font-family: var(--font-sans); line-height: 1.5; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
+    
+    /* ==========================================================================
+       UTILITAS TATA LETAK
+       ========================================================================== */
+    .mono { font-family: var(--font-mono); }
+    .font-bold { font-weight: 700; }
+    .text-xs { font-size: 0.75rem; } .text-sm { font-size: 0.875rem; } .text-base { font-size: 1rem; } .text-xl { font-size: 1.25rem; } .text-3xl { font-size: 1.875rem; } .text-4xl { font-size: 2.25rem; }
+    
+    .text-accent { color: var(--accent); } .text-danger { color: var(--danger); } .text-success { color: var(--success); } .text-cyan { color: var(--cyan); } .text-muted { color: var(--text-muted); } .text-white { color: #ffffff; }
+    
+    .flex { display: flex; } .flex-col { flex-direction: column; } .flex-wrap { flex-wrap: wrap; }
+    .items-center { align-items: center; } .justify-between { justify-content: space-between; } .justify-center { justify-content: center; }
+    .gap-1 { gap: 0.25rem; } .gap-2 { gap: 0.5rem; } .gap-3 { gap: 0.75rem; } .gap-4 { gap: 1rem; }
+    .w-full { width: 100%; } .flex-1 { flex: 1; } .text-center { text-align: center; } .text-right { text-align: right; }
+    
+    .grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+    .grid-cols-4 { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .hidden { display: none !important; }
+    
+    /* ==========================================================================
+       KOMPONEN UI
+       ========================================================================== */
+    .app-header { background: rgba(22, 27, 34, 0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 40; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+    
+    .app-nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1rem; display: flex; overflow-x: auto; scrollbar-width: none; }
+    .app-nav::-webkit-scrollbar { display: none; }
+    .tab-btn { background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); padding: 1rem 1.25rem; cursor: pointer; font-family: var(--font-mono); font-size: 0.875rem; font-weight: bold; white-space: nowrap; transition: var(--transition); }
+    .tab-btn:hover { color: var(--text-main); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: linear-gradient(to top, rgba(245, 158, 11, 0.1) 0%, transparent 100%); }
+    
+    main { padding: 1.5rem 1rem; max-width: 1400px; margin: 0 auto; width: 100%; flex: 1; }
+    
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 1rem; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; }
+    
+    .input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 0.375rem; padding: 0.625rem; color: var(--text-main); font-family: var(--font-mono); font-size: 0.875rem; transition: border-color 0.2s; }
+    .input:focus { outline: none; border-color: var(--accent); }
+    
+    .btn { background: var(--surface-hl); color: var(--text-main); border: 1px solid var(--border); padding: 0.625rem 1rem; border-radius: 0.375rem; cursor: pointer; font-family: var(--font-mono); font-size: 0.75rem; font-weight: bold; transition: var(--transition); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
+    .btn:active { transform: scale(0.97); }
+    .btn:hover { filter: brightness(1.2); }
+    .btn-primary { background: var(--accent); color: #000; border-color: var(--accent); }
+    .btn-danger { background: var(--danger-bg); color: var(--danger); border-color: rgba(248, 81, 73, 0.4); }
+    .btn-success { background: var(--success-bg); color: var(--success); border-color: rgba(46, 160, 67, 0.4); }
+    
+    .badge { padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.65rem; font-weight: bold; text-transform: uppercase; font-family: var(--font-mono); }
+    .badge-accent { background: rgba(245, 158, 11, 0.1); color: var(--accent); border: 1px solid rgba(245, 158, 11, 0.2); }
+    .badge-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(248, 81, 73, 0.2); }
+    .badge-success { background: var(--success-bg); color: var(--success); border: 1px solid rgba(46, 160, 67, 0.2); }
+    .badge-cyan { background: var(--cyan-bg); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.2); }
+    
+    /* Masonry & Elemen Khusus */
+    .masonry { column-count: 1; column-gap: 1rem; }
+    @media (min-width: 768px) { .masonry { column-count: 2; } }
+    @media (min-width: 1024px) { .masonry { column-count: 3; } }
+    .masonry-item { break-inside: avoid; margin-bottom: 1rem; }
+
+    canvas { background: var(--bg); touch-action: none; width: 100%; border-radius: 0.375rem; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-family: var(--font-mono); font-size: 0.875rem; }
+    th, td { padding: 0.75rem; border-bottom: 1px solid var(--border); }
+    th { background: rgba(255,255,255,0.03); color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
+    
+    /* Kalkulator Taktis */
+    .btn-calc-num { background: var(--surface); color: var(--text-main); font-size: 1.25rem; font-weight: bold; padding: 1.25rem 0; border: 1px solid var(--border); border-radius: 0.5rem; transition: var(--transition); }
+    .btn-calc-num:active { background: var(--surface-hl); transform: scale(0.95); }
+    .btn-calc-op { background: var(--cyan-bg); color: var(--cyan); border: 1px solid rgba(56,189,248,0.4); font-size: 1.25rem; font-weight: bold; border-radius: 0.5rem; transition: var(--transition); }
+    .btn-calc-op:active { background: var(--cyan); color: #000; }
+    
+    /* Sistem Notifikasi Toast */
+    .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
+    .toast { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); padding: 1rem; border-radius: 0.375rem; box-shadow: var(--shadow); font-family: var(--font-mono); font-size: 0.875rem; animation: slideIn 0.3s forwards; pointer-events: auto; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes blink { 50% { opacity: 0.5; } }
+    .blink { animation: blink 1.5s infinite; }
+    
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="flex items-center gap-3">
+      <div class="btn-primary flex items-center justify-center font-bold text-xl rounded" style="width: 2.5rem; height: 2.5rem;">OG</div>
+      <div class="flex flex-col">
+        <h1 class="font-bold mono text-base tracking-widest text-white">OFFGRID</h1>
+        <span class="text-xs text-muted mono">Suite Bertahan Hidup Mandiri</span>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-3 text-xs mono">
+      <div class="flex flex-col items-end">
+        <span id="sys-clock" class="text-white font-bold text-sm">00:00:00</span>
+        <span id="sys-date" class="text-muted">--/--/----</span>
+      </div>
+      <div class="flex flex-col items-end border-l border-border pl-3">
+        <span id="net-status" class="badge badge-success flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full" style="background-color:currentColor;"></span> LURING AKTIF
+        </span>
+        <span id="coord-status" class="text-muted mt-1 text-[10px]">GPS: NONAKTIF</span>
+      </div>
+      <button data-action="toggleAudio" class="btn ml-2" title="Suara Umpan Balik">🔊</button>
+    </div>
+  </header>
+
+  <!-- NAVIGASI TAB -->
+  <nav id="nav-tabs" class="app-nav">
+    <button data-tab="notepad" class="tab-btn active">📝 CATATAN</button>
+    <button data-tab="wiki" class="tab-btn">📚 WIKI LURING</button>
+    <button data-tab="online" class="tab-btn">🌐 RADAR ONLINE</button>
+    <button data-tab="flashlight" class="tab-btn">🔦 SENTER</button>
+    <button data-tab="map" class="tab-btn">🗺️ PETA NAV</button>
+    <button data-tab="comms" class="tab-btn">📡 P2P & MORSE</button>
+    <button data-tab="calc" class="tab-btn">🔢 ALAT HITUNG</button>
+    <button data-tab="crud" class="tab-btn">📊 INVENTARIS</button>
+    <button data-tab="time" class="tab-btn">⏱️ WAKTU</button>
+    <button data-tab="canvas" class="tab-btn">🎨 SKETSA</button>
+  </nav>
+
+  <main>
+    
+    <!-- 1. NOTEPAD & TUGAS -->
+    <section id="sec-notepad" class="grid-auto">
+      <div class="card">
+        <div class="card-header">
+          <span class="font-bold mono text-accent">📝 EDITOR CATATAN DARURAT</span>
+          <span id="note-stat" class="badge badge-accent">0 Kata</span>
+        </div>
+        <textarea id="app-notepad" class="input flex-1" style="min-height: 400px; resize: vertical;" placeholder="Tulis kronologi insiden atau log aktivitas di sini. Tersimpan otomatis."></textarea>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <span class="font-bold mono text-success">✅ CHECKLIST PRIORITAS</span>
+          <button data-action="clearTasks" class="btn btn-danger text-[10px]">HAPUS SELESAI</button>
+        </div>
+        <div class="flex gap-2">
+          <select id="task-prio" class="input" style="width: 100px;">
+            <option value="KRITIS">🔴 KRT</option>
+            <option value="SEDANG" selected>🟡 SDG</option>
+            <option value="RUTIN">🟢 RTN</option>
+          </select>
+          <input type="text" id="task-input" class="input flex-1" placeholder="Tindakan baru...">
+          <button data-action="addTask" class="btn btn-primary">+</button>
+        </div>
+        <div id="task-list" class="flex flex-col gap-2 overflow-y-auto pr-1" style="max-height: 350px;"></div>
+      </div>
+    </section>
+
+    <!-- 2. WIKI (JSON IN-APP) -->
+    <section id="sec-wiki" class="hidden flex flex-col gap-4">
+      <div class="card">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="font-bold mono text-cyan text-xl">📚 BUKU PANDUAN LURING</h2>
+          <input type="text" id="wiki-search" class="input w-full md:w-auto flex-1 max-w-md" placeholder="Cari protokol, medis, survival...">
+        </div>
+      </div>
+      <div id="wiki-grid" class="masonry"></div>
+    </section>
+
+    <!-- 3. RADAR ONLINE -->
+    <section id="sec-online" class="hidden grid-auto">
+      <div class="card md:col-span-2">
+        <div class="card-header">
+          <span class="font-bold mono text-cyan">🌐 KONEKTOR SUMBER TERBUKA (OSINT)</span>
+          <button data-action="syncOnline" class="btn btn-primary text-xs">🔄 SINKRONISASI DATA</button>
+        </div>
+        <div class="flex flex-wrap gap-4 mono text-xs items-end">
+          <div class="flex-1 min-w-[200px]">
+            <label class="text-muted block mb-1">Garis Lintang (Latitude):</label>
+            <input type="number" id="osint-lat" class="input" value="-6.2088">
+          </div>
+          <div class="flex-1 min-w-[200px]">
+            <label class="text-muted block mb-1">Garis Bujur (Longitude):</label>
+            <input type="number" id="osint-lon" class="input" value="106.8456">
+          </div>
+          <button data-action="getGPS" class="btn btn-success">📍 GUNAKAN GPS</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="font-bold mono text-accent">⛅ CUACA TERKINI (OPEN-METEO)</span>
+          <span id="weather-time" class="text-[10px] text-muted mono">Belum disinkronkan</span>
+        </div>
+        <div id="weather-content" class="flex flex-col gap-3">
+          <div class="text-center py-6 text-muted mono text-xs border border-dashed border-border rounded">Tekan sinkronisasi untuk memuat data.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="font-bold mono text-danger">🌋 GEMPA BUMI M4.5+ (USGS 24J)</span>
+          <span id="quake-time" class="text-[10px] text-muted mono">Belum disinkronkan</span>
+        </div>
+        <div id="quake-content" class="flex flex-col gap-2 overflow-y-auto" style="max-height: 300px; padding-right:4px;">
+          <div class="text-center py-6 text-muted mono text-xs border border-dashed border-border rounded">Tekan sinkronisasi untuk memuat data.</div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- 4. SENTER LAYAR (BARU) -->
+    <section id="sec-flashlight" class="hidden grid-auto">
+      <div class="card flex flex-col gap-4 text-center justify-center py-10 md:col-span-2 shadow-lg">
+        <h3 class="mono text-accent text-xl font-bold border-b border-border pb-3">🔦 PENGATURAN SENTER LAYAR</h3>
+        <p class="text-xs text-muted mono">Mengubah layar perangkat menjadi sumber cahaya darurat atau sinyal suar (beacon).</p>
+        
+        <div class="flex flex-wrap gap-8 justify-center mt-6">
+          <label class="flex flex-col text-sm mono font-bold text-white gap-3 items-center">
+            Warna Cahaya
+            <input type="color" id="flash-color" value="#ffffff" class="cursor-pointer border-none bg-transparent" style="width: 80px; height: 50px;">
+          </label>
+          <label class="flex flex-col text-sm mono font-bold text-white gap-3 items-start">
+            Mode Kedipan
+            <select id="flash-mode" class="input text-center text-base" style="width: 250px;">
+              <option value="solid">Solid (Nyala Terus)</option>
+              <option value="slow">Lambat (1Hz)</option>
+              <option value="medium">Sedang (2Hz)</option>
+              <option value="fast">Cepat (5Hz)</option>
+              <option value="vfast">Strobo (10Hz)</option>
+              <option value="sos">Sandi Darurat (S.O.S)</option>
+            </select>
+          </label>
+        </div>
+        
+        <button data-action="startFlashlight" class="btn btn-primary text-lg py-5 mt-6 w-full max-w-md mx-auto rounded-lg uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.5)]">
+          NYALAKAN SENTER FULLSCREEN
+        </button>
+      </div>
+    </section>
+
+    <!-- Overlay Senter -->
+    <div id="flash-overlay" class="hidden" style="position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center;">
+       <button data-action="stopFlashlight" class="cursor-pointer border-2 border-black/20 text-black font-bold text-xl px-10 py-5 bg-white/40 backdrop-blur-md rounded-full shadow-2xl hover:bg-white/60 transition-colors">
+         MATIKAN SENTER
+       </button>
+    </div>
+
+    <!-- 5. PETA NAVIGASI -->
+    <section id="sec-map" class="hidden grid-auto">
+      <div class="card md:col-span-2">
+        <div class="card-header">
+          <span class="font-bold mono text-cyan">🗺️ GRID VEKTOR & WAYPOINT</span>
+          <span id="map-coords" class="badge badge-cyan text-[10px]">KOORDINAT KURSOR</span>
+        </div>
+        <canvas id="map-canvas" style="height: 50vh; cursor: crosshair;"></canvas>
+      </div>
+      
+      <div class="card flex flex-col gap-3 mono text-sm">
+        <h3 class="font-bold text-accent border-b border-border pb-2">📐 HAVERSINE & AZIMUTH</h3>
+        <div class="flex flex-col gap-1">
+          <span class="text-cyan text-xs">Titik Awal (Lat, Lon):</span>
+          <div class="flex gap-2"><input id="nav-lat1" type="number" class="input"><input id="nav-lon1" type="number" class="input"></div>
+        </div>
+        <div class="flex flex-col gap-1 mt-2">
+          <span class="text-accent text-xs">Titik Tujuan (Lat, Lon):</span>
+          <div class="flex gap-2"><input id="nav-lat2" type="number" class="input"><input id="nav-lon2" type="number" class="input"></div>
+        </div>
+        <button data-action="calcMap" class="btn btn-primary w-full mt-2">HITUNG JARAK & ARAH</button>
+        
+        <div class="bg-bg p-3 rounded border border-border flex flex-col gap-2 mt-2 text-xs">
+          <div class="flex justify-between"><span>Jarak Lurus:</span><span id="nav-dist" class="text-white font-bold">-</span></div>
+          <div class="flex justify-between"><span>Bearing:</span><span id="nav-bear" class="text-white font-bold">-</span></div>
+        </div>
+        <button data-action="clearMap" class="btn btn-danger w-full mt-auto">HAPUS WAYPOINT</button>
+      </div>
+    </section>
+
+    <!-- 6. KOMUNIKASI P2P & MORSE -->
+    <section id="sec-comms" class="hidden grid-auto">
+      <div class="card flex flex-col gap-3 mono text-sm">
+        <div class="card-header">
+          <span class="font-bold text-cyan">📡 P2P WEBRTC LOKAL</span>
+          <span id="rtc-status" class="badge text-[10px]">TERPUTUS</span>
+        </div>
+        <div class="flex gap-2 mt-2">
+          <button data-action="rtcOffer" class="btn btn-primary flex-1">1. Buat Tawaran</button>
+          <button data-action="rtcAnswer" class="btn flex-1">2. Balas Tawaran</button>
+        </div>
+        <textarea id="rtc-sdp" class="input text-xs" rows="3" placeholder="Kode SDP akan muncul di sini..."></textarea>
+        <div class="flex gap-2">
+          <button data-action="rtcCopy" class="btn flex-1 text-xs">Salin Kode</button>
+          <button data-action="rtcConnect" class="btn btn-success flex-1 text-xs">3. Sambungkan</button>
+        </div>
+        <div id="rtc-chat" class="bg-bg p-3 rounded border border-border flex-1 overflow-y-auto flex flex-col gap-2 mt-2 text-xs" style="min-height: 150px;"></div>
+        <div class="flex gap-2">
+          <input type="text" id="rtc-msg" class="input flex-1" placeholder="Pesan luring..." onkeydown="if(event.key==='Enter') Actions.rtcSend()">
+          <button data-action="rtcSend" class="btn btn-primary">KIRIM</button>
+        </div>
+      </div>
+      
+      <div class="card flex flex-col gap-3 mono text-sm">
+        <div class="card-header">
+          <span class="font-bold text-accent">⚡ PEMANCAR SANDI MORSE</span>
+        </div>
+        <input type="text" id="morse-input" class="input text-xl font-bold uppercase tracking-widest text-center mt-2" value="SOS">
+        <div class="bg-bg p-3 rounded border border-border text-accent font-bold text-center tracking-widest" id="morse-preview">... --- ...</div>
+        <div class="flex gap-2 mt-2">
+          <button data-action="txMorse" class="btn btn-primary flex-1">PANCARKAN KILAT</button>
+          <button data-action="stopMorse" class="btn btn-danger flex-1">HENTIKAN</button>
+        </div>
+        <div id="morse-flash" class="flex-1 rounded-lg border-2 border-border bg-bg flex items-center justify-center text-muted font-bold transition-none mt-4 text-2xl tracking-widest" style="min-height: 150px;">
+          STANDBY
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. ALAT HITUNG & KALKULATOR (DIROMBAK) -->
+    <section id="sec-calc" class="hidden grid-auto">
+      <div class="card md:col-span-1 shadow-lg bg-surface">
+        <h3 class="font-bold mono text-accent border-b border-border pb-3 mb-2 flex items-center gap-2"><span>🔢</span> KALKULATOR TAKTIS</h3>
+        
+        <!-- Layar Kalkulator -->
+        <div id="calc-disp" class="text-right text-4xl font-bold text-accent p-4 bg-[#05080c] rounded-lg shadow-inner border border-border mb-4 font-mono overflow-x-auto whitespace-nowrap" style="min-height: 80px; display: flex; align-items: center; justify-content: flex-end;">
+          0
+        </div>
+        
+        <!-- Papan Tombol -->
+        <div class="grid-cols-4 gap-2 font-mono" id="calc-pad">
+          <button class="btn btn-danger py-4 text-xl rounded-lg font-bold" data-val="C">AC</button>
+          <button class="btn-calc-num" data-val="(">(</button>
+          <button class="btn-calc-num" data-val=")">)</button>
+          <button class="btn-calc-op" data-val="/">÷</button>
+          
+          <button class="btn-calc-num" data-val="7">7</button>
+          <button class="btn-calc-num" data-val="8">8</button>
+          <button class="btn-calc-num" data-val="9">9</button>
+          <button class="btn-calc-op" data-val="*">×</button>
+          
+          <button class="btn-calc-num" data-val="4">4</button>
+          <button class="btn-calc-num" data-val="5">5</button>
+          <button class="btn-calc-num" data-val="6">6</button>
+          <button class="btn-calc-op" data-val="-">−</button>
+          
+          <button class="btn-calc-num" data-val="1">1</button>
+          <button class="btn-calc-num" data-val="2">2</button>
+          <button class="btn-calc-num" data-val="3">3</button>
+          <button class="btn-calc-op" data-val="+">+</button>
+          
+          <button class="btn-calc-num" data-val="0" style="grid-column: span 2;">0</button>
+          <button class="btn-calc-num" data-val=".">.</button>
+          <button class="btn btn-primary py-4 text-2xl rounded-lg font-bold shadow-md" data-val="=">=</button>
+        </div>
+      </div>
+      
+      <div class="card flex flex-col gap-4">
+        <h3 class="font-bold mono text-cyan border-b border-border pb-2">💧 ESTIMATOR RANSUM & LOGISTIK</h3>
+        <div class="flex gap-3">
+          <label class="flex-1 mono text-sm text-muted">Jumlah Orang:<input type="number" id="sup-p" class="input mt-1" value="4" min="1"></label>
+          <label class="flex-1 mono text-sm text-muted">Target Hari:<input type="number" id="sup-d" class="input mt-1" value="7" min="1"></label>
+        </div>
+        <button data-action="calcSupplies" class="btn btn-primary py-3 text-sm">HITUNG KEBUTUHAN MINIMAL</button>
+        
+        <div class="bg-bg p-4 rounded border border-border mono text-sm flex flex-col gap-3 mt-2 text-muted">
+          <div class="flex justify-between items-center border-b border-border pb-2"><span>Air Bersih (3L/org/hari):</span> <span id="res-water" class="text-cyan font-bold text-lg">-</span></div>
+          <div class="flex justify-between items-center border-b border-border pb-2"><span>Kalori Total (2000/hari):</span> <span id="res-cal" class="text-accent font-bold text-lg">-</span></div>
+          <div class="flex justify-between items-center"><span>Pemutih (Desinfeksi):</span> <span id="res-bl" class="text-success font-bold text-lg">-</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. INVENTARIS CRUD -->
+    <section id="sec-crud" class="hidden flex flex-col gap-4">
+      <div class="card flex flex-row flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3 w-full md:w-auto flex-1">
+          <h2 class="font-bold mono text-accent text-xl whitespace-nowrap">📊 TABEL INVENTARIS</h2>
+          <input type="text" id="crud-search" class="input" placeholder="Cari nama, kategori, kode...">
+        </div>
+        <div class="flex gap-2 w-full md:w-auto">
+          <label class="btn cursor-pointer whitespace-nowrap text-xs">📥 IMPOR CSV <input type="file" id="crud-file" accept=".csv" class="hidden"></label>
+          <button data-action="exportCSV" class="btn btn-success text-xs">📤 EKSPOR</button>
+          <button data-action="openCrudModal" class="btn btn-primary text-xs">➕ TAMBAH ITEM</button>
+        </div>
+      </div>
+      
+      <div class="card p-0 overflow-hidden" style="overflow-x: auto;">
+        <table class="w-full">
+          <thead><tr><th>ID</th><th>Nama Barang</th><th>Kategori</th><th>Qty</th><th>Kondisi</th><th>Lokasi</th><th>Aksi</th></tr></thead>
+          <tbody id="crud-body" class="divide-y divide-border"></tbody>
+        </table>
+      </div>
+      
+      <!-- Modal Form CRUD -->
+      <div id="crud-modal" class="hidden" style="position:fixed; inset:0; background:rgba(9,12,16,0.85); backdrop-filter:blur(4px); z-index:100; display:flex; align-items:center; justify-content:center; padding:1rem;">
+        <div class="card" style="width: 100%; max-width: 450px;">
+          <h3 class="mono text-accent text-lg font-bold border-b border-border pb-3 mb-2">FORMULIR LOGISTIK</h3>
+          <input type="hidden" id="crud-id">
+          <div class="flex flex-col gap-3 mono text-sm text-muted">
+            <label>Nama Item:<input type="text" id="crud-n" class="input mt-1"></label>
+            <div class="flex gap-3">
+              <label class="flex-1">Kategori:<input type="text" id="crud-c" class="input mt-1"></label>
+              <label class="w-1/3">Jumlah:<input type="number" id="crud-q" class="input mt-1" value="1" min="1"></label>
+            </div>
+            <div class="flex gap-3">
+              <label class="flex-1">Kondisi:
+                <select id="crud-s" class="input mt-1">
+                  <option value="Baik">Baik</option><option value="Terbatas">Menipis</option><option value="Rusak">Rusak</option>
+                </select>
+              </label>
+              <label class="flex-1">Lokasi:<input type="text" id="crud-l" class="input mt-1"></label>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-4 pt-4 border-t border-border">
+            <button data-action="closeCrudModal" class="btn flex-1">BATAL</button>
+            <button data-action="saveCrudItem" class="btn btn-primary flex-1">SIMPAN</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. WAKTU -->
+    <section id="sec-time" class="hidden grid-auto">
+      <div class="card flex flex-col gap-4 text-center justify-center py-10">
+        <h3 class="mono text-muted text-xs tracking-widest border-b border-border pb-2">WAKTU SISTEM LOKAL</h3>
+        <div id="time-big" class="text-6xl font-bold mono text-accent tracking-wider">00:00:00</div>
+        <div id="date-big" class="text-sm mono text-white"></div>
+        <div class="flex justify-center gap-6 mono text-xs text-muted bg-bg p-3 rounded border border-border mt-4">
+          <div class="flex flex-col items-center"><span>UTC ZULU</span><span id="time-utc" class="text-cyan font-bold text-sm mt-1">00:00:00 Z</span></div>
+          <div class="w-px bg-border"></div>
+          <div class="flex flex-col items-center"><span>ZONA</span><span id="time-zone" class="text-white font-bold text-sm mt-1">WIB</span></div>
+        </div>
+      </div>
+      
+      <div class="card flex flex-col gap-4 text-center">
+        <h3 class="mono text-muted text-xs tracking-widest border-b border-border pb-2 flex justify-between">
+          <span>ALARM DARURAT</span>
+          <span id="alarm-badge" class="badge">NONAKTIF</span>
+        </h3>
+        <div class="flex-1 flex flex-col justify-center gap-6 py-6">
+          <input type="time" id="alarm-input" class="input text-center text-4xl font-bold py-4 bg-bg border-border">
+          <div class="flex gap-2">
+            <button data-action="toggleAlarm" id="btn-alarm" class="btn btn-primary flex-1 py-3 text-sm">AKTIFKAN ALARM</button>
+            <button data-action="stopAlarm" id="btn-stop-alarm" class="btn btn-danger hidden flex-1 py-3 text-sm">MATIKAN SIRINE</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10. SKETSA -->
+    <section id="sec-canvas" class="hidden flex flex-col gap-3">
+      <div class="card p-3 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-4 mono text-xs text-muted">
+          <label class="flex items-center gap-2">Warna Pena:
+            <input type="color" id="brush-color" value="#f59e0b" class="rounded cursor-pointer" style="width:30px; height:30px; padding:0; border:none; background:none;">
+          </label>
+          <label class="flex items-center gap-2">Tebal:
+            <input type="range" id="brush-size" min="1" max="25" value="4" class="accent-accent">
+          </label>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button data-action="setPen" id="btn-pen" class="btn btn-primary text-xs">PENA</button>
+          <button data-action="setEraser" id="btn-eraser" class="btn text-xs">PENGHAPUS</button>
+          <div class="w-px bg-border mx-1"></div>
+          <button data-action="clearCanvas" class="btn btn-danger text-xs">BERSIHKAN</button>
+          <button data-action="exportCanvas" class="btn btn-success text-xs">SIMPAN PNG</button>
+        </div>
+      </div>
+      <div class="border border-border rounded-lg overflow-hidden bg-[#0d1117] shadow-lg relative">
+        <canvas id="app-canvas" style="height: 65vh; display: block;"></canvas>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script>
+    /* ==========================================================================
+       DATA TERTANAM (WIKI JSON)
+       ========================================================================== */
+    const WIKI_DATA = [
+      { id: 'w1', title: 'Triage Medis Lapangan (Metode START)', category: 'Medis', icon: '🏥', 
+        content: `**Triage START (Simple Triage and Rapid Treatment)**\nDigunakan untuk memilah korban massal secara cepat.\n\n*   🔴 **MERAH (Segera/Prioritas 1):** Cedera mengancam jiwa. Pernapasan > 30x/menit, perfusi lambat, atau tidak mampu ikuti perintah.\n*   🟡 **KUNING (Tunda/Prioritas 2):** Cedera serius tapi tidak segera mengancam jiwa. Tanda vital stabil.\n*   🟢 **HIJAU (Ringan/Prioritas 3):** "Walking Wounded" (korban yang mampu berjalan sendiri).\n*   ⚫ **HITAM (Meninggal):** Tidak bernapas setelah reposisi jalan napas dibuka.` },
+      { id: 'w2', title: 'Resusitasi Jantung Paru (RJP/CPR)', category: 'Medis', icon: '🩺',
+        content: `**Protokol Dasar RJP**\nLakukan jika korban tidak sadar dan tidak bernapas normal.\n\n1.  **D-R-A-B:** Danger, Response, Airway, Breathing.\n2.  **Kompresi Dada:** Letakkan tumit telapak tangan di pertengahan dada bagian bawah. Tekan kuat dan cepat.\n3.  **Kedalaman:** 5 - 6 cm (Dewasa).\n4.  **Kecepatan:** 100 - 120 kali per menit (Ritme lagu "Stayin' Alive").\n5.  **Rasio:** Jika terlatih berikan napas buatan, rasio 30 kompresi : 2 napas.` },
+      { id: 'w3', title: 'Purifikasi & Desinfeksi Air', category: 'Logistik', icon: '💧',
+        content: `**Membuat Air Aman Diminum di Alam Liar**\n\n1.  **Filtrasi Mekanis:** Saring kotoran besar menggunakan kain bersih atau lapisan pasir dan arang aktif.\n2.  **Perebusan (Aman):** Rebus air hingga mendidih bergolak minimal selama 1 menit (3 menit jika > 2000 MDPL).\n3.  **Desinfeksi (Klorin):** Gunakan pemutih cair (klorin 5.25%) tanpa pewangi. Dosis: 2 tetes per 1 Liter air jernih (atau 4 tetes jika keruh). Diamkan selama 30-60 menit sebelum diminum.` },
+      { id: 'w4', title: 'Sandi Morse Internasional', category: 'Sinyal', icon: '📻',
+        content: `**Sinyal Darurat**\n\n**SOS:** \`... --- ...\`\n\n*   A: \`. -\` | B: \`- . . .\` | C: \`- . - .\`\n*   D: \`- . .\` | E: \`.\` | F: \`. . - .\`\n*   G: \`- - .\` | H: \`. . . .\` | I: \`. .\`\n*   J: \`. - - -\` | K: \`- . -\` | L: \`. - . .\`\n*   M: \`- -\` | N: \`- .\` | O: \`- - -\`\n*   P: \`. - - .\` | Q: \`- - . -\` | R: \`. - .\`\n*   S: \`. . .\` | T: \`-\` | U: \`. . -\`\n*   V: \`. . . -\` | W: \`. - -\` | X: \`- . . -\`\n*   Y: \`- . - -\` | Z: \`- - . .\`` }
+    ];
+
+    /* ==========================================================================
+       INFRASTRUKTUR SISTEM & UTILITAS UTAMA
+       ========================================================================== */
+    const UI = {
+      toast: (msg, type = 'info') => {
+        const container = document.getElementById('toast-container');
+        const el = document.createElement('div');
+        el.className = `toast ${type === 'error' ? 'text-danger border-danger' : (type === 'success' ? 'text-success border-success' : '')}`;
+        el.innerHTML = `<strong>${type === 'error'?'⚠️':type==='success'?'✓':'⚡'}</strong> &nbsp; ${msg}`;
+        container.appendChild(el);
+        setTimeout(() => {
+          el.style.transform = 'translateX(100%)'; el.style.opacity = '0';
+          setTimeout(() => el.remove(), 300);
+        }, 3000);
+      },
+      escape: str => String(str).replace(/[&<>"']/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m])),
+      generateId: () => typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `ID-${Math.random().toString(36).substr(2, 9)}`,
+      parseMarkdown: (text) => {
+        return UI.escape(text)
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .replace(/`(.*?)`/g, '<code class="bg-surface-hl px-1 rounded text-cyan">$1</code>')
+          .replace(/\n\n/g, '</p><p class="mt-2">')
+          .replace(/\n/g, '<br>')
+          .replace(/(^|<br>)\*\s(.*)/g, '$1&bull; $2'); 
+      }
+    };
+
+    const DB = {
+      get: (key, def) => { try { const v = localStorage.getItem('og_' + key); return v ? JSON.parse(v) : def; } catch { return def; } },
+      set: (key, val) => { try { localStorage.setItem('og_' + key, JSON.stringify(val)); } catch(e) { UI.toast("Penyimpanan lokal penuh!", "error"); } }
+    };
+
+    /* ==========================================================================
+       MESIN AUDIO (WEB AUDIO API MURNI)
+       ========================================================================== */
+    let audioCtx = null, isMuted = false, activeSiren = null;
+    
+    function getAudio() {
+      if(!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+    
+    function playBeep(freq = 600, duration = 0.1, type = 'sine') {
+      if(isMuted) return;
+      try {
+        const ctx = getAudio(), osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.type = type; osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.01);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime + duration - 0.02);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + duration);
+      } catch(e) {}
+    }
+    
+    function startSiren() {
+      if(isMuted || activeSiren) return;
+      try {
+        const ctx = getAudio();
+        activeSiren = { o: ctx.createOscillator(), g: ctx.createGain(), interval: null };
+        activeSiren.o.type = 'sawtooth';
+        activeSiren.g.gain.value = 0.25;
+        
+        const sweep = () => {
+          if(!activeSiren) return;
+          activeSiren.o.frequency.setValueAtTime(400, ctx.currentTime);
+          activeSiren.o.frequency.linearRampToValueAtTime(900, ctx.currentTime + 0.4);
+          activeSiren.o.frequency.linearRampToValueAtTime(400, ctx.currentTime + 0.8);
+        };
+        
+        sweep();
+        activeSiren.interval = setInterval(sweep, 800);
+        activeSiren.o.connect(activeSiren.g); activeSiren.g.connect(ctx.destination);
+        activeSiren.o.start();
+        
+        document.getElementById('btn-stop-alarm').classList.remove('hidden');
+        document.getElementById('btn-alarm').classList.add('hidden');
+      } catch(e) {}
+    }
+    
+    function stopSiren() {
+      if(activeSiren) {
+        clearInterval(activeSiren.interval);
+        activeSiren.g.gain.linearRampToValueAtTime(0, getAudio().currentTime + 0.1);
+        setTimeout(() => { if(activeSiren){ activeSiren.o.stop(); activeSiren.o.disconnect(); activeSiren = null; } }, 100);
+      }
+      document.getElementById('btn-stop-alarm').classList.add('hidden');
+      document.getElementById('btn-alarm').classList.remove('hidden');
+    }
+
+    /* ==========================================================================
+       MANAJER ROUTING & DELEGASI EVENT
+       ========================================================================== */
+    const TABS = ['notepad', 'wiki', 'online', 'flashlight', 'map', 'comms', 'calc', 'crud', 'time', 'canvas'];
+    
+    document.getElementById('nav-tabs').addEventListener('click', e => {
+      if (!e.target.classList.contains('tab-btn')) return;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      const targetTab = e.target.dataset.tab;
+      
+      TABS.forEach(tab => document.getElementById(`sec-${tab}`).classList.add('hidden'));
+      document.getElementById(`sec-${targetTab}`).classList.remove('hidden');
+      
+      if (targetTab === 'canvas') initCanvas();
+      if (targetTab === 'map') renderMap();
+      if (targetTab === 'wiki') renderWiki();
+      
+      playBeep(1200, 0.03);
+    });
+
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      if (Actions[action]) {
+        Actions[action](e, btn);
+        if (!['txMorse', 'stopSiren', 'startFlashlight', 'stopFlashlight'].includes(action)) playBeep(1400, 0.02);
+      }
+    });
+
+    // Menangani Resizing Kanvas Supaya Responsif
+    window.addEventListener('resize', () => {
+       if(!document.getElementById('sec-map').classList.contains('hidden')) renderMap();
+       // Sketsa diabaikan di resize agar gambar tidak terhapus. Sketsa pakai css resizer.
+    });
+
+    /* ==========================================================================
+       MODUL 1: NOTEPAD & TUGAS
+       ========================================================================== */
+    const noteEl = document.getElementById('app-notepad');
+    noteEl.value = DB.get('note', '');
+    
+    noteEl.addEventListener('input', () => {
+      DB.set('note', noteEl.value);
+      document.getElementById('note-stat').textContent = `${noteEl.value.trim().split(/\s+/).filter(x=>x).length} Kata`;
+    });
+    document.getElementById('note-stat').textContent = `${noteEl.value.trim().split(/\s+/).filter(x=>x).length} Kata`;
+    
+    let tasks = DB.get('tasks', []);
+    function renderTasks() {
+      const list = document.getElementById('task-list');
+      list.innerHTML = '';
+      if(tasks.length === 0) list.innerHTML = '<div class="text-xs text-muted mono text-center py-4 border border-dashed border-border rounded">Daftar tindakan kosong.</div>';
+      
+      tasks.forEach((t, i) => {
+        let badgeColor = t.p === 'KRITIS' ? 'badge-danger' : t.p === 'SEDANG' ? 'badge-accent' : 'badge-success';
+        const div = document.createElement('div');
+        div.className = `flex items-center justify-between p-2.5 border border-border rounded bg-bg ${t.d ? 'opacity-40 grayscale' : ''} transition-all`;
+        div.innerHTML = `
+          <div class="flex items-center gap-3 flex-1 overflow-hidden">
+            <input type="checkbox" ${t.d ? 'checked' : ''} data-idx="${i}" class="task-check w-4 h-4 accent-accent cursor-pointer">
+            <span class="badge ${badgeColor}">${t.p}</span>
+            <span class="text-sm mono truncate ${t.d ? 'line-through text-muted' : 'text-main'}">${UI.escape(t.t)}</span>
+          </div>
+          <button data-del="${i}" class="text-muted hover:text-danger bg-transparent border-none cursor-pointer px-2">✕</button>
+        `;
+        list.appendChild(div);
+      });
+      DB.set('tasks', tasks);
+    }
+    
+    document.getElementById('task-list').addEventListener('change', e => {
+      if(e.target.classList.contains('task-check')) { 
+        tasks[e.target.dataset.idx].d = e.target.checked; 
+        playBeep(e.target.checked ? 800 : 500, 0.05);
+        renderTasks(); 
+      }
+    });
+    
+    document.getElementById('task-list').addEventListener('click', e => {
+      if(e.target.dataset.del) { tasks.splice(e.target.dataset.del, 1); renderTasks(); }
+    });
+    renderTasks();
+
+    /* ==========================================================================
+       MODUL 2: WIKI (JSON IN-APP)
+       ========================================================================== */
+    function renderWiki(filterQuery = '') {
+      const grid = document.getElementById('wiki-grid');
+      grid.innerHTML = '';
+      const q = filterQuery.toLowerCase();
+      
+      const filtered = WIKI_DATA.filter(w => w.title.toLowerCase().includes(q) || w.category.toLowerCase().includes(q) || w.content.toLowerCase().includes(q));
+      
+      if(filtered.length === 0) {
+        grid.innerHTML = `<div class="card text-center text-muted mono text-sm">Tidak ada panduan yang cocok.</div>`;
+        return;
+      }
+      
+      filtered.forEach(w => {
+        const card = document.createElement('div');
+        card.className = "card masonry-item bg-bg hover:border-accent transition-colors";
+        card.innerHTML = `
+          <div class="flex justify-between items-start border-b border-border pb-2 mb-2">
+            <div>
+              <span class="badge badge-cyan mb-1 inline-block">${w.category}</span>
+              <h3 class="font-bold text-base text-white flex items-center gap-2">${w.icon} ${UI.escape(w.title)}</h3>
+            </div>
+            <button class="btn p-1.5" onclick="navigator.clipboard.writeText('${UI.escape(w.content).replace(/'/g, "\\'")}').then(()=>UI.toast('Panduan disalin','success'))">📋</button>
+          </div>
+          <div class="mono text-xs text-main leading-relaxed" style="word-break: break-word;"><p>${UI.parseMarkdown(w.content)}</p></div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+    
+    document.getElementById('wiki-search').addEventListener('input', e => renderWiki(e.target.value));
+    renderWiki();
+
+    /* ==========================================================================
+       MODUL 3: RADAR ONLINE (OSINT API)
+       ========================================================================== */
+    async function fetchOnlineData() {
+      if (!navigator.onLine) {
+        UI.toast("Koneksi terputus. Menampilkan data cache.", "error");
+        loadOnlineCache();
+        return;
+      }
+      const lat = document.getElementById('osint-lat').value || '-6.2088';
+      const lon = document.getElementById('osint-lon').value || '106.8456';
+      
+      UI.toast("Menyinkronkan data...", "info");
+      
+      try {
+        const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`, { signal: AbortSignal.timeout(5000) });
+        const wData = await wRes.json();
+        const wCache = { temp: wData.current_weather.temperature, wind: wData.current_weather.windspeed, time: new Date().toLocaleTimeString() };
+        DB.set('cache_weather', wCache); renderWeather(wCache);
+      } catch (err) {}
+
+      try {
+        const qRes = await fetch(`https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson`, { signal: AbortSignal.timeout(5000) });
+        const qData = await qRes.json();
+        const quakes = qData.features.slice(0, 8).map(f => ({ mag: f.properties.mag, place: f.properties.place, time: f.properties.time }));
+        DB.set('cache_quakes', { list: quakes, updated: new Date().toLocaleTimeString() });
+        renderQuakes({ list: quakes, updated: new Date().toLocaleTimeString() });
+        UI.toast("Sinkronisasi radar berhasil.", "success");
+      } catch (err) {}
+    }
+    
+    function renderWeather(data) {
+      if(!data) return;
+      document.getElementById('weather-time').textContent = `Sinkronisasi: ${data.time}`;
+      document.getElementById('weather-content').innerHTML = `
+        <div class="flex justify-between items-center bg-bg p-4 rounded border border-border">
+          <div class="text-4xl font-bold mono text-accent">${data.temp}°C</div>
+          <div class="text-right mono text-xs text-muted"><div>Suhu Udara</div><div class="text-cyan font-bold mt-1">Angin: ${data.wind} km/h</div></div>
+        </div>
+      `;
+    }
+    
+    function renderQuakes(data) {
+      if(!data || !data.list) return;
+      document.getElementById('quake-time').textContent = `Sinkronisasi: ${data.updated}`;
+      const container = document.getElementById('quake-content');
+      container.innerHTML = '';
+      
+      data.list.forEach(q => {
+        const date = new Date(q.time);
+        const isRecent = (Date.now() - q.time) < 3600000; 
+        const magColor = q.mag >= 6 ? 'text-danger' : q.mag >= 5 ? 'text-accent' : 'text-success';
+        
+        container.innerHTML += `
+          <div class="flex justify-between items-center bg-bg p-2.5 rounded border border-border mono text-xs">
+            <div class="flex items-center gap-3">
+              <div class="${magColor} font-bold text-base w-8 text-center bg-surface rounded py-1 border border-border">M${q.mag.toFixed(1)}</div>
+              <div class="flex flex-col">
+                <span class="text-main font-bold truncate max-w-[150px] md:max-w-xs">${UI.escape(q.place)}</span>
+                <span class="text-muted">${date.toLocaleTimeString()} - ${date.toLocaleDateString()}</span>
+              </div>
+            </div>
+            ${isRecent ? '<span class="badge badge-danger blink">BARU</span>' : ''}
+          </div>
+        `;
+      });
+    }
+    
+    function loadOnlineCache() {
+      renderWeather(DB.get('cache_weather', null));
+      renderQuakes(DB.get('cache_quakes', null));
+    }
+    loadOnlineCache();
+
+    /* ==========================================================================
+       MODUL 4: PETA VEKTOR & NAVIGASI
+       ========================================================================== */
+    let waypoints = DB.get('wp', []);
+    function renderMap() {
+      const cvs = document.getElementById('map-canvas'); if(!cvs) return;
+      const ctx = cvs.getContext('2d');
+      const rect = cvs.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      cvs.width = rect.width * dpr; cvs.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      
+      const w = rect.width, h = rect.height;
+      
+      ctx.fillStyle = '#090c10'; ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#161b22'; ctx.lineWidth = 1;
+      for(let i=0; i<w; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,h); ctx.stroke(); }
+      for(let i=0; i<h; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(w,i); ctx.stroke(); }
+      
+      if(waypoints.length > 1) {
+        ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        waypoints.forEach((wp, i) => {
+          const cx = w/2 + (wp.lon - waypoints[0].lon) * 1000;
+          const cy = h/2 - (wp.lat - waypoints[0].lat) * 1000;
+          if(i===0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        });
+        ctx.stroke(); ctx.setLineDash([]);
+      }
+      
+      waypoints.forEach((wp, idx) => {
+        const cx = w/2 + (wp.lon - waypoints[0].lon) * 1000;
+        const cy = h/2 - (wp.lat - waypoints[0].lat) * 1000;
+        ctx.fillStyle = idx === 0 ? '#2ea043' : '#f85149';
+        ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle='#fff'; ctx.font='10px ui-monospace, monospace'; 
+        ctx.fillText(`WP-${idx+1}`, cx+10, cy+4);
+      });
+      
+      if(waypoints.length >= 2) {
+        document.getElementById('nav-lat1').value = waypoints[waypoints.length-2].lat;
+        document.getElementById('nav-lon1').value = waypoints[waypoints.length-2].lon;
+        document.getElementById('nav-lat2').value = waypoints[waypoints.length-1].lat;
+        document.getElementById('nav-lon2').value = waypoints[waypoints.length-1].lon;
+      }
+    }
+    
+    document.getElementById('map-canvas').addEventListener('click', e => {
+      const rect = e.target.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      let lat = -6.2, lon = 106.8; 
+      if(waypoints.length > 0) {
+        lat = waypoints[0].lat - (y - rect.height/2) / 1000;
+        lon = waypoints[0].lon + (x - rect.width/2) / 1000;
+      } else {
+        lat = parseFloat(document.getElementById('osint-lat').value) || lat;
+        lon = parseFloat(document.getElementById('osint-lon').value) || lon;
+      }
+      
+      waypoints.push({ lat: parseFloat(lat.toFixed(5)), lon: parseFloat(lon.toFixed(5)) });
+      DB.set('wp', waypoints); renderMap(); playBeep(1000, 0.05);
+    });
+    
+    document.getElementById('map-canvas').addEventListener('mousemove', e => {
+      const rect = e.target.getBoundingClientRect();
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      let lat = -6.2, lon = 106.8;
+      if(waypoints.length > 0) {
+        lat = waypoints[0].lat - (y - rect.height/2) / 1000;
+        lon = waypoints[0].lon + (x - rect.width/2) / 1000;
+      }
+      document.getElementById('map-coords').textContent = `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`;
+    });
+
+    /* ==========================================================================
+       MODUL 5: ALAT HITUNG, PARSER MATEMATIKA AMAN, & RANSUM
+       ========================================================================== */
+    function safeEvaluate(expr) {
+      const tokens = expr.match(/\d+(\.\d+)?|[+\-*/()]/g); if(!tokens) return 0;
+      let pos = 0;
+      const parseTerm = () => {
+        let val = parseFactor();
+        while(pos < tokens.length && (tokens[pos]==='*' || tokens[pos]==='/')) { 
+          let op=tokens[pos++]; let next=parseFactor(); 
+          if(op==='/' && next===0) throw "DivZero"; 
+          val = op==='*' ? val*next : val/next; 
+        }
+        return val;
+      };
+      const parseFactor = () => {
+        if(pos >= tokens.length) return 0; 
+        let tk=tokens[pos++];
+        if(tk==='(') { let val=parseExpr(); if(tokens[pos]===')') pos++; return val; }
+        return parseFloat(tk);
+      };
+      const parseExpr = () => {
+        let val = parseTerm();
+        while(pos < tokens.length && (tokens[pos]==='+' || tokens[pos]==='-')) { 
+          let op=tokens[pos++]; let next=parseTerm(); 
+          val = op==='+' ? val+next : val-next; 
+        }
+        return val;
+      };
+      return parseExpr();
+    }
+    
+    let calcStr = "";
+    document.getElementById('calc-pad').addEventListener('click', e => {
+      if(e.target.tagName !== 'BUTTON') return;
+      const v = e.target.dataset.val; if(!v) return;
+      playBeep(900, 0.02);
+      
+      const disp = document.getElementById('calc-disp');
+      if(v === 'C') { calcStr = ""; disp.textContent = "0"; }
+      else if(v === '=') { 
+        try { 
+          const res = safeEvaluate(calcStr); 
+          calcStr = Number.isInteger(res) ? String(res) : String(res.toFixed(6)).replace(/\.?0+$/, ''); 
+          disp.textContent = calcStr.replace(/\*/g, '×').replace(/\//g, '÷'); 
+        } catch(e) { disp.textContent = "Error"; calcStr=""; } 
+      }
+      else { 
+        calcStr += v; 
+        disp.textContent = calcStr.replace(/\*/g, '×').replace(/\//g, '÷'); 
+      }
+    });
+
+    /* ==========================================================================
+       MODUL 6: TABEL INVENTARIS CRUD
+       ========================================================================== */
+    let inv = DB.get('inv', []);
+    
+    function renderCrud() {
+      const tbody = document.getElementById('crud-body'), q = document.getElementById('crud-search').value.toLowerCase();
+      tbody.innerHTML = '';
+      const filtered = inv.filter(x => x.n.toLowerCase().includes(q) || x.i.toLowerCase().includes(q) || x.c.toLowerCase().includes(q));
+      
+      if(filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted mono">Data kosong atau tidak ditemukan.</td></tr>';
+        return;
+      }
+      
+      filtered.forEach(x => {
+        let statusClass = x.s === 'Rusak' ? 'text-danger' : x.s === 'Terbatas' ? 'text-accent' : 'text-success';
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-surface-hl transition-colors";
+        tr.innerHTML = `
+          <td class="text-muted font-bold">${UI.escape(x.i.slice(-5))}</td>
+          <td class="text-main font-bold">${UI.escape(x.n)}</td>
+          <td><span class="bg-bg px-2 py-1 rounded border border-border text-xs">${UI.escape(x.c)}</span></td>
+          <td class="font-bold text-accent">${x.q}</td>
+          <td class="${statusClass} font-bold text-xs">${x.s}</td>
+          <td class="text-muted">${UI.escape(x.l)}</td>
+          <td class="whitespace-nowrap">
+            <button data-edit="${x.i}" class="btn px-2 py-1 border-transparent hover:border-accent">✎</button> 
+            <button data-delinv="${x.i}" class="btn px-2 py-1 border-transparent text-danger hover:border-danger hover:bg-danger-bg">✕</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      DB.set('inv', inv);
+    }
+    
+    document.getElementById('crud-search').addEventListener('input', renderCrud);
+    document.getElementById('crud-body').addEventListener('click', e => {
+      const btn = e.target.closest('button'); if(!btn) return;
+      const d = btn.dataset;
+      if(d.delinv && confirm("Hapus logistik permanen?")) { inv = inv.filter(x => x.i !== d.delinv); renderCrud(); playBeep(400, 0.05); }
+      if(d.edit) {
+        const it = inv.find(x => x.i === d.edit);
+        if(it) {
+          document.getElementById('crud-id').value = it.i; document.getElementById('crud-n').value = it.n;
+          document.getElementById('crud-c').value = it.c; document.getElementById('crud-q').value = it.q;
+          document.getElementById('crud-s').value = it.s; document.getElementById('crud-l').value = it.l;
+          document.getElementById('crud-modal').classList.remove('hidden');
+        }
+      }
+    });
+    
+    document.getElementById('crud-file').addEventListener('change', e => {
+      const f = e.target.files[0]; if(!f) return;
+      const r = new FileReader();
+      r.onload = ev => {
+        let str = ev.target.result, rows = [], col=[], qt=false, cur='';
+        for(let i=0; i<str.length; i++) {
+          let c=str[i], nc=str[i+1];
+          if(c==='"' && qt && nc==='"') { cur+=c; i++; continue; }
+          if(c==='"') { qt=!qt; continue; }
+          if(c===',' && !qt) { col.push(cur.replace(/^[=+\-@]/, '')); cur=''; continue; }
+          if(c==='\n' && !qt) { col.push(cur); rows.push(col); col=[]; cur=''; continue; }
+          if(c!=='\r') cur+=c;
+        }
+        if(cur) col.push(cur); if(col.length) rows.push(col);
+        
+        let count = 0;
+        rows.slice(1).forEach(r => {
+          if(r.length >= 4) {
+            inv.push({ i: UI.generateId(), n: r[1]||'Barang Impor', c: r[2]||'Umum', q: parseInt(r[3])||1, s: r[4]||'Baik', l: r[5]||'' });
+            count++;
+          }
+        });
+        renderCrud(); UI.toast(`${count} barang diimpor`, "success");
+      };
+      r.readAsText(f);
+    });
+    
+    renderCrud();
+
+    /* ==========================================================================
+       MODUL 7: SKETSA DIGITAL (POINTER EVENTS)
+       ========================================================================== */
+    let cvs, ctx, isDraw=false, drwMode='pen', lastPos=null;
+    function initCanvas() {
+      cvs = document.getElementById('app-canvas');
+      if(!ctx) {
+        ctx = cvs.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        const rect = cvs.getBoundingClientRect();
+        cvs.width = rect.width * dpr; cvs.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = '#0d1117'; ctx.fillRect(0,0, rect.width, rect.height);
+        
+        const getPos = e => { const r = cvs.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+        
+        cvs.addEventListener('pointerdown', e => { 
+          isDraw=true; lastPos=getPos(e); 
+          cvs.setPointerCapture(e.pointerId);
+        });
+        cvs.addEventListener('pointermove', e => {
+          if(!isDraw) return;
+          const pos = getPos(e);
+          ctx.beginPath(); ctx.moveTo(lastPos.x, lastPos.y); ctx.lineTo(pos.x, pos.y);
+          ctx.strokeStyle = drwMode==='pen' ? document.getElementById('brush-color').value : '#0d1117';
+          ctx.lineWidth = drwMode==='pen' ? document.getElementById('brush-size').value : 30;
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+          lastPos = pos;
+        });
+        cvs.addEventListener('pointerup', e => { 
+          isDraw=false; 
+          if(cvs.hasPointerCapture(e.pointerId)) cvs.releasePointerCapture(e.pointerId); 
+        });
+      }
+    }
+
+    /* ==========================================================================
+       MODUL 8: WEBRTC P2P SERVERLESS
+       ========================================================================== */
+    let pc, dc;
+    function setupRTC() {
+      pc = new RTCPeerConnection({ iceServers: [] });
+      pc.onicecandidate = e => { 
+        if(!e.candidate) {
+          document.getElementById('rtc-sdp').value = btoa(JSON.stringify(pc.localDescription));
+          UI.toast("Kode SDP siap disalin!", "success");
+        }
+      };
+    }
+    
+    function appendChat(msg, type='SAYA') {
+      const box = document.getElementById('rtc-chat');
+      const time = new Date().toTimeString().substring(0,5);
+      const isMe = type === 'SAYA';
+      box.innerHTML += `<div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} mb-2">
+        <span class="text-[9px] text-muted mb-0.5">${type} • ${time}</span>
+        <div class="px-2 py-1 rounded border ${isMe ? 'bg-cyan-bg border-cyan text-cyan' : 'bg-surface-hl border-border text-white'}">${UI.escape(msg)}</div>
+      </div>`;
+      box.scrollTop = box.scrollHeight;
+    }
+
+    /* ==========================================================================
+       SISTEM JAM & PEMANTAU JARINGAN GLOBAL
+       ========================================================================== */
+    setInterval(() => {
+      const n = new Date();
+      const tStr = n.toTimeString().split(' ')[0];
+      const dStr = n.toLocaleDateString('id-ID', {weekday:'short', year:'numeric', month:'short', day:'numeric'});
+      
+      document.getElementById('sys-clock').textContent = tStr;
+      document.getElementById('sys-date').textContent = dStr;
+      
+      const tb = document.getElementById('time-big');
+      if(tb) {
+        tb.textContent = tStr;
+        document.getElementById('date-big').textContent = dStr;
+        document.getElementById('time-utc').textContent = n.toISOString().substring(11, 19) + ' Z';
+        let tz = -n.getTimezoneOffset() / 60;
+        document.getElementById('time-zone').textContent = tz === 7 ? 'WIB' : tz === 8 ? 'WITA' : tz === 9 ? 'WIT' : `UTC+${tz}`;
+      }
+
+      if(alarmActive && tStr.substring(0,5) === alarmTime && n.getSeconds() === 0) startSiren();
+    }, 1000);
+
+    const updateNetStatus = () => {
+      const el = document.getElementById('net-status');
+      if (navigator.onLine) {
+        el.className = 'badge badge-danger flex items-center gap-1';
+        el.innerHTML = '<span class="w-2 h-2 rounded-full" style="background-color:currentColor;"></span> TERHUBUNG JARINGAN';
+      } else {
+        el.className = 'badge badge-success flex items-center gap-1';
+        el.innerHTML = '<span class="w-2 h-2 rounded-full" style="background-color:currentColor;"></span> LURING AKTIF';
+      }
+    };
+    window.addEventListener('online', updateNetStatus);
+    window.addEventListener('offline', updateNetStatus);
+    updateNetStatus();
+
+    /* ==========================================================================
+       KUMPULAN AKSI KLIK GLOBAL (Actions Object)
+       ========================================================================== */
+    let flashInt = null, flashActive = false;
+    const sosDelay = (ms) => new Promise(r => setTimeout(r, ms));
+
+    const Actions = {
+      toggleAudio: (e, btn) => { 
+        isMuted = !isMuted; 
+        btn.textContent = isMuted ? '🔇' : '🔊'; 
+        UI.toast(`Audio ${isMuted?'Dimatikan':'Aktif'}`, 'info'); 
+      },
+      addTask: () => {
+        const v = document.getElementById('task-input').value.trim();
+        if(v) { 
+          tasks.unshift({ t:v, p:document.getElementById('task-prio').value, d:false }); 
+          document.getElementById('task-input').value=''; 
+          renderTasks(); 
+        }
+      },
+      clearTasks: () => { tasks = tasks.filter(t=>!t.d); renderTasks(); },
+      syncOnline: () => fetchOnlineData(),
+      getGPS: () => {
+        if(!navigator.geolocation) return UI.toast("GPS tidak didukung", "error");
+        UI.toast("Mencari satelit GPS...", "info");
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            document.getElementById('osint-lat').value = pos.coords.latitude.toFixed(5);
+            document.getElementById('osint-lon').value = pos.coords.longitude.toFixed(5);
+            document.getElementById('coord-status').textContent = "GPS: TERKUNCI";
+            document.getElementById('coord-status').classList.replace('text-muted', 'text-success');
+            UI.toast("Koordinat GPS dikunci", "success");
+            fetchOnlineData();
+          },
+          err => UI.toast("Akses GPS ditolak", "error"), { enableHighAccuracy: true, timeout: 10000 }
+        );
+      },
+      calcSupplies: () => {
+        const p = parseInt(document.getElementById('sup-p').value)||1, d = parseInt(document.getElementById('sup-d').value)||1;
+        document.getElementById('res-water').textContent = `${p*d*3} Liter`;
+        document.getElementById('res-cal').textContent = `${(p*d*2000).toLocaleString('id-ID')} kkal`;
+        document.getElementById('res-bl').textContent = `${p*d*3*2} tetes (5%)`;
+      },
+      calcMap: () => {
+        const lat1 = parseFloat(document.getElementById('nav-lat1').value), lon1 = parseFloat(document.getElementById('nav-lon1').value);
+        const lat2 = parseFloat(document.getElementById('nav-lat2').value), lon2 = parseFloat(document.getElementById('nav-lon2').value);
+        if(isNaN(lat1)||isNaN(lon1)||isNaN(lat2)||isNaN(lon2)) return UI.toast("Koordinat tidak lengkap", "error");
+        
+        const dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+        const dist = 6371 * (2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        const y = Math.sin(dLon)*Math.cos(lat2*Math.PI/180), x = Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180) - Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dLon);
+        const brng = (Math.atan2(y, x)*180/Math.PI + 360)%360;
+        
+        document.getElementById('nav-dist').textContent = `${dist.toFixed(2)} KM`; 
+        document.getElementById('nav-bear').textContent = `${brng.toFixed(1)}°`;
+      },
+      clearMap: () => { waypoints=[]; DB.set('wp', waypoints); renderMap(); UI.toast("Peta dibersihkan"); },
+      openCrudModal: () => { document.getElementById('crud-id').value=''; document.getElementById('crud-n').value=''; document.getElementById('crud-modal').classList.remove('hidden'); },
+      closeCrudModal: () => document.getElementById('crud-modal').classList.add('hidden'),
+      saveCrudItem: () => {
+        const id = document.getElementById('crud-id').value, n = document.getElementById('crud-n').value.trim();
+        if(!n) return UI.toast("Nama wajib diisi", "error");
+        const obj = { 
+          i: id||UI.generateId(), n: n, c: document.getElementById('crud-c').value||'Umum', 
+          q: parseInt(document.getElementById('crud-q').value)||1, 
+          s: document.getElementById('crud-s').value, l: document.getElementById('crud-l').value 
+        };
+        if(id) { const idx = inv.findIndex(x=>x.i===id); if(idx>=0) inv[idx]=obj; } else inv.push(obj);
+        document.getElementById('crud-modal').classList.add('hidden'); renderCrud();
+      },
+      exportCSV: () => {
+        const csv = ['ID,Nama_Barang,Kategori,Jumlah,Kondisi,Lokasi'].concat(inv.map(x=>`"${x.i}","${x.n}","${x.c}",${x.q},"${x.s}","${x.l}"`)).join('\n');
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='Inventaris_Taktis.csv'; a.click();
+      },
+      toggleAlarm: (e, btn) => {
+        const inp = document.getElementById('alarm-input').value;
+        if(!alarmActive) {
+          if(!inp) return UI.toast('Tentukan jam terlebih dahulu', 'error');
+          alarmActive=true; alarmTime=inp;
+          btn.textContent="BATALKAN ALARM"; btn.className="btn btn-danger flex-1 py-3 text-sm";
+          const badge = document.getElementById('alarm-badge');
+          badge.textContent=`AKTIF: ${alarmTime}`; badge.className='badge badge-accent blink';
+        } else {
+          alarmActive=false; 
+          btn.textContent="AKTIFKAN ALARM"; btn.className="btn btn-primary flex-1 py-3 text-sm";
+          const badge = document.getElementById('alarm-badge');
+          badge.textContent=`NONAKTIF`; badge.className='badge'; stopSiren();
+        }
+      },
+      stopAlarm: () => stopSiren(),
+      rtcOffer: async () => { 
+        setupRTC(); dc = pc.createDataChannel('chat'); 
+        dc.onopen = () => { document.getElementById('rtc-status').className="badge badge-success"; document.getElementById('rtc-status').textContent="TERHUBUNG"; };
+        dc.onmessage = e => appendChat(e.data, 'DIA'); 
+        await pc.setLocalDescription(await pc.createOffer()); 
+      },
+      rtcAnswer: async () => { 
+        const sdpStr = document.getElementById('rtc-sdp').value; if(!sdpStr) return UI.toast("Tempel SDP Offer dulu!", "error");
+        setupRTC(); pc.ondatachannel = e => { 
+          dc = e.channel; dc.onopen = () => { document.getElementById('rtc-status').className="badge badge-success"; document.getElementById('rtc-status').textContent="TERHUBUNG"; };
+          dc.onmessage = ev => appendChat(ev.data, 'DIA'); 
+        }; 
+        try { await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(sdpStr)))); await pc.setLocalDescription(await pc.createAnswer()); } 
+        catch(e) { UI.toast("Format SDP Salah", "error"); }
+      },
+      rtcConnect: async () => { 
+        try { await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(atob(document.getElementById('rtc-sdp').value)))); UI.toast("Memulai koneksi..."); } 
+        catch(e) { UI.toast("Format SDP Salah", "error"); }
+      },
+      rtcCopy: () => { navigator.clipboard.writeText(document.getElementById('rtc-sdp').value).then(()=>UI.toast("SDP Disalin","success")).catch(() => UI.toast("Gagal salin", "error")); },
+      rtcSend: () => { 
+        const v = document.getElementById('rtc-msg').value; 
+        if(v && dc && dc.readyState==='open') { dc.send(v); appendChat(v, 'SAYA'); document.getElementById('rtc-msg').value=''; } else { UI.toast("Saluran belum terbuka", "error"); }
+      },
+      setPen: (e, btn) => { drwMode = 'pen'; btn.className="btn btn-primary text-xs"; document.getElementById('btn-eraser').className="btn text-xs"; },
+      setEraser: (e, btn) => { drwMode = 'eraser'; btn.className="btn btn-primary text-xs"; document.getElementById('btn-pen').className="btn text-xs"; },
+      clearCanvas: () => { ctx.fillStyle='#0d1117'; ctx.fillRect(0,0,cvs.width,cvs.height); },
+      exportCanvas: () => { const a = document.createElement('a'); a.href = cvs.toDataURL('image/png'); a.download='Sketsa_Taktis.png'; a.click(); },
+      txMorse: async () => {
+        if(morseTx) return; morseTx = true;
+        const txt = document.getElementById('morse-preview').textContent, f = document.getElementById('morse-flash');
+        for(let c of txt) {
+          if(!morseTx) break;
+          if(c === ' ') { await new Promise(r=>setTimeout(r, 600)); continue; }
+          const dur = c==='.' ? 100 : 300;
+          f.className = 'flex-1 rounded-lg border-2 border-accent bg-accent flex items-center justify-center text-black font-bold transition-none mt-4 text-3xl tracking-widest'; 
+          f.textContent = c==='.'?'DIT':'DAH';
+          playBeep(800, dur/1000);
+          await new Promise(r=>setTimeout(r, dur));
+          f.className = 'flex-1 rounded-lg border-2 border-border bg-bg flex items-center justify-center text-muted font-bold transition-none mt-4 text-2xl tracking-widest'; 
+          f.textContent = '...';
+          await new Promise(r=>setTimeout(r, 100));
+        }
+        morseTx = false; f.textContent = 'STANDBY';
+      },
+      stopMorse: () => { morseTx = false; },
+      
+      // -- FITUR SENTER / FLASHLIGHT --
+      startFlashlight: async () => {
+        const color = document.getElementById('flash-color').value;
+        const mode = document.getElementById('flash-mode').value;
+        const overlay = document.getElementById('flash-overlay');
+        
+        overlay.style.backgroundColor = color;
+        overlay.classList.remove('hidden');
+        flashActive = true;
+        
+        // Coba request fullscreen
+        try { if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch(e) {}
+        
+        if (mode === 'solid') {
+          // do nothing, tetap nyala solid
+        } else if (mode === 'sos') {
+          const runSOS = async () => {
+             while(flashActive) {
+               for(let c of '...---...') {
+                 if(!flashActive) break;
+                 overlay.style.backgroundColor = color;
+                 await sosDelay(c === '.' ? 250 : 750);
+                 if(!flashActive) break;
+                 overlay.style.backgroundColor = '#000000';
+                 await sosDelay(250);
+               }
+               if(flashActive) await sosDelay(1500);
+             }
+          };
+          runSOS();
+        } else {
+          // Kedipan biasa
+          const speed = mode === 'slow' ? 1000 : mode === 'medium' ? 500 : mode === 'fast' ? 200 : 50;
+          let isOn = true;
+          flashInt = setInterval(() => {
+             isOn = !isOn;
+             overlay.style.backgroundColor = isOn ? color : '#000000';
+          }, speed);
+        }
+      },
+      stopFlashlight: () => {
+        flashActive = false;
+        if(flashInt) clearInterval(flashInt);
+        document.getElementById('flash-overlay').classList.add('hidden');
+        if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+      }
+    };
+    let morseTx = false;
+  </script>
+</body>
+</html>

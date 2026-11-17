@@ -1,0 +1,2746 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyDiary</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
+    <script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        :root {
+            --bg-page: #d4d0c8;
+            --bg-panel: #ffffff;
+            --bg-header: #004e98;
+            --text-header: #ffffff;
+            --border-light: #ffffff;
+            --border-dark: #808080;
+            --border-darkest: #404040;
+            --accent: #004e98;
+            --text-main: #222222;
+            --font-ui: 'Tahoma', 'Verdana', sans-serif;
+            --font-body: 'Georgia', serif;
+        }
+
+        [data-theme="diary"] {
+            --bg-page: #f4e8ee;
+            --bg-panel: #fffafb;
+            --bg-header: #8b3a62;
+            --accent: #8b3a62;
+        }
+
+        [data-theme="journal"] {
+            --bg-page: #e8e8e8;
+            --bg-panel: #ffffff;
+            --bg-header: #2b2b2b;
+            --accent: #2b2b2b;
+            --font-body: 'Georgia', serif;
+        }
+
+        [data-theme="logbook"] {
+            --bg-page: #d8e2dc;
+            --bg-panel: #f8f9fa;
+            --bg-header: #1d3557;
+            --accent: #1d3557;
+            --font-body: 'Courier New', monospace;
+        }
+
+        [data-theme="medical"] {
+            --bg-page: #e0f2f1;
+            --bg-panel: #ffffff;
+            --bg-header: #00695c;
+            --accent: #00695c;
+        }
+
+        [data-theme="financial"] {
+            --bg-page: #e8f5e9;
+            --bg-panel: #ffffff;
+            --bg-header: #2e5a27;
+            --accent: #2e5a27;
+        }
+
+        [data-theme="study"] {
+            --bg-page: #fff8e1;
+            --bg-panel: #ffffff;
+            --bg-header: #b26a00;
+            --accent: #b26a00;
+        }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            font-family: var(--font-ui);
+            font-size: 13px;
+            margin: 0;
+            padding: 0;
+            background-size: cover;
+            background-attachment: fixed;
+        }
+
+        .retro-box {
+            background-color: var(--bg-panel);
+            border-top: 2px solid var(--border-light);
+            border-left: 2px solid var(--border-light);
+            border-right: 2px solid var(--border-darkest);
+            border-bottom: 2px solid var(--border-darkest);
+            box-shadow: inset 1px 1px 0px #dfdfdf, inset -1px -1px 0px var(--border-dark);
+        }
+
+        .retro-inset {
+            background-color: #ffffff;
+            border-top: 2px solid var(--border-dark);
+            border-left: 2px solid var(--border-dark);
+            border-right: 2px solid var(--border-light);
+            border-bottom: 2px solid var(--border-light);
+        }
+
+        .retro-btn {
+            background-color: #e0ded8;
+            color: #111;
+            border-top: 2px solid #ffffff;
+            border-left: 2px solid #ffffff;
+            border-right: 2px solid #404040;
+            border-bottom: 2px solid #404040;
+            padding: 4px 10px;
+            font-family: var(--font-ui);
+            font-size: 12px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            user-select: none;
+        }
+
+        .retro-btn:active {
+            border-top: 2px solid #404040;
+            border-left: 2px solid #404040;
+            border-right: 2px solid #ffffff;
+            border-bottom: 2px solid #ffffff;
+            transform: translate(1px, 1px);
+        }
+
+        .retro-btn-primary {
+            background-color: var(--accent);
+            color: #ffffff;
+            border-top: 2px solid rgba(255,255,255,0.5);
+            border-left: 2px solid rgba(255,255,255,0.5);
+            border-right: 2px solid #111111;
+            border-bottom: 2px solid #111111;
+        }
+
+        .retro-header {
+            background: var(--bg-header);
+            color: var(--text-header);
+            padding: 4px 8px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .editor-content {
+            font-family: var(--font-body);
+            min-height: 280px;
+            max-height: 550px;
+            overflow-y: auto;
+            padding: 12px;
+            line-height: 1.6;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .editor-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 8px 0;
+        }
+
+        .editor-content td, .editor-content th {
+            border: 1px solid #888;
+            padding: 6px;
+        }
+
+        .editor-content pre {
+            background: #f0f0f0;
+            border: 1px dashed #666;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+
+        .editor-content blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 10px;
+            color: #555;
+            margin: 8px 0;
+        }
+
+        .blog-post {
+            font-family: var(--font-body);
+            line-height: 1.6;
+        }
+
+        .blog-post table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+
+        .blog-post th, .blog-post td {
+            border: 1px solid #999;
+            padding: 4px 8px;
+        }
+
+        .sticker-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border: 1px dotted #888;
+            background: #ffffcc;
+            font-size: 11px;
+            margin-right: 4px;
+            font-family: var(--font-ui);
+        }
+
+        .wiki-link {
+            color: var(--accent);
+            font-weight: bold;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            cursor: pointer;
+        }
+
+        .flashcard-box {
+            perspective: 1000px;
+        }
+    </style>
+</head>
+<body data-theme="diary">
+
+    <div class="max-w-7xl mx-auto p-2 sm:p-4">
+        
+        <!-- Top Weblog Banner -->
+        <header class="retro-box mb-3">
+            <div class="retro-header">
+                <span>MyDiary // Personal Weblog & Knowledge System</span>
+                <span id="clockDisplay" class="text-xs font-mono"></span>
+            </div>
+            <div class="p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-gradient-to-r from-gray-100 to-white">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight" style="color: var(--accent);">MyDiary</h1>
+                    <p class="text-xs text-gray-600" id="modeSubtitle">Mode Aktif: Diari Personal — Kustomisasi penuh & perlindungan kata sandi</p>
+                </div>
+                
+                <!-- Mode Selector Tabs -->
+                <nav class="flex flex-wrap gap-1" aria-label="Pilih Format Catatan">
+                    <button type="button" class="retro-btn mode-tab retro-btn-primary" data-mode="diary">Diari</button>
+                    <button type="button" class="retro-btn mode-tab" data-mode="journal">Jurnal</button>
+                    <button type="button" class="retro-btn mode-tab" data-mode="logbook">Logbook</button>
+                    <button type="button" class="retro-btn mode-tab" data-mode="medical">Notebook Medis</button>
+                    <button type="button" class="retro-btn mode-tab" data-mode="financial">Notebook Finansial</button>
+                    <button type="button" class="retro-btn mode-tab" data-mode="study">Notebook Studi</button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Status Notification Bar -->
+        <div id="statusToast" class="hidden retro-box mb-3 p-2 bg-yellow-50 border-yellow-600 text-xs flex justify-between items-center">
+            <span id="statusToastText">Status siap.</span>
+            <button type="button" id="closeToastBtn" class="retro-btn px-2 py-0.5">Tutup</button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-3">
+            
+            <!-- Left Sidebar: Profile, Archive, Masking, Backup -->
+            <aside class="lg:col-span-3 space-y-3">
+                
+                <!-- Statistik & Pencarian -->
+                <div class="retro-box">
+                    <div class="retro-header">Navigasi & Arsip</div>
+                    <div class="p-2.5 space-y-2">
+                        <div>
+                            <label for="searchInput" class="block text-xs font-bold mb-1">Cari Catatan:</label>
+                            <input type="text" id="searchInput" placeholder="Kata kunci / tag / [[Wiki]]..." class="retro-inset w-full p-1.5 text-xs">
+                        </div>
+                        <div class="flex justify-between text-xs pt-1 border-t border-gray-300">
+                            <span>Total Entri:</span>
+                            <strong id="statTotalEntries">0</strong>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span>Entri Mode Ini:</span>
+                            <strong id="statModeEntries">0</strong>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span>Status Draf:</span>
+                            <span id="draftSaveStatus" class="text-green-700 font-semibold">Tersimpan</span>
+                        </div>
+                        <div class="pt-1">
+                            <button type="button" id="newEntryBtn" class="retro-btn w-full justify-center font-bold">+ Buat Entri Baru</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Impor Dokumen & Template -->
+                <div class="retro-box">
+                    <div class="retro-header">Impor & Ekspor Berkas</div>
+                    <div class="p-2.5 space-y-2 text-xs">
+                        <p class="text-gray-600">Impor dokumen ke editor aktif (.docx, .xlsx, .pptx, .csv, .md, .txt, .rtf):</p>
+                        <input type="file" id="importDocInput" accept=".docx,.xlsx,.xls,.pptx,.csv,.md,.txt,.rtf" class="hidden">
+                        <button type="button" id="triggerImportDocBtn" class="retro-btn w-full justify-center">Impor Dokumen ke Editor</button>
+                        
+                        <hr class="border-gray-300 my-2">
+                        <p class="text-gray-600">Kelola Paket & Cadangan:</p>
+                        <div class="grid grid-cols-2 gap-1">
+                            <button type="button" id="exportHtmlBtn" class="retro-btn justify-center">Ekspor HTML</button>
+                            <button type="button" id="exportZipBtn" class="retro-btn justify-center">Ekspor ZIP</button>
+                            <button type="button" id="exportJsonBtn" class="retro-btn justify-center">Unduh JSON</button>
+                            <button type="button" id="triggerImportJsonBtn" class="retro-btn justify-center">Muat JSON</button>
+                        </div>
+                        <input type="file" id="importJsonInput" accept=".json" class="hidden">
+                    </div>
+                </div>
+
+                <!-- Modul Masking Data Pribadi -->
+                <div class="retro-box">
+                    <div class="retro-header">Penyamaran Data (Masking)</div>
+                    <div class="p-2.5 space-y-2 text-xs">
+                        <p class="text-gray-600">Samarkan nama, nomor, atau kata sensitif sebelum disalin ke AI atau dibagikan.</p>
+                        <div>
+                            <label for="maskRuleInput" class="block font-bold mb-1">Daftar Kata (`kata_asli,pengganti`):</label>
+                            <textarea id="maskRuleInput" rows="3" class="retro-inset w-full p-1.5 font-mono text-xs" placeholder="Budi,[NAMA_1]&#10;08123456789,[NO_TELP]"></textarea>
+                        </div>
+                        <div class="flex gap-1">
+                            <input type="file" id="importMaskCsvInput" accept=".csv,.txt" class="hidden">
+                            <button type="button" id="triggerMaskCsvBtn" class="retro-btn flex-1 justify-center">Impor CSV/TXT</button>
+                            <button type="button" id="applyMaskEditorBtn" class="retro-btn flex-1 justify-center">Terapkan di Editor</button>
+                        </div>
+                        <button type="button" id="copyMaskedForAiBtn" class="retro-btn retro-btn-primary w-full justify-center">Salin Teks Tersamar (Aman untuk AI)</button>
+                    </div>
+                </div>
+
+                <!-- Daftar Arsip Entri Cepat -->
+                <div class="retro-box">
+                    <div class="retro-header">Indeks Entri</div>
+                    <ul id="sidebarArchiveList" class="p-2 space-y-1 max-h-60 overflow-y-auto text-xs">
+                        <li class="text-gray-500 italic">Belum ada catatan.</li>
+                    </ul>
+                </div>
+            </aside>
+
+            <main class="lg:col-span-9 space-y-3">
+                
+                <!-- Editor Box -->
+                <section class="retro-box">
+                    <div class="retro-header">
+                        <span id="editorBoxTitle">Tulis Entri Baru</span>
+                        <div class="flex gap-1">
+                            <button type="button" id="undoBtn" class="retro-btn py-0.5 px-2 text-xs" title="Undo (Ctrl+Z)">Undo</button>
+                            <button type="button" id="redoBtn" class="retro-btn py-0.5 px-2 text-xs" title="Redo (Ctrl+Y)">Redo</button>
+                        </div>
+                    </div>
+
+                    <div class="p-3 space-y-3">
+                        <!-- Judul, Tanggal, Tag -->
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-2">
+                            <div class="md:col-span-6">
+                                <label for="entryTitle" class="block text-xs font-bold mb-1">Judul Entri:</label>
+                                <input type="text" id="entryTitle" placeholder="Masukkan judul catatan..." class="retro-inset w-full p-1.5 text-sm font-bold">
+                            </div>
+                            <div class="md:col-span-3">
+                                <label for="entryDate" class="block text-xs font-bold mb-1">Tanggal & Waktu:</label>
+                                <input type="datetime-local" id="entryDate" class="retro-inset w-full p-1.5 text-xs">
+                            </div>
+                            <div class="md:col-span-3">
+                                <label for="entryTags" class="block text-xs font-bold mb-1">Kategori / Tag:</label>
+                                <input type="text" id="entryTags" placeholder="pribadi, ide, riset" class="retro-inset w-full p-1.5 text-xs">
+                            </div>
+                        </div>
+
+                        <!-- Panel Spesifik Mode: DIARI -->
+                        <div id="panel-diary" class="mode-panel retro-inset p-2.5 bg-pink-50/40 space-y-2">
+                            <div class="font-bold text-xs text-pink-900 border-b border-pink-200 pb-1">Kustomisasi Diari Personal</div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                                <div>
+                                    <label for="diaryBgColor" class="block mb-1">Warna Latar Kartu:</label>
+                                    <input type="color" id="diaryBgColor" value="#fffafb" class="h-7 w-full cursor-pointer">
+                                </div>
+                                <div>
+                                    <label for="diaryBgPattern" class="block mb-1">Pola Latar Halaman:</label>
+                                    <select id="diaryBgPattern" class="retro-inset w-full p-1">
+                                        <option value="none">Polos Klasik</option>
+                                        <option value="dots">Bintik Retro (Polka)</option>
+                                        <option value="grid">Kertas Kotak-kotak</option>
+                                        <option value="lines">Garis Buku Tulis</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block mb-1">Sisipkan Stiker / Suasana:</label>
+                                    <div class="flex flex-wrap gap-1">
+                                        <button type="button" class="retro-btn sticker-trigger px-1.5 py-0.5" data-sticker="[Suasana: Bahagia]">Bahagia</button>
+                                        <button type="button" class="retro-btn sticker-trigger px-1.5 py-0.5" data-sticker="[Suasana: Tenang]">Tenang</button>
+                                        <button type="button" class="retro-btn sticker-trigger px-1.5 py-0.5" data-sticker="[Penting!]">Penting</button>
+                                        <button type="button" class="retro-btn sticker-trigger px-1.5 py-0.5" data-sticker="[Target Tercapai]">Tercapai</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel Spesifik Mode: JURNAL -->
+                        <div id="panel-journal" class="mode-panel hidden retro-inset p-2.5 bg-gray-50 space-y-2">
+                            <div class="font-bold text-xs text-gray-800 border-b border-gray-300 pb-1">Refleksi & Mindfulness (Monokrom)</div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                                <div>
+                                    <label for="journalGratitude" class="block mb-1 font-semibold">Hal yang Disyukuri Hari Ini:</label>
+                                    <input type="text" id="journalGratitude" placeholder="1-3 hal sederhana..." class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="journalFocus" class="block mb-1 font-semibold">Fokus Utama / Intensi:</label>
+                                    <input type="text" id="journalFocus" placeholder="Prioritas pikiran..." class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="journalClarity" class="block mb-1 font-semibold">Tingkat Ketenangan (1-10):</label>
+                                    <input type="number" id="journalClarity" min="1" max="10" value="8" class="retro-inset w-full p-1">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel Spesifik Mode: LOGBOOK (Gaya DocuWiki) -->
+                        <div id="panel-logbook" class="mode-panel hidden retro-inset p-2.5 bg-slate-50 space-y-2">
+                            <div class="flex flex-wrap justify-between items-center border-b border-slate-300 pb-1">
+                                <span class="font-bold text-xs text-slate-800">Pencatatan Teknis & Bukti (Standar DocuWiki)</span>
+                                <span id="logbookWordStat" class="text-[11px] font-mono text-slate-600">0 Kata | 0 Karakter</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5 text-xs">
+                                <button type="button" id="logInsertTimestampBtn" class="retro-btn">Sisipkan Timestamp ISO</button>
+                                <button type="button" id="logInsertCodeBtn" class="retro-btn">Sisipkan Blok Kode</button>
+                                <button type="button" id="logInsertSpecTableBtn" class="retro-btn">Sisipkan Tabel Log Insiden</button>
+                                <button type="button" id="logInsertWikiLinkBtn" class="retro-btn">Tautan Referensi [[Wiki]]</button>
+                                <button type="button" id="logToggleMdSourceBtn" class="retro-btn">Mode Sintaks Markdown (.md)</button>
+                                <button type="button" id="logExportMdBtn" class="retro-btn">Unduh .MD</button>
+                            </div>
+                            <div id="logMarkdownContainer" class="hidden pt-1">
+                                <label for="logMarkdownTextarea" class="block text-[11px] font-mono text-slate-700 mb-1">Editor Sintaks Markdown GFM (Sinkronisasi Dua Arah):</label>
+                                <textarea id="logMarkdownTextarea" rows="5" class="retro-inset w-full p-2 font-mono text-xs bg-slate-900 text-emerald-400" placeholder="# Ketik sintaks Markdown GFM di sini..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Panel Spesifik Mode: NOTEBOOK MEDIS -->
+                        <div id="panel-medical" class="mode-panel hidden retro-inset p-2.5 bg-teal-50/40 space-y-2.5">
+                            <div class="flex flex-wrap justify-between items-center border-b border-teal-200 pb-1 gap-1">
+                                <span class="font-bold text-xs text-teal-900">Checklist 11 Panel Parameter Laboratorium Klinik, Biometrik & CalFit</span>
+                                <div class="flex gap-1">
+                                    <input type="file" id="importCalfitInput" accept=".csv,.ics" class="hidden">
+                                    <button type="button" id="triggerImportCalfitBtn" class="retro-btn text-[11px] py-0.5 px-2">Impor Data CalFit (.CSV / .ICS)</button>
+                                </div>
+                            </div>
+
+                            <!-- Biometrik Dasar & Pelacak Diet CalFit -->
+                            <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
+                                <div>
+                                    <label for="medGender" class="block font-semibold">Gender Rujukan:</label>
+                                    <select id="medGender" class="retro-inset w-full p-1">
+                                        <option value="pria">Pria</option>
+                                        <option value="wanita">Wanita</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="medHeight" class="block">Tinggi (cm):</label>
+                                    <input type="number" id="medHeight" value="168" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="medWeight" class="block">Berat (kg):</label>
+                                    <input type="number" id="medWeight" value="64" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="medSys" class="block">Tensi (Sis/Dia):</label>
+                                    <div class="flex gap-1">
+                                        <input type="number" id="medSys" value="118" class="retro-inset w-1/2 p-1" title="Sistolik">
+                                        <input type="number" id="medDia" value="78" class="retro-inset w-1/2 p-1" title="Diastolik">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="medCalories" class="block">Kalori (kkal):</label>
+                                    <input type="number" id="medCalories" value="1950" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="medWater" class="block">Air Minum (ml):</label>
+                                    <input type="number" id="medWater" value="2000" step="250" class="retro-inset w-full p-1">
+                                </div>
+                            </div>
+
+                            <!-- Pemilih 11 Panel Laboratorium Klinik -->
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-2 text-xs pt-1 border-t border-teal-200/60">
+                                <div class="md:col-span-4 space-y-1">
+                                    <label for="labCategorySelect" class="block font-bold text-teal-950">Pilih Kategori Panel Lab (1-11):</label>
+                                    <select id="labCategorySelect" class="retro-inset w-full p-1.5 font-semibold">
+                                        <option value="1">1. Hematologi (Darah Rutin)</option>
+                                        <option value="2">2. Kimia Darah (Gula & Metabolisme)</option>
+                                        <option value="3">3. Profil Lipid (Lemak Darah)</option>
+                                        <option value="4">4. Fungsi Ginjal & Elektrolit</option>
+                                        <option value="5">5. Fungsi Hati / Liver (Panel Hepatik)</option>
+                                        <option value="6">6. Urinalisis & Imuno-Serologi</option>
+                                        <option value="7">7. Fungsi Jantung (Cardiac Markers)</option>
+                                        <option value="8">8. Fungsi Tiroid (Thyroid Panel)</option>
+                                        <option value="9">9. Fungsi Sendi & Rematik (Joint Panel)</option>
+                                        <option value="10">10. Fungsi Paru-Paru (AGD & Respirasi)</option>
+                                        <option value="11">11. Sistem Saraf (Cairan Serebrospinal / LCS)</option>
+                                    </select>
+                                    <p class="text-[11px] text-gray-600">Centang parameter lab yang diperiksa dan isi nilainya untuk evaluasi klinis otomatis.</p>
+                                </div>
+                                <div class="md:col-span-8 retro-inset p-2 bg-white max-h-48 overflow-y-auto" id="labParameterChecklistContainer">
+                                    <!-- Dirender secara dinamis dari daftar_lengkap_parameter_laboratorium.md -->
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                                <span id="medSummaryOutput" class="text-xs font-semibold text-teal-900">BMI: 22.68 (Normal) | Tensi: 118/78 mmHg (Normal)</span>
+                                <div class="flex flex-wrap gap-1">
+                                    <button type="button" id="insertMedReportBtn" class="retro-btn retro-btn-primary">Masukkan Hasil Lab Tercentang ke Catatan</button>
+                                    <button type="button" id="insertAllLabRefBtn" class="retro-btn">Sisipkan Tabel Referensi 11 Panel Lengkap</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel Spesifik Mode: NOTEBOOK FINANSIAL -->
+                        <div id="panel-financial" class="mode-panel hidden retro-inset p-2.5 bg-green-50/40 space-y-2.5">
+                            <div class="font-bold text-xs text-green-900 border-b border-green-200 pb-1">Financial Check-Up (5 Rasio Standar Fin) & Jurnal Akuntansi</div>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                <div>
+                                    <label for="finIncome" class="block">Pendapatan Bulanan (Rp):</label>
+                                    <input type="number" id="finIncome" value="10000000" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="finExpense" class="block">Pengeluaran Rutin (Rp):</label>
+                                    <input type="number" id="finExpense" value="5000000" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="finSavings" class="block">Tabungan & Investasi/Bln:</label>
+                                    <input type="number" id="finSavings" value="2500000" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="finDebt" class="block">Cicilan Utang Bulanan:</label>
+                                    <input type="number" id="finDebt" value="1500000" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="finEmergency" class="block">Kas / Dana Darurat (Rp):</label>
+                                    <input type="number" id="finEmergency" value="25000000" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="finInvestAsset" class="block">Total Aset Investasi (Rp):</label>
+                                    <input type="number" id="finInvestAsset" value="45000000" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="finTotalAsset" class="block">Total Aset Keseluruhan:</label>
+                                    <input type="number" id="finTotalAsset" value="100000000" class="retro-inset w-full p-1">
+                                </div>
+                                <div>
+                                    <label for="finTotalDebt" class="block">Total Sisa Pokok Utang:</label>
+                                    <input type="number" id="finTotalDebt" value="20000000" class="retro-inset w-full p-1">
+                                </div>
+                            </div>
+
+                            <!-- Sub-baris: Pencatat Cepat Jurnal Akuntansi (Debit/Kredit) & Simulasi Bunga Majemuk -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 border-t border-green-200/60 text-xs">
+                                <div class="bg-white p-2 border border-green-300 space-y-1">
+                                    <div class="font-bold text-green-900">Entri Cepat Jurnal Umum (Debit / Kredit):</div>
+                                    <div class="grid grid-cols-3 gap-1">
+                                        <input type="text" id="finJurnalDesc" placeholder="Keterangan..." class="retro-inset p-1">
+                                        <select id="finJurnalDebit" class="retro-inset p-1">
+                                            <option value="Kas">Dr: Kas</option>
+                                            <option value="Bank">Dr: Bank</option>
+                                            <option value="Piutang Usaha">Dr: Piutang</option>
+                                            <option value="Perlengkapan">Dr: Perlengkapan</option>
+                                            <option value="Peralatan">Dr: Peralatan</option>
+                                            <option value="Beban">Dr: Beban</option>
+                                        </select>
+                                        <select id="finJurnalCredit" class="retro-inset p-1">
+                                            <option value="Pendapatan">Cr: Pendapatan</option>
+                                            <option value="Modal">Cr: Modal</option>
+                                            <option value="Utang Usaha">Cr: Utang</option>
+                                            <option value="Kas">Cr: Kas</option>
+                                            <option value="Bank">Cr: Bank</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex gap-1">
+                                        <input type="number" id="finJurnalAmt" placeholder="Nominal (Rp)" class="retro-inset p-1 flex-1">
+                                        <button type="button" id="insertJurnalRowBtn" class="retro-btn">+ Sisipkan Jurnal</button>
+                                    </div>
+                                </div>
+                                <div class="bg-white p-2 border border-green-300 space-y-1">
+                                    <div class="font-bold text-green-900">Simulasi Portofolio Bunga Majemuk (Compound):</div>
+                                    <div class="grid grid-cols-3 gap-1">
+                                        <input type="text" id="finInvName" placeholder="Aset (Cth: SBN/BBCA)" class="retro-inset p-1">
+                                        <input type="number" id="finInvModal" placeholder="Modal (Rp)" class="retro-inset p-1">
+                                        <input type="number" id="finInvRate" placeholder="Return %/thn" step="0.1" class="retro-inset p-1">
+                                    </div>
+                                    <div class="flex gap-1">
+                                        <input type="number" id="finInvYears" placeholder="Durasi (Tahun)" step="0.5" class="retro-inset p-1 flex-1">
+                                        <button type="button" id="insertCompoundInvBtn" class="retro-btn">+ Hitung & Sisipkan</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                                <span id="finSummaryOutput" class="text-xs font-semibold text-green-900">Skor Kesehatan: 5/5 (Sangat Sehat)</span>
+                                <button type="button" id="insertFinReportBtn" class="retro-btn retro-btn-primary">Masukkan Laporan 5 Rasio Finansial ke Catatan</button>
+                            </div>
+                        </div>
+
+                        <!-- Panel Spesifik Mode: NOTEBOOK STUDI -->
+                        <div id="panel-study" class="mode-panel hidden retro-inset p-2.5 bg-amber-50/40 space-y-2">
+                            <div class="flex flex-wrap justify-between items-center border-b border-amber-200 pb-1 gap-1">
+                                <span class="font-bold text-xs text-amber-900">Pembuat Flashcard, Kuis Interaktif (Standar Quizr + KaTeX) & Daftar Pustaka</span>
+                                <div class="flex gap-1">
+                                    <input type="file" id="importQuizrJsonInput" accept=".json" class="hidden">
+                                    <button type="button" id="triggerImportQuizrBtn" class="retro-btn text-[11px] py-0.5 px-2">Impor .quizr.json</button>
+                                    <button type="button" id="exportQuizrJsonBtn" class="retro-btn text-[11px] py-0.5 px-2">Ekspor .quizr.json</button>
+                                    <button type="button" id="exportStandaloneQuizBtn" class="retro-btn text-[11px] py-0.5 px-2">Unduh Kuis HTML</button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                                <div class="space-y-1">
+                                    <div class="font-semibold">Tambah Flashcard:</div>
+                                    <input type="text" id="studyCardFront" placeholder="Pertanyaan / Rumus ($E=mc^2$)..." class="retro-inset w-full p-1">
+                                    <input type="text" id="studyCardBack" placeholder="Jawaban / Definisi..." class="retro-inset w-full p-1">
+                                    <button type="button" id="addFlashcardBtn" class="retro-btn w-full justify-center">+ Tambah Flashcard</button>
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-semibold">Tambah Soal Kuis:</span>
+                                        <select id="studyQuizType" class="retro-inset text-[11px] p-0.5">
+                                            <option value="mc">Pilihan Ganda</option>
+                                            <option value="tf">Benar / Salah</option>
+                                            <option value="short">Uraian Singkat</option>
+                                        </select>
+                                    </div>
+                                    <input type="text" id="studyQuizQ" placeholder="Pertanyaan kuis (mendukung $LaTeX$)..." class="retro-inset w-full p-1">
+                                    <input type="text" id="studyQuizOpts" placeholder="Opsi pisah koma (A, B, C, D)" class="retro-inset w-full p-1">
+                                    <input type="text" id="studyQuizAns" placeholder="Jawaban benar | Pembahasan (opsional)" class="retro-inset w-full p-1">
+                                    <button type="button" id="addQuizBtn" class="retro-btn w-full justify-center">+ Tambah Soal Kuis</button>
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="font-semibold">Sitasi / Daftar Pustaka (APA):</div>
+                                    <input type="text" id="studyCiteAuthor" placeholder="Penulis (contoh: Pratama, R.)" class="retro-inset w-full p-1">
+                                    <div class="grid grid-cols-2 gap-1">
+                                        <input type="text" id="studyCiteYear" placeholder="Tahun (2025)" class="retro-inset w-full p-1">
+                                        <input type="text" id="studyCitePub" placeholder="Penerbit / Jurnal" class="retro-inset w-full p-1">
+                                    </div>
+                                    <input type="text" id="studyCiteTitle" placeholder="Judul Buku / Artikel..." class="retro-inset w-full p-1">
+                                    <button type="button" id="insertCitationBtn" class="retro-btn w-full justify-center">+ Sisipkan Sitasi</button>
+                                </div>
+                            </div>
+                            <div id="studyDraftStats" class="text-xs text-amber-800 pt-1">Flashcard tersimpan di draf: 0 | Soal Kuis: 0</div>
+                        </div>
+
+                        <!-- Formatting Toolbar -->
+                        <div class="flex flex-wrap gap-1 bg-gray-100 p-1.5 border border-gray-400">
+                            <button type="button" class="retro-btn fmt-btn font-bold" data-cmd="bold" title="Tebal">B</button>
+                            <button type="button" class="retro-btn fmt-btn italic" data-cmd="italic" title="Miring">I</button>
+                            <button type="button" class="retro-btn fmt-btn underline" data-cmd="underline" title="Garis Bawah">U</button>
+                            <button type="button" class="retro-btn fmt-btn" data-cmd="insertUnorderedList" title="Daftar Poin">• List</button>
+                            <button type="button" class="retro-btn fmt-btn" data-cmd="insertOrderedList" title="Daftar Angka">1. List</button>
+                            <button type="button" class="retro-btn fmt-btn" data-cmd="formatBlock" data-val="H3" title="Subjudul">H3</button>
+                            <button type="button" class="retro-btn fmt-btn" data-cmd="formatBlock" data-val="BLOCKQUOTE" title="Kutipan">Kutipan</button>
+                            <button type="button" id="insertTableToolbarBtn" class="retro-btn" title="Sisipkan Tabel">Tabel</button>
+                            <button type="button" id="insertDateToolbarBtn" class="retro-btn" title="Sisipkan Tanggal & Waktu">Waktu</button>
+                            <button type="button" id="drawCanvasToolbarBtn" class="retro-btn" title="Buat Sketsa Grafis">Sketsa Grafis</button>
+                        </div>
+
+                        <!-- Rich Text Contenteditable Area -->
+                        <div id="editorContent" class="retro-inset editor-content" contenteditable="true" spellcheck="false">
+                            <p>Mulai menulis catatan di sini...</p>
+                        </div>
+
+                        <!-- Panel Lampiran Multi-Format & Enkripsi -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                            <!-- Lampiran -->
+                            <div class="retro-inset p-2 bg-gray-50 space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-bold">Lampiran Berkas (Gambar, Audio, Video, ICS, VCF, Lainnya)</span>
+                                    <input type="file" id="attachmentInput" multiple class="hidden">
+                                    <button type="button" id="addAttachmentBtn" class="retro-btn py-0.5 px-2 text-xs">+ Tambah Berkas</button>
+                                </div>
+                                <ul id="attachmentDraftList" class="text-xs space-y-1 max-h-28 overflow-y-auto">
+                                    <li class="text-gray-500 italic">Tidak ada lampiran.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Pengaturan Enkripsi AES-GCM -->
+                            <div class="retro-inset p-2 bg-gray-50 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <label for="enableEncryptionToggle" class="text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+                                        <input type="checkbox" id="enableEncryptionToggle">
+                                        Kunci Entri dengan Enkripsi AES-GCM (256-bit)
+                                    </label>
+                                    <span class="text-[11px] text-gray-600">PBKDF2 Zero-Knowledge</span>
+                                </div>
+                                <div id="encryptionPasswordGroup" class="hidden space-y-1">
+                                    <input type="password" id="entryPasswordInput" placeholder="Masukkan kata sandi enkripsi..." class="retro-inset w-full p-1.5 text-xs">
+                                    <p class="text-[11px] text-gray-600">Catatan: Kata sandi tidak disimpan di sistem. Pastikan Anda mengingatnya.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tombol Simpan & Bersihkan -->
+                        <div class="flex flex-wrap justify-between items-center pt-2 border-t border-gray-300 gap-2">
+                            <div class="text-xs text-gray-600" id="editingIndicator">Mode: Membuat Entri Baru</div>
+                            <div class="flex gap-2">
+                                <button type="button" id="clearEditorBtn" class="retro-btn">Reset Form</button>
+                                <button type="button" id="saveEntryBtn" class="retro-btn retro-btn-primary font-bold px-4">Simpan Entri ke Weblog</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Daftar Pos Weblog -->
+                <section class="retro-box">
+                    <div class="retro-header">
+                        <span id="feedHeaderTitle">Arsip Pos Weblog</span>
+                        <span id="feedFilterInfo" class="text-xs font-normal">Menampilkan semua entri</span>
+                    </div>
+                    <div id="entriesFeedContainer" class="p-3 space-y-4">
+                        <!-- Entries rendered dynamically here -->
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal Sketsa Grafis -->
+    <div id="sketchModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="retro-box w-full max-w-md">
+            <div class="retro-header">
+                <span>Lampiran Sketsa Grafis</span>
+                <button type="button" id="closeSketchModalBtn" class="retro-btn py-0 px-1.5 text-xs">X</button>
+            </div>
+            <div class="p-3 space-y-2">
+                <canvas id="sketchCanvas" width="380" height="220" class="retro-inset w-full bg-white cursor-crosshair"></canvas>
+                <div class="flex justify-between items-center">
+                    <div class="flex gap-1 items-center text-xs">
+                        <label for="sketchColor">Warna:</label>
+                        <input type="color" id="sketchColor" value="#004e98">
+                        <button type="button" id="clearSketchBtn" class="retro-btn">Bersihkan</button>
+                    </div>
+                    <button type="button" id="saveSketchBtn" class="retro-btn retro-btn-primary">Lampirkan Grafis</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Buka Enkripsi -->
+    <div id="decryptModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="retro-box w-full max-w-sm">
+            <div class="retro-header">
+                <span>Buka Kunci Entri Terenkripsi</span>
+                <button type="button" id="closeDecryptModalBtn" class="retro-btn py-0 px-1.5 text-xs">X</button>
+            </div>
+            <div class="p-3 space-y-3 text-xs">
+                <p>Masukkan kata sandi untuk mendekripsi entri ini di memori peramban:</p>
+                <input type="password" id="decryptPasswordInput" placeholder="Kata sandi..." class="retro-inset w-full p-1.5">
+                <div id="decryptErrorMsg" class="hidden text-red-700 font-bold">Kata sandi salah atau data rusak.</div>
+                <div class="flex justify-end gap-1">
+                    <button type="button" id="confirmDecryptBtn" class="retro-btn retro-btn-primary">Dekripsi Sekarang</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Prompt Tautan Wiki (Menggantikan window.prompt) -->
+    <div id="wikiLinkModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="retro-box w-full max-w-sm">
+            <div class="retro-header">
+                <span>Sisipkan Tautan Referensi [[Wiki]]</span>
+                <button type="button" id="closeWikiModalBtn" class="retro-btn py-0 px-1.5 text-xs">X</button>
+            </div>
+            <div class="p-3 space-y-3 text-xs">
+                <p>Masukkan judul entri atau halaman referensi yang ingin ditautkan:</p>
+                <input type="text" id="wikiLinkTitleInput" value="Dokumen_Referensi_Utama" class="retro-inset w-full p-1.5">
+                <div class="flex justify-end gap-1">
+                    <button type="button" id="confirmWikiLinkBtn" class="retro-btn retro-btn-primary">Sisipkan [[WikiLink]]</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // Konfigurasi Mode & Deskripsi
+            const MODE_CONFIG = {
+                diary: {
+                    name: 'Diari',
+                    subtitle: 'Mode Aktif: Diari Personal — Kustomisasi latar, stiker suasana & perlindungan kata sandi',
+                    defaultEncrypted: false
+                },
+                journal: {
+                    name: 'Jurnal',
+                    subtitle: 'Mode Aktif: Jurnal Mindfulness — Tema monokrom fokus ketenangan & refleksi harian',
+                    defaultEncrypted: false
+                },
+                logbook: {
+                    name: 'Logbook',
+                    subtitle: 'Mode Aktif: Logbook Teknis — Penanda waktu presisi, tabel insiden, Markdown GFM & [[WikiLink]]',
+                    defaultEncrypted: false
+                },
+                medical: {
+                    name: 'Notebook Medis',
+                    subtitle: 'Mode Aktif: Notebook Medis — 11 Panel Laboratorium Klinik, integrasi CalFit, pelacak diet & enkripsi',
+                    defaultEncrypted: true
+                },
+                financial: {
+                    name: 'Notebook Finansial',
+                    subtitle: 'Mode Aktif: Notebook Finansial — 5 Rasio Kesehatan Keuangan Fin, jurnal akuntansi & enkripsi',
+                    defaultEncrypted: true
+                },
+                study: {
+                    name: 'Notebook Studi',
+                    subtitle: 'Mode Aktif: Notebook Studi — Flashcard interaktif, kuis gaya Quizr dengan KaTeX & sitasi pustaka',
+                    defaultEncrypted: false
+                }
+            };
+
+            // Basis Data 11 Panel Parameter Laboratorium Klinik Lengkap (Sesuai daftar_lengkap_parameter_laboratorium.md)
+            const CLINICAL_LAB_PANELS = {
+                "1": {
+                    title: "1. Hematologi (Darah Rutin)",
+                    items: [
+                        { id: "hb", name: "Hemoglobin (Hb)", unit: "g/dL", refText: "Pria: 13–17 | Wanita: 12–15", minM: 13, maxM: 17, minF: 12, maxF: 15, defaultVal: 14.2, desc: "Kadar rendah menandakan anemia; tinggi menandakan dehidrasi/polisitemia." },
+                        { id: "leukosit", name: "Leukosit (Sel Darah Putih)", unit: "sel/µL", refText: "4.000 – 11.000", min: 4000, max: 11000, defaultVal: 7200, desc: "Peningkatan (leukositosis) menandakan infeksi atau peradangan." },
+                        { id: "trombosit", name: "Trombosit", unit: "sel/µL", refText: "150.000 – 450.000", min: 150000, max: 450000, defaultVal: 280000, desc: "Berperan dalam pembekuan darah." },
+                        { id: "hct", name: "Hematokrit (HCT)", unit: "%", refText: "Pria: 40–48% | Wanita: 37–43%", minM: 40, maxM: 48, minF: 37, maxF: 43, defaultVal: 42, desc: "Persentase sel darah merah dalam volume darah total." },
+                        { id: "eritrosit", name: "Eritrosit (RBC)", unit: "10⁶/µL", refText: "4,50 – 6,50", min: 4.5, max: 6.5, defaultVal: 5.1, desc: "Jumlah sel darah merah pengikat oksigen." }
+                    ]
+                },
+                "2": {
+                    title: "2. Kimia Darah (Gula & Metabolisme)",
+                    items: [
+                        { id: "gdp", name: "Gula Darah Puasa (GDP)", unit: "mg/dL", refText: "70 – 99", min: 70, max: 99, defaultVal: 92, desc: "Puasa min. 8 jam. Indikasi diabetes jika >= 126 mg/dL." },
+                        { id: "gd2pp", name: "Gula Darah 2 Jam PP", unit: "mg/dL", refText: "< 140", min: 60, max: 139, defaultVal: 118, desc: "Toleransi tubuh terhadap glukosa 2 jam pasca makan." },
+                        { id: "gds", name: "Gula Darah Sewaktu (GDS)", unit: "mg/dL", refText: "< 200", min: 60, max: 199, defaultVal: 110, desc: "Pemeriksaan acak tanpa puasa." },
+                        { id: "hba1c", name: "HbA1c", unit: "%", refText: "Normal < 5,7% | Pradiabetes 5,7–6,4%", min: 4.0, max: 5.6, defaultVal: 5.3, desc: "Rata-rata kadar gula darah 2-3 bulan terakhir." },
+                        { id: "asam_urat", name: "Asam Urat", unit: "mg/dL", refText: "Pria: 3,4–7,0 | Wanita: 2,4–6,0", minM: 3.4, maxM: 7.0, minF: 2.4, maxF: 6.0, defaultVal: 5.4, desc: "Limbah metabolisme purin (risiko Gout jika tinggi)." }
+                    ]
+                },
+                "3": {
+                    title: "3. Profil Lipid (Lemak Darah)",
+                    items: [
+                        { id: "kol_total", name: "Kolesterol Total", unit: "mg/dL", refText: "< 200", min: 100, max: 199, defaultVal: 185, desc: "Jumlah keseluruhan kolesterol dalam darah." },
+                        { id: "ldl", name: "Kolesterol LDL (Lemak Jahat)", unit: "mg/dL", refText: "< 100", min: 40, max: 99, defaultVal: 92, desc: "Pemicu penumpukan plak di arteri (aterosklerosis)." },
+                        { id: "hdl", name: "Kolesterol HDL (Lemak Baik)", unit: "mg/dL", refText: "Pria: > 40 | Wanita: > 50", minM: 41, maxM: 120, minF: 51, maxF: 120, defaultVal: 55, desc: "Membersihkan kelebihan kolesterol kembali ke hati." },
+                        { id: "trigliserida", name: "Trigliserida", unit: "mg/dL", refText: "< 150", min: 30, max: 149, defaultVal: 120, desc: "Lemak darah hasil kalori yang tidak terpakai." }
+                    ]
+                },
+                "4": {
+                    title: "4. Fungsi Ginjal & Elektrolit",
+                    items: [
+                        { id: "kreatinin", name: "Kreatinin", unit: "mg/dL", refText: "Pria: 0,7–1,3 | Wanita: 0,6–1,1", minM: 0.7, maxM: 1.3, minF: 0.6, maxF: 1.1, defaultVal: 0.9, desc: "Produk limbah otot; meningkat jika filtrasi ginjal menurun." },
+                        { id: "ureum", name: "Ureum / BUN", unit: "mg/dL", refText: "7 – 20", min: 7, max: 20, defaultVal: 14, desc: "Sisa metabolisme protein yang diekskresikan ginjal." },
+                        { id: "egfr", name: "eGFR", unit: "mL/min/1,73m²", refText: ">= 90", min: 90, max: 150, defaultVal: 98, desc: "Laju filtrasi glomerulus estimasi fungsi ginjal." },
+                        { id: "natrium", name: "Natrium (Na)", unit: "mmol/L", refText: "135 – 145", min: 135, max: 145, defaultVal: 140, desc: "Mengatur keseimbangan cairan dan tekanan darah." },
+                        { id: "kalium", name: "Kalium (K)", unit: "mmol/L", refText: "3,5 – 5,0", min: 3.5, max: 5.0, defaultVal: 4.1, desc: "Penting untuk fungsi otot dan listrik jantung." },
+                        { id: "klorida", name: "Klorida (Cl)", unit: "mmol/L", refText: "94 – 111", min: 94, max: 111, defaultVal: 102, desc: "Menjaga tekanan osmotik dan asam-basa tubuh." },
+                        { id: "kalsium", name: "Kalsium", unit: "mg/dL", refText: "8,5 – 10,2", min: 8.5, max: 10.2, defaultVal: 9.2, desc: "Kesehatan tulang, pembekuan darah, dan kontraksi otot." }
+                    ]
+                },
+                "5": {
+                    title: "5. Fungsi Hati / Liver (Panel Hepatik)",
+                    items: [
+                        { id: "sgot", name: "SGOT (AST)", unit: "U/L", refText: "< 35 - 40", min: 5, max: 40, defaultVal: 24, desc: "Enzim di hati, jantung, dan otot; naik saat sel rusak." },
+                        { id: "sgpt", name: "SGPT (ALT)", unit: "U/L", refText: "< 40 - 56", min: 5, max: 56, defaultVal: 28, desc: "Enzim spesifik yang mencerminkan kerusakan sel hati." },
+                        { id: "bilirubin", name: "Bilirubin Total", unit: "mg/dL", refText: "0,2 – 1,2", min: 0.2, max: 1.2, defaultVal: 0.7, desc: "Pigmen empedu; tinggi menyebabkan ikterus (kuning)." },
+                        { id: "albumin", name: "Albumin", unit: "g/dL", refText: "3,5 – 5,0", min: 3.5, max: 5.0, defaultVal: 4.2, desc: "Protein utama darah yang diproduksi hati." },
+                        { id: "ggt", name: "Gamma-GT (GGT)", unit: "U/L", refText: "5 – 38", min: 5, max: 38, defaultVal: 20, desc: "Enzim saluran empedu & hati." }
+                    ]
+                },
+                "6": {
+                    title: "6. Urinalisis & Imuno-Serologi",
+                    items: [
+                        { id: "protein_urin", name: "Protein Urin", unit: "Kualitatif", refText: "Negatif", isText: true, expected: "Negatif", defaultVal: "Negatif", desc: "Positif (proteinuria) menandakan kebocoran filter ginjal." },
+                        { id: "glukosa_urin", name: "Glukosa Urin", unit: "Kualitatif", refText: "Negatif", isText: true, expected: "Negatif", defaultVal: "Negatif", desc: "Positif (glukosuria) saat gula darah sangat tinggi." },
+                        { id: "leukosit_urin", name: "Leukosit & Nitrit Urin", unit: "Kualitatif", refText: "Negatif", isText: true, expected: "Negatif", defaultVal: "Negatif", desc: "Positif mengarah pada Infeksi Saluran Kemih (ISK)." },
+                        { id: "hbsag", name: "HBsAg", unit: "Serologi", refText: "Non-reaktif / Negatif", isText: true, expected: "Non-reaktif", defaultVal: "Non-reaktif", desc: "Skrining infeksi virus Hepatitis B permukaan." },
+                        { id: "antihcv", name: "Anti-HCV", unit: "Serologi", refText: "Non-reaktif / Negatif", isText: true, expected: "Non-reaktif", defaultVal: "Non-reaktif", desc: "Skrining antibodi terhadap virus Hepatitis C." },
+                        { id: "crp", name: "CRP (C-Reactive Protein)", unit: "mg/L", refText: "< 3", min: 0, max: 3, defaultVal: 1.2, desc: "Protein penanda peradangan akut atau infeksi bakteri." }
+                    ]
+                },
+                "7": {
+                    title: "7. Fungsi Jantung (Cardiac Markers)",
+                    items: [
+                        { id: "troponin", name: "Troponin (T atau I)", unit: "ng/mL", refText: "< 0,1", min: 0, max: 0.09, defaultVal: 0.02, desc: "Golden standard deteksi cedera otot jantung." },
+                        { id: "ckmb", name: "CK-MB", unit: "% total CK", refText: "< 5%", min: 0, max: 4.9, defaultVal: 2.1, desc: "Enzim otot jantung pasca cedera miokard." },
+                        { id: "ntprobnp", name: "NT-proBNP / BNP", unit: "pg/mL", refText: "< 125", min: 0, max: 124, defaultVal: 45, desc: "Penanda regangan dinding jantung (evaluasi gagal jantung)." }
+                    ]
+                },
+                "8": {
+                    title: "8. Fungsi Tiroid (Thyroid Panel)",
+                    items: [
+                        { id: "tsh", name: "TSH", unit: "mIU/L", refText: "0,4 – 4,0", min: 0.4, max: 4.0, defaultVal: 1.8, desc: "Hormon stimulasi tiroid; tinggi pada hipotiroid." },
+                        { id: "ft4", name: "FT4 (Free T4)", unit: "ng/dL", refText: "0,7 – 1,9", min: 0.7, max: 1.9, defaultVal: 1.2, desc: "Hormon tiroksin bebas yang aktif di jaringan." },
+                        { id: "ft3", name: "FT3 (Free T3)", unit: "pg/mL", refText: "2,3 – 4,2", min: 2.3, max: 4.2, defaultVal: 3.1, desc: "Hormon triiodotironin bebas." },
+                        { id: "antitpo", name: "Anti-TPO", unit: "IU/mL", refText: "< 35", min: 0, max: 34, defaultVal: 12, desc: "Antibodi penyakit tiroid autoimun (Hashimoto)." }
+                    ]
+                },
+                "9": {
+                    title: "9. Fungsi Sendi & Rematik (Joint Panel)",
+                    items: [
+                        { id: "rf", name: "RF (Rheumatoid Factor)", unit: "IU/mL", refText: "< 20", min: 0, max: 19, defaultVal: 8, desc: "Antibodi pada penderita rematik (Rheumatoid Arthritis)." },
+                        { id: "anticcp", name: "Anti-CCP", unit: "Units", refText: "< 20", min: 0, max: 19, defaultVal: 6, desc: "Penanda autoimun spesifik deteksi dini destruksi sendi." },
+                        { id: "led", name: "LED (Laju Endap Darah)", unit: "mm/jam", refText: "Pria: < 10 | Wanita: < 15", minM: 0, maxM: 10, minF: 0, maxF: 15, defaultVal: 7, desc: "Kecepatan pengendapan eritrosit akibat peradangan." }
+                    ]
+                },
+                "10": {
+                    title: "10. Fungsi Paru-Paru (Analisis Gas Darah & Respirasi)",
+                    items: [
+                        { id: "ph_darah", name: "pH Darah Arteri", unit: "pH", refText: "7,35 – 7,45", min: 7.35, max: 7.45, defaultVal: 7.40, desc: "Keseimbangan asam-basa darah arteri." },
+                        { id: "pco2", name: "pCO2 (Karbon Dioksida)", unit: "mmHg", refText: "35 – 45", min: 35, max: 45, defaultVal: 40, desc: "Tekanan parsial CO2; naik jika hipoventilasi." },
+                        { id: "po2", name: "pO2 (Oksigen)", unit: "mmHg", refText: "80 – 100", min: 80, max: 100, defaultVal: 92, desc: "Tekanan parsial oksigen di darah arteri." },
+                        { id: "sao2", name: "SaO2 (Saturasi Oksigen)", unit: "%", refText: ">= 95%", min: 95, max: 100, defaultVal: 98, desc: "Persentase hemoglobin yang jenuh dengan oksigen." },
+                        { id: "bta", name: "BTA Sputum (Dahak)", unit: "Mikroskopis", refText: "Negatif", isText: true, expected: "Negatif", defaultVal: "Negatif", desc: "Pemeriksaan mikroskopis dahak untuk deteksi bakteri TBC." }
+                    ]
+                },
+                "11": {
+                    title: "11. Sistem Saraf (Cairan Serebrospinal / LCS)",
+                    items: [
+                        { id: "leukosit_lcs", name: "Leukosit LCS", unit: "sel/µL", refText: "< 5", min: 0, max: 4, defaultVal: 1, desc: "Sel darah putih cairan otak; naik saat meningitis." },
+                        { id: "glukosa_lcs", name: "Glukosa LCS", unit: "mg/dL", refText: "50 – 80", min: 50, max: 80, defaultVal: 65, desc: "Normalnya +- 60% dari gula darah; turun pada infeksi bakteri." },
+                        { id: "protein_lcs", name: "Protein LCS", unit: "mg/dL", refText: "15 – 45", min: 15, max: 45, defaultVal: 28, desc: "Meningkat pada cedera saraf, infeksi, atau Guillain-Barré." }
+                    ]
+                }
+            };
+
+            // Penyimpan nilai input parameter lab lintas kategori
+            const labUserValues = {};
+            Object.keys(CLINICAL_LAB_PANELS).forEach(catKey => {
+                CLINICAL_LAB_PANELS[catKey].items.forEach(item => {
+                    labUserValues[item.id] = {
+                        checked: catKey === "1" || catKey === "2",
+                        value: item.defaultVal
+                    };
+                });
+            });
+
+            // Turndown Service untuk Konversi HTML <-> Markdown GFM (DocuWiki)
+            let turndownEngine = null;
+            if (window.TurndownService) {
+                turndownEngine = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' });
+                if (window.turndownPluginGfm) {
+                    turndownEngine.use(window.turndownPluginGfm.gfm);
+                }
+            }
+
+            // State Aplikasi
+            const state = {
+                currentMode: 'diary',
+                editingEntryId: null,
+                entries: [],
+                draftAttachments: [],
+                draftStudyCards: [],
+                draftStudyQuizzes: [],
+                draftStickers: [],
+                historyStack: [],
+                redoStack: [],
+                lastRecordedHtml: '',
+                pendingDecryptEntryId: null,
+                unlockedCache: {}
+            };
+
+            // IndexedDB Wrapper
+            const DB_NAME = 'MyDiaryWeblogDB';
+            const DB_VERSION = 1;
+            let dbInstance = null;
+
+            function initDB() {
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open(DB_NAME, DB_VERSION);
+                    req.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains('entries')) {
+                            db.createObjectStore('entries', { keyPath: 'id' });
+                        }
+                        if (!db.objectStoreNames.contains('meta')) {
+                            db.createObjectStore('meta', { keyPath: 'key' });
+                        }
+                    };
+                    req.onsuccess = (e) => {
+                        dbInstance = e.target.result;
+                        resolve(dbInstance);
+                    };
+                    req.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            function dbPut(storeName, data) {
+                return new Promise((resolve, reject) => {
+                    if (!dbInstance) return resolve();
+                    const tx = dbInstance.transaction(storeName, 'readwrite');
+                    const store = tx.objectStore(storeName);
+                    const req = store.put(data);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            function dbGetAll(storeName) {
+                return new Promise((resolve, reject) => {
+                    if (!dbInstance) return resolve([]);
+                    const tx = dbInstance.transaction(storeName, 'readonly');
+                    const store = tx.objectStore(storeName);
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            function dbGet(storeName, key) {
+                return new Promise((resolve, reject) => {
+                    if (!dbInstance) return resolve(null);
+                    const tx = dbInstance.transaction(storeName, 'readonly');
+                    const store = tx.objectStore(storeName);
+                    const req = store.get(key);
+                    req.onsuccess = () => resolve(req.result || null);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            function dbDelete(storeName, key) {
+                return new Promise((resolve, reject) => {
+                    if (!dbInstance) return resolve();
+                    const tx = dbInstance.transaction(storeName, 'readwrite');
+                    const store = tx.objectStore(storeName);
+                    const req = store.delete(key);
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            async function deriveKey(password, saltBytes) {
+                const enc = new TextEncoder();
+                const keyMaterial = await crypto.subtle.importKey(
+                    'raw',
+                    enc.encode(password),
+                    { name: 'PBKDF2' },
+                    false,
+                    ['deriveKey']
+                );
+                return crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: saltBytes,
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['encrypt', 'decrypt']
+                );
+            }
+
+            function bufToBase64(buffer) {
+                const bytes = new Uint8Array(buffer);
+                let binary = '';
+                for (let i = 0; i < bytes.byteLength; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return btoa(binary);
+            }
+
+            function base64ToBuf(base64) {
+                const binary = atob(base64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                return bytes.buffer;
+            }
+
+            async function encryptPayload(plainObject, password) {
+                const salt = crypto.getRandomValues(new Uint8Array(16));
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const key = await deriveKey(password, salt);
+                const enc = new TextEncoder();
+                const encodedData = enc.encode(JSON.stringify(plainObject));
+                const cipherBuffer = await crypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    key,
+                    encodedData
+                );
+                return {
+                    salt: bufToBase64(salt.buffer),
+                    iv: bufToBase64(iv.buffer),
+                    ciphertext: bufToBase64(cipherBuffer)
+                };
+            }
+
+            async function decryptPayload(encryptedBundle, password) {
+                const salt = new Uint8Array(base64ToBuf(encryptedBundle.salt));
+                const iv = new Uint8Array(base64ToBuf(encryptedBundle.iv));
+                const cipherBuffer = base64ToBuf(encryptedBundle.ciphertext);
+                const key = await deriveKey(password, salt);
+                const plainBuffer = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    key,
+                    cipherBuffer
+                );
+                const dec = new TextDecoder();
+                return JSON.parse(dec.decode(plainBuffer));
+            }
+
+            function showToast(message) {
+                const toast = document.getElementById('statusToast');
+                const text = document.getElementById('statusToastText');
+                text.textContent = message;
+                toast.classList.remove('hidden');
+            }
+
+            function recordHistorySnapshot() {
+                const editor = document.getElementById('editorContent');
+                const currentHtml = editor.innerHTML;
+                if (currentHtml !== state.lastRecordedHtml) {
+                    state.historyStack.push(state.lastRecordedHtml);
+                    if (state.historyStack.length > 40) state.historyStack.shift();
+                    state.lastRecordedHtml = currentHtml;
+                    state.redoStack = [];
+                    saveDraftCache();
+                }
+            }
+
+            function performUndo() {
+                if (state.historyStack.length === 0) return;
+                const editor = document.getElementById('editorContent');
+                state.redoStack.push(editor.innerHTML);
+                const prev = state.historyStack.pop();
+                editor.innerHTML = prev;
+                state.lastRecordedHtml = prev;
+            }
+
+            function performRedo() {
+                if (state.redoStack.length === 0) return;
+                const editor = document.getElementById('editorContent');
+                state.historyStack.push(editor.innerHTML);
+                const next = state.redoStack.pop();
+                editor.innerHTML = next;
+                state.lastRecordedHtml = next;
+            }
+
+            async function saveDraftCache() {
+                const statusEl = document.getElementById('draftSaveStatus');
+                statusEl.textContent = 'Menyimpan...';
+                const draft = {
+                    key: 'currentDraft',
+                    title: document.getElementById('entryTitle').value,
+                    tags: document.getElementById('entryTags').value,
+                    content: document.getElementById('editorContent').innerHTML,
+                    mode: state.currentMode,
+                    updatedAt: new Date().toISOString()
+                };
+                await dbPut('meta', draft);
+                statusEl.textContent = 'Tersimpan Otomatis';
+            }
+
+            function evaluateLabItemStatus(item, rawVal, gender) {
+                if (item.isText) {
+                    const norm = String(rawVal || '').trim().toLowerCase();
+                    const exp = String(item.expected || '').trim().toLowerCase();
+                    if (norm === exp) {
+                        return { label: 'Normal', badgeClass: 'bg-green-100 text-green-800 border border-green-400' };
+                    }
+                    return { label: 'Atensi / Positif', badgeClass: 'bg-red-100 text-red-800 border border-red-400' };
+                }
+                const num = parseFloat(rawVal);
+                if (isNaN(num)) return { label: '-', badgeClass: 'bg-gray-100 text-gray-600' };
+
+                const min = (gender === 'wanita' && item.minF !== undefined) ? item.minF : (item.minM !== undefined ? item.minM : item.min);
+                const max = (gender === 'wanita' && item.maxF !== undefined) ? item.maxF : (item.maxM !== undefined ? item.maxM : item.max);
+
+                if (min !== undefined && num < min) {
+                    return { label: 'Rendah (Low)', badgeClass: 'bg-amber-100 text-amber-900 border border-amber-400' };
+                }
+                if (max !== undefined && num > max) {
+                    return { label: 'Tinggi (High)', badgeClass: 'bg-red-100 text-red-800 border border-red-400' };
+                }
+                return { label: 'Normal', badgeClass: 'bg-green-100 text-green-800 border border-green-400' };
+            }
+
+            function renderLabChecklistPanel(categoryId) {
+                const container = document.getElementById('labParameterChecklistContainer');
+                const panel = CLINICAL_LAB_PANELS[categoryId];
+                if (!container || !panel) return;
+
+                const gender = document.getElementById('medGender')?.value || 'pria';
+                let html = `<div class="font-bold text-teal-900 mb-1.5 border-b border-gray-300 pb-0.5">${escapeHtml(panel.title)}</div><div class="space-y-1.5">`;
+                panel.items.forEach(item => {
+                    const saved = labUserValues[item.id] || { checked: false, value: item.defaultVal };
+                    const statusObj = evaluateLabItemStatus(item, saved.value, gender);
+                    html += `<div class="flex flex-wrap items-center justify-between gap-1 bg-gray-50 p-1 border border-gray-200">
+                        <label class="flex items-center gap-1.5 font-semibold cursor-pointer flex-1 min-w-[160px]">
+                            <input type="checkbox" class="lab-item-check" data-id="${item.id}" ${saved.checked ? 'checked' : ''}>
+                            <span>${escapeHtml(item.name)}</span>
+                        </label>
+                        <div class="flex items-center gap-1">
+                            <input type="${item.isText ? 'text' : 'number'}" step="any" class="retro-inset p-0.5 w-24 text-xs lab-item-val" data-id="${item.id}" value="${escapeHtml(saved.value)}">
+                            <span class="text-[11px] text-gray-600 w-16">${escapeHtml(item.unit)}</span>
+                            <span class="text-[10px] px-1.5 py-0.5 font-bold ${statusObj.badgeClass}" id="lab-badge-${item.id}">${statusObj.label}</span>
+                        </div>
+                        <div class="w-full text-[10px] text-gray-500 pl-4">Rujukan: ${escapeHtml(item.refText)} — ${escapeHtml(item.desc)}</div>
+                    </div>`;
+                });
+                html += `</div>`;
+                container.innerHTML = html;
+            }
+
+            function computeMedicalSummary() {
+                const gender = document.getElementById('medGender')?.value || 'pria';
+                const hCm = parseFloat(document.getElementById('medHeight').value) || 170;
+                const wKg = parseFloat(document.getElementById('medWeight').value) || 65;
+                const sys = parseFloat(document.getElementById('medSys').value) || 120;
+                const dia = parseFloat(document.getElementById('medDia').value) || 80;
+                const cal = parseFloat(document.getElementById('medCalories').value) || 2000;
+                const water = parseFloat(document.getElementById('medWater')?.value) || 2000;
+
+                const hM = hCm / 100;
+                const bmi = (wKg / (hM * hM)).toFixed(2);
+                let bmiCat = 'Normal';
+                if (bmi < 18.5) bmiCat = 'Berat Kurang';
+                else if (bmi >= 25 && bmi < 30) bmiCat = 'Berat Lebih';
+                else if (bmi >= 30) bmiCat = 'Obesitas';
+
+                let bpCat = 'Normal';
+                if (sys >= 140 || dia >= 90) bpCat = 'Hipertensi';
+                else if (sys >= 120 || dia >= 80) bpCat = 'Pra-Hipertensi';
+
+                const summaryText = `BMI: ${bmi} (${bmiCat}) | Tensi: ${sys}/${dia} mmHg (${bpCat}) | Diet: ${cal} kkal & Air: ${water} ml`;
+                document.getElementById('medSummaryOutput').textContent = summaryText;
+
+                return { gender, hCm, wKg, bmi, bmiCat, sys, dia, bpCat, cal, water };
+            }
+
+            function computeFinancialSummary() {
+                const inc = parseFloat(document.getElementById('finIncome').value) || 0;
+                const exp = parseFloat(document.getElementById('finExpense').value) || 0;
+                const sav = parseFloat(document.getElementById('finSavings')?.value) || 0;
+                const debt = parseFloat(document.getElementById('finDebt').value) || 0;
+                const emerg = parseFloat(document.getElementById('finEmergency').value) || 0;
+                const invAsset = parseFloat(document.getElementById('finInvestAsset')?.value) || 0;
+                const totalAsset = parseFloat(document.getElementById('finTotalAsset')?.value) || 0;
+                const totalDebt = parseFloat(document.getElementById('finTotalDebt')?.value) || 0;
+
+                // 5 Rasio Standar Fin.html
+                const liquidityMonths = exp > 0 ? (emerg / exp) : 0;
+                const liqStat = liquidityMonths >= 6 ? 'Sangat Aman' : (liquidityMonths >= 3 ? 'Aman / Ideal' : (liquidityMonths >= 1 ? 'Perhatian' : 'Kritis'));
+
+                const savingsRatio = inc > 0 ? ((sav / inc) * 100) : 0;
+                const savStat = savingsRatio >= 20 ? 'Sangat Baik' : (savingsRatio >= 10 ? 'Ideal' : 'Perlu Ditingkatkan');
+
+                const debtRatio = inc > 0 ? ((debt / inc) * 100) : 0;
+                const debtStat = debtRatio <= 30 ? 'Sehat' : (debtRatio <= 40 ? 'Waspada' : 'Kritis');
+
+                const solvRatio = totalAsset > 0 ? ((totalDebt / totalAsset) * 100) : 0;
+                const solvStat = solvRatio <= 50 ? 'Sehat' : (solvRatio <= 80 ? 'Berisiko' : 'Kritis');
+
+                const invRatio = totalAsset > 0 ? ((invAsset / totalAsset) * 100) : 0;
+                const invStat = invRatio >= 30 ? 'Produktif' : (invRatio >= 10 ? 'Ditingkatkan' : 'Kritis');
+
+                let score = 0;
+                if (liquidityMonths >= 3) score++;
+                if (savingsRatio >= 10) score++;
+                if (debtRatio <= 30) score++;
+                if (solvRatio <= 50) score++;
+                if (invRatio >= 30) score++;
+
+                const overallHealth = score === 5 ? 'Sangat Sehat (5/5)' : (score >= 3 ? `Cukup Sehat (${score}/5)` : `Kritis (${score}/5)`);
+                const summaryText = `Skor: ${overallHealth} | Likuiditas: ${liquidityMonths.toFixed(1)} bln | Tabungan: ${savingsRatio.toFixed(1)}% | Utang: ${debtRatio.toFixed(1)}%`;
+                document.getElementById('finSummaryOutput').textContent = summaryText;
+
+                return {
+                    inc, exp, sav, debt, emerg, invAsset, totalAsset, totalDebt,
+                    liquidityMonths: liquidityMonths.toFixed(1), liqStat,
+                    savingsRatio: savingsRatio.toFixed(1), savStat,
+                    debtRatio: debtRatio.toFixed(1), debtStat,
+                    solvRatio: solvRatio.toFixed(1), solvStat,
+                    invRatio: invRatio.toFixed(1), invStat,
+                    score, overallHealth
+                };
+            }
+
+            function stripRtfBasic(rtfText) {
+                return rtfText
+                    .replace(/\\par[d]?/g, '\n')
+                    .replace(/\{\*?\\[^{}]+}|[{}]|\\\n?[A-Za-z]+\n?(?:-?\d+)?[ ]?/g, '')
+                    .replace(/\\'[0-9a-fA-F]{2}/g, '')
+                    .trim();
+            }
+
+            async function handleDocumentImport(file) {
+                if (!file) return;
+                const ext = file.name.split('.').pop().toLowerCase();
+                const editor = document.getElementById('editorContent');
+                recordHistorySnapshot();
+
+                try {
+                    if (ext === 'docx') {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const result = await mammoth.convertToHtml({ arrayBuffer });
+                        editor.innerHTML += `<div>${result.value}</div>`;
+                        showToast(`Dokumen DOCX "${file.name}" berhasil diimpor.`);
+                    } else if (ext === 'xlsx' || ext === 'xls') {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                        let sheetsHtml = '';
+                        workbook.SheetNames.forEach(sheetName => {
+                            const sheet = workbook.Sheets[sheetName];
+                            sheetsHtml += `<h4>Lembar Kerja: ${escapeHtml(sheetName)}</h4>` + XLSX.utils.sheet_to_html(sheet);
+                        });
+                        editor.innerHTML += `<div>${sheetsHtml}</div>`;
+                        showToast(`Spreadsheet "${file.name}" berhasil dikonversi ke tabel.`);
+                    } else if (ext === 'pptx') {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const zip = await JSZip.loadAsync(arrayBuffer);
+                        const slideFiles = [];
+                        zip.forEach((relativePath) => {
+                            const m = relativePath.match(/^ppt\/slides\/slide(\d+)\.xml$/i);
+                            if (m) slideFiles.push({ path: relativePath, index: parseInt(m[1], 10) });
+                        });
+                        slideFiles.sort((a, b) => a.index - b.index);
+                        let slidesHtml = `<h3>Presentasi: ${escapeHtml(file.name)}</h3>`;
+                        for (const s of slideFiles) {
+                            const xmlContent = await zip.file(s.path).async('text');
+                            const xmlDoc = new DOMParser().parseFromString(xmlContent, 'application/xml');
+                            const textNodes = xmlDoc.getElementsByTagName('a:t');
+                            const texts = [];
+                            for (let i = 0; i < textNodes.length; i++) {
+                                const t = textNodes[i].textContent.trim();
+                                if (t) texts.push(escapeHtml(t));
+                            }
+                            slidesHtml += `<div class="p-2 my-1 border border-gray-300 bg-gray-50"><strong>Slide ${s.index}</strong><p>${texts.join(' — ') || '<em>(Visual/Tanpa Teks)</em>'}</p></div>`;
+                        }
+                        editor.innerHTML += slidesHtml;
+                        showToast(`Presentasi PPTX "${file.name}" (${slideFiles.length} slide) berhasil diekstrak.`);
+                    } else if (ext === 'csv') {
+                        const text = await file.text();
+                        const parsed = Papa.parse(text.trim(), { skipEmptyLines: true });
+                        let tableHtml = '<table><thead><tr>';
+                        if (parsed.data.length > 0) {
+                            parsed.data[0].forEach(col => { tableHtml += `<th>${escapeHtml(col)}</th>`; });
+                            tableHtml += '</tr></thead><tbody>';
+                            for (let i = 1; i < parsed.data.length; i++) {
+                                tableHtml += '<tr>';
+                                parsed.data[i].forEach(cell => { tableHtml += `<td>${escapeHtml(cell)}</td>`; });
+                                tableHtml += '</tr>';
+                            }
+                            tableHtml += '</tbody></table>';
+                        }
+                        editor.innerHTML += tableHtml;
+                        showToast(`Berkas CSV "${file.name}" berhasil dimuat sebagai tabel.`);
+                    } else if (ext === 'md') {
+                        const text = await file.text();
+                        const html = marked.parse(text);
+                        editor.innerHTML += `<div>${html}</div>`;
+                        showToast(`Berkas Markdown "${file.name}" berhasil dirender.`);
+                    } else if (ext === 'rtf') {
+                        const text = await file.text();
+                        const cleaned = stripRtfBasic(text);
+                        editor.innerHTML += `<p>${escapeHtml(cleaned).replace(/\n/g, '<br>')}</p>`;
+                        showToast(`Berkas RTF "${file.name}" berhasil diekstrak.`);
+                    } else {
+                        const text = await file.text();
+                        editor.innerHTML += `<p>${escapeHtml(text).replace(/\n/g, '<br>')}</p>`;
+                        showToast(`Berkas teks "${file.name}" berhasil diimpor.`);
+                    }
+                    recordHistorySnapshot();
+                } catch (err) {
+                    showToast(`Gagal mengimpor berkas: ${err.message}`);
+                }
+            }
+
+            function parseIcsSummary(icsText) {
+                const summaryMatch = icsText.match(/SUMMARY:(.*)/i);
+                const dtStartMatch = icsText.match(/DTSTART[^:]*:(.*)/i);
+                const locMatch = icsText.match(/LOCATION:(.*)/i);
+                return {
+                    summary: summaryMatch ? summaryMatch[1].trim() : 'Acara Kalender',
+                    start: dtStartMatch ? dtStartMatch[1].trim() : '-',
+                    location: locMatch ? locMatch[1].trim() : '-'
+                };
+            }
+
+            function parseVcfSummary(vcfText) {
+                const fnMatch = vcfText.match(/FN:(.*)/i);
+                const telMatch = vcfText.match(/TEL[^:]*:(.*)/i);
+                const emailMatch = vcfText.match(/EMAIL[^:]*:(.*)/i);
+                return {
+                    name: fnMatch ? fnMatch[1].trim() : 'Kontak',
+                    phone: telMatch ? telMatch[1].trim() : '-',
+                    email: emailMatch ? emailMatch[1].trim() : '-'
+                };
+            }
+
+            function fileToDataUrl(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            async function handleAttachmentFiles(fileList) {
+                for (const file of fileList) {
+                    if (file.size > 25 * 1024 * 1024) {
+                        showToast(`Ukuran berkas "${file.name}" melebihi batas 25 MB.`);
+                        continue;
+                    }
+                    const dataUrl = await fileToDataUrl(file);
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    let metaInfo = null;
+
+                    if (ext === 'ics') {
+                        const rawText = await file.text();
+                        metaInfo = parseIcsSummary(rawText);
+                    } else if (ext === 'vcf') {
+                        const rawText = await file.text();
+                        metaInfo = parseVcfSummary(rawText);
+                    }
+
+                    state.draftAttachments.push({
+                        id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                        name: file.name,
+                        type: file.type || 'application/octet-stream',
+                        ext: ext,
+                        size: file.size,
+                        dataUrl: dataUrl,
+                        metaInfo: metaInfo
+                    });
+                }
+                renderDraftAttachments();
+                showToast('Lampiran ditambahkan ke draf entri.');
+            }
+
+            function renderDraftAttachments() {
+                const listEl = document.getElementById('attachmentDraftList');
+                if (state.draftAttachments.length === 0) {
+                    listEl.innerHTML = '<li class="text-gray-500 italic">Tidak ada lampiran.</li>';
+                    return;
+                }
+                listEl.innerHTML = state.draftAttachments.map((att, idx) => `
+                    <li class="flex justify-between items-center bg-white px-2 py-1 border border-gray-300">
+                        <span class="truncate max-w-[220px]">${escapeHtml(att.name)} (${(att.size / 1024).toFixed(1)} KB)</span>
+                        <button type="button" data-remove-att="${idx}" class="retro-btn py-0 px-1.5 text-[10px]">Hapus</button>
+                    </li>
+                `).join('');
+            }
+
+            function parseMaskingRules() {
+                const raw = document.getElementById('maskRuleInput').value.trim();
+                if (!raw) return [];
+                const lines = raw.split(/\r?\n/);
+                const rules = [];
+                lines.forEach(line => {
+                    const parts = line.split(',');
+                    if (parts.length >= 2) {
+                        const target = parts[0].trim();
+                        const replacement = parts.slice(1).join(',').trim();
+                        if (target) rules.push({ target, replacement });
+                    } else if (parts[0].trim()) {
+                        const target = parts[0].trim();
+                        const randomCode = '[SENSOR_' + Math.random().toString(36).substring(2, 6).toUpperCase() + ']';
+                        rules.push({ target, replacement: randomCode });
+                    }
+                });
+                return rules;
+            }
+
+            function applyMaskToText(inputText) {
+                const rules = parseMaskingRules();
+                let output = inputText;
+                rules.forEach(({ target, replacement }) => {
+                    const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(escaped, 'gi');
+                    output = output.replace(regex, replacement);
+                });
+                return output;
+            }
+
+            function escapeHtml(str) {
+                return String(str || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function renderAttachmentViewer(attachments) {
+                if (!attachments || attachments.length === 0) return '';
+                const itemsHtml = attachments.map(att => {
+                    if (att.type.startsWith('image/')) {
+                        return `<div class="border border-gray-400 p-1 bg-white inline-block m-1">
+                            <img src="${att.dataUrl}" alt="${escapeHtml(att.name)}" class="max-h-48 object-contain">
+                            <div class="text-[11px] text-gray-600 mt-1">${escapeHtml(att.name)}</div>
+                        </div>`;
+                    }
+                    if (att.type.startsWith('audio/')) {
+                        return `<div class="p-2 border border-gray-300 bg-gray-50 my-1">
+                            <div class="text-xs font-semibold mb-1">Audio: ${escapeHtml(att.name)}</div>
+                            <audio controls src="${att.dataUrl}" class="w-full h-8"></audio>
+                        </div>`;
+                    }
+                    if (att.type.startsWith('video/')) {
+                        return `<div class="p-2 border border-gray-300 bg-gray-50 my-1">
+                            <div class="text-xs font-semibold mb-1">Video: ${escapeHtml(att.name)}</div>
+                            <video controls src="${att.dataUrl}" class="max-h-60 w-full"></video>
+                        </div>`;
+                    }
+                    if (att.ext === 'ics' && att.metaInfo) {
+                        return `<div class="p-2 border border-blue-400 bg-blue-50 my-1 text-xs">
+                            <strong>Jadwal Kalender (.ICS):</strong> ${escapeHtml(att.metaInfo.summary)}<br>
+                            <span>Waktu: ${escapeHtml(att.metaInfo.start)} | Lokasi: ${escapeHtml(att.metaInfo.location)}</span>
+                        </div>`;
+                    }
+                    if (att.ext === 'vcf' && att.metaInfo) {
+                        return `<div class="p-2 border border-amber-500 bg-amber-50 my-1 text-xs">
+                            <strong>Kartu Kontak (.VCF):</strong> ${escapeHtml(att.metaInfo.name)}<br>
+                            <span>Telp: ${escapeHtml(att.metaInfo.phone)} | Email: ${escapeHtml(att.metaInfo.email)}</span>
+                        </div>`;
+                    }
+                    return `<div class="p-1.5 border border-gray-300 bg-gray-50 my-1 flex justify-between items-center text-xs">
+                        <span>Berkas: <strong>${escapeHtml(att.name)}</strong> (${(att.size / 1024).toFixed(1)} KB)</span>
+                        <a href="${att.dataUrl}" download="${escapeHtml(att.name)}" class="retro-btn py-0.5 px-2">Unduh</a>
+                    </div>`;
+                }).join('');
+
+                return `<div class="mt-3 pt-2 border-t border-dotted border-gray-400">
+                    <div class="text-xs font-bold mb-1">Lampiran Tersemat (${attachments.length}):</div>
+                    <div>${itemsHtml}</div>
+                </div>`;
+            }
+
+            function renderStudyInteractiveSection(entry) {
+                const cards = entry.studyCards || [];
+                const quizzes = entry.studyQuizzes || [];
+                if (cards.length === 0 && quizzes.length === 0) return '';
+
+                let html = '<div class="mt-3 pt-2 border-t border-amber-400 space-y-3 bg-amber-50/50 p-2">';
+                if (cards.length > 0) {
+                    html += `<div class="text-xs font-bold text-amber-900">Flashcard Studi (Klik kartu untuk membalik):</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">`;
+                    cards.forEach((c, idx) => {
+                        html += `<div class="retro-box p-2.5 cursor-pointer study-flashcard" data-front="${escapeHtml(c.front)}" data-back="${escapeHtml(c.back)}" data-flipped="false">
+                            <div class="text-[10px] uppercase text-gray-500 font-bold mb-1">Kartu #${idx + 1} (Pertanyaan)</div>
+                            <div class="font-semibold text-sm card-body-text">${escapeHtml(c.front)}</div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                }
+
+                if (quizzes.length > 0) {
+                    html += `<div class="text-xs font-bold text-amber-900 pt-1">Kuis Evaluasi Mandiri (Standar Quizr):</div><div class="space-y-2">`;
+                    quizzes.forEach((q, qIdx) => {
+                        const qType = q.type || 'mc';
+                        const expAttr = escapeHtml(q.explanation || '');
+                        let interactionHtml = '';
+                        if (qType === 'short') {
+                            interactionHtml = `<div class="flex gap-1 items-center">
+                                <input type="text" class="retro-inset p-1 text-xs flex-1 quiz-short-input" placeholder="Ketik jawaban singkat...">
+                                <button type="button" class="retro-btn quiz-short-check-btn text-xs" data-ans="${escapeHtml(q.answer)}" data-exp="${expAttr}">Periksa</button>
+                            </div>`;
+                        } else {
+                            const opts = (qType === 'tf' && (!q.options || q.options.length === 0)) ? ['Benar', 'Salah'] : (q.options || []);
+                            interactionHtml = `<div class="flex flex-wrap gap-1">` + opts.map(opt => `
+                                <button type="button" class="retro-btn quiz-opt-btn text-xs" data-ans="${escapeHtml(q.answer)}" data-pick="${escapeHtml(opt)}" data-exp="${expAttr}">${escapeHtml(opt)}</button>
+                            `).join(' ') + `</div>`;
+                        }
+                        html += `<div class="p-2 bg-white border border-gray-300 text-xs space-y-1.5">
+                            <div class="font-semibold"><span class="px-1 py-0.5 bg-amber-100 border border-amber-300 text-[10px] mr-1 uppercase">${escapeHtml(qType)}</span>${qIdx + 1}. ${escapeHtml(q.question)}</div>
+                            ${interactionHtml}
+                            <div class="quiz-feedback font-bold hidden"></div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                }
+                html += '</div>';
+                return html;
+            }
+
+            function formatWikiLinksAndMath(htmlContent) {
+                if (!htmlContent) return '';
+                return htmlContent.replace(/\[\[(.*?)\]\]/g, (match, title) => {
+                    return `<span class="wiki-link" data-wikilink="${escapeHtml(title)}" title="Cari entri referensi: ${escapeHtml(title)}">[[${escapeHtml(title)}]]</span>`;
+                });
+            }
+
+            function triggerKaTeXRender(containerEl) {
+                if (window.renderMathInElement && containerEl) {
+                    try {
+                        window.renderMathInElement(containerEl, {
+                            delimiters: [
+                                { left: '$$', right: '$$', display: true },
+                                { left: '$', right: '$', display: false }
+                            ],
+                            throwOnError: false
+                        });
+                    } catch (e) {}
+                }
+            }
+
+            function renderEntriesFeed() {
+                const container = document.getElementById('entriesFeedContainer');
+                const archiveList = document.getElementById('sidebarArchiveList');
+                const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+                const sorted = [...state.entries].sort((a, b) => new Date(b.date) - new Date(a.date));
+                const filtered = sorted.filter(item => {
+                    const matchMode = item.mode === state.currentMode;
+                    if (!matchMode) return false;
+                    if (!query) return true;
+                    const inTitle = (item.title || '').toLowerCase().includes(query);
+                    const inTags = (item.tags || []).join(' ').toLowerCase().includes(query);
+                    const inContent = (item.content || '').toLowerCase().includes(query);
+                    return inTitle || inTags || inContent;
+                });
+
+                document.getElementById('statTotalEntries').textContent = state.entries.length;
+                document.getElementById('statModeEntries').textContent = state.entries.filter(e => e.mode === state.currentMode).length;
+                document.getElementById('feedHeaderTitle').textContent = `Arsip Pos Weblog — ${MODE_CONFIG[state.currentMode].name}`;
+
+                if (filtered.length === 0) {
+                    archiveList.innerHTML = '<li class="text-gray-500 italic">Tidak ada entri pada mode ini.</li>';
+                    container.innerHTML = `<div class="retro-inset p-6 text-center text-gray-500">
+                        Belum ada catatan tersimpan untuk mode <strong>${MODE_CONFIG[state.currentMode].name}</strong>. Silakan tulis entri baru di atas.
+                    </div>`;
+                    return;
+                }
+
+                archiveList.innerHTML = filtered.map(item => `
+                    <li class="flex justify-between items-center border-b border-dotted border-gray-300 py-1">
+                        <a href="#post-${item.id}" class="hover:underline truncate max-w-[160px] font-medium" style="color: var(--accent);">
+                            ${item.encrypted ? '[Terkunci] ' : ''}${escapeHtml(item.title)}
+                        </a>
+                        <span class="text-[10px] text-gray-500">${new Date(item.date).toLocaleDateString('id-ID')}</span>
+                    </li>
+                `).join('');
+
+                container.innerHTML = filtered.map(item => {
+                    const unlockedData = state.unlockedCache[item.id];
+                    const isLocked = item.encrypted && !unlockedData;
+                    const activeData = unlockedData || item;
+                    const cardBg = activeData.customBgColor || '#ffffff';
+
+                    if (isLocked) {
+                        return `<article id="post-${item.id}" class="retro-box p-3 bg-gray-100">
+                            <div class="flex justify-between items-center border-b border-gray-400 pb-1.5 mb-2">
+                                <div>
+                                    <span class="sticker-badge">TERENKRIPSI AES-GCM</span>
+                                    <h3 class="text-base font-bold inline">${escapeHtml(item.title)}</h3>
+                                </div>
+                                <span class="text-xs text-gray-600 font-mono">${new Date(item.date).toLocaleString('id-ID')}</span>
+                            </div>
+                            <p class="text-xs text-gray-700 mb-3">Isi catatan dan lampiran pada entri ini dienkripsi dengan kata sandi.</p>
+                            <div class="flex gap-2">
+                                <button type="button" class="retro-btn retro-btn-primary unlock-entry-btn" data-id="${item.id}">Buka Kunci Entri</button>
+                                <button type="button" class="retro-btn delete-entry-btn" data-id="${item.id}">Hapus</button>
+                            </div>
+                        </article>`;
+                    }
+
+                    const tagsBadges = (item.tags || []).map(t => `<span class="px-1.5 py-0.5 bg-gray-200 border border-gray-400 text-[11px] mr-1">#${escapeHtml(t)}</span>`).join('');
+                    const stickersBadges = (activeData.stickers || []).map(s => `<span class="sticker-badge">${escapeHtml(s)}</span>`).join('');
+
+                    let extraMetaHtml = '';
+                    if (item.mode === 'journal' && activeData.journalMeta) {
+                        extraMetaHtml = `<div class="mb-2 p-2 bg-gray-100 border-l-4 border-gray-700 text-xs">
+                            <strong>Syukur:</strong> ${escapeHtml(activeData.journalMeta.gratitude || '-')} |
+                            <strong>Fokus:</strong> ${escapeHtml(activeData.journalMeta.focus || '-')} |
+                            <strong>Ketenangan:</strong> ${escapeHtml(activeData.journalMeta.clarity || '-')}/10
+                        </div>`;
+                    }
+
+                    return `<article id="post-${item.id}" class="retro-box p-3.5" style="background-color: ${escapeHtml(cardBg)};">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b-2 border-gray-300 pb-1.5 mb-2.5 gap-1">
+                            <div>
+                                <h3 class="text-lg font-bold" style="color: var(--accent);">${escapeHtml(item.title)}</h3>
+                                <div class="text-[11px] text-gray-600">Diposting pada ${new Date(item.date).toLocaleString('id-ID')} | Mode: ${MODE_CONFIG[item.mode].name}</div>
+                            </div>
+                            <div class="flex gap-1">
+                                <button type="button" class="retro-btn edit-entry-btn text-xs" data-id="${item.id}">Edit</button>
+                                <button type="button" class="retro-btn delete-entry-btn text-xs" data-id="${item.id}">Hapus</button>
+                            </div>
+                        </div>
+                        <div class="mb-2">${stickersBadges} ${tagsBadges}</div>
+                        ${extraMetaHtml}
+                        <div class="blog-post text-sm">${formatWikiLinksAndMath(activeData.content || '')}</div>
+                        ${renderStudyInteractiveSection(activeData)}
+                        ${renderAttachmentViewer(activeData.attachments)}
+                    </article>`;
+                }).join('');
+
+                triggerKaTeXRender(container);
+            }
+
+            function buildStandaloneHtmlDocument(entriesToExport) {
+                const postsHtml = entriesToExport.map(item => {
+                    const unlocked = state.unlockedCache[item.id] || item;
+                    if (item.encrypted && !state.unlockedCache[item.id]) {
+                        return `<div class="post encrypted-post" data-salt="${item.cipherBundle.salt}" data-iv="${item.cipherBundle.iv}" data-cipher="${item.cipherBundle.ciphertext}">
+                            <h2>[Terenkripsi] ${escapeHtml(item.title)}</h2>
+                            <div class="meta">${new Date(item.date).toLocaleString('id-ID')} | Mode: ${item.mode}</div>
+                            <p>Entri ini dilindungi enkripsi AES-GCM.</p>
+                        </div>`;
+                    }
+                    return `<div class="post">
+                        <h2>${escapeHtml(item.title)}</h2>
+                        <div class="meta">${new Date(item.date).toLocaleString('id-ID')} | Mode: ${item.mode} | Tag: ${(item.tags || []).join(', ')}</div>
+                        <div class="content">${unlocked.content || ''}</div>
+                    </div>`;
+                }).join('\n');
+
+                return `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Ekspor Weblog MyDiary</title>
+<style>
+    body { font-family: Georgia, serif; background: #d4d0c8; color: #222; max-width: 820px; margin: 20px auto; padding: 15px; }
+    header { background: #004e98; color: #fff; padding: 12px 16px; border: 2px solid #404040; margin-bottom: 16px; font-family: Tahoma, sans-serif; }
+    .post { background: #fff; border: 2px solid #808080; padding: 16px; margin-bottom: 16px; }
+    .meta { font-family: Tahoma, sans-serif; font-size: 12px; color: #666; border-bottom: 1px dotted #999; padding-bottom: 6px; margin-bottom: 10px; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #888; padding: 6px; }
+</style>
+</head>
+<body>
+    <header>
+        <h1 style="margin:0;font-size:20px;">MyDiary // Arsip Weblog Personal</h1>
+        <small>Diekspor pada ${new Date().toLocaleString('id-ID')}</small>
+    </header>
+    ${postsHtml}
+</body>
+</html>`;
+            }
+
+            async function exportAsHtmlFile() {
+                const htmlContent = buildStandaloneHtmlDocument(state.entries);
+                const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `MyDiary_Weblog_${new Date().toISOString().slice(0,10)}.html`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('Berkas HTML mandiri berhasil diunduh.');
+            }
+
+            async function exportAsZipArchive() {
+                const zip = new JSZip();
+                const assetsFolder = zip.folder('assets');
+                const mdFolder = zip.folder('markdown');
+                const clonedEntries = JSON.parse(JSON.stringify(state.entries));
+
+                clonedEntries.forEach(entry => {
+                    const target = state.unlockedCache[entry.id] || entry;
+                    if (target.attachments && target.attachments.length > 0) {
+                        target.attachments.forEach((att, idx) => {
+                            if (att.dataUrl && att.dataUrl.includes(',')) {
+                                const base64Part = att.dataUrl.split(',')[1];
+                                const safeName = `${entry.id}_${idx}_${att.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                                assetsFolder.file(safeName, base64Part, { base64: true });
+                            }
+                        });
+                    }
+                    if (!entry.encrypted || state.unlockedCache[entry.id]) {
+                        const mdBody = turndownEngine ? turndownEngine.turndown(target.content || '') : (target.content || '');
+                        const safeDocName = `${entry.mode}_${entry.title.replace(/[^a-zA-Z0-9._-]/g, '_')}.md`;
+                        mdFolder.file(safeDocName, `# ${entry.title}\n\n*Tanggal: ${entry.date} | Mode: ${entry.mode}*\n\n${mdBody}`);
+                    }
+                });
+
+                zip.file('index.html', buildStandaloneHtmlDocument(state.entries));
+                zip.file('backup_entries.json', JSON.stringify(state.entries, null, 2));
+
+                const blob = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `MyDiary_Bundle_${new Date().toISOString().slice(0,10)}.zip`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('Arsip ZIP beserta direktori lampiran dan Markdown berhasil diunduh.');
+            }
+
+            function switchMode(newMode) {
+                if (!MODE_CONFIG[newMode]) return;
+                state.currentMode = newMode;
+                document.body.setAttribute('data-theme', newMode);
+                document.getElementById('modeSubtitle').textContent = MODE_CONFIG[newMode].subtitle;
+
+                document.querySelectorAll('.mode-tab').forEach(btn => {
+                    if (btn.dataset.mode === newMode) {
+                        btn.classList.add('retro-btn-primary');
+                    } else {
+                        btn.classList.remove('retro-btn-primary');
+                    }
+                });
+
+                document.querySelectorAll('.mode-panel').forEach(p => p.classList.add('hidden'));
+                const activePanel = document.getElementById(`panel-${newMode}`);
+                if (activePanel) activePanel.classList.remove('hidden');
+
+                const encToggle = document.getElementById('enableEncryptionToggle');
+                encToggle.checked = MODE_CONFIG[newMode].defaultEncrypted;
+                document.getElementById('encryptionPasswordGroup').classList.toggle('hidden', !encToggle.checked);
+
+                if (newMode === 'medical') {
+                    computeMedicalSummary();
+                    renderLabChecklistPanel(document.getElementById('labCategorySelect').value);
+                }
+                if (newMode === 'financial') computeFinancialSummary();
+
+                renderEntriesFeed();
+            }
+
+            function resetEditorForm() {
+                state.editingEntryId = null;
+                state.draftAttachments = [];
+                state.draftStudyCards = [];
+                state.draftStudyQuizzes = [];
+                state.draftStickers = [];
+                document.getElementById('entryTitle').value = '';
+                document.getElementById('entryTags').value = '';
+                const now = new Date();
+                now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                document.getElementById('entryDate').value = now.toISOString().slice(0, 16);
+                document.getElementById('editorContent').innerHTML = '<p>Mulai menulis catatan di sini...</p>';
+                document.getElementById('entryPasswordInput').value = '';
+                document.getElementById('editingIndicator').textContent = 'Mode: Membuat Entri Baru';
+                document.getElementById('studyDraftStats').textContent = 'Flashcard tersimpan di draf: 0 | Soal Kuis: 0';
+                renderDraftAttachments();
+            }
+
+            async function saveCurrentEntry() {
+                const title = document.getElementById('entryTitle').value.trim() || 'Catatan Tanpa Judul';
+                const dateVal = document.getElementById('entryDate').value || new Date().toISOString();
+                const tags = document.getElementById('entryTags').value.split(',').map(t => t.trim()).filter(Boolean);
+                const contentHtml = document.getElementById('editorContent').innerHTML;
+                const wantEncrypt = document.getElementById('enableEncryptionToggle').checked;
+                const password = document.getElementById('entryPasswordInput').value;
+
+                if (wantEncrypt && password.length < 4) {
+                    showToast('Masukkan kata sandi minimal 4 karakter untuk mengenkripsi entri.');
+                    return;
+                }
+
+                const entryId = state.editingEntryId || ('entry_' + Date.now());
+                const sensitivePayload = {
+                    content: contentHtml,
+                    attachments: state.draftAttachments,
+                    stickers: state.draftStickers,
+                    customBgColor: state.currentMode === 'diary' ? document.getElementById('diaryBgColor').value : '#ffffff',
+                    journalMeta: state.currentMode === 'journal' ? {
+                        gratitude: document.getElementById('journalGratitude').value,
+                        focus: document.getElementById('journalFocus').value,
+                        clarity: document.getElementById('journalClarity').value
+                    } : null,
+                    studyCards: state.draftStudyCards,
+                    studyQuizzes: state.draftStudyQuizzes
+                };
+
+                let newRecord = {
+                    id: entryId,
+                    mode: state.currentMode,
+                    title: title,
+                    date: dateVal,
+                    tags: tags,
+                    encrypted: wantEncrypt
+                };
+
+                if (wantEncrypt) {
+                    const cipherBundle = await encryptPayload(sensitivePayload, password);
+                    newRecord.cipherBundle = cipherBundle;
+                    state.unlockedCache[entryId] = sensitivePayload;
+                } else {
+                    Object.assign(newRecord, sensitivePayload);
+                }
+
+                await dbPut('entries', newRecord);
+                const existingIdx = state.entries.findIndex(e => e.id === entryId);
+                if (existingIdx >= 0) {
+                    state.entries[existingIdx] = newRecord;
+                } else {
+                    state.entries.push(newRecord);
+                }
+
+                resetEditorForm();
+                renderEntriesFeed();
+                showToast(`Entri "${title}" berhasil disimpan ke dalam ${MODE_CONFIG[state.currentMode].name}.`);
+            }
+
+            async function seedInitialSampleData() {
+                const nowIso = new Date().toISOString().slice(0, 16);
+                const samples = [
+                    {
+                        id: 'sample_diary_1',
+                        mode: 'diary',
+                        title: 'Catatan Perjalanan & Target Pribadi',
+                        date: nowIso,
+                        tags: ['personal', 'refleksi'],
+                        encrypted: false,
+                        customBgColor: '#fffafb',
+                        stickers: ['[Suasana: Tenang]', '[Target Tercapai]'],
+                        content: '<p>Hari ini berhasil menyusun sistem pencatatan pribadi dalam satu arsip terpadu. Semua dokumen lama kini bisa diimpor dan dikelola secara luring.</p>',
+                        attachments: []
+                    },
+                    {
+                        id: 'sample_logbook_1',
+                        mode: 'logbook',
+                        title: 'Pemeliharaan Basis Data Lokal & Backup Rutin',
+                        date: nowIso,
+                        tags: ['sistem', 'audit'],
+                        encrypted: false,
+                        content: '<p>Verifikasi penyimpanan IndexedDB dan skema kriptografi Web Crypto API berjalan normal. Lihat juga [[Catatan Perjalanan & Target Pribadi]].</p><pre>[STATUS] PBKDF2 100.000 iterasi + AES-GCM 256-bit: OK</pre>',
+                        attachments: []
+                    },
+                    {
+                        id: 'sample_study_1',
+                        mode: 'study',
+                        title: 'Ringkasan Kriptografi Simetris & Fisika Dasar',
+                        date: nowIso,
+                        tags: ['kriptografi', 'studi'],
+                        encrypted: false,
+                        content: '<p>Catatan pembelajaran mengenai perbedaan fungsi derivasi kunci dan persamaan energi relativistik $E = mc^2$.</p><p><strong>Referensi:</strong> Stallings, W. (2023). <em>Cryptography and Network Security</em>. Pearson.</p>',
+                        studyCards: [
+                            { front: 'Apa fungsi utama PBKDF2?', back: 'Mengubah kata sandi manusia menjadi kunci kriptografi melalui ribuan iterasi hash.' },
+                            { front: 'Keunggulan mode AES-GCM?', back: 'Menyediakan kerahasiaan (enkripsi) sekaligus pemeriksaan integritas (autentikasi) data.' }
+                        ],
+                        studyQuizzes: [
+                            { type: 'mc', question: 'Berapa ukuran panjang bit kunci tertinggi pada standar AES?', options: ['128-bit', '192-bit', '256-bit'], answer: '256-bit', explanation: 'AES mendukung panjang kunci 128, 192, dan 256-bit.' }
+                        ],
+                        attachments: []
+                    }
+                ];
+
+                for (const item of samples) {
+                    await dbPut('entries', item);
+                    state.entries.push(item);
+                }
+            }
+
+            function initSketchCanvas() {
+                const canvas = document.getElementById('sketchCanvas');
+                const ctx = canvas.getContext('2d');
+                let drawing = false;
+
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+
+                const getPos = (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    return {
+                        x: (clientX - rect.left) * (canvas.width / rect.width),
+                        y: (clientY - rect.top) * (canvas.height / rect.height)
+                    };
+                };
+
+                const start = (e) => {
+                    drawing = true;
+                    const pos = getPos(e);
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x, pos.y);
+                };
+
+                const move = (e) => {
+                    if (!drawing) return;
+                    e.preventDefault();
+                    ctx.strokeStyle = document.getElementById('sketchColor').value;
+                    const pos = getPos(e);
+                    ctx.lineTo(pos.x, pos.y);
+                    ctx.stroke();
+                };
+
+                const stop = () => { drawing = false; };
+
+                canvas.addEventListener('mousedown', start);
+                canvas.addEventListener('mousemove', move);
+                window.addEventListener('mouseup', stop);
+                canvas.addEventListener('touchstart', start, { passive: false });
+                canvas.addEventListener('touchmove', move, { passive: false });
+                canvas.addEventListener('touchend', stop);
+
+                document.getElementById('clearSketchBtn').addEventListener('click', () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                });
+
+                document.getElementById('saveSketchBtn').addEventListener('click', () => {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    state.draftAttachments.push({
+                        id: 'sketch_' + Date.now(),
+                        name: `Sketsa_${new Date().toISOString().slice(0,10)}.png`,
+                        type: 'image/png',
+                        ext: 'png',
+                        size: Math.round(dataUrl.length * 0.75),
+                        dataUrl: dataUrl
+                    });
+                    renderDraftAttachments();
+                    document.getElementById('sketchModal').classList.add('hidden');
+                    showToast('Sketsa grafis berhasil ditambahkan ke lampiran.');
+                });
+            }
+
+            function bindEvents() {
+                setInterval(() => {
+                    document.getElementById('clockDisplay').textContent = new Date().toLocaleString('id-ID');
+                }, 1000);
+                document.getElementById('clockDisplay').textContent = new Date().toLocaleString('id-ID');
+
+                document.getElementById('closeToastBtn').addEventListener('click', () => {
+                    document.getElementById('statusToast').classList.add('hidden');
+                });
+
+                document.querySelectorAll('.mode-tab').forEach(btn => {
+                    btn.addEventListener('click', () => switchMode(btn.dataset.mode));
+                });
+
+                document.querySelectorAll('.fmt-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        recordHistorySnapshot();
+                        const cmd = btn.dataset.cmd;
+                        const val = btn.dataset.val || null;
+                        document.execCommand(cmd, false, val);
+                        recordHistorySnapshot();
+                    });
+                });
+
+                document.getElementById('insertTableToolbarBtn').addEventListener('click', () => {
+                    recordHistorySnapshot();
+                    const tableHtml = `<table><thead><tr><th>Kolom 1</th><th>Kolom 2</th><th>Kolom 3</th></tr></thead><tbody><tr><td>Data A</td><td>Data B</td><td>Data C</td></tr></tbody></table><p></p>`;
+                    document.getElementById('editorContent').innerHTML += tableHtml;
+                    recordHistorySnapshot();
+                });
+
+                document.getElementById('insertDateToolbarBtn').addEventListener('click', () => {
+                    recordHistorySnapshot();
+                    document.execCommand('insertText', false, ` [${new Date().toLocaleString('id-ID')}] `);
+                    recordHistorySnapshot();
+                });
+
+                // Undo / Redo & Editor Input
+                document.getElementById('undoBtn').addEventListener('click', performUndo);
+                document.getElementById('redoBtn').addEventListener('click', performRedo);
+                document.getElementById('editorContent').addEventListener('keyup', () => {
+                    recordHistorySnapshot();
+                    updateLogbookEditorStats();
+                });
+
+                function updateLogbookEditorStats() {
+                    const text = document.getElementById('editorContent').innerText || '';
+                    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+                    const chars = text.length;
+                    const statEl = document.getElementById('logbookWordStat');
+                    if (statEl) statEl.textContent = `${words} Kata | ${chars} Karakter`;
+                    if (turndownEngine && !document.getElementById('logMarkdownContainer').classList.contains('hidden')) {
+                        document.getElementById('logMarkdownTextarea').value = turndownEngine.turndown(document.getElementById('editorContent').innerHTML);
+                    }
+                }
+
+                // Pola Latar Diari & Stiker
+                document.getElementById('diaryBgPattern').addEventListener('change', (e) => {
+                    const val = e.target.value;
+                    if (val === 'dots') {
+                        document.body.style.backgroundImage = 'radial-gradient(#b5838d 1px, transparent 1px)';
+                        document.body.style.backgroundSize = '16px 16px';
+                    } else if (val === 'grid') {
+                        document.body.style.backgroundImage = 'linear-gradient(to right, #ccc 1px, transparent 1px), linear-gradient(to bottom, #ccc 1px, transparent 1px)';
+                        document.body.style.backgroundSize = '20px 20px';
+                    } else if (val === 'lines') {
+                        document.body.style.backgroundImage = 'repeating-linear-gradient(0deg, transparent, transparent 23px, #cbd5e1 24px)';
+                        document.body.style.backgroundSize = '100% 24px';
+                    } else {
+                        document.body.style.backgroundImage = 'none';
+                    }
+                });
+
+                document.querySelectorAll('.sticker-trigger').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const st = btn.dataset.sticker;
+                        if (!state.draftStickers.includes(st)) state.draftStickers.push(st);
+                        showToast(`Stiker ${st} ditambahkan ke entri.`);
+                    });
+                });
+
+                // Logbook Helpers (DocuWiki)
+                document.getElementById('logInsertTimestampBtn').addEventListener('click', () => {
+                    document.getElementById('editorContent').innerHTML += `<p><code>[${new Date().toISOString()}]</code> — Log aktivitas dicatat.</p>`;
+                    updateLogbookEditorStats();
+                });
+                document.getElementById('logInsertCodeBtn').addEventListener('click', () => {
+                    document.getElementById('editorContent').innerHTML += `<pre>// Tulis potongan kode atau konfigurasi teknis di sini\nconst status = "READY";</pre><p></p>`;
+                    updateLogbookEditorStats();
+                });
+                document.getElementById('logInsertSpecTableBtn').addEventListener('click', () => {
+                    document.getElementById('editorContent').innerHTML += `<table><thead><tr><th>Waktu</th><th>Komponen</th><th>Status</th><th>Tindakan</th></tr></thead><tbody><tr><td>${new Date().toLocaleTimeString('id-ID')}</td><td>Modul Utama</td><td>Normal</td><td>Verifikasi berkala</td></tr></tbody></table>`;
+                    updateLogbookEditorStats();
+                });
+                document.getElementById('logInsertWikiLinkBtn').addEventListener('click', () => {
+                    document.getElementById('wikiLinkModal').classList.remove('hidden');
+                });
+                document.getElementById('closeWikiModalBtn').addEventListener('click', () => {
+                    document.getElementById('wikiLinkModal').classList.add('hidden');
+                });
+                document.getElementById('confirmWikiLinkBtn').addEventListener('click', () => {
+                    const title = document.getElementById('wikiLinkTitleInput').value.trim() || 'Dokumen_Referensi_Utama';
+                    document.getElementById('editorContent').innerHTML += ` <span>[[${escapeHtml(title)}]]</span> `;
+                    document.getElementById('wikiLinkModal').classList.add('hidden');
+                    updateLogbookEditorStats();
+                });
+
+                document.getElementById('logToggleMdSourceBtn').addEventListener('click', () => {
+                    const cont = document.getElementById('logMarkdownContainer');
+                    cont.classList.toggle('hidden');
+                    if (!cont.classList.contains('hidden') && turndownEngine) {
+                        document.getElementById('logMarkdownTextarea').value = turndownEngine.turndown(document.getElementById('editorContent').innerHTML);
+                    }
+                });
+
+                document.getElementById('logMarkdownTextarea').addEventListener('input', (e) => {
+                    const md = e.target.value;
+                    document.getElementById('editorContent').innerHTML = marked.parse(md);
+                    updateLogbookEditorStats();
+                });
+
+                document.getElementById('logExportMdBtn').addEventListener('click', () => {
+                    const md = turndownEngine ? turndownEngine.turndown(document.getElementById('editorContent').innerHTML) : document.getElementById('editorContent').innerText;
+                    const title = (document.getElementById('entryTitle').value.trim() || 'Logbook_DocuWiki').replace(/[^a-zA-Z0-9._-]/g, '_');
+                    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${title}.md`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    showToast('Berkas Markdown (.md) berhasil diunduh.');
+                });
+
+                // Kalkulator Medis, 11 Panel Lab & CalFit Importer
+                ['medGender','medHeight','medWeight','medSys','medDia','medCalories','medWater'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.addEventListener('input', () => {
+                        computeMedicalSummary();
+                        if (id === 'medGender') renderLabChecklistPanel(document.getElementById('labCategorySelect').value);
+                    });
+                });
+
+                document.getElementById('labCategorySelect').addEventListener('change', (e) => {
+                    renderLabChecklistPanel(e.target.value);
+                });
+
+                document.getElementById('labParameterChecklistContainer').addEventListener('input', (e) => {
+                    const checkEl = e.target.closest('.lab-item-check');
+                    if (checkEl) {
+                        const id = checkEl.dataset.id;
+                        if (!labUserValues[id]) labUserValues[id] = { checked: false, value: '' };
+                        labUserValues[id].checked = checkEl.checked;
+                        return;
+                    }
+                    const valEl = e.target.closest('.lab-item-val');
+                    if (valEl) {
+                        const id = valEl.dataset.id;
+                        if (!labUserValues[id]) labUserValues[id] = { checked: true, value: '' };
+                        labUserValues[id].value = valEl.value;
+                        labUserValues[id].checked = true;
+                        const catId = document.getElementById('labCategorySelect').value;
+                        const itemObj = CLINICAL_LAB_PANELS[catId].items.find(x => x.id === id);
+                        if (itemObj) {
+                            const st = evaluateLabItemStatus(itemObj, valEl.value, document.getElementById('medGender').value);
+                            const badge = document.getElementById(`lab-badge-${id}`);
+                            if (badge) {
+                                badge.textContent = st.label;
+                                badge.className = `text-[10px] px-1.5 py-0.5 font-bold ${st.badgeClass}`;
+                            }
+                        }
+                    }
+                });
+
+                document.getElementById('insertMedReportBtn').addEventListener('click', () => {
+                    const m = computeMedicalSummary();
+                    let labRowsHtml = '';
+                    Object.keys(CLINICAL_LAB_PANELS).forEach(catKey => {
+                        const panel = CLINICAL_LAB_PANELS[catKey];
+                        panel.items.forEach(item => {
+                            const saved = labUserValues[item.id];
+                            if (saved && saved.checked) {
+                                const st = evaluateLabItemStatus(item, saved.value, m.gender);
+                                labRowsHtml += `<tr>
+                                    <td><strong>${escapeHtml(item.name)}</strong> <span style="font-size:11px;color:#555;">(${escapeHtml(panel.title)})</span></td>
+                                    <td>${escapeHtml(saved.value)} ${escapeHtml(item.unit)}</td>
+                                    <td>${escapeHtml(item.refText)}</td>
+                                    <td><strong>${escapeHtml(st.label)}</strong> — ${escapeHtml(item.desc)}</td>
+                                </tr>`;
+                            }
+                        });
+                    });
+
+                    const html = `<h4>Hasil Pemeriksaan Biometrik, Diet CalFit & Parameter Laboratorium Klinik</h4>
+                    <p><strong>Biometrik & Diet:</strong> Gender: ${m.gender.toUpperCase()} | BMI: ${m.bmi} kg/m² (${m.bmiCat}) | Tensi: ${m.sys}/${m.dia} mmHg (${m.bpCat}) | Kalori: ${m.cal} kkal | Hidrasi Air: ${m.water} ml</p>
+                    <table>
+                        <thead><tr><th>Parameter Pemeriksaan</th><th>Hasil</th><th>Nilai Rujukan Normal</th><th>Evaluasi & Keterangan Klinis</th></tr></thead>
+                        <tbody>${labRowsHtml || '<tr><td colspan="4">Belum ada parameter yang dicentang.</td></tr>'}</tbody>
+                    </table><p></p>`;
+                    document.getElementById('editorContent').innerHTML += html;
+                    recordHistorySnapshot();
+                    showToast('Tabel parameter laboratorium tercentang ditambahkan ke editor.');
+                });
+
+                document.getElementById('insertAllLabRefBtn').addEventListener('click', () => {
+                    let fullHtml = `<h3>Daftar Lengkap Parameter Laboratorium Klinik (11 Panel Rujukan)</h3>`;
+                    Object.keys(CLINICAL_LAB_PANELS).forEach(catKey => {
+                        const panel = CLINICAL_LAB_PANELS[catKey];
+                        fullHtml += `<h4>${escapeHtml(panel.title)}</h4><table><thead><tr><th>Parameter</th><th>Nilai Rujukan Normal</th><th>Keterangan Klinis</th></tr></thead><tbody>`;
+                        panel.items.forEach(it => {
+                            fullHtml += `<tr><td><strong>${escapeHtml(it.name)}</strong></td><td>${escapeHtml(it.refText)} ${escapeHtml(it.unit)}</td><td>${escapeHtml(it.desc)}</td></tr>`;
+                        });
+                        fullHtml += `</tbody></table>`;
+                    });
+                    document.getElementById('editorContent').innerHTML += fullHtml;
+                    recordHistorySnapshot();
+                    showToast('Daftar rujukan lengkap 11 panel laboratorium disisipkan ke editor.');
+                });
+
+                // Impor berkas CalFit (.csv / .ics)
+                document.getElementById('triggerImportCalfitBtn').addEventListener('click', () => {
+                    document.getElementById('importCalfitInput').click();
+                });
+                document.getElementById('importCalfitInput').addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const text = await file.text();
+                    if (file.name.toLowerCase().endsWith('.csv')) {
+                        const parsed = Papa.parse(text.trim(), { header: true, skipEmptyLines: true });
+                        let rowsHtml = '';
+                        parsed.data.forEach(r => {
+                            const tgl = r.Tanggal || Object.values(r)[0] || '-';
+                            const mod = r.Modul || Object.values(r)[1] || '-';
+                            const key = r.Kunci_Metrik || Object.values(r)[2] || '-';
+                            const val = r.Nilai || Object.values(r)[3] || '-';
+                            if (key === 'calories' && !isNaN(parseFloat(val))) document.getElementById('medCalories').value = parseFloat(val);
+                            if (key === 'water' && !isNaN(parseFloat(val))) document.getElementById('medWater').value = parseFloat(val);
+                            if (key === 'weight' && !isNaN(parseFloat(val))) document.getElementById('medWeight').value = parseFloat(val);
+                            rowsHtml += `<tr><td>${escapeHtml(tgl)}</td><td>${escapeHtml(mod)}</td><td>${escapeHtml(key)}</td><td>${escapeHtml(val)}</td></tr>`;
+                        });
+                        computeMedicalSummary();
+                        document.getElementById('editorContent').innerHTML += `<h4>Riwayat Log Kesehatan CalFit (${escapeHtml(file.name)})</h4><table><thead><tr><th>Tanggal</th><th>Modul</th><th>Metrik</th><th>Nilai</th></tr></thead><tbody>${rowsHtml}</tbody></table><p></p>`;
+                        showToast(`Data kesehatan CalFit dari "${file.name}" berhasil dibaca.`);
+                    } else if (file.name.toLowerCase().endsWith('.ics')) {
+                        const events = text.split('BEGIN:VEVENT').slice(1);
+                        let listHtml = `<h4>Jadwal & Aktivitas Kalender CalFit (${escapeHtml(file.name)})</h4><ul>`;
+                        events.forEach(ev => {
+                            const sum = (ev.match(/SUMMARY:(.*)/i) || [])[1] || 'Aktivitas';
+                            const dt = (ev.match(/DTSTART[^:]*:(.*)/i) || [])[1] || '-';
+                            const desc = (ev.match(/DESCRIPTION:(.*)/i) || [])[1] || '';
+                            listHtml += `<li><strong>${escapeHtml(dt.trim())}</strong> — ${escapeHtml(sum.trim())} ${desc ? `(${escapeHtml(desc.trim())})` : ''}</li>`;
+                        });
+                        listHtml += `</ul><p></p>`;
+                        document.getElementById('editorContent').innerHTML += listHtml;
+                        showToast(`Jadwal CalFit ICS berhasil dimasukkan ke catatan.`);
+                    }
+                    e.target.value = '';
+                });
+
+                // Kalkulator Finansial (5 Rasio Fin.html, Jurnal Akuntansi & Bunga Majemuk)
+                ['finIncome','finExpense','finSavings','finDebt','finEmergency','finInvestAsset','finTotalAsset','finTotalDebt'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.addEventListener('input', computeFinancialSummary);
+                });
+
+                document.getElementById('insertFinReportBtn').addEventListener('click', () => {
+                    const f = computeFinancialSummary();
+                    const fmt = (n) => new Intl.NumberFormat('id-ID').format(n);
+                    const html = `<h4>Laporan Financial Check-Up (5 Rasio Standar Fin)</h4>
+                    <p><strong>Diagnosa Keseluruhan:</strong> ${escapeHtml(f.overallHealth)}</p>
+                    <table>
+                        <thead><tr><th>No</th><th>Rasio Kesehatan Keuangan</th><th>Hasil Perhitungan</th><th>Standar Ideal</th><th>Status Diagnosa</th></tr></thead>
+                        <tbody>
+                            <tr><td>1</td><td>Likuiditas (Dana Darurat)</td><td>${f.liquidityMonths} Bulan (Rp ${fmt(f.emerg)})</td><td>3 - 6 Bulan Pengeluaran</td><td><strong>${f.liqStat}</strong></td></tr>
+                            <tr><td>2</td><td>Rasio Tabungan & Investasi</td><td>${f.savingsRatio}% (Rp ${fmt(f.sav)}/bln)</td><td>Minimal 10% - 20%</td><td><strong>${f.savStat}</strong></td></tr>
+                            <tr><td>3</td><td>Rasio Cicilan Utang (DSR)</td><td>${f.debtRatio}% (Rp ${fmt(f.debt)}/bln)</td><td>Maksimal 30% dari Pendapatan</td><td><strong>${f.debtStat}</strong></td></tr>
+                            <tr><td>4</td><td>Rasio Solvabilitas (Utang/Aset)</td><td>${f.solvRatio}% (Utang Rp ${fmt(f.totalDebt)} / Aset Rp ${fmt(f.totalAsset)})</td><td>Maksimal 50%</td><td><strong>${f.solvStat}</strong></td></tr>
+                            <tr><td>5</td><td>Rasio Aset Investasi Produktif</td><td>${f.invRatio}% (Rp ${fmt(f.invAsset)})</td><td>Minimal 30% - 50% Total Aset</td><td><strong>${f.invStat}</strong></td></tr>
+                        </tbody>
+                    </table><p></p>`;
+                    document.getElementById('editorContent').innerHTML += html;
+                    recordHistorySnapshot();
+                    showToast('Tabel 5 rasio kesehatan finansial ditambahkan ke editor.');
+                });
+
+                document.getElementById('insertJurnalRowBtn').addEventListener('click', () => {
+                    const desc = document.getElementById('finJurnalDesc').value.trim() || 'Transaksi Jurnal Umum';
+                    const dr = document.getElementById('finJurnalDebit').value;
+                    const cr = document.getElementById('finJurnalCredit').value;
+                    const amt = parseFloat(document.getElementById('finJurnalAmt').value) || 0;
+                    const fmt = new Intl.NumberFormat('id-ID').format(amt);
+                    const html = `<table><thead><tr><th>Tanggal</th><th>Keterangan Jurnal</th><th>Akun Debit (Dr)</th><th>Akun Kredit (Cr)</th><th>Nominal (Rp)</th></tr></thead><tbody><tr><td>${new Date().toLocaleDateString('id-ID')}</td><td>${escapeHtml(desc)}</td><td>${escapeHtml(dr)}</td><td>${escapeHtml(cr)}</td><td>Rp ${fmt}</td></tr></tbody></table><p></p>`;
+                    document.getElementById('editorContent').innerHTML += html;
+                    document.getElementById('finJurnalDesc').value = '';
+                    document.getElementById('finJurnalAmt').value = '';
+                    recordHistorySnapshot();
+                    showToast('Baris jurnal akuntansi (Debit/Kredit) disisipkan ke editor.');
+                });
+
+                document.getElementById('insertCompoundInvBtn').addEventListener('click', () => {
+                    const name = document.getElementById('finInvName').value.trim() || 'Aset Portofolio';
+                    const modal = parseFloat(document.getElementById('finInvModal').value) || 0;
+                    const rate = parseFloat(document.getElementById('finInvRate').value) || 0;
+                    const years = parseFloat(document.getElementById('finInvYears').value) || 1;
+                    const finalVal = modal * Math.pow((1 + (rate / 100)), years);
+                    const profit = finalVal - modal;
+                    const fmt = (n) => new Intl.NumberFormat('id-ID').format(Math.round(n));
+                    const html = `<p><strong>Proyeksi Bunga Majemuk (${escapeHtml(name)}):</strong> Modal Awal: Rp ${fmt(modal)} | Bunga: ${rate}%/thn | Durasi: ${years} thn &rarr; <strong>Estimasi Akhir: Rp ${fmt(finalVal)}</strong> (Estimasi Profit: +Rp ${fmt(profit)})</p>`;
+                    document.getElementById('editorContent').innerHTML += html;
+                    recordHistorySnapshot();
+                    showToast('Simulasi portofolio bunga majemuk ditambahkan ke editor.');
+                });
+
+                // Notebook Studi: Flashcard, Kuis (Quizr), Sitasi
+                document.getElementById('studyQuizType').addEventListener('change', (e) => {
+                    const t = e.target.value;
+                    const optsInput = document.getElementById('studyQuizOpts');
+                    if (t === 'tf') {
+                        optsInput.value = 'Benar, Salah';
+                        optsInput.disabled = true;
+                    } else if (t === 'short') {
+                        optsInput.value = '';
+                        optsInput.placeholder = '(Tidak perlu opsi untuk Uraian Singkat)';
+                        optsInput.disabled = true;
+                    } else {
+                        optsInput.disabled = false;
+                        optsInput.placeholder = 'Opsi pisah koma (A, B, C, D)';
+                    }
+                });
+
+                document.getElementById('addFlashcardBtn').addEventListener('click', () => {
+                    const front = document.getElementById('studyCardFront').value.trim();
+                    const back = document.getElementById('studyCardBack').value.trim();
+                    if (!front || !back) return showToast('Isi pertanyaan dan jawaban flashcard terlebih dahulu.');
+                    state.draftStudyCards.push({ front, back });
+                    document.getElementById('studyCardFront').value = '';
+                    document.getElementById('studyCardBack').value = '';
+                    document.getElementById('studyDraftStats').textContent = `Flashcard tersimpan di draf: ${state.draftStudyCards.length} | Soal Kuis: ${state.draftStudyQuizzes.length}`;
+                    showToast('Flashcard ditambahkan ke draf catatan studi.');
+                });
+
+                document.getElementById('addQuizBtn').addEventListener('click', () => {
+                    const qType = document.getElementById('studyQuizType').value || 'mc';
+                    const question = document.getElementById('studyQuizQ').value.trim();
+                    const options = qType === 'tf' ? ['Benar', 'Salah'] : (qType === 'short' ? [] : document.getElementById('studyQuizOpts').value.split(',').map(s => s.trim()).filter(Boolean));
+                    const rawAnsParts = document.getElementById('studyQuizAns').value.split('|');
+                    const answer = (rawAnsParts[0] || '').trim();
+                    const explanation = (rawAnsParts[1] || '').trim();
+
+                    if (!question || !answer || (qType === 'mc' && options.length < 2)) {
+                        return showToast('Lengkapi pertanyaan, opsi jawaban, dan kunci jawaban benar.');
+                    }
+                    state.draftStudyQuizzes.push({ type: qType, question, options, answer, explanation });
+                    document.getElementById('studyQuizQ').value = '';
+                    if (qType === 'mc') document.getElementById('studyQuizOpts').value = '';
+                    document.getElementById('studyQuizAns').value = '';
+                    document.getElementById('studyDraftStats').textContent = `Flashcard tersimpan di draf: ${state.draftStudyCards.length} | Soal Kuis: ${state.draftStudyQuizzes.length}`;
+                    showToast('Soal kuis ditambahkan ke draf catatan studi.');
+                });
+
+                document.getElementById('insertCitationBtn').addEventListener('click', () => {
+                    const author = document.getElementById('studyCiteAuthor').value.trim() || 'Anonim';
+                    const year = document.getElementById('studyCiteYear').value.trim() || 'n.d.';
+                    const title = document.getElementById('studyCiteTitle').value.trim() || 'Tanpa Judul';
+                    const pub = document.getElementById('studyCitePub').value.trim() || 'Penerbit';
+                    const citationHtml = `<p class="citation-item">• ${escapeHtml(author)} (${escapeHtml(year)}). <em>${escapeHtml(title)}</em>. ${escapeHtml(pub)}.</p>`;
+                    document.getElementById('editorContent').innerHTML += citationHtml;
+                    showToast('Sitasi daftar pustaka disisipkan ke editor.');
+                });
+
+                // Impor & Ekspor .quizr.json kompatibel dengan Quizr.html
+                document.getElementById('triggerImportQuizrBtn').addEventListener('click', () => {
+                    document.getElementById('importQuizrJsonInput').click();
+                });
+                document.getElementById('importQuizrJsonInput').addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    try {
+                        const parsed = JSON.parse(await file.text());
+                        if (parsed.questions && Array.isArray(parsed.questions)) {
+                            parsed.questions.forEach(q => {
+                                const qType = q.type || 'mc';
+                                const opts = q.options || (qType === 'tf' ? ['Benar', 'Salah'] : []);
+                                let ans = '';
+                                if (qType === 'short') {
+                                    ans = (q.correctAnswers || [])[0] || '';
+                                } else {
+                                    const idx = (q.correctAnswers || [0])[0];
+                                    ans = opts[idx] !== undefined ? opts[idx] : String(idx);
+                                }
+                                state.draftStudyQuizzes.push({
+                                    type: qType,
+                                    question: q.stem || 'Soal',
+                                    options: opts,
+                                    answer: ans,
+                                    explanation: q.explanation || ''
+                                });
+                            });
+                            document.getElementById('studyDraftStats').textContent = `Flashcard tersimpan di draf: ${state.draftStudyCards.length} | Soal Kuis: ${state.draftStudyQuizzes.length}`;
+                            showToast(`${parsed.questions.length} butir soal dari berkas Quizr berhasil dimuat ke draf.`);
+                        }
+                    } catch (err) {
+                        showToast('Gagal membaca berkas .quizr.json.');
+                    }
+                    e.target.value = '';
+                });
+
+                document.getElementById('exportQuizrJsonBtn').addEventListener('click', () => {
+                    const quizrFormat = {
+                        meta: {
+                            title: document.getElementById('entryTitle').value.trim() || 'Kuis Notebook Studi MyDiary',
+                            timerPerQuestion: 30,
+                            author: 'MyDiary Study'
+                        },
+                        questions: state.draftStudyQuizzes.map((q, idx) => {
+                            const qType = q.type || 'mc';
+                            let correctArr = [0];
+                            if (qType === 'short') {
+                                correctArr = [q.answer];
+                            } else {
+                                const foundIdx = (q.options || []).findIndex(o => o.toLowerCase() === q.answer.toLowerCase());
+                                correctArr = [foundIdx >= 0 ? foundIdx : 0];
+                            }
+                            return {
+                                id: 'q-' + (idx + 1),
+                                type: qType,
+                                stem: q.question,
+                                media: null,
+                                options: q.options || [],
+                                correctAnswers: correctArr,
+                                explanation: q.explanation || ''
+                            };
+                        })
+                    };
+                    const blob = new Blob([JSON.stringify(quizrFormat, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `studi_${new Date().toISOString().slice(0,10)}.quizr.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    showToast('Berkas .quizr.json berhasil diunduh (kompatibel dengan Quizr.html).');
+                });
+
+                document.getElementById('exportStandaloneQuizBtn').addEventListener('click', () => {
+                    if (state.draftStudyQuizzes.length === 0) return showToast('Tambahkan minimal 1 soal kuis pada draf untuk diekspor.');
+                    const title = document.getElementById('entryTitle').value.trim() || 'Evaluasi Mandiri MyDiary';
+                    const qJson = JSON.stringify(state.draftStudyQuizzes);
+                    const scrOpen = '<' + 'script' + '>';
+                    const scrClose = '<' + '/script' + '>';
+                    const standaloneQuizHtml = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title>
+<style>body{font-family:Tahoma,sans-serif;background:#d4d0c8;padding:20px;max-width:680px;margin:auto}.box{background:#fff;border:2px solid #404040;padding:16px}.btn{background:#e0ded8;border:2px solid #404040;padding:4px 10px;cursor:pointer;margin:3px}</style></head>
+<body><div class="box"><h2>${escapeHtml(title)}</h2><div id="qArea"></div></div>
+${scrOpen}const qs=${qJson};const area=document.getElementById('qArea');qs.forEach((q,i)=>{const d=document.createElement('div');d.style='border-bottom:1px dotted #999;padding:10px 0';d.innerHTML='<b>'+(i+1)+'. '+q.question+'</b><br>';(q.options||['Benar','Salah']).forEach(o=>{const b=document.createElement('button');b.className='btn';b.textContent=o;b.onclick=()=>{b.style.background=(o.toLowerCase()===q.answer.toLowerCase())?'#bbf7d0':'#fecaca';};d.appendChild(b)});area.appendChild(d);});${scrClose}</body></html>`;
+                    const blob = new Blob([standaloneQuizHtml], { type: 'text/html;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Kuis_${new Date().toISOString().slice(0,10)}.html`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    showToast('Aplikasi Kuis HTML mandiri berhasil diunduh.');
+                });
+
+                // Lampiran & Sketsa
+                document.getElementById('addAttachmentBtn').addEventListener('click', () => {
+                    document.getElementById('attachmentInput').click();
+                });
+                document.getElementById('attachmentInput').addEventListener('change', (e) => {
+                    handleAttachmentFiles(e.target.files);
+                    e.target.value = '';
+                });
+                document.getElementById('attachmentDraftList').addEventListener('click', (e) => {
+                    const rmIdx = e.target.getAttribute('data-remove-att');
+                    if (rmIdx !== null) {
+                        state.draftAttachments.splice(parseInt(rmIdx, 10), 1);
+                        renderDraftAttachments();
+                    }
+                });
+
+                document.getElementById('drawCanvasToolbarBtn').addEventListener('click', () => {
+                    document.getElementById('sketchModal').classList.remove('hidden');
+                });
+                document.getElementById('closeSketchModalBtn').addEventListener('click', () => {
+                    document.getElementById('sketchModal').classList.add('hidden');
+                });
+
+                // Enkripsi Toggle
+                document.getElementById('enableEncryptionToggle').addEventListener('change', (e) => {
+                    document.getElementById('encryptionPasswordGroup').classList.toggle('hidden', !e.target.checked);
+                });
+
+                // Simpan & Reset
+                document.getElementById('saveEntryBtn').addEventListener('click', saveCurrentEntry);
+                document.getElementById('clearEditorBtn').addEventListener('click', resetEditorForm);
+                document.getElementById('newEntryBtn').addEventListener('click', () => {
+                    resetEditorForm();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+
+                // Pencarian
+                document.getElementById('searchInput').addEventListener('input', renderEntriesFeed);
+
+                // Impor Dokumen
+                document.getElementById('triggerImportDocBtn').addEventListener('click', () => {
+                    document.getElementById('importDocInput').click();
+                });
+                document.getElementById('importDocInput').addEventListener('change', (e) => {
+                    if (e.target.files[0]) handleDocumentImport(e.target.files[0]);
+                    e.target.value = '';
+                });
+
+                // Ekspor & Impor JSON / HTML / ZIP
+                document.getElementById('exportHtmlBtn').addEventListener('click', exportAsHtmlFile);
+                document.getElementById('exportZipBtn').addEventListener('click', exportAsZipArchive);
+                document.getElementById('exportJsonBtn').addEventListener('click', () => {
+                    const blob = new Blob([JSON.stringify(state.entries, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `MyDiary_Template_${new Date().toISOString().slice(0,10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    showToast('Template JSON berhasil diunduh.');
+                });
+                document.getElementById('triggerImportJsonBtn').addEventListener('click', () => {
+                    document.getElementById('importJsonInput').click();
+                });
+                document.getElementById('importJsonInput').addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    try {
+                        const text = await file.text();
+                        const imported = JSON.parse(text);
+                        if (Array.isArray(imported)) {
+                            for (const item of imported) {
+                                if (item.id && item.title) {
+                                    await dbPut('entries', item);
+                                    const idx = state.entries.findIndex(x => x.id === item.id);
+                                    if (idx >= 0) state.entries[idx] = item;
+                                    else state.entries.push(item);
+                                }
+                            }
+                            renderEntriesFeed();
+                            showToast(`${imported.length} entri dari berkas JSON berhasil dimuat.`);
+                        }
+                    } catch (err) {
+                        showToast('Format berkas JSON tidak valid.');
+                    }
+                    e.target.value = '';
+                });
+
+                // Masking Data Pribadi
+                document.getElementById('triggerMaskCsvBtn').addEventListener('click', () => {
+                    document.getElementById('importMaskCsvInput').click();
+                });
+                document.getElementById('importMaskCsvInput').addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const text = await file.text();
+                    const area = document.getElementById('maskRuleInput');
+                    area.value = (area.value ? area.value + '\n' : '') + text.trim();
+                    showToast('Daftar kata penyamaran berhasil dimuat.');
+                    e.target.value = '';
+                });
+
+                document.getElementById('applyMaskEditorBtn').addEventListener('click', () => {
+                    recordHistorySnapshot();
+                    const editor = document.getElementById('editorContent');
+                    editor.innerHTML = applyMaskToText(editor.innerHTML);
+                    document.getElementById('entryTitle').value = applyMaskToText(document.getElementById('entryTitle').value);
+                    recordHistorySnapshot();
+                    showToast('Penyamaran data pribadi telah diterapkan pada teks editor.');
+                });
+
+                document.getElementById('copyMaskedForAiBtn').addEventListener('click', () => {
+                    const rawText = document.getElementById('editorContent').innerText;
+                    const maskedText = applyMaskToText(rawText);
+                    const tempArea = document.createElement('textarea');
+                    tempArea.value = maskedText;
+                    document.body.appendChild(tempArea);
+                    tempArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempArea);
+                    showToast('Teks tersamar berhasil disalin ke papan klip dan siap digunakan untuk prompt AI.');
+                });
+
+                // Delegasi Event pada Feed (Buka Kunci, Edit, Hapus, Flashcard, Kuis, WikiLink)
+                document.getElementById('entriesFeedContainer').addEventListener('click', async (e) => {
+                    const wikiEl = e.target.closest('.wiki-link');
+                    if (wikiEl) {
+                        const targetTitle = wikiEl.dataset.wikilink;
+                        const found = state.entries.find(x => (x.title || '').toLowerCase() === targetTitle.toLowerCase());
+                        if (found) {
+                            if (found.mode !== state.currentMode) switchMode(found.mode);
+                            const postEl = document.getElementById(`post-${found.id}`);
+                            if (postEl) postEl.scrollIntoView({ behavior: 'smooth' });
+                            showToast(`Menampilkan tautan referensi [[${targetTitle}]].`);
+                        } else {
+                            document.getElementById('searchInput').value = targetTitle;
+                            renderEntriesFeed();
+                            showToast(`Mencari referensi "${targetTitle}" pada arsip.`);
+                        }
+                        return;
+                    }
+
+                    const unlockBtn = e.target.closest('.unlock-entry-btn');
+                    if (unlockBtn) {
+                        state.pendingDecryptEntryId = unlockBtn.dataset.id;
+                        document.getElementById('decryptPasswordInput').value = '';
+                        document.getElementById('decryptErrorMsg').classList.add('hidden');
+                        document.getElementById('decryptModal').classList.remove('hidden');
+                        return;
+                    }
+
+                    const deleteBtn = e.target.closest('.delete-entry-btn');
+                    if (deleteBtn) {
+                        const id = deleteBtn.dataset.id;
+                        await dbDelete('entries', id);
+                        state.entries = state.entries.filter(x => x.id !== id);
+                        renderEntriesFeed();
+                        showToast('Entri telah dihapus.');
+                        return;
+                    }
+
+                    const editBtn = e.target.closest('.edit-entry-btn');
+                    if (editBtn) {
+                        const id = editBtn.dataset.id;
+                        const entry = state.entries.find(x => x.id === id);
+                        if (!entry) return;
+                        const data = state.unlockedCache[id] || entry;
+                        state.editingEntryId = id;
+                        document.getElementById('entryTitle').value = entry.title;
+                        document.getElementById('entryDate').value = entry.date.slice(0, 16);
+                        document.getElementById('entryTags').value = (entry.tags || []).join(', ');
+                        document.getElementById('editorContent').innerHTML = data.content || '';
+                        state.draftAttachments = [...(data.attachments || [])];
+                        state.draftStudyCards = [...(data.studyCards || [])];
+                        state.draftStudyQuizzes = [...(data.studyQuizzes || [])];
+                        state.draftStickers = [...(data.stickers || [])];
+                        document.getElementById('editingIndicator').textContent = `Mode: Mengedit "${entry.title}"`;
+                        document.getElementById('studyDraftStats').textContent = `Flashcard tersimpan di draf: ${state.draftStudyCards.length} | Soal Kuis: ${state.draftStudyQuizzes.length}`;
+                        renderDraftAttachments();
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        return;
+                    }
+
+                    const cardEl = e.target.closest('.study-flashcard');
+                    if (cardEl) {
+                        const isFlipped = cardEl.dataset.flipped === 'true';
+                        cardEl.dataset.flipped = (!isFlipped).toString();
+                        const bodyText = cardEl.querySelector('.card-body-text');
+                        bodyText.textContent = !isFlipped ? cardEl.dataset.back : cardEl.dataset.front;
+                        cardEl.style.backgroundColor = !isFlipped ? '#fef3c7' : '#ffffff';
+                        triggerKaTeXRender(cardEl);
+                        return;
+                    }
+
+                    const quizBtn = e.target.closest('.quiz-opt-btn');
+                    if (quizBtn) {
+                        const ans = quizBtn.dataset.ans;
+                        const pick = quizBtn.dataset.pick;
+                        const exp = quizBtn.dataset.exp;
+                        const parent = quizBtn.closest('div.p-2');
+                        const fb = parent.querySelector('.quiz-feedback');
+                        fb.classList.remove('hidden');
+                        if (ans.toLowerCase() === pick.toLowerCase()) {
+                            fb.textContent = '✓ Jawaban Benar!' + (exp ? ` Pembahasan: ${exp}` : '');
+                            fb.className = 'quiz-feedback font-bold text-green-700';
+                        } else {
+                            fb.textContent = `✕ Kurang tepat. Kunci: ${ans}` + (exp ? ` | Pembahasan: ${exp}` : '');
+                            fb.className = 'quiz-feedback font-bold text-red-700';
+                        }
+                        return;
+                    }
+
+                    const shortCheckBtn = e.target.closest('.quiz-short-check-btn');
+                    if (shortCheckBtn) {
+                        const ans = shortCheckBtn.dataset.ans;
+                        const exp = shortCheckBtn.dataset.exp;
+                        const parent = shortCheckBtn.closest('div.p-2');
+                        const inputVal = (parent.querySelector('.quiz-short-input')?.value || '').trim();
+                        const fb = parent.querySelector('.quiz-feedback');
+                        fb.classList.remove('hidden');
+                        if (inputVal.toLowerCase() === ans.toLowerCase()) {
+                            fb.textContent = '✓ Jawaban Uraian Tepat!' + (exp ? ` Pembahasan: ${exp}` : '');
+                            fb.className = 'quiz-feedback font-bold text-green-700';
+                        } else {
+                            fb.textContent = `✕ Kurang tepat. Kunci: ${ans}` + (exp ? ` | Pembahasan: ${exp}` : '');
+                            fb.className = 'quiz-feedback font-bold text-red-700';
+                        }
+                    }
+                });
+
+                // Modal Dekripsi
+                document.getElementById('closeDecryptModalBtn').addEventListener('click', () => {
+                    document.getElementById('decryptModal').classList.add('hidden');
+                });
+
+                document.getElementById('confirmDecryptBtn').addEventListener('click', async () => {
+                    const id = state.pendingDecryptEntryId;
+                    const entry = state.entries.find(x => x.id === id);
+                    const pass = document.getElementById('decryptPasswordInput').value;
+                    if (!entry || !entry.cipherBundle) return;
+
+                    try {
+                        const plainData = await decryptPayload(entry.cipherBundle, pass);
+                        state.unlockedCache[id] = plainData;
+                        document.getElementById('decryptModal').classList.add('hidden');
+                        renderEntriesFeed();
+                        showToast('Entri berhasil didekripsi untuk sesi ini.');
+                    } catch (err) {
+                        document.getElementById('decryptErrorMsg').classList.remove('hidden');
+                    }
+                });
+            }
+
+            window.onload = async function() {
+                try {
+                    await initDB();
+                    const savedEntries = await dbGetAll('entries');
+                    state.entries = savedEntries;
+                    if (state.entries.length === 0) {
+                        await seedInitialSampleData();
+                    }
+
+                    resetEditorForm();
+                    const cachedDraft = await dbGet('meta', 'currentDraft');
+                    if (cachedDraft && cachedDraft.content) {
+                        state.lastRecordedHtml = cachedDraft.content;
+                    } else {
+                        state.lastRecordedHtml = document.getElementById('editorContent').innerHTML;
+                    }
+
+                    renderLabChecklistPanel("1");
+                    initSketchCanvas();
+                    bindEvents();
+                    switchMode('diary');
+                } catch (err) {
+                    console.error(err);
+                    showToast('Berjalan dalam mode memori sementara.');
+                }
+            };
+        })();
+    </script>
+</body>
+</html>

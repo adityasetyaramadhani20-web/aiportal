@@ -1,0 +1,1892 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Galeri</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@0.468.0"></script>
+  <!-- Panzoom for Smooth Image Zoom & Pan -->
+  <script src="https://unpkg.com/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            yt: {
+              black: '#0f0f0f',
+              surface: '#212121',
+              hover: '#272727',
+              border: '#383838',
+              red: '#ff0000',
+              redHover: '#cc0000',
+              text: '#f1f1f1',
+              muted: '#aaaaaa'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar YouTube Style */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f0f0f;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #383838;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555555;
+    }
+
+    /* Range slider custom */
+    input[type=range] {
+      accent-color: #ff0000;
+    }
+
+    .no-scrollbar{scrollbar-width:none}.no-scrollbar::-webkit-scrollbar{display:none}
+    /* Panzoom cursor */
+    .panzoom-cursor-grab {
+      cursor: grab;
+    }
+    .panzoom-cursor-grabbing {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body class="bg-yt-black text-yt-text font-sans min-h-screen flex flex-col select-none antialiased pb-28">
+
+  <!-- ================= HEADER (YouTube Style) ================= -->
+  <header class="sticky top-0 z-30 bg-yt-black/95 backdrop-blur border-b border-yt-border px-4 py-2.5 flex items-center justify-between gap-4">
+    <!-- Brand & Folder Status -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 cursor-pointer" onclick="resetGalleryFilter()">
+        <div class="w-8 h-8 rounded-lg bg-yt-red flex items-center justify-center text-white shadow-md">
+          <i data-lucide="play-square" class="w-5 h-5 fill-current"></i>
+        </div>
+        <span class="text-xl font-bold tracking-tight text-white hidden sm:inline">Galeri</span>
+      </div>
+      <div id="activeFolderBadge" class="hidden text-xs bg-yt-surface border border-yt-border text-yt-muted pl-2.5 pr-1.5 py-1 rounded-full flex items-center gap-1.5 max-w-[220px]">
+        <i data-lucide="folder" class="w-3.5 h-3.5 shrink-0 text-white"></i>
+        <span id="folderNameText" class="truncate">Folder</span>
+        <button onclick="resetGalleryData(); event.stopPropagation();" title="Reset & bersihkan folder" class="p-0.5 rounded-full hover:bg-yt-hover text-yt-muted hover:text-white transition ml-0.5">
+          <i data-lucide="x" class="w-3 h-3"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Center Search Bar -->
+    <div class="flex-1 max-w-xl mx-2">
+      <div class="relative flex items-center">
+        <input 
+          type="text" 
+          id="searchInput" 
+          placeholder="Cari media di folder ini..." 
+          class="w-full bg-[#121212] border border-yt-border focus:border-blue-500 rounded-full pl-10 pr-10 py-1.5 text-sm text-yt-text focus:outline-none transition"
+        >
+        <i data-lucide="search" class="w-4 h-4 text-yt-muted absolute left-3.5 pointer-events-none"></i>
+        <button id="clearSearchBtn" class="hidden absolute right-3 text-yt-muted hover:text-white" onclick="clearSearch()">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right Controls: View Switcher & Action Buttons -->
+    <div class="flex items-center gap-2">
+      <!-- View Mode Buttons -->
+      <div class="flex bg-yt-surface border border-yt-border p-1 rounded-lg">
+        <button id="btnViewList" title="Daftar" onclick="setViewMode('list')" class="p-1.5 rounded hover:bg-yt-hover text-yt-muted transition">
+          <i data-lucide="list" class="w-4 h-4"></i>
+        </button>
+        <button id="btnViewDetailed" title="Daftar Rinci" onclick="setViewMode('detailed')" class="p-1.5 rounded hover:bg-yt-hover text-yt-muted transition">
+          <i data-lucide="table" class="w-4 h-4"></i>
+        </button>
+        <button id="btnViewGrid" title="Kotak" onclick="setViewMode('grid')" class="p-1.5 rounded hover:bg-yt-hover text-yt-muted transition">
+          <i data-lucide="grid-2x2" class="w-4 h-4"></i>
+        </button>
+        <button id="btnViewLargeGrid" title="Kotak Besar" onclick="setViewMode('large-grid')" class="p-1.5 rounded hover:bg-yt-hover text-yt-muted transition">
+          <i data-lucide="layout-grid" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Open Folder Button -->
+      <button 
+        onclick="openFolderPicker()" 
+        class="flex items-center gap-1.5 bg-yt-surface hover:bg-yt-hover border border-yt-border text-white text-sm font-medium px-3.5 py-1.5 rounded-full transition shadow-sm"
+      >
+        <i data-lucide="folder-open" class="w-4 h-4 text-yt-red"></i>
+        <span class="hidden md:inline">Buka Folder</span>
+      </button>
+
+      <!-- Reset Gallery Button -->
+      <button 
+        id="btnResetGallery"
+        onclick="resetGalleryData()" 
+        title="Reset & Bersihkan Galeri"
+        class="hidden items-center gap-1.5 bg-yt-surface hover:bg-red-950/40 hover:text-red-400 hover:border-red-500/50 border border-yt-border text-yt-muted text-sm font-medium px-3 py-1.5 rounded-full transition"
+      >
+        <i data-lucide="rotate-ccw" class="w-4 h-4 text-red-500"></i>
+        <span class="hidden md:inline">Reset</span>
+      </button>
+
+      <!-- Demo Samples Button -->
+      <button 
+        onclick="loadSampleMedia()" 
+        title="Muat Sampel Media Percobaan"
+        class="hidden sm:flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm font-medium px-3 py-1.5 rounded-full transition"
+      >
+        <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+        <span>Sampel</span>
+      </button>
+
+      <!-- Hidden Fallback Inputs -->
+      <input type="file" id="fallbackFolderInput" webkitdirectory directory multiple class="hidden">
+      <input type="file" id="fallbackFilesInput" multiple accept="image/*,video/*,audio/*" class="hidden">
+    </div>
+  </header>
+
+  <!-- ================= SUB-HEADER / CHIP FILTERS (YouTube Style) ================= -->
+  <div class="px-4 py-2.5 bg-yt-black border-b border-yt-border/40 flex items-center justify-between gap-3 overflow-x-auto text-xs no-scrollbar">
+    <div class="flex items-center gap-2">
+      <button onclick="setFilter('all')" id="filterChip-all" class="filter-chip px-3 py-1.5 rounded-lg font-medium transition bg-white text-black">
+        Semua (<span id="count-all">0</span>)
+      </button>
+      <button onclick="setFilter('image')" id="filterChip-image" class="filter-chip px-3 py-1.5 rounded-lg font-medium transition bg-yt-surface hover:bg-yt-hover text-yt-text">
+        Gambar (<span id="count-image">0</span>)
+      </button>
+      <button onclick="setFilter('video')" id="filterChip-video" class="filter-chip px-3 py-1.5 rounded-lg font-medium transition bg-yt-surface hover:bg-yt-hover text-yt-text">
+        Video (<span id="count-video">0</span>)
+      </button>
+      <button onclick="setFilter('audio')" id="filterChip-audio" class="filter-chip px-3 py-1.5 rounded-lg font-medium transition bg-yt-surface hover:bg-yt-hover text-yt-text">
+        Audio (<span id="count-audio">0</span>)
+      </button>
+    </div>
+
+    <!-- Sorting -->
+    <div class="flex items-center gap-2 text-yt-muted shrink-0">
+      <span>Urutkan:</span>
+      <select id="sortSelector" onchange="sortMedia()" class="bg-yt-surface border border-yt-border text-yt-text rounded px-2 py-1 focus:outline-none cursor-pointer">
+        <option value="name-asc">Nama (A-Z)</option>
+        <option value="name-desc">Nama (Z-A)</option>
+        <option value="date-desc">Terbaru</option>
+        <option value="size-desc">Ukuran Terbesar</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ================= MAIN CONTENT VIEWPORT ================= -->
+  <main class="flex-1 p-4 md:p-6 overflow-y-auto">
+    <!-- Empty State -->
+    <div id="emptyState" class="flex flex-col items-center justify-center min-h-[50vh] text-center max-w-md mx-auto">
+      <div class="w-20 h-20 rounded-full bg-yt-surface border border-yt-border flex items-center justify-center text-yt-muted mb-4 shadow-inner">
+        <i data-lucide="hard-drive-download" class="w-9 h-9 text-yt-muted"></i>
+      </div>
+      <h2 class="text-xl font-bold text-white mb-2">Pilih Folder Media</h2>
+      <p class="text-yt-muted text-sm mb-6 leading-relaxed">
+        Pilih folder lokal perangkat Anda (seperti di C:\, D:\, atau direktori lainnya). Berkas gambar, video, dan audio pada folder tersebut akan ditampilkan secara aman.
+      </p>
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <button 
+          onclick="openFolderPicker()" 
+          class="bg-yt-red hover:bg-yt-redHover text-white px-5 py-2.5 rounded-full font-medium text-sm flex items-center gap-2 transition shadow-lg shadow-red-900/20"
+        >
+          <i data-lucide="folder-open" class="w-4 h-4"></i>
+          Pilih Folder Lokal
+        </button>
+        <button 
+          onclick="loadSampleMedia()" 
+          class="bg-yt-surface hover:bg-yt-hover border border-yt-border text-yt-text px-4 py-2.5 rounded-full font-medium text-sm flex items-center gap-2 transition"
+        >
+          <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+          Coba Sampel Media
+        </button>
+        <button id="resumeFolderBtn" onclick="resumeLastFolder()" class="hidden bg-yt-surface hover:bg-yt-hover border border-yt-border text-yt-text px-4 py-2.5 rounded-full font-medium text-sm items-center gap-2 transition">
+          <i data-lucide="history" class="w-4 h-4"></i>
+          Buka kembali: <span id="resumeFolderName"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Media Container (Rendered dynamically) -->
+    <div id="mediaContainer" class="hidden"></div>
+  </main>
+
+  <!-- ================= PHOTO VIEWER MODAL (Flickr Lightbox Style) ================= -->
+  <div id="photoModal" class="fixed inset-0 z-50 bg-[#0a0a0ae6] backdrop-blur-md hidden flex-col">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between px-4 py-3 bg-[#111111]/90 border-b border-yt-border/60 z-10">
+      <div class="flex items-center gap-3 truncate max-w-[45%]">
+        <div class="w-7 h-7 rounded bg-blue-600/30 text-blue-400 flex items-center justify-center shrink-0">
+          <i data-lucide="image" class="w-4 h-4"></i>
+        </div>
+        <div class="truncate">
+          <h3 id="photoModalTitle" class="text-sm font-semibold truncate text-white">image.jpg</h3>
+          <span id="photoModalCounter" class="text-xs text-yt-muted">1 / 1</span>
+        </div>
+      </div>
+
+      <!-- Photo Controls Toolbar -->
+      <div class="flex items-center gap-1.5 md:gap-2">
+        <div class="flex items-center bg-yt-surface border border-yt-border rounded-lg px-2 py-1 text-xs text-yt-muted gap-2 mr-1">
+          <button onclick="zoomPhoto(-0.25)" title="Perkecil" class="hover:text-white"><i data-lucide="zoom-out" class="w-3.5 h-3.5"></i></button>
+          <span id="zoomPercentText" class="font-mono min-w-[40px] text-center">100%</span>
+          <button onclick="zoomPhoto(0.25)" title="Perbesar" class="hover:text-white"><i data-lucide="zoom-in" class="w-3.5 h-3.5"></i></button>
+          <button onclick="resetPhotoZoom()" title="Reset Zoom" class="hover:text-white border-l border-yt-border pl-2"><i data-lucide="maximize" class="w-3.5 h-3.5"></i></button>
+        </div>
+
+        <!-- Slideshow Toggle -->
+        <button id="slideshowBtn" onclick="toggleSlideshow()" title="Slideshow Otomatis" class="p-2 rounded-lg bg-yt-surface border border-yt-border text-yt-muted hover:text-white hover:bg-yt-hover transition">
+          <i id="slideshowIcon" data-lucide="play" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Download Button -->
+        <button onclick="downloadActivePhoto()" title="Unduh Berkas" class="p-2 rounded-lg bg-yt-surface border border-yt-border text-yt-muted hover:text-white hover:bg-yt-hover transition">
+          <i data-lucide="download" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Info Drawer Toggle -->
+        <button onclick="togglePhotoInfoDrawer()" id="photoInfoBtn" title="Rincian Berkas" class="p-2 rounded-lg bg-yt-surface border border-yt-border text-yt-muted hover:text-white hover:bg-yt-hover transition">
+          <i data-lucide="info" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Close Modal -->
+        <button onclick="closePhotoViewer()" title="Tutup (Esc)" class="p-2 rounded-lg bg-yt-surface hover:bg-red-600 text-yt-muted hover:text-white transition ml-2">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal Workspace -->
+    <div class="relative flex-1 flex overflow-hidden">
+      <!-- Previous Button -->
+      <button onclick="prevPhoto()" class="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition border border-white/10 shadow-lg">
+        <i data-lucide="chevron-left" class="w-6 h-6"></i>
+      </button>
+
+      <!-- Image Panzoom Container -->
+      <div id="panzoomContainer" class="flex-1 flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing p-4">
+        <img id="lightboxImg" src="" alt="Viewer" class="max-w-full max-h-full object-contain pointer-events-auto rounded shadow-2xl">
+      </div>
+
+      <!-- Next Button -->
+      <button onclick="nextPhoto()" class="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition border border-white/10 shadow-lg">
+        <i data-lucide="chevron-right" class="w-6 h-6"></i>
+      </button>
+
+      <!-- Right Side Info Drawer (Flickr Technical Specs) -->
+      <aside id="photoInfoDrawer" class="w-80 bg-[#141414] border-l border-yt-border p-5 hidden flex-col justify-between overflow-y-auto z-20">
+        <div>
+          <h4 class="text-sm font-bold text-white uppercase tracking-wider mb-4 border-b border-yt-border pb-2 flex items-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4 text-blue-400"></i>
+            Rincian Berkas
+          </h4>
+          <dl class="space-y-3.5 text-xs">
+            <div>
+              <dt class="text-yt-muted">Nama Berkas</dt>
+              <dd id="infoFileName" class="text-yt-text font-mono mt-0.5 break-all font-medium">-</dd>
+            </div>
+            <div>
+              <dt class="text-yt-muted">Dimensi Resolusi</dt>
+              <dd id="infoDimensions" class="text-yt-text mt-0.5 font-medium">-</dd>
+            </div>
+            <div>
+              <dt class="text-yt-muted">Ukuran Berkas</dt>
+              <dd id="infoFileSize" class="text-yt-text mt-0.5 font-medium">-</dd>
+            </div>
+            <div>
+              <dt class="text-yt-muted">Tipe MIME</dt>
+              <dd id="infoFileType" class="text-yt-text mt-0.5 font-medium">-</dd>
+            </div>
+            <div>
+              <dt class="text-yt-muted">Terakhir Dimodifikasi</dt>
+              <dd id="infoFileModified" class="text-yt-text mt-0.5 font-medium">-</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="mt-6 pt-4 border-t border-yt-border text-[11px] text-yt-muted">
+          Pintasan: <b>← / →</b> ganti foto, <b>Space</b> slideshow, <b>Esc</b> keluar.
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ================= VIDEO THEATER MODAL ================= -->
+  <div id="videoModal" class="fixed inset-0 z-[35] pb-28 bg-black/95 hidden flex-col justify-between">
+    <!-- Video Header -->
+    <div class="flex items-center justify-between px-4 py-3 bg-[#111111]/80 border-b border-yt-border">
+      <div class="flex items-center gap-2 truncate">
+        <i data-lucide="video" class="w-4 h-4 text-yt-red"></i>
+        <span id="videoModalTitle" class="text-sm font-semibold truncate text-white">video.mp4</span>
+      </div>
+      <button onclick="togglePiP()" title="Picture-in-Picture" class="ml-auto mr-2 p-1.5 rounded-lg bg-yt-surface hover:bg-yt-hover text-yt-muted hover:text-white transition"><i data-lucide="picture-in-picture-2" class="w-5 h-5"></i></button>
+      <button onclick="closeVideoModal()" class="p-1.5 rounded-lg bg-yt-surface hover:bg-yt-hover text-yt-muted hover:text-white transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- Center Video Viewport -->
+    <div class="flex-1 flex items-center justify-center p-2 md:p-6 overflow-hidden relative">
+      <video id="theaterVideoPlayer" class="max-w-full max-h-[80vh] rounded-lg shadow-2xl outline-none" playsinline></video>
+    </div>
+
+    <div class="p-3 text-center text-xs text-yt-muted">
+      Kontrol pemutaran tersinkronisasi di bilah bawah player.
+    </div>
+  </div>
+
+  <!-- ================= FIXED BOTTOM MEDIA BAR (YouTube Style Player) ================= -->
+  <div id="mediaBottomBar" class="fixed bottom-0 left-0 right-0 z-40 bg-[#181818] border-t border-yt-border px-3 md:px-5 py-2.5 transition-transform duration-200 translate-y-full shadow-2xl">
+    <!-- Audio element (Unified background playback) -->
+    <audio id="globalAudioPlayer" class="hidden"></audio>
+
+    <!-- Scrubber Progress Bar -->
+    <div class="w-full flex items-center gap-3 mb-2">
+      <span id="playerCurrentTime" class="text-[11px] font-mono text-yt-muted min-w-[38px] text-right">0:00</span>
+      <div id="scrubberTrack" class="relative flex-1 h-1.5 bg-[#383838] hover:h-2.5 rounded-full cursor-pointer transition-all flex items-center group">
+        <div id="scrubberBuffer" class="absolute inset-y-0 left-0 w-0 bg-white/30 rounded-full"></div>
+        <div id="scrubberProgress" class="h-full bg-yt-red rounded-full relative w-0">
+          <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-yt-red rounded-full shadow scale-0 group-hover:scale-100 transition-transform"></div>
+        </div>
+      </div>
+      <span id="playerTotalDuration" class="text-[11px] font-mono text-yt-muted min-w-[38px]">0:00</span>
+    </div>
+
+    <!-- Media Controls Flex -->
+    <div class="flex items-center justify-between gap-3">
+      <!-- Media Info (Left) -->
+      <div class="flex items-center gap-3 min-w-0 max-w-[28%]">
+        <div id="playerThumbContainer" class="w-11 h-11 rounded bg-yt-surface border border-yt-border flex items-center justify-center shrink-0 overflow-hidden relative cursor-pointer" onclick="toggleTheaterIfVideo()">
+          <img id="playerThumbImg" class="w-full h-full object-cover hidden">
+          <i id="playerThumbIcon" data-lucide="music" class="w-5 h-5 text-yt-muted"></i>
+        </div>
+        <div class="min-w-0">
+          <div id="playerTitle" class="text-xs md:text-sm font-semibold truncate text-white">Judul Media</div>
+          <div class="flex items-center gap-2 text-[11px] text-yt-muted">
+            <span id="playerCategoryBadge" class="bg-yt-hover px-1.5 py-0.5 rounded uppercase text-[9px] font-bold text-yt-text">AUDIO</span>
+            <span id="playerMetaText" class="truncate">Lokal</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Playback Controls (Center) -->
+      <div class="flex items-center gap-1 sm:gap-2">
+        <!-- Shuffle -->
+        <button id="btnShuffle" onclick="toggleShuffle()" title="Acak Antrean (Shuffle)" class="p-2 text-yt-muted hover:text-white rounded-full transition">
+          <i data-lucide="shuffle" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Previous -->
+        <button onclick="playPrevMedia()" title="Sebelumnya" class="p-2 text-yt-muted hover:text-white rounded-full transition">
+          <i data-lucide="skip-back" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Play/Pause Primary Button -->
+        <button id="btnPlayPause" onclick="togglePlayPause()" title="Putar/Jeda" class="w-10 h-10 rounded-full bg-white text-black hover:scale-105 active:scale-95 flex items-center justify-center transition shadow">
+          <i id="playPauseIcon" data-lucide="play" class="w-5 h-5 fill-current"></i>
+        </button>
+
+        <!-- Next -->
+        <button onclick="playNextMedia()" title="Berikutnya" class="p-2 text-yt-muted hover:text-white rounded-full transition">
+          <i data-lucide="skip-forward" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Stop -->
+        <button onclick="stopPlayback()" title="Hentikan Pemutaran" class="p-2 text-yt-muted hover:text-white rounded-full transition">
+          <i data-lucide="square" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Loop -->
+        <button id="btnLoop" onclick="toggleLoop()" title="Ulangi (Loop)" class="p-2 text-yt-muted hover:text-white rounded-full transition">
+          <i data-lucide="repeat" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Tooling Controls: Speed, Volume, Download, Theater (Right) -->
+      <div class="flex items-center gap-2 justify-end min-w-0 max-w-[32%]">
+        <!-- Speed Selector -->
+        <div class="relative hidden sm:block">
+          <select id="playbackSpeedSelect" onchange="changePlaybackSpeed(this.value)" class="bg-yt-surface border border-yt-border text-yt-text text-xs rounded px-2 py-1 focus:outline-none cursor-pointer">
+            <option value="0.5">0.5x</option>
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1.0x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
+          </select>
+        </div>
+
+        <!-- Volume Control -->
+        <div class="flex items-center gap-1.5">
+          <button id="btnVolumeMute" onclick="toggleMute()" class="p-1.5 text-yt-muted hover:text-white">
+            <i id="volumeIcon" data-lucide="volume-2" class="w-4 h-4"></i>
+          </button>
+          <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.8" class="w-16 md:w-20 h-1 bg-yt-border rounded cursor-pointer hidden sm:block" oninput="changeVolume(this.value)">
+        </div>
+
+        <!-- Download Media -->
+        <button onclick="downloadCurrentMedia()" title="Unduh Berkas" class="p-2 text-yt-muted hover:text-white rounded-full transition">
+          <i data-lucide="download" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Expand Video (Theater Mode) -->
+        <button id="btnExpandTheater" onclick="openVideoTheater()" title="Mode Bioskop" class="hidden p-2 text-yt-muted hover:text-white rounded-full transition">
+          <i data-lucide="maximize-2" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= INLINE TOAST MESSAGE ================= -->
+  <div id="toastMessage" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-neutral-900 border border-neutral-700 text-white text-xs px-4 py-2.5 rounded-full shadow-2xl opacity-0 pointer-events-none transition-opacity duration-150 z-50 flex items-center gap-2">
+    <i data-lucide="info" class="w-4 h-4 text-yt-red"></i>
+    <span id="toastText">Notifikasi</span>
+  </div>
+
+  <!-- ================= JAVASCRIPT APPLICATION CORE ================= -->
+  <script>
+    /* =============================================================
+       KONFIGURASI BERKAS SAMPEL HOSTING (HOSTED MEDIA SAMPLES)
+       -------------------------------------------------------------
+       Jika galeri ini diunggah ke server / hosting web dan Anda ingin
+       tombol "Sampel" memuat berkas dari hosting Anda, daftarkan
+       alamat berkas (URL atau path relatif) pada array HOSTED_SAMPLES.
+
+       Format yang didukung:
+       1. URL String langsung, contoh:
+          "https://domain-anda.com/media/foto1.jpg",
+          "media/video-promo.mp4",
+          "audio/lagu.mp3"
+
+       2. Objek berkas dengan informasi kustom, contoh:
+          { name: "Lanskap.jpg", url: "media/lanskap.jpg", category: "image", size: 1024 * 650 },
+          { name: "Trailer.mp4", url: "media/trailer.mp4", category: "video", size: 1024 * 1024 * 12 },
+          { name: "Suara.mp3", url: "media/suara.mp3", category: "audio", size: 1024 * 1024 * 3.5 }
+
+       *CATATAN:* Jika array di bawah dibiarkan KOSONG ([]), galeri
+       akan secara otomatis menampilkan berkas contoh bawaan (demo SVG, synth audio, video).
+       ============================================================= */
+    const HOSTED_SAMPLES = [
+      // Contoh: Tambahkan URL berkas hosting Anda di sini jika ada:
+      // "media/foto1.jpg",
+      // "media/video1.mp4",
+      // "media/lagu.mp3"
+    ];
+
+    /* -------------------------------------------------------------
+       STATE MANAGEMENT
+       ------------------------------------------------------------- */
+    const state = {
+      files: [],             // Array of file metadata objects
+      filteredFiles: [],     // Search and filter view
+      activeFilter: 'all',   // 'all', 'image', 'video', 'audio'
+      viewMode: 'grid',      // 'list', 'detailed', 'grid', 'large-grid'
+      searchQuery: '',
+      sortOption: 'name-asc',
+
+      // Photo Lightbox state
+      photoList: [],         // Images only
+      currentPhotoIndex: 0,
+      slideshowTimer: null,
+      panzoomInstance: null,
+
+      // Audio/Video player state
+      activeMediaIndex: -1,
+      mediaQueue: [],        // Audio/Video hasil filter
+      playQueue: [],         // Salinan antrean saat pemutaran dimulai
+      isPlaying: false,
+      isShuffle: false,
+      isLoop: false,
+      volume: 0.8,
+      playbackRate: 1.0,
+      isMuted: false,
+      activeMediaType: null  // 'audio' or 'video'
+    };
+
+    // Supported Extension Maps
+    const EXTENSIONS = {
+      image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'],
+      video: ['mp4', 'webm', 'ogv', 'mkv', 'mov', 'm4v'],
+      audio: ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac', 'opus']
+    };
+
+    // DOM Elements Cache
+    const el = {
+      mediaContainer: document.getElementById('mediaContainer'),
+      emptyState: document.getElementById('emptyState'),
+      searchInput: document.getElementById('searchInput'),
+      clearSearchBtn: document.getElementById('clearSearchBtn'),
+      sortSelector: document.getElementById('sortSelector'),
+      folderBadge: document.getElementById('activeFolderBadge'),
+      folderNameText: document.getElementById('folderNameText'),
+      btnResetGallery: document.getElementById('btnResetGallery'),
+
+      // Fallback inputs
+      fallbackFolderInput: document.getElementById('fallbackFolderInput'),
+      fallbackFilesInput: document.getElementById('fallbackFilesInput'),
+
+      // Photo Lightbox
+      photoModal: document.getElementById('photoModal'),
+      lightboxImg: document.getElementById('lightboxImg'),
+      panzoomContainer: document.getElementById('panzoomContainer'),
+      photoModalTitle: document.getElementById('photoModalTitle'),
+      photoModalCounter: document.getElementById('photoModalCounter'),
+      zoomPercentText: document.getElementById('zoomPercentText'),
+      slideshowBtn: document.getElementById('slideshowBtn'),
+      slideshowIcon: document.getElementById('slideshowIcon'),
+      photoInfoDrawer: document.getElementById('photoInfoDrawer'),
+      photoInfoBtn: document.getElementById('photoInfoBtn'),
+
+      // Photo Info fields
+      infoFileName: document.getElementById('infoFileName'),
+      infoDimensions: document.getElementById('infoDimensions'),
+      infoFileSize: document.getElementById('infoFileSize'),
+      infoFileType: document.getElementById('infoFileType'),
+      infoFileModified: document.getElementById('infoFileModified'),
+
+      // Media Bottom Bar & Audio/Video
+      mediaBottomBar: document.getElementById('mediaBottomBar'),
+      globalAudioPlayer: document.getElementById('globalAudioPlayer'),
+      theaterVideoPlayer: document.getElementById('theaterVideoPlayer'),
+      videoModal: document.getElementById('videoModal'),
+      videoModalTitle: document.getElementById('videoModalTitle'),
+      btnPlayPause: document.getElementById('btnPlayPause'),
+      playPauseIcon: document.getElementById('playPauseIcon'),
+      btnLoop: document.getElementById('btnLoop'),
+      btnShuffle: document.getElementById('btnShuffle'),
+      btnExpandTheater: document.getElementById('btnExpandTheater'),
+      playerTitle: document.getElementById('playerTitle'),
+      playerCategoryBadge: document.getElementById('playerCategoryBadge'),
+      playerMetaText: document.getElementById('playerMetaText'),
+      playerThumbContainer: document.getElementById('playerThumbContainer'),
+      playerThumbImg: document.getElementById('playerThumbImg'),
+      playerThumbIcon: document.getElementById('playerThumbIcon'),
+      scrubberTrack: document.getElementById('scrubberTrack'),
+      scrubberProgress: document.getElementById('scrubberProgress'),
+      scrubberBuffer: document.getElementById('scrubberBuffer'),
+      playerCurrentTime: document.getElementById('playerCurrentTime'),
+      playerTotalDuration: document.getElementById('playerTotalDuration'),
+      volumeSlider: document.getElementById('volumeSlider'),
+      volumeIcon: document.getElementById('volumeIcon'),
+      playbackSpeedSelect: document.getElementById('playbackSpeedSelect'),
+
+      // Toasts
+      toastMessage: document.getElementById('toastMessage'),
+      toastText: document.getElementById('toastText')
+    };
+
+    /* -------------------------------------------------------------
+       INITIALIZATION
+       ------------------------------------------------------------- */
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initViewMode();
+      setupEventListeners();
+      setupPanzoom();
+      restoreLastFolder();
+    });
+
+    function setupEventListeners() {
+      // Search input
+      let searchTimer = null;
+      el.searchInput.addEventListener('input', (e) => {
+        state.searchQuery = e.target.value.toLowerCase().trim();
+        el.clearSearchBtn.classList.toggle('hidden', state.searchQuery === '');
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(applyFiltersAndRender, 150);
+      });
+
+      // Fallback folder input
+      el.fallbackFolderInput.addEventListener('change', (e) => {
+        processStandardFiles(e.target.files, (e.target.files[0]?.webkitRelativePath || '').split('/')[0] || 'Folder Lokal');
+      });
+      el.fallbackFilesInput.addEventListener('change', (e) => {
+        processStandardFiles(e.target.files, 'Berkas Lokal');
+      });
+
+      // Audio & Video media event listeners
+      [el.globalAudioPlayer, el.theaterVideoPlayer].forEach(player => {
+        player.addEventListener('timeupdate', onMediaTimeUpdate);
+        player.addEventListener('loadedmetadata', onMediaMetadataLoaded);
+        player.addEventListener('ended', onMediaEnded);
+        player.addEventListener('play', syncPlayState);
+        player.addEventListener('pause', syncPlayState);
+        player.addEventListener('progress', onMediaProgress);
+        player.addEventListener('error', onMediaError);
+      });
+      setupScrubberDrag();
+
+      // Global Keyboard Shortcuts
+      window.addEventListener('keydown', handleGlobalKeydown);
+    }
+
+    function initViewMode() {
+      const savedMode = localStorage.getItem('galeri_view_mode') || 'grid';
+      setViewMode(savedMode, false);
+    }
+
+    /* -------------------------------------------------------------
+       TOAST NOTIFICATION (No native alert() as per rules)
+       ------------------------------------------------------------- */
+    let toastTimer = null;
+    function showToast(message) {
+      el.toastText.textContent = message;
+      el.toastMessage.classList.remove('opacity-0', 'pointer-events-none');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        el.toastMessage.classList.add('opacity-0', 'pointer-events-none');
+      }, 3200);
+    }
+
+    /* -------------------------------------------------------------
+       FILE SYSTEM ACCESS API & FALLBACK HANDLING
+       ------------------------------------------------------------- */
+    async function openFolderPicker() {
+      // 1. Coba File System Access API modern
+      if ('showDirectoryPicker' in window) {
+        try {
+          const dirHandle = await window.showDirectoryPicker({
+            mode: 'read'
+          });
+          await processDirectoryHandle(dirHandle);
+          return;
+        } catch (err) {
+          // Jika dibatalkan oleh pengguna
+          if (err.name === 'AbortError') return;
+
+          // Jika dijalankan dalam iframe sandbox cross-origin (SecurityError)
+          console.warn('showDirectoryPicker dibatasi, beralih ke input direktori fallback:', err);
+        }
+      }
+
+      // 2. Fallback input direktori untuk webkitdirectory
+      el.fallbackFolderInput.click();
+    }
+
+    async function processDirectoryHandle(dirHandle) {
+      const discoveredFiles = [];
+      el.folderNameText.textContent = dirHandle.name || 'Direktori Aktif';
+      el.folderBadge.classList.remove('hidden');
+
+      // Iterasi HANYA pada root folder (tidak masuk ke subfolder sesuai instruksi)
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file') {
+          const file = await entry.getFile();
+          const category = getMediaCategory(file.name);
+          if (category) {
+            discoveredFiles.push(createMediaObject(file, category));
+          }
+        }
+      }
+
+      saveLastHandle(dirHandle);
+      commitDiscoveredFiles(discoveredFiles, dirHandle.name);
+    }
+
+    function idb() {
+      return new Promise((res, rej) => {
+        const r = indexedDB.open('galeri_db', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('h');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+    }
+    async function saveLastHandle(h) {
+      try { const db = await idb(); db.transaction('h', 'readwrite').objectStore('h').put(h, 'last'); } catch (e) {}
+    }
+    let lastHandle = null;
+    async function restoreLastFolder() {
+      try {
+        const db = await idb();
+        const h = await new Promise(res => {
+          const q = db.transaction('h').objectStore('h').get('last');
+          q.onsuccess = () => res(q.result); q.onerror = () => res(null);
+        });
+        if (!h) return;
+        lastHandle = h;
+        document.getElementById('resumeFolderName').textContent = h.name;
+        const b = document.getElementById('resumeFolderBtn');
+        b.classList.remove('hidden'); b.classList.add('flex');
+      } catch (e) {}
+    }
+    async function resumeLastFolder() {
+      if (!lastHandle) return;
+      try {
+        if (await lastHandle.requestPermission({ mode: 'read' }) !== 'granted') { showToast('Izin akses folder ditolak.'); return; }
+        await processDirectoryHandle(lastHandle);
+      } catch (e) { showToast('Gagal membuka folder terakhir.'); }
+    }
+
+    function getUrl(item) {
+      if (!item.url) item.url = URL.createObjectURL(item.file);
+      return item.url;
+    }
+
+    function resetViewersAndPlayer() {
+      closePhotoViewer();
+      [el.globalAudioPlayer, el.theaterVideoPlayer].forEach(p => { p.pause(); p.removeAttribute('src'); p.load(); });
+      closeVideoModal();
+      el.mediaBottomBar.classList.add('translate-y-full');
+      state.playQueue = []; state.activeMediaIndex = -1; state.activeMediaType = null; state.isPlaying = false;
+      updatePlayPauseButtonUI();
+    }
+
+    /* -------------------------------------------------------------
+       RESET GALLERY DATA (Membersihkan data galeri untuk folder baru)
+       ------------------------------------------------------------- */
+    function resetGalleryData() {
+      resetViewersAndPlayer();
+
+      // Hapus alokasi URL objek lokal untuk membebaskan memori browser
+      state.files.forEach(f => {
+        if (f.url && !f.isSample) {
+          URL.revokeObjectURL(f.url);
+        }
+      });
+
+      // Bersihkan antrean dan berkas
+      state.files = [];
+      state.filteredFiles = [];
+      state.photoList = [];
+      state.mediaQueue = [];
+      state.playQueue = [];
+
+      // Reset pencarian dan filter
+      state.searchQuery = '';
+      el.searchInput.value = '';
+      el.clearSearchBtn.classList.add('hidden');
+      setFilter('all');
+
+      // Sembunyikan badge folder dan tombol reset
+      el.folderBadge.classList.add('hidden');
+      el.folderNameText.textContent = '';
+      if (el.btnResetGallery) {
+        el.btnResetGallery.classList.add('hidden');
+        el.btnResetGallery.classList.remove('flex');
+      }
+
+      // Bersihkan nilai input file fallback agar event change dapat dipicu kembali
+      if (el.fallbackFolderInput) el.fallbackFolderInput.value = '';
+      if (el.fallbackFilesInput) el.fallbackFilesInput.value = '';
+
+      updateCategoryCounts();
+      renderGallery();
+
+      showToast('Galeri telah dibersihkan. Anda dapat membuka folder baru.');
+      lucide.createIcons();
+    }
+
+    function processStandardFiles(fileList, folderName) {
+      if (!fileList || fileList.length === 0) return;
+      
+      const discoveredFiles = [];
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        
+        // Cek path agar TIDAK menyertakan subdirektori (hanya berkas di root folder yang dipilih)
+        const relPath = file.webkitRelativePath || file.name;
+        const slashCount = (relPath.match(/\//g) || []).length;
+        if (slashCount > 1) {
+          continue; // Lewati subfolder
+        }
+
+        const category = getMediaCategory(file.name);
+        if (category) {
+          discoveredFiles.push(createMediaObject(file, category));
+        }
+      }
+
+      el.folderNameText.textContent = folderName;
+      el.folderBadge.classList.remove('hidden');
+      commitDiscoveredFiles(discoveredFiles, folderName);
+    }
+
+    function createMediaObject(file, category) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      return {
+        id: 'media_' + Math.random().toString(36).substring(2, 9),
+        name: file.name,
+        category: category, // 'image', 'video', 'audio'
+        ext: ext,
+        size: file.size,
+        lastModified: file.lastModified,
+        file: file,
+        url: null, // dibuat saat dibutuhkan (getUrl)
+        dimensions: null
+      };
+    }
+
+    function commitDiscoveredFiles(items, name) {
+      resetViewersAndPlayer();
+      // Hapus alokasi URL lama untuk mencegah memory leak
+      state.files.forEach(f => {
+        if (f.url && !f.isSample) URL.revokeObjectURL(f.url);
+      });
+
+      state.files = items;
+      updateCategoryCounts();
+      applyFiltersAndRender();
+
+      if (items.length === 0) {
+        if (el.btnResetGallery) {
+          el.btnResetGallery.classList.add('hidden');
+          el.btnResetGallery.classList.remove('flex');
+        }
+        showToast('Tidak ditemukan berkas gambar, video, atau audio di folder ini.');
+      } else {
+        if (el.btnResetGallery) {
+          el.btnResetGallery.classList.remove('hidden');
+          el.btnResetGallery.classList.add('flex');
+        }
+        showToast(`Memuat ${items.length} berkas media dari ${name}`);
+      }
+    }
+
+    function getMediaCategory(filename) {
+      const ext = filename.split('.').pop().toLowerCase();
+      if (EXTENSIONS.image.includes(ext)) return 'image';
+      if (EXTENSIONS.video.includes(ext)) return 'video';
+      if (EXTENSIONS.audio.includes(ext)) return 'audio';
+      return null;
+    }
+
+    /* -------------------------------------------------------------
+       SAMPLE MEDIA GENERATOR (Hosted Files / Default Fallback Demo)
+       ------------------------------------------------------------- */
+    function loadSampleMedia() {
+      // 1. Cek apakah berkas hosted diatur pada HOSTED_SAMPLES
+      if (Array.isArray(HOSTED_SAMPLES) && HOSTED_SAMPLES.length > 0) {
+        const hostedItems = HOSTED_SAMPLES.map((item, index) => {
+          if (typeof item === 'string') {
+            const cleanUrl = item.trim();
+            const urlPath = cleanUrl.split('?')[0].split('#')[0];
+            const rawName = urlPath.split('/').pop() || `Sampel_${index + 1}`;
+            const ext = rawName.includes('.') ? rawName.split('.').pop().toLowerCase() : 'jpg';
+            const category = getMediaCategory(rawName) || 'image';
+            return {
+              id: 'hosted_sample_' + index + '_' + Math.random().toString(36).substring(2, 7),
+              name: decodeURIComponent(rawName),
+              category: category,
+              ext: ext,
+              size: 0,
+              lastModified: Date.now(),
+              url: cleanUrl,
+              isSample: true,
+              isHosted: true
+            };
+          } else if (item && typeof item === 'object') {
+            const rawUrl = item.url || '';
+            const urlPath = rawUrl.split('?')[0].split('#')[0];
+            const autoName = urlPath.split('/').pop() || `Sampel_${index + 1}`;
+            const name = item.name || autoName;
+            const ext = item.ext || (name.includes('.') ? name.split('.').pop().toLowerCase() : 'jpg');
+            const category = item.category || getMediaCategory(name) || 'image';
+            return {
+              id: item.id || ('hosted_sample_' + index + '_' + Math.random().toString(36).substring(2, 7)),
+              name: decodeURIComponent(name),
+              category: category,
+              ext: ext,
+              size: item.size || 0,
+              lastModified: item.lastModified || Date.now(),
+              url: rawUrl,
+              isSample: true,
+              isHosted: true
+            };
+          }
+          return null;
+        }).filter(Boolean);
+
+        if (hostedItems.length > 0) {
+          el.folderNameText.textContent = 'Sampel Hosting';
+          el.folderBadge.classList.remove('hidden');
+          commitDiscoveredFiles(hostedItems, 'Sampel Hosting');
+          return;
+        }
+      }
+
+      // 2. Berkas sampel bawaan jika HOSTED_SAMPLES tidak diatur (fallback otomatis)
+      const samples = [
+        {
+          id: 'sample_img_1',
+          name: 'Pemandangan_Gunung.svg',
+          category: 'image',
+          ext: 'svg',
+          size: 1024 * 340,
+          lastModified: Date.now() - 3600000,
+          url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%231a2a6c"/><stop offset="50%" stop-color="%23b21f1f"/><stop offset="100%" stop-color="%23fdbb2d"/></linearGradient></defs><rect width="100%" height="100%" fill="url(%23sky)"/><circle cx="640" cy="380" r="160" fill="%23fff" opacity="0.8"/><polygon points="200,720 540,420 880,720" fill="%23222"/><polygon points="600,720 890,460 1180,720" fill="%23111"/><text x="640" y="660" font-family="sans-serif" font-size="28" fill="%23ffffff" text-anchor="middle" font-weight="bold">Contoh Foto Spektakuler</text></svg>',
+          isSample: true
+        },
+        {
+          id: 'sample_img_2',
+          name: 'Arsitektur_Modern.svg',
+          category: 'image',
+          ext: 'svg',
+          size: 1024 * 280,
+          lastModified: Date.now() - 7200000,
+          url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"><rect width="100%" height="100%" fill="%231e1e24"/><circle cx="540" cy="540" r="400" fill="%23ff0055" opacity="0.85"/><rect x="240" y="240" width="600" height="600" fill="%2300f0ff" opacity="0.6"/><text x="540" y="555" font-family="sans-serif" font-size="34" fill="%23ffffff" text-anchor="middle" font-weight="bold">Studio Desain Arsitektur</text></svg>',
+          isSample: true
+        },
+        {
+          id: 'sample_audio_1',
+          name: 'Harmoni_Akustik.mp3',
+          category: 'audio',
+          ext: 'mp3',
+          size: 1024 * 1024 * 2.8,
+          lastModified: Date.now() - 12000000,
+          url: createSyntheticAudioTone(440, 6),
+          isSample: true
+        },
+        {
+          id: 'sample_video_1',
+          name: 'Cuplikan_Animasi.mp4',
+          category: 'video',
+          ext: 'mp4',
+          size: 1024 * 1024 * 5.4,
+          lastModified: Date.now() - 24000000,
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+          isSample: true
+        }
+      ];
+
+      el.folderNameText.textContent = 'Demo Media Sampel';
+      el.folderBadge.classList.remove('hidden');
+      commitDiscoveredFiles(samples, 'Demo Media Sampel');
+    }
+
+    function createSyntheticAudioTone(freq, seconds) {
+      try {
+        const sampleRate = 8000;
+        const numSamples = sampleRate * seconds;
+        const buffer = new Uint8Array(44 + numSamples);
+        const writeString = (offset, str) => {
+          for (let i = 0; i < str.length; i++) buffer[offset + i] = str.charCodeAt(i);
+        };
+        const write32 = (offset, val) => {
+          buffer[offset] = val & 0xff; buffer[offset + 1] = (val >> 8) & 0xff;
+          buffer[offset + 2] = (val >> 16) & 0xff; buffer[offset + 3] = (val >> 24) & 0xff;
+        };
+        const write16 = (offset, val) => {
+          buffer[offset] = val & 0xff; buffer[offset + 1] = (val >> 8) & 0xff;
+        };
+
+        writeString(0, 'RIFF');
+        write32(4, 36 + numSamples);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        write32(16, 16);
+        write16(20, 1); // PCM
+        write16(22, 1); // Mono
+        write32(24, sampleRate);
+        write32(28, sampleRate);
+        write16(32, 1);
+        write16(34, 8); // 8-bit
+        writeString(36, 'data');
+        write32(40, numSamples);
+
+        for (let i = 0; i < numSamples; i++) {
+          const t = i / sampleRate;
+          const sample = Math.sin(2 * Math.PI * freq * t) * Math.sin(2 * Math.PI * 0.5 * t);
+          buffer[44 + i] = Math.floor((sample + 1) * 127.5);
+        }
+
+        const blob = new Blob([buffer], { type: 'audio/wav' });
+        return URL.createObjectURL(blob);
+      } catch (e) {
+        return '';
+      }
+    }
+
+    /* -------------------------------------------------------------
+       FILTERING, SEARCH & SORTING
+       ------------------------------------------------------------- */
+    function setFilter(type) {
+      state.activeFilter = type;
+      
+      // Update UI Chips
+      ['all', 'image', 'video', 'audio'].forEach(key => {
+        const chip = document.getElementById(`filterChip-${key}`);
+        if (key === type) {
+          chip.className = 'filter-chip px-3 py-1.5 rounded-lg font-medium transition bg-white text-black shadow-sm';
+        } else {
+          chip.className = 'filter-chip px-3 py-1.5 rounded-lg font-medium transition bg-yt-surface hover:bg-yt-hover text-yt-text';
+        }
+      });
+
+      applyFiltersAndRender();
+    }
+
+    function resetGalleryFilter() {
+      setFilter('all');
+      clearSearch();
+    }
+
+    function clearSearch() {
+      state.searchQuery = '';
+      el.searchInput.value = '';
+      el.clearSearchBtn.classList.add('hidden');
+      applyFiltersAndRender();
+    }
+
+    function updateCategoryCounts() {
+      const counts = { all: state.files.length, image: 0, video: 0, audio: 0 };
+      state.files.forEach(f => {
+        if (counts[f.category] !== undefined) counts[f.category]++;
+      });
+      document.getElementById('count-all').textContent = counts.all;
+      document.getElementById('count-image').textContent = counts.image;
+      document.getElementById('count-video').textContent = counts.video;
+      document.getElementById('count-audio').textContent = counts.audio;
+    }
+
+    function sortMedia() {
+      state.sortOption = el.sortSelector.value;
+      el.sortSelector.blur();
+      applyFiltersAndRender();
+    }
+
+    function applyFiltersAndRender() {
+      let filtered = state.files.filter(f => {
+        const matchesCategory = (state.activeFilter === 'all') || (f.category === state.activeFilter);
+        const matchesQuery = f.name.toLowerCase().includes(state.searchQuery);
+        return matchesCategory && matchesQuery;
+      });
+
+      // Sorting
+      switch (state.sortOption) {
+        case 'name-asc':
+          filtered.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+          break;
+        case 'name-desc':
+          filtered.sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' }));
+          break;
+        case 'date-desc':
+          filtered.sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0));
+          break;
+        case 'size-desc':
+          filtered.sort((a, b) => b.size - a.size);
+          break;
+      }
+
+      state.filteredFiles = filtered;
+
+      // Sync sub-queues
+      state.photoList = filtered.filter(f => f.category === 'image');
+      state.mediaQueue = filtered.filter(f => f.category === 'audio' || f.category === 'video');
+
+      renderGallery();
+    }
+
+    /* -------------------------------------------------------------
+       VIEW MODES & RENDERING
+       ------------------------------------------------------------- */
+    function setViewMode(mode, save = true) {
+      state.viewMode = mode;
+      if (save) localStorage.setItem('galeri_view_mode', mode);
+
+      // Update button highlights
+      const modeMap = {
+        'list': 'btnViewList',
+        'detailed': 'btnViewDetailed',
+        'grid': 'btnViewGrid',
+        'large-grid': 'btnViewLargeGrid'
+      };
+
+      Object.entries(modeMap).forEach(([k, btnId]) => {
+        const btn = document.getElementById(btnId);
+        if (k === mode) {
+          btn.className = 'p-1.5 rounded bg-white text-black font-semibold shadow-sm';
+        } else {
+          btn.className = 'p-1.5 rounded hover:bg-yt-hover text-yt-muted transition';
+        }
+      });
+
+      renderGallery();
+    }
+
+    function renderGallery() {
+      if (state.files.length === 0) {
+        el.emptyState.classList.remove('hidden');
+        el.mediaContainer.classList.add('hidden');
+        return;
+      }
+
+      el.emptyState.classList.add('hidden');
+      el.mediaContainer.classList.remove('hidden');
+
+      if (state.filteredFiles.length === 0) {
+        el.mediaContainer.innerHTML = `
+          <div class="py-20 text-center text-yt-muted">
+            <i data-lucide="search-x" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+            <p class="text-sm">Tidak ada berkas yang cocok dengan filter atau kata kunci.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      let html = '';
+      switch (state.viewMode) {
+        case 'list':
+          html = renderListView(state.filteredFiles);
+          break;
+        case 'detailed':
+          html = renderDetailedView(state.filteredFiles);
+          break;
+        case 'large-grid':
+          html = renderLargeGridView(state.filteredFiles);
+          break;
+        case 'grid':
+        default:
+          html = renderGridView(state.filteredFiles);
+          break;
+      }
+
+      el.mediaContainer.innerHTML = html;
+      lucide.createIcons();
+      observeLazyVideos();
+    }
+
+    /* 1. Grid View (Flickr Style) */
+    function renderGridView(items) {
+      return `
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          ${items.map(item => `
+            <div class="group relative bg-yt-surface border border-yt-border rounded-lg overflow-hidden hover:border-neutral-500 transition duration-150 flex flex-col cursor-pointer" onclick="handleItemClick('${item.id}')">
+              <!-- Thumbnail Aspect 1:1 -->
+              <div class="relative w-full aspect-square bg-[#141414] overflow-hidden flex items-center justify-center">
+                ${getThumbnailMarkup(item, 'w-full h-full object-cover group-hover:scale-105 transition-transform duration-200')}
+                <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getCategoryBadgeColor(item.category)} shadow">
+                  ${item.ext}
+                </span>
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <div class="w-9 h-9 rounded-full bg-yt-red text-white flex items-center justify-center shadow-lg">
+                    <i data-lucide="${item.category === 'image' ? 'zoom-in' : 'play'}" class="w-4 h-4 fill-current"></i>
+                  </div>
+                </div>
+              </div>
+              <!-- Meta Footer -->
+              <div class="p-2.5">
+                <p class="text-xs font-medium text-yt-text truncate" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</p>
+                <p class="text-[10px] text-yt-muted mt-0.5">${formatBytes(item.size)}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    /* 2. Large Grid View */
+    function renderLargeGridView(items) {
+      return `
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          ${items.map(item => `
+            <div class="group bg-yt-surface border border-yt-border rounded-xl overflow-hidden hover:border-neutral-500 transition flex flex-col shadow-md">
+              <!-- Large Preview Aspect 16:9 -->
+              <div class="relative w-full aspect-video bg-[#121212] flex items-center justify-center overflow-hidden cursor-pointer" onclick="handleItemClick('${item.id}')">
+                ${getThumbnailMarkup(item, 'w-full h-full object-cover group-hover:scale-102 transition-transform duration-200')}
+                <span class="absolute top-3 right-3 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${getCategoryBadgeColor(item.category)} shadow">
+                  ${item.category}
+                </span>
+                <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div class="w-12 h-12 rounded-full bg-yt-red text-white flex items-center justify-center shadow-lg">
+                    <i data-lucide="${item.category === 'image' ? 'maximize' : 'play'}" class="w-6 h-6 fill-current"></i>
+                  </div>
+                </div>
+              </div>
+              <!-- Info Bar -->
+              <div class="p-4 flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <h4 class="text-sm font-semibold text-white truncate" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</h4>
+                  <div class="flex items-center gap-3 text-xs text-yt-muted mt-1">
+                    <span>${formatBytes(item.size)}</span>
+                    <span>•</span>
+                    <span>${formatDate(item.lastModified)}</span>
+                  </div>
+                </div>
+                <button onclick="downloadMediaDirectly('${item.id}'); event.stopPropagation();" title="Unduh" class="p-2 rounded-lg bg-yt-hover hover:bg-neutral-600 text-yt-muted hover:text-white transition">
+                  <i data-lucide="download" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    /* 3. List View */
+    function renderListView(items) {
+      return `
+        <div class="space-y-1.5">
+          ${items.map(item => `
+            <div class="flex items-center justify-between px-3.5 py-2 rounded-lg bg-yt-surface/60 hover:bg-yt-hover border border-yt-border/50 transition cursor-pointer" onclick="handleItemClick('${item.id}')">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-8 h-8 rounded bg-[#161616] flex items-center justify-center shrink-0">
+                  <i data-lucide="${getCategoryIconName(item.category)}" class="w-4 h-4 ${getCategoryIconColor(item.category)}"></i>
+                </div>
+                <span class="text-sm text-yt-text font-medium truncate">${escapeHtml(item.name)}</span>
+              </div>
+              <div class="flex items-center gap-4 text-xs text-yt-muted shrink-0">
+                <span class="hidden sm:inline">${formatBytes(item.size)}</span>
+                <span class="uppercase px-1.5 py-0.5 rounded text-[10px] font-bold ${getCategoryBadgeColor(item.category)}">${item.ext}</span>
+                <button onclick="downloadMediaDirectly('${item.id}'); event.stopPropagation();" class="p-1 hover:text-white transition">
+                  <i data-lucide="download" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    /* 4. Detailed View (Table) */
+    function renderDetailedView(items) {
+      return `
+        <div class="overflow-x-auto rounded-lg border border-yt-border bg-yt-surface">
+          <table class="w-full text-left text-xs text-yt-muted">
+            <thead class="bg-[#191919] text-yt-text uppercase tracking-wider font-semibold border-b border-yt-border text-[11px]">
+              <tr>
+                <th class="py-3 px-4">Nama Berkas</th>
+                <th class="py-3 px-3">Tipe</th>
+                <th class="py-3 px-3">Format</th>
+                <th class="py-3 px-3">Ukuran</th>
+                <th class="py-3 px-4">Terakhir Diubah</th>
+                <th class="py-3 px-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-yt-border/60">
+              ${items.map(item => `
+                <tr class="hover:bg-yt-hover/70 transition cursor-pointer" onclick="handleItemClick('${item.id}')">
+                  <td class="py-2.5 px-4 text-yt-text font-medium flex items-center gap-2 max-w-xs truncate">
+                    <i data-lucide="${getCategoryIconName(item.category)}" class="w-3.5 h-3.5 shrink-0 ${getCategoryIconColor(item.category)}"></i>
+                    <span class="truncate">${escapeHtml(item.name)}</span>
+                  </td>
+                  <td class="py-2.5 px-3 uppercase text-[10px] font-bold tracking-wider">${item.category}</td>
+                  <td class="py-2.5 px-3 font-mono">.${item.ext}</td>
+                  <td class="py-2.5 px-3">${formatBytes(item.size)}</td>
+                  <td class="py-2.5 px-4">${formatDate(item.lastModified)}</td>
+                  <td class="py-2.5 px-3 text-right">
+                    <button onclick="downloadMediaDirectly('${item.id}'); event.stopPropagation();" class="p-1.5 rounded hover:bg-[#333] text-yt-muted hover:text-white transition">
+                      <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    let videoObserver = null;
+    function observeLazyVideos() {
+      if (videoObserver) videoObserver.disconnect();
+      videoObserver = new IntersectionObserver(entries => entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        const v = en.target; v.src = v.dataset.vsrc; v.preload = 'metadata';
+        videoObserver.unobserve(v);
+      }), { rootMargin: '200px' });
+      el.mediaContainer.querySelectorAll('video[data-vsrc]').forEach(v => videoObserver.observe(v));
+    }
+
+    function getThumbnailMarkup(item, imgClasses) {
+      if (item.category === 'image') {
+        return `<img src="${escapeHtml(getUrl(item))}" alt="${escapeHtml(item.name)}" class="${imgClasses}" loading="lazy">`;
+      } else if (item.category === 'video') {
+        return `
+          <video data-vsrc="${escapeHtml(getUrl(item))}#t=0.5" class="${imgClasses} pointer-events-none" preload="none" muted playsinline></video>
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center text-white">
+              <i data-lucide="video" class="w-5 h-5"></i>
+            </div>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-neutral-900 to-[#121212] text-yt-muted p-2">
+            <i data-lucide="music-2" class="w-10 h-10 text-emerald-400 mb-1"></i>
+            <span class="text-[11px] truncate max-w-[80%] text-center text-neutral-300 font-mono">${escapeHtml(item.name)}</span>
+          </div>
+        `;
+      }
+    }
+
+    function getCategoryBadgeColor(cat) {
+      switch (cat) {
+        case 'image': return 'bg-blue-600/90 text-white';
+        case 'video': return 'bg-yt-red text-white';
+        case 'audio': return 'bg-emerald-600 text-white';
+        default: return 'bg-neutral-700 text-white';
+      }
+    }
+
+    function getCategoryIconName(cat) {
+      if (cat === 'image') return 'image';
+      if (cat === 'video') return 'video';
+      return 'music';
+    }
+
+    function getCategoryIconColor(cat) {
+      if (cat === 'image') return 'text-blue-400';
+      if (cat === 'video') return 'text-yt-red';
+      return 'text-emerald-400';
+    }
+
+    /* -------------------------------------------------------------
+       ITEM SELECTION ROUTER
+       ------------------------------------------------------------- */
+    function handleItemClick(itemId) {
+      const item = state.files.find(f => f.id === itemId);
+      if (!item) return;
+
+      if (item.category === 'image') {
+        openPhotoViewer(item.id);
+      } else {
+        playMediaItem(item.id);
+      }
+    }
+
+    /* -------------------------------------------------------------
+       PHOTO VIEWER (FLICKR LIGHTBOX + PANZOOM)
+       ------------------------------------------------------------- */
+    function setupPanzoom() {
+      if (window.Panzoom) {
+        state.panzoomInstance = Panzoom(el.lightboxImg, {
+          maxScale: 8,
+          minScale: 1,
+          canvas: true
+        });
+
+        // Hubungkan wheel event untuk zoom mulus
+        el.panzoomContainer.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          state.panzoomInstance.zoomWithWheel(e);
+          updateZoomLabel();
+        });
+
+        el.lightboxImg.addEventListener('panzoomchange', () => {
+          updateZoomLabel();
+        });
+        el.panzoomContainer.addEventListener('dblclick', () => {
+          if (state.panzoomInstance.getScale() > 1) state.panzoomInstance.reset({ animate: true });
+          else state.panzoomInstance.zoom(2.5, { animate: true });
+        });
+      }
+    }
+
+    function updateZoomLabel() {
+      if (state.panzoomInstance) {
+        const scale = state.panzoomInstance.getScale();
+        el.zoomPercentText.textContent = `${Math.round(scale * 100)}%`;
+      }
+    }
+
+    function openPhotoViewer(photoId) {
+      const index = state.photoList.findIndex(p => p.id === photoId);
+      if (index === -1) return;
+
+      state.currentPhotoIndex = index;
+      el.photoModal.classList.remove('hidden');
+      el.photoModal.classList.add('flex');
+      document.body.classList.add('overflow-hidden');
+      loadActivePhoto();
+    }
+
+    function closePhotoViewer() {
+      stopSlideshow();
+      el.photoModal.classList.add('hidden');
+      el.photoModal.classList.remove('flex');
+      document.body.classList.remove('overflow-hidden');
+      el.lightboxImg.removeAttribute('src');
+      if (state.panzoomInstance) state.panzoomInstance.reset();
+    }
+
+    function loadActivePhoto() {
+      const photo = state.photoList[state.currentPhotoIndex];
+      if (!photo) return;
+
+      el.lightboxImg.onload = () => {
+        photo.dimensions = `${el.lightboxImg.naturalWidth} × ${el.lightboxImg.naturalHeight} piksel`;
+        el.infoDimensions.textContent = photo.dimensions;
+      };
+      el.lightboxImg.src = getUrl(photo);
+      el.photoModalTitle.textContent = photo.name;
+      el.photoModalCounter.textContent = `${state.currentPhotoIndex + 1} / ${state.photoList.length}`;
+
+      if (state.panzoomInstance) {
+        state.panzoomInstance.reset();
+        updateZoomLabel();
+      }
+
+      // Populate Info Specs
+      el.infoFileName.textContent = photo.name;
+      el.infoFileSize.textContent = formatBytes(photo.size);
+      el.infoFileType.textContent = photo.file ? photo.file.type || photo.ext : photo.ext;
+      el.infoFileModified.textContent = formatDate(photo.lastModified);
+      el.infoDimensions.textContent = 'Memuat dimensi...';
+    }
+
+    function nextPhoto() {
+      if (state.photoList.length <= 1) return;
+      state.currentPhotoIndex = (state.currentPhotoIndex + 1) % state.photoList.length;
+      loadActivePhoto();
+    }
+
+    function prevPhoto() {
+      if (state.photoList.length <= 1) return;
+      state.currentPhotoIndex = (state.currentPhotoIndex - 1 + state.photoList.length) % state.photoList.length;
+      loadActivePhoto();
+    }
+
+    function zoomPhoto(step) {
+      if (state.panzoomInstance) {
+        const current = state.panzoomInstance.getScale();
+        state.panzoomInstance.zoom(current + step, { animate: true });
+        updateZoomLabel();
+      }
+    }
+
+    function resetPhotoZoom() {
+      if (state.panzoomInstance) {
+        state.panzoomInstance.reset();
+        updateZoomLabel();
+      }
+    }
+
+    function toggleSlideshow() {
+      if (state.slideshowTimer) {
+        stopSlideshow();
+        showToast('Slideshow dihentikan.');
+      } else {
+        startSlideshow();
+        showToast('Slideshow dimulai (interval 3,5 detik).');
+      }
+    }
+
+    function startSlideshow() {
+      el.slideshowBtn.classList.add('bg-yt-red', 'text-white');
+      setIcon('slideshowIcon', 'pause');
+
+      state.slideshowTimer = setInterval(() => {
+        nextPhoto();
+      }, 3500);
+    }
+
+    function stopSlideshow() {
+      if (state.slideshowTimer) {
+        clearInterval(state.slideshowTimer);
+        state.slideshowTimer = null;
+      }
+      el.slideshowBtn.classList.remove('bg-yt-red', 'text-white');
+      setIcon('slideshowIcon', 'play');
+    }
+
+    function togglePhotoInfoDrawer() {
+      el.photoInfoDrawer.classList.toggle('hidden');
+      el.photoInfoDrawer.classList.toggle('flex');
+      el.photoInfoBtn.classList.toggle('bg-white');
+      el.photoInfoBtn.classList.toggle('text-black');
+    }
+
+    function downloadActivePhoto() {
+      const photo = state.photoList[state.currentPhotoIndex];
+      if (photo) triggerDownload(getUrl(photo), photo.name);
+    }
+
+    /* -------------------------------------------------------------
+       AUDIO & VIDEO PLAYER LOGIC (YOUTUBE STYLE)
+       ------------------------------------------------------------- */
+    function playMediaItem(mediaId) {
+      const index = state.mediaQueue.findIndex(m => m.id === mediaId);
+      if (index === -1) return;
+
+      state.playQueue = [...state.mediaQueue]; // antrean tidak berubah saat filter/pencarian diganti
+      state.activeMediaIndex = index;
+      loadAndPlayActiveMedia();
+    }
+
+    function loadAndPlayActiveMedia() {
+      const media = state.playQueue[state.activeMediaIndex];
+      if (!media) return;
+
+      state.activeMediaType = media.category;
+      
+      // Update UI Bar
+      el.mediaBottomBar.classList.remove('translate-y-full');
+      el.playerTitle.textContent = media.name;
+      el.playerCategoryBadge.textContent = media.category;
+      el.playerCategoryBadge.className = `px-1.5 py-0.5 rounded uppercase text-[9px] font-bold ${getCategoryBadgeColor(media.category)}`;
+      el.playerMetaText.textContent = `${media.ext.toUpperCase()} • ${formatBytes(media.size)}`;
+
+      // Update thumbnail & Theater button visibility
+      if (media.category === 'video') {
+        setIcon('playerThumbIcon', 'video');
+        el.btnExpandTheater.classList.remove('hidden');
+      } else {
+        setIcon('playerThumbIcon', 'music');
+        el.btnExpandTheater.classList.add('hidden');
+        closeVideoModal();
+      }
+
+      // Stop previous active audio/video
+      el.globalAudioPlayer.pause();
+      el.theaterVideoPlayer.pause();
+
+      const targetPlayer = media.category === 'video' ? el.theaterVideoPlayer : el.globalAudioPlayer;
+      el.scrubberProgress.style.width = '0%';
+      el.scrubberBuffer.style.width = '0%';
+      el.playerTotalDuration.textContent = '0:00';
+      targetPlayer.src = getUrl(media);
+      targetPlayer.playbackRate = state.playbackRate;
+      targetPlayer.volume = state.volume;
+      targetPlayer.muted = state.isMuted;
+      targetPlayer.loop = state.isLoop;
+
+      targetPlayer.play()
+        .then(() => {
+          state.isPlaying = true;
+          updatePlayPauseButtonUI();
+        })
+        .catch(err => {
+          console.warn('Autoplay terhalang oleh peramban:', err);
+          state.isPlaying = false;
+          updatePlayPauseButtonUI();
+        });
+
+      lucide.createIcons();
+    }
+
+    function getActivePlayerElement() {
+      return state.activeMediaType === 'video' ? el.theaterVideoPlayer : el.globalAudioPlayer;
+    }
+
+    function togglePlayPause() {
+      const player = getActivePlayerElement();
+      if (!player.src) return;
+
+      if (player.paused) {
+        player.play().catch(() => {});
+        state.isPlaying = true;
+      } else {
+        player.pause();
+        state.isPlaying = false;
+      }
+      updatePlayPauseButtonUI();
+    }
+
+    function updatePlayPauseButtonUI() {
+      if (state.isPlaying) {
+        setIcon('playPauseIcon', 'pause');
+      } else {
+        setIcon('playPauseIcon', 'play');
+      }
+      lucide.createIcons();
+    }
+
+    function stopPlayback() {
+      const player = getActivePlayerElement();
+      player.pause();
+      player.currentTime = 0;
+      state.isPlaying = false;
+      updatePlayPauseButtonUI();
+      el.scrubberProgress.style.width = '0%';
+      el.playerCurrentTime.textContent = '0:00';
+    }
+
+    function playNextMedia() {
+      if (state.playQueue.length <= 1) return;
+
+      if (state.isShuffle) {
+        let randIndex = Math.floor(Math.random() * state.playQueue.length);
+        if (randIndex === state.activeMediaIndex) randIndex = (randIndex + 1) % state.playQueue.length;
+        state.activeMediaIndex = randIndex;
+      } else {
+        state.activeMediaIndex = (state.activeMediaIndex + 1) % state.playQueue.length;
+      }
+      loadAndPlayActiveMedia();
+    }
+
+    function playPrevMedia() {
+      const player = getActivePlayerElement();
+      // Jika sudah berjalan lebih dari 3 detik, kembalikan ke awal berkas
+      if (player.currentTime > 3) {
+        player.currentTime = 0;
+        return;
+      }
+
+      if (state.playQueue.length <= 1) return;
+      state.activeMediaIndex = (state.activeMediaIndex - 1 + state.playQueue.length) % state.playQueue.length;
+      loadAndPlayActiveMedia();
+    }
+
+    function toggleLoop() {
+      state.isLoop = !state.isLoop;
+      el.globalAudioPlayer.loop = state.isLoop;
+      el.theaterVideoPlayer.loop = state.isLoop;
+
+      if (state.isLoop) {
+        el.btnLoop.classList.add('text-yt-red', 'font-bold');
+        showToast('Loop diaktifkan.');
+      } else {
+        el.btnLoop.classList.remove('text-yt-red', 'font-bold');
+        showToast('Loop dinonaktifkan.');
+      }
+    }
+
+    function toggleShuffle() {
+      state.isShuffle = !state.isShuffle;
+      if (state.isShuffle) {
+        el.btnShuffle.classList.add('text-yt-red', 'font-bold');
+        showToast('Shuffle diaktifkan.');
+      } else {
+        el.btnShuffle.classList.remove('text-yt-red', 'font-bold');
+        showToast('Shuffle dinonaktifkan.');
+      }
+    }
+
+    function changePlaybackSpeed(speedVal) {
+      state.playbackRate = parseFloat(speedVal);
+      el.globalAudioPlayer.playbackRate = state.playbackRate;
+      el.theaterVideoPlayer.playbackRate = state.playbackRate;
+      el.playbackSpeedSelect.blur();
+      showToast(`Kecepatan putar: ${speedVal}x`);
+    }
+
+    function changeVolume(val) {
+      state.volume = parseFloat(val);
+      state.isMuted = false;
+      [el.globalAudioPlayer, el.theaterVideoPlayer].forEach(p => { p.volume = state.volume; p.muted = false; });
+      updateVolumeIcon();
+    }
+
+    function toggleMute() {
+      state.isMuted = !state.isMuted;
+      [el.globalAudioPlayer, el.theaterVideoPlayer].forEach(p => { p.muted = state.isMuted; });
+      updateVolumeIcon();
+    }
+
+    function updateVolumeIcon() {
+      if (state.isMuted || state.volume === 0) {
+        setIcon('volumeIcon', 'volume-x');
+      } else if (state.volume < 0.5) {
+        setIcon('volumeIcon', 'volume-1');
+      } else {
+        setIcon('volumeIcon', 'volume-2');
+      }
+      lucide.createIcons();
+    }
+
+    function onMediaTimeUpdate(e) {
+      const player = e.target;
+      if (player !== getActivePlayerElement()) return;
+
+      const current = player.currentTime || 0;
+      const duration = player.duration || 0;
+
+      el.playerCurrentTime.textContent = formatTime(current);
+      if (duration > 0) {
+        const pct = (current / duration) * 100;
+        el.scrubberProgress.style.width = `${pct}%`;
+      }
+    }
+
+    function onMediaMetadataLoaded(e) {
+      const player = e.target;
+      if (player !== getActivePlayerElement()) return;
+      el.playerTotalDuration.textContent = formatTime(player.duration || 0);
+    }
+
+    function onMediaEnded(e) {
+      const player = e.target;
+      if (player !== getActivePlayerElement()) return;
+
+      if (!state.isLoop) {
+        playNextMedia();
+      }
+    }
+
+    function seekMedia(e) {
+      const rect = el.scrubberTrack.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const fraction = Math.max(0, Math.min(1, clickX / rect.width));
+
+      const player = getActivePlayerElement();
+      if (player.duration) {
+        player.currentTime = fraction * player.duration;
+      }
+    }
+
+    function openVideoTheater() {
+      if (state.activeMediaType !== 'video') return;
+      el.videoModalTitle.textContent = state.playQueue[state.activeMediaIndex]?.name || 'Video';
+      el.videoModal.classList.remove('hidden');
+      el.videoModal.classList.add('flex');
+    }
+
+    function closeVideoModal() {
+      el.videoModal.classList.add('hidden');
+      el.videoModal.classList.remove('flex');
+    }
+
+    function toggleTheaterIfVideo() {
+      if (state.activeMediaType === 'video') {
+        openVideoTheater();
+      }
+    }
+
+    // Ikon Lucide diganti jadi <svg> setelah createIcons, jadi cari ulang lewat id.
+    function setIcon(id, name) {
+      const n = document.getElementById(id);
+      if (!n) return;
+      n.setAttribute('data-lucide', name);
+      lucide.createIcons();
+    }
+
+    function syncPlayState(e) {
+      if (e.target !== getActivePlayerElement()) return;
+      state.isPlaying = !e.target.paused;
+      updatePlayPauseButtonUI();
+    }
+
+    function onMediaProgress(e) {
+      const p = e.target;
+      if (p !== getActivePlayerElement() || !p.duration || !p.buffered.length) return;
+      el.scrubberBuffer.style.width = `${(p.buffered.end(p.buffered.length - 1) / p.duration) * 100}%`;
+    }
+
+    function onMediaError(e) {
+      if (e.target !== getActivePlayerElement() || !e.target.getAttribute('src')) return;
+      showToast('Format berkas ini tidak didukung peramban.');
+    }
+
+    function setupScrubberDrag() {
+      const t = el.scrubberTrack;
+      let dragging = false;
+      t.style.touchAction = 'none';
+      t.addEventListener('pointerdown', (e) => { dragging = true; t.setPointerCapture(e.pointerId); seekMedia(e); });
+      t.addEventListener('pointermove', (e) => { if (dragging) seekMedia(e); });
+      ['pointerup', 'pointercancel'].forEach(ev => t.addEventListener(ev, () => { dragging = false; }));
+    }
+
+    async function togglePiP() {
+      try {
+        if (document.pictureInPictureElement) await document.exitPictureInPicture();
+        else if (document.pictureInPictureEnabled && state.activeMediaType === 'video') await el.theaterVideoPlayer.requestPictureInPicture();
+      } catch (e) { showToast('Picture-in-Picture tidak tersedia.'); }
+    }
+
+    function downloadCurrentMedia() {
+      const media = state.playQueue[state.activeMediaIndex];
+      if (media) triggerDownload(getUrl(media), media.name);
+    }
+
+    function downloadMediaDirectly(id) {
+      const item = state.files.find(f => f.id === id);
+      if (item) triggerDownload(getUrl(item), item.name);
+    }
+
+    function triggerDownload(url, filename) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast(`Mengunduh ${filename}`);
+    }
+
+    /* -------------------------------------------------------------
+       KEYBOARD SHORTCUTS
+       ------------------------------------------------------------- */
+    function handleGlobalKeydown(e) {
+      // Abaikan jika fokus pada kotak input pencarian
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+
+      if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+        const t = !el.photoModal.classList.contains('hidden') ? el.photoModal
+                : !el.videoModal.classList.contains('hidden') ? el.videoModal : null;
+        if (t) { document.fullscreenElement ? document.exitFullscreen() : t.requestFullscreen(); return; }
+      }
+
+      // Modal Foto terbuka
+      if (!el.photoModal.classList.contains('hidden')) {
+        if (e.key === 'ArrowRight') { nextPhoto(); }
+        else if (e.key === 'ArrowLeft') { prevPhoto(); }
+        else if (e.key === 'Escape') { closePhotoViewer(); }
+        else if (e.key === ' ') { e.preventDefault(); toggleSlideshow(); }
+        return;
+      }
+
+      // Modal Video terbuka
+      if (!el.videoModal.classList.contains('hidden')) {
+        if (e.key === 'Escape') { closeVideoModal(); return; }
+      }
+
+      // Kontrol Media Global
+      if (e.key === ' ' && state.activeMediaIndex !== -1) {
+        e.preventDefault();
+        togglePlayPause();
+      } else if (e.key === 'ArrowRight' && state.activeMediaIndex !== -1) {
+        const player = getActivePlayerElement();
+        player.currentTime = Math.min(player.duration || 0, player.currentTime + 5);
+      } else if (e.key === 'ArrowLeft' && state.activeMediaIndex !== -1) {
+        const player = getActivePlayerElement();
+        player.currentTime = Math.max(0, player.currentTime - 5);
+      } else if (e.key.toLowerCase() === 'm' && state.activeMediaIndex !== -1) {
+        toggleMute();
+      }
+    }
+
+    /* -------------------------------------------------------------
+       FORMATTING & UTILITY FUNCTIONS
+       ------------------------------------------------------------- */
+    function formatBytes(bytes, decimals = 1) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    function formatTime(seconds) {
+      if (isNaN(seconds)) return '0:00';
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function formatDate(timestamp) {
+      if (!timestamp) return '-';
+      const d = new Date(timestamp);
+      return d.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    }
+
+    function escapeHtml(string) {
+      if (!string) return '';
+      return String(string).replace(/[&<>"']/g, function (s) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[s];
+      });
+    }
+  </script>
+</body>
+</html>

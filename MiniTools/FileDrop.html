@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>FileDrop</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b',
+            },
+            surface: {
+              950: '#090d16',
+              900: '#0f172a',
+              850: '#131d36',
+              800: '#1e293b',
+              700: '#334155'
+            }
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Menlo', 'monospace'],
+            sans: ['Inter', 'system-ui', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- QR Generator Engine (qrcode-generator by Kazuhiko Arase - Fast & Reliable) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+
+  <!-- Fallback QR Scanner Engine (jsQR) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <style>
+    /* Custom scanline animation for camera viewfinder */
+    @keyframes scanline {
+      0% { top: 6%; opacity: 0.9; }
+      50% { top: 92%; opacity: 1; }
+      100% { top: 6%; opacity: 0.9; }
+    }
+    .animate-scanline {
+      animation: scanline 2.2s ease-in-out infinite;
+    }
+    
+    /* Subtle pulse animation for received chunks */
+    @keyframes chunkPop {
+      0% { transform: scale(0.6); opacity: 0.5; }
+      70% { transform: scale(1.15); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .chunk-just-received {
+      animation: chunkPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-surface-950 text-slate-100 min-h-screen font-sans flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-surface-800 bg-surface-900/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-brand-500/20">
+          <svg class="w-5 h-5 text-surface-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold tracking-tight text-lg text-white">FileDrop</h1>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">P2P Optical Offline QR Data Transfer </p>
+        </div>
+      </div>
+
+      <!-- Action & Info buttons -->
+      <div class="flex items-center gap-2">
+        <button id="btnInfoModal" class="p-2 rounded-lg bg-surface-800 hover:bg-surface-700 text-slate-300 transition-colors text-xs font-medium flex items-center gap-1.5" title="Cara Kerja & Batasan">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="hidden sm:inline">Bantuan</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col gap-6">
+
+    <!-- Mode Selector Tabs (Kirim / Terima) -->
+    <div class="bg-surface-900 p-1.5 rounded-2xl border border-surface-800 grid grid-cols-2 gap-1.5 shadow-inner">
+      <button id="tabSender" class="flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 bg-brand-500 text-surface-950 shadow-md shadow-brand-500/25">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+        </svg>
+        <span>Kirim (Pengirim)</span>
+      </button>
+
+      <button id="tabReceiver" class="flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 text-slate-400 hover:text-white hover:bg-surface-800/60">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        <span>Terima (Penerima)</span>
+      </button>
+    </div>
+
+    <!-- SECTION 1: SENDER (KIRIM) -->
+    <section id="sectionSender" class="flex flex-col gap-6">
+
+      <!-- Upload Box & Text Switcher -->
+      <div class="bg-surface-900 border border-surface-800 rounded-2xl p-5 shadow-sm">
+        <div class="flex items-center justify-between pb-4 border-b border-surface-800 mb-4">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Sumber Data:</span>
+            <div class="inline-flex rounded-lg bg-surface-950 p-1 border border-surface-800">
+              <button id="btnSourceFile" class="px-3 py-1 rounded-md text-xs font-medium bg-surface-800 text-white transition-colors">Berkas File</button>
+              <button id="btnSourceText" class="px-3 py-1 rounded-md text-xs font-medium text-slate-400 hover:text-white transition-colors">Teks Langsung</button>
+            </div>
+          </div>
+          <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Maks. 500 KB Disarankan</span>
+        </div>
+
+        <!-- File Upload Area -->
+        <div id="wrapperFileSource" class="space-y-4">
+          <label for="fileInput" class="border-2 border-dashed border-surface-700 hover:border-brand-500/60 rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center gap-3 cursor-pointer bg-surface-950/40 hover:bg-surface-850/40 transition-all duration-200 group">
+            <div class="w-12 h-12 rounded-full bg-surface-800 group-hover:bg-brand-500/20 text-slate-300 group-hover:text-brand-400 flex items-center justify-center transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+              </svg>
+            </div>
+            <div class="text-center">
+              <p class="text-sm font-medium text-white group-hover:text-brand-400 transition-colors">Tarik berkas ke sini atau klik untuk memilih</p>
+              <p class="text-xs text-slate-400 mt-1">Dokumen, arsip zip, kunci kripto, gambar (Otomatis dikompresi gzip)</p>
+            </div>
+            <input type="file" id="fileInput" class="hidden">
+          </label>
+        </div>
+
+        <!-- Text Input Area -->
+        <div id="wrapperTextSource" class="hidden space-y-3">
+          <textarea id="textInput" rows="4" placeholder="Ketik atau tempel teks rahasia, seed phrase, atau catatan di sini..." class="w-full bg-surface-950 border border-surface-800 rounded-xl p-3.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 font-mono resize-none"></textarea>
+          <div class="flex justify-between items-center text-xs text-slate-400">
+            <span id="charCount">0 karakter</span>
+            <button id="btnTextToPack" class="px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-white font-medium transition-colors">Muat Teks</button>
+          </div>
+        </div>
+
+        <!-- Selected File Status Badge -->
+        <div id="fileMetaCard" class="hidden mt-4 p-3.5 rounded-xl bg-surface-850 border border-surface-700/60 flex items-center justify-between">
+          <div class="flex items-center gap-3 overflow-hidden">
+            <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+            <div class="truncate">
+              <p id="metaFileName" class="text-sm font-semibold text-white truncate">nama-file.ext</p>
+              <p id="metaFileSize" class="text-xs text-slate-400 font-mono">0 KB (0 KB terkompresi)</p>
+            </div>
+          </div>
+          <button id="btnCancelFile" class="text-xs text-slate-400 hover:text-rose-400 p-2 transition-colors" title="Batal">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Transmission Stage (Interactive Animated QR) -->
+      <div id="transmissionCard" class="bg-surface-900 border border-surface-800 rounded-2xl p-5 sm:p-6 flex flex-col items-center gap-5 shadow-lg">
+        
+        <!-- Live Status Bar -->
+        <div class="w-full flex flex-wrap items-center justify-between gap-2 border-b border-surface-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-xs font-mono font-semibold text-slate-300 uppercase tracking-wide">Transmisi Aktif</span>
+          </div>
+          <div class="flex items-center gap-3 text-xs font-mono">
+            <span class="text-slate-400">Frame: <strong id="lblChunkIndex" class="text-brand-400">1</strong>/<span id="lblTotalChunks">1</span></span>
+            <span class="text-slate-400">Loop: <strong id="lblLoopCount" class="text-white">1</strong></span>
+            <span class="text-slate-400">Durasi: <strong id="lblCycleTime" class="text-white">0s</strong></span>
+          </div>
+        </div>
+
+        <!-- High-Contrast QR Code Display Canvas Container -->
+        <div class="relative w-full max-w-[340px] aspect-square flex items-center justify-center p-4 rounded-2xl bg-white shadow-2xl transition-all duration-300" id="qrContainer">
+          <canvas id="qrCanvas" class="w-full h-full object-contain"></canvas>
+          <div id="qrPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-slate-400 bg-surface-950/90 rounded-2xl">
+            <svg class="w-12 h-12 text-slate-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+            </svg>
+            <p class="text-xs font-medium text-slate-300">Pilih berkas atau masukkan teks untuk memulai loop kode QR</p>
+          </div>
+        </div>
+
+        <!-- Frame Progress Bar -->
+        <div class="w-full max-w-md space-y-1.5">
+          <div class="w-full bg-surface-800 rounded-full h-2 overflow-hidden flex">
+            <div id="senderProgressBar" class="bg-brand-500 h-full transition-all duration-100 ease-linear" style="width: 0%"></div>
+          </div>
+          <div class="flex justify-between text-[11px] font-mono text-slate-500">
+            <span id="lblSpeedDetail">FPS: 8 frame/detik</span>
+            <span id="lblChunkSizeDetail">Ukuran paket: 320 byte</span>
+          </div>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="flex items-center gap-3">
+          <button id="btnPrevFrame" class="p-2.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-slate-200 transition-colors" title="Frame Sebelumnya">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+
+          <button id="btnPlayPause" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-surface-950 font-bold text-sm flex items-center gap-2 shadow-lg shadow-brand-500/20 transition-all">
+            <svg id="iconPlay" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"></path>
+            </svg>
+            <svg id="iconPause" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path>
+            </svg>
+            <span id="lblPlayPause">Jeda</span>
+          </button>
+
+          <button id="btnNextFrame" class="p-2.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-slate-200 transition-colors" title="Frame Berikutnya">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Collapsible Tuning Options -->
+        <details class="w-full border-t border-surface-800 pt-3 group text-xs">
+          <summary class="cursor-pointer text-slate-400 hover:text-slate-200 font-medium flex items-center justify-between select-none">
+            <span>Pengaturan Transmisi (FPS & Densitas)</span>
+            <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </summary>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 pt-2">
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1">
+                <span>Kecepatan (FPS): <strong id="lblFpsVal" class="text-white">8</strong></span>
+              </div>
+              <input type="range" id="sliderFps" min="2" max="15" value="8" class="w-full accent-brand-500 cursor-pointer">
+              <p class="text-[10px] text-slate-500 mt-1">Turunkan FPS jika kamera penerima sering melewatkan frame.</p>
+            </div>
+            <div>
+              <div class="flex justify-between text-slate-400 mb-1">
+                <span>Ukuran Paket (Byte): <strong id="lblChunkSizeVal" class="text-white">320</strong></span>
+              </div>
+              <input type="range" id="sliderChunkSize" min="150" max="600" step="10" value="320" class="w-full accent-brand-500 cursor-pointer">
+              <p class="text-[10px] text-slate-500 mt-1">Nilai lebih kecil = QR lebih sederhana dan mudah dibaca.</p>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </section>
+
+    <!-- SECTION 2: RECEIVER (TERIMA) -->
+    <section id="sectionReceiver" class="hidden flex-col gap-6">
+
+      <!-- Camera Viewfinder Card -->
+      <div class="bg-surface-900 border border-surface-800 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-sm">
+        
+        <!-- Camera Toolbar -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span id="camStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+            <span id="camStatusText" class="text-xs font-mono text-slate-300">Menginisialisasi Kamera...</span>
+          </div>
+
+          <!-- Camera Switch & Torch Controls -->
+          <div class="flex items-center gap-2">
+            <select id="cameraSelect" class="bg-surface-800 text-xs rounded-lg px-2.5 py-1.5 border border-surface-700 text-slate-200 focus:outline-none focus:border-brand-500">
+              <option value="">Kamera Default</option>
+            </select>
+            <button id="btnToggleScanner" class="px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-surface-700 text-xs font-medium text-white transition-colors">
+              Matikan
+            </button>
+          </div>
+        </div>
+
+        <!-- Scanner Viewfinder Box -->
+        <div class="relative w-full aspect-[4/3] sm:aspect-video rounded-xl bg-black overflow-hidden flex items-center justify-center border border-surface-800 shadow-inner">
+          <video id="receiverVideo" class="w-full h-full object-cover" playsinline muted></video>
+          <canvas id="scannerWorkerCanvas" class="hidden"></canvas>
+
+          <!-- Framing Reticle Overlay -->
+          <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <!-- Target Box -->
+            <div class="relative w-56 h-56 sm:w-64 sm:h-64 border-2 border-emerald-400/70 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]">
+              <!-- Corner Highlights -->
+              <div class="absolute -top-1.5 -left-1.5 w-4 h-4 border-t-4 border-l-4 border-emerald-400 rounded-tl-sm"></div>
+              <div class="absolute -top-1.5 -right-1.5 w-4 h-4 border-t-4 border-r-4 border-emerald-400 rounded-tr-sm"></div>
+              <div class="absolute -bottom-1.5 -left-1.5 w-4 h-4 border-b-4 border-l-4 border-emerald-400 rounded-bl-sm"></div>
+              <div class="absolute -bottom-1.5 -right-1.5 w-4 h-4 border-b-4 border-r-4 border-emerald-400 rounded-br-sm"></div>
+              
+              <!-- Laser Scan Line -->
+              <div class="absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399] animate-scanline"></div>
+            </div>
+          </div>
+
+          <!-- Camera permission warning box -->
+          <div id="camFallbackBox" class="hidden absolute inset-0 bg-surface-950 p-6 flex flex-col items-center justify-center text-center">
+            <svg class="w-12 h-12 text-rose-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+            <p class="text-sm font-semibold text-white">Akses Kamera Diperlukan</p>
+            <p class="text-xs text-slate-400 mt-1 max-w-sm">Izinkan peramban mengakses kamera belakang untuk mulai membaca aliran kode QR pengirim.</p>
+            <button id="btnRetryCamera" class="mt-4 px-4 py-2 rounded-xl bg-brand-500 text-surface-950 font-semibold text-xs">Minta Ulang Izin Kamera</button>
+          </div>
+        </div>
+
+        <p class="text-center text-[11px] text-slate-400">Arahkan kotak bidik ke layar perangkat pengirim. Jaga kestabilan posisi ponsel.</p>
+      </div>
+
+      <!-- Defragmentation Matrix & Progress Tracker -->
+      <div id="receiverProgressCard" class="bg-surface-900 border border-surface-800 rounded-2xl p-5 shadow-sm space-y-4">
+        
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-surface-800 pb-3">
+          <div>
+            <h3 class="text-sm font-semibold text-white">Status Penerimaan Paket</h3>
+            <p id="lblReceiverFileName" class="text-xs font-mono text-slate-400 mt-0.5">Menunggu sinyal pertama...</p>
+          </div>
+          <div class="text-right">
+            <span id="lblReceiverRatio" class="text-base font-bold font-mono text-brand-400">0 / 0</span>
+            <p id="lblReceiverPercent" class="text-[11px] text-slate-400 font-mono">0% selesai</p>
+          </div>
+        </div>
+
+        <!-- Defrag Chunk Grid (Visual Blocks) -->
+        <div>
+          <div class="flex justify-between text-[11px] text-slate-400 mb-1.5">
+            <span>Matriks Paket:</span>
+            <span id="lblMissingChunksHint" class="font-mono text-amber-400">Belum ada transmisi</span>
+          </div>
+          <div id="chunkMatrixContainer" class="bg-surface-950 p-3 rounded-xl border border-surface-800 min-h-[90px] max-h-44 overflow-y-auto flex flex-wrap gap-1.5 content-start">
+            <div class="text-xs text-slate-500 m-auto">Matriks paket akan terbentuk otomatis saat QR pertama terbaca.</div>
+          </div>
+        </div>
+
+        <!-- Overall Progress bar -->
+        <div class="space-y-1">
+          <div class="w-full bg-surface-800 rounded-full h-2.5 overflow-hidden">
+            <div id="receiverProgressBar" class="bg-emerald-500 h-full transition-all duration-150 ease-out" style="width: 0%"></div>
+          </div>
+          <div class="flex justify-between text-[10px] font-mono text-slate-500">
+            <span id="lblScanRate">Kecepatan: 0 fps</span>
+            <span id="lblSessionId">ID Sesi: -</span>
+          </div>
+        </div>
+
+        <!-- Completed File Download Banner -->
+        <div id="downloadReadyCard" class="hidden p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500 text-surface-950 flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-white">Transmisi Berhasil Rekonstruksi!</p>
+              <p id="lblCompletedDetail" class="text-xs text-emerald-400/90 font-mono">Integritas CRC32 Valid</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button id="btnDownloadFile" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-surface-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+              </svg>
+              <span>Unduh Berkas</span>
+            </button>
+            <button id="btnResetReceiver" class="px-3 py-2.5 rounded-xl bg-surface-800 hover:bg-surface-700 text-slate-300 text-xs font-semibold transition-colors" title="Scan Baru">
+              Ulangi
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview for Decoded Text -->
+        <div id="decodedTextPreviewCard" class="hidden space-y-2">
+          <label class="text-xs font-semibold text-slate-300">Isi Teks Diterima:</label>
+          <div class="relative">
+            <pre id="decodedTextContent" class="w-full bg-surface-950 border border-surface-800 rounded-xl p-3.5 text-xs text-slate-200 font-mono max-h-40 overflow-y-auto whitespace-pre-wrap select-all"></pre>
+            <button id="btnCopyDecodedText" class="absolute top-2 right-2 px-2.5 py-1 rounded bg-surface-800 hover:bg-surface-700 text-[11px] font-medium text-slate-300 border border-surface-700">Salin</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Info & Limits Modal Dialog -->
+  <div id="infoModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-surface-900 border border-surface-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-surface-800">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <span>Tentang FileDrop & Arsitektur Air-Gapped</span>
+        </h3>
+        <button id="btnCloseInfoModal" class="text-slate-400 hover:text-white p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-300 leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
+        <p><strong>FileDrop</strong> adalah sistem transfer berkas tanpa koneksi internet (air-gapped) yang memanfaatkan media optik: layar dan kamera.</p>
+        
+        <div class="bg-surface-950 p-3 rounded-xl border border-surface-800 space-y-1">
+          <p class="font-semibold text-emerald-400">Keunggulan Utama:</p>
+          <ul class="list-disc list-inside space-y-0.5 text-slate-400">
+            <li><strong>Zero-Server:</strong> Berjalan 100% di browser pengguna tanpa lalu lintas jaringan atau database.</li>
+            <li><strong>Air-Gapped:</strong> Tidak memerlukan Wi-Fi, Bluetooth, atau kabel USB. Cocok untuk data sensitif.</li>
+            <li><strong>Gzip Compression:</strong> Payload dikompresi otomatis sebelum dicacah menjadi paket QR.</li>
+            <li><strong>Integrity Check:</strong> Menggunakan checksum CRC32 untuk menjamin berkas tidak korup.</li>
+          </ul>
+        </div>
+
+        <div class="bg-surface-950 p-3 rounded-xl border border-surface-800 space-y-1">
+          <p class="font-semibold text-amber-400">Batasan Media Optik:</p>
+          <p class="text-slate-400">Kamera smartphone memindai dengan throughput ~3–8 KB/s. Karena itu, FileDrop sangat optimal untuk berkas <strong>di bawah 500 KB</strong> (kunci SSH, seed phrase, teks JSON, dokumen kecil). Untuk berkas raksasa (>5 MB), proses pemindaian optik akan membutuhkan ratusan frame.</p>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <button id="btnOkInfoModal" class="w-full py-2.5 rounded-xl bg-brand-500 text-surface-950 font-bold text-xs">Paham & Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Message Element -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-16 opacity-0 transition-all duration-300 bg-surface-800 border border-surface-700 text-white text-xs px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 pointer-events-none">
+    <span id="toastDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+    <span id="toastMsg">Pesan</span>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. APPLICATION STATE & CONSTANTS
+    // ==========================================
+    const STATE = {
+      activeTab: 'sender', // 'sender' | 'receiver'
+      sender: {
+        sourceType: 'file', // 'file' | 'text'
+        rawBuffer: null,
+        fileName: '',
+        mimeType: '',
+        compressedBytes: null,
+        chunks: [],
+        currentIndex: 0,
+        isPlaying: false,
+        fps: 8,
+        chunkSize: 320,
+        timer: null,
+        loopCount: 1,
+        startTime: null
+      },
+      receiver: {
+        isScanning: false,
+        sessionId: null,
+        totalChunks: 0,
+        fileName: '',
+        mimeType: '',
+        expectedCrc: 0,
+        receivedMap: new Map(), // index -> Uint8Array
+        stream: null,
+        detector: null,
+        animFrameId: null,
+        lastScanTimestamp: 0,
+        fpsCounter: 0,
+        fpsLastTime: performance.now(),
+        isCompleted: false,
+        reconstructedBlob: null
+      }
+    };
+
+    // Protocol Header Identifier: FD1:<id>:<index>:<total>:<crc32>:<dataB64>
+    const PROTOCOL_PREFIX = "FD1";
+
+    // Web Audio API Synthesizer for feedback chimes
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playTickSound() {
+      try {
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.04);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.05);
+      } catch (e) {
+        // Audio might be blocked before first interaction
+      }
+    }
+
+    function playSuccessChime() {
+      try {
+        const ctx = getAudioContext();
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          const startTime = ctx.currentTime + idx * 0.08;
+          gain.gain.setValueAtTime(0.12, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + 0.36);
+        });
+        if (navigator.vibrate) {
+          navigator.vibrate([100, 50, 150]);
+        }
+      } catch (e) {}
+    }
+
+    // Toast helper
+    function showToast(text, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastDot = document.getElementById('toastDot');
+      toastMsg.textContent = text;
+      toastDot.className = `w-2 h-2 rounded-full ${isError ? 'bg-rose-500' : 'bg-emerald-400'}`;
+      toast.classList.remove('translate-y-16', 'opacity-0');
+      clearTimeout(toast._timeout);
+      toast._timeout = setTimeout(() => {
+        toast.classList.add('translate-y-16', 'opacity-0');
+      }, 3000);
+    }
+
+    // ==========================================
+    // 2. CRYPTO & COMPRESSION PIPELINE
+    // ==========================================
+    
+    // Fast CRC32 table implementation
+    const CRC32_TABLE = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let j = 0; j < 8; j++) {
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      CRC32_TABLE[i] = c >>> 0;
+    }
+
+    function calculateCRC32(bytes) {
+      let crc = 0 ^ (-1);
+      for (let i = 0; i < bytes.length; i++) {
+        crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ bytes[i]) & 0xFF];
+      }
+      return ((crc ^ (-1)) >>> 0);
+    }
+
+    // Native CompressionStream (GZIP)
+    async function compressGzip(uint8Array) {
+      if ('CompressionStream' in window) {
+        try {
+          const cs = new CompressionStream('gzip');
+          const writer = cs.writable.getWriter();
+          writer.write(uint8Array);
+          writer.close();
+          const arrayBuf = await new Response(cs.readable).arrayBuffer();
+          return new Uint8Array(arrayBuf);
+        } catch (e) {
+          console.warn('Gzip compression failed, using raw data', e);
+        }
+      }
+      return uint8Array;
+    }
+
+    // Native DecompressionStream (GZIP)
+    async function decompressGzip(uint8Array) {
+      if ('DecompressionStream' in window) {
+        try {
+          const ds = new DecompressionStream('gzip');
+          const writer = ds.writable.getWriter();
+          writer.write(uint8Array);
+          writer.close();
+          const arrayBuf = await new Response(ds.readable).arrayBuffer();
+          return new Uint8Array(arrayBuf);
+        } catch (e) {
+          console.warn('Gzip decompression failed, using raw data', e);
+        }
+      }
+      return uint8Array;
+    }
+
+    // Base64 Binary Encoding Helpers
+    function uint8ToBase64(bytes) {
+      let binary = '';
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function base64ToUint8(base64) {
+      const binary = atob(base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    // Pack file metadata with payload into a single binary envelope
+    // [Header format: 2B NameLen | Name UTF8 | 2B MimeLen | Mime UTF8 | Compressed Data]
+    function encodeBinaryEnvelope(fileName, mimeType, payloadBytes) {
+      const enc = new TextEncoder();
+      const nameBytes = enc.encode(fileName);
+      const mimeBytes = enc.encode(mimeType);
+
+      const headerLen = 2 + nameBytes.length + 2 + mimeBytes.length;
+      const totalLen = headerLen + payloadBytes.length;
+      const envelope = new Uint8Array(totalLen);
+      const view = new DataView(envelope.buffer);
+
+      let offset = 0;
+      view.setUint16(offset, nameBytes.length, false);
+      offset += 2;
+      envelope.set(nameBytes, offset);
+      offset += nameBytes.length;
+
+      view.setUint16(offset, mimeBytes.length, false);
+      offset += 2;
+      envelope.set(mimeBytes, offset);
+      offset += mimeBytes.length;
+
+      envelope.set(payloadBytes, offset);
+      return envelope;
+    }
+
+    function decodeBinaryEnvelope(envelope) {
+      const view = new DataView(envelope.buffer, envelope.byteOffset, envelope.byteLength);
+      const dec = new TextDecoder();
+      let offset = 0;
+
+      const nameLen = view.getUint16(offset, false);
+      offset += 2;
+      const nameBytes = envelope.subarray(offset, offset + nameLen);
+      const fileName = dec.decode(nameBytes);
+      offset += nameLen;
+
+      const mimeLen = view.getUint16(offset, false);
+      offset += 2;
+      const mimeBytes = envelope.subarray(offset, offset + mimeLen);
+      const mimeType = dec.decode(mimeBytes);
+      offset += mimeLen;
+
+      const payload = envelope.subarray(offset);
+      return { fileName, mimeType, payload };
+    }
+
+    // ==========================================
+    // 3. SENDER LOGIC (CHUNKING & QR RENDER)
+    // ==========================================
+
+    async function prepareSenderTransmission(rawBytes, fileName, mimeType) {
+      // 1. Compress raw content
+      const compressed = await compressGzip(rawBytes);
+      // 2. Wrap into binary envelope
+      const envelope = encodeBinaryEnvelope(fileName, mimeType, compressed);
+      // 3. Compute overall CRC32
+      const fullCrc32 = calculateCRC32(envelope);
+
+      // 4. Generate unique 4-character session ID
+      const sessionId = Math.random().toString(36).substring(2, 6).toUpperCase();
+
+      // 5. Partition envelope into chunks
+      const chunkSize = STATE.sender.chunkSize;
+      const totalChunks = Math.ceil(envelope.length / chunkSize);
+      const chunks = [];
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, envelope.length);
+        const slice = envelope.subarray(start, end);
+        const b64 = uint8ToBase64(slice);
+        // Header: FD1:<id>:<idx>:<tot>:<crc32>:<b64>
+        const qrString = `${PROTOCOL_PREFIX}:${sessionId}:${i}:${totalChunks}:${fullCrc32.toString(16)}:${b64}`;
+        chunks.push(qrString);
+      }
+
+      STATE.sender.chunks = chunks;
+      STATE.sender.currentIndex = 0;
+      STATE.sender.loopCount = 1;
+      STATE.sender.rawBuffer = rawBytes;
+      STATE.sender.compressedBytes = compressed;
+      STATE.sender.fileName = fileName;
+      STATE.sender.mimeType = mimeType;
+
+      // Update UI Counters
+      document.getElementById('lblTotalChunks').textContent = totalChunks;
+      document.getElementById('lblChunkIndex').textContent = '1';
+      document.getElementById('lblLoopCount').textContent = '1';
+      document.getElementById('qrPlaceholder').classList.add('hidden');
+
+      // Update Meta Badge
+      const origKb = (rawBytes.length / 1024).toFixed(1);
+      const compKb = (compressed.length / 1024).toFixed(1);
+      document.getElementById('metaFileName').textContent = fileName;
+      document.getElementById('metaFileSize').textContent = `${origKb} KB (dikompresi jadi ${compKb} KB)`;
+      document.getElementById('fileMetaCard').classList.remove('hidden');
+
+      // Render First QR Code & Start Animation
+      renderCurrentSenderChunk();
+      startSenderLoop();
+    }
+
+    function renderCurrentSenderChunk() {
+      if (!STATE.sender.chunks.length) return;
+      const idx = STATE.sender.currentIndex;
+      const qrText = STATE.sender.chunks[idx];
+
+      const canvas = document.getElementById('qrCanvas');
+      const ctx = canvas.getContext('2d');
+
+      try {
+        // Generate QR code using qrcode-generator
+        // Level 'L' or 'M' for max capacity with error correction
+        const qr = qrcode(0, 'M');
+        qr.addData(qrText);
+        qr.make();
+
+        const moduleCount = qr.getModuleCount();
+        const cellSize = Math.max(4, Math.floor(400 / moduleCount));
+        const margin = cellSize * 2;
+        const size = moduleCount * cellSize + margin * 2;
+
+        canvas.width = size;
+        canvas.height = size;
+
+        // Draw white background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+
+        // Draw QR Modules
+        ctx.fillStyle = '#000000';
+        for (let row = 0; row < moduleCount; row++) {
+          for (let col = 0; col < moduleCount; col++) {
+            if (qr.isDark(row, col)) {
+              ctx.fillRect(
+                margin + col * cellSize,
+                margin + row * cellSize,
+                cellSize,
+                cellSize
+              );
+            }
+          }
+        }
+
+        // Update progress bar
+        const total = STATE.sender.chunks.length;
+        const progressPct = ((idx + 1) / total) * 100;
+        document.getElementById('senderProgressBar').style.width = `${progressPct}%`;
+        document.getElementById('lblChunkIndex').textContent = (idx + 1);
+
+        // Estimate cycle duration
+        const cycleSec = (total / STATE.sender.fps).toFixed(1);
+        document.getElementById('lblCycleTime').textContent = `${cycleSec}s/putaran`;
+
+      } catch (err) {
+        console.error('Gagal membuat QR:', err);
+      }
+    }
+
+    function startSenderLoop() {
+      if (STATE.sender.timer) clearInterval(STATE.sender.timer);
+      STATE.sender.isPlaying = true;
+      document.getElementById('iconPlay').classList.add('hidden');
+      document.getElementById('iconPause').classList.remove('hidden');
+      document.getElementById('lblPlayPause').textContent = 'Jeda';
+
+      const intervalMs = Math.round(1000 / STATE.sender.fps);
+      STATE.sender.timer = setInterval(() => {
+        if (!STATE.sender.chunks.length) return;
+        STATE.sender.currentIndex++;
+        if (STATE.sender.currentIndex >= STATE.sender.chunks.length) {
+          STATE.sender.currentIndex = 0;
+          STATE.sender.loopCount++;
+          document.getElementById('lblLoopCount').textContent = STATE.sender.loopCount;
+        }
+        renderCurrentSenderChunk();
+      }, intervalMs);
+    }
+
+    function pauseSenderLoop() {
+      STATE.sender.isPlaying = false;
+      if (STATE.sender.timer) clearInterval(STATE.sender.timer);
+      STATE.sender.timer = null;
+      document.getElementById('iconPlay').classList.remove('hidden');
+      document.getElementById('iconPause').classList.add('hidden');
+      document.getElementById('lblPlayPause').textContent = 'Putar';
+    }
+
+    // ==========================================
+    // 4. RECEIVER LOGIC (CAMERA & SCANNING)
+    // ==========================================
+
+    async function initCamera() {
+      const video = document.getElementById('receiverVideo');
+      const camSelect = document.getElementById('cameraSelect');
+      const fallbackBox = document.getElementById('camFallbackBox');
+      const statusText = document.getElementById('camStatusText');
+      const statusDot = document.getElementById('camStatusDot');
+
+      try {
+        if (STATE.receiver.stream) {
+          STATE.receiver.stream.getTracks().forEach(t => t.stop());
+        }
+
+        // Check for BarcodeDetector API support
+        if ('BarcodeDetector' in window) {
+          try {
+            const formats = await BarcodeDetector.getSupportedFormats();
+            if (formats.includes('qr_code')) {
+              STATE.receiver.detector = new BarcodeDetector({ formats: ['qr_code'] });
+            }
+          } catch (e) {
+            console.warn('BarcodeDetector format check error, using jsQR fallback');
+          }
+        }
+
+        const selectedDeviceId = camSelect.value;
+        const constraints = {
+          audio: false,
+          video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        STATE.receiver.stream = stream;
+        video.srcObject = stream;
+        await video.play();
+
+        fallbackBox.classList.add('hidden');
+        statusText.textContent = 'Kamera Aktif - Memindai...';
+        statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+
+        // Enumerate camera devices for switcher dropdown
+        if (navigator.mediaDevices.enumerateDevices) {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(d => d.kind === 'videoinput');
+          if (videoDevices.length > 1 && camSelect.children.length <= 1) {
+            camSelect.innerHTML = '';
+            videoDevices.forEach((device, i) => {
+              const opt = document.createElement('option');
+              opt.value = device.deviceId;
+              opt.textContent = device.label || `Kamera ${i + 1}`;
+              camSelect.appendChild(opt);
+            });
+          }
+        }
+
+        STATE.receiver.isScanning = true;
+        document.getElementById('btnToggleScanner').textContent = 'Matikan';
+        startScanningLoop();
+
+      } catch (err) {
+        console.error('Camera access error:', err);
+        fallbackBox.classList.remove('hidden');
+        statusText.textContent = 'Akses Kamera Ditolak';
+        statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+      }
+    }
+
+    function stopCamera() {
+      STATE.receiver.isScanning = false;
+      if (STATE.receiver.animFrameId) {
+        cancelAnimationFrame(STATE.receiver.animFrameId);
+      }
+      if (STATE.receiver.stream) {
+        STATE.receiver.stream.getTracks().forEach(t => t.stop());
+        STATE.receiver.stream = null;
+      }
+      document.getElementById('btnToggleScanner').textContent = 'Nyalakan';
+      document.getElementById('camStatusText').textContent = 'Kamera Dimatikan';
+      document.getElementById('camStatusDot').className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+    }
+
+    // Continuous Scanning Loop (Hardware BarcodeDetector with jsQR fallback)
+    async function startScanningLoop() {
+      const video = document.getElementById('receiverVideo');
+      const canvas = document.getElementById('scannerWorkerCanvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+      async function scanFrame() {
+        if (!STATE.receiver.isScanning) return;
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          // Calculate FPS metrics
+          STATE.receiver.fpsCounter++;
+          const now = performance.now();
+          if (now - STATE.receiver.fpsLastTime >= 1000) {
+            document.getElementById('lblScanRate').textContent = `Kecepatan: ${STATE.receiver.fpsCounter} fps`;
+            STATE.receiver.fpsCounter = 0;
+            STATE.receiver.fpsLastTime = now;
+          }
+
+          let detectedRawValue = null;
+
+          // Strategy A: Native Hardware BarcodeDetector
+          if (STATE.receiver.detector) {
+            try {
+              const barcodes = await STATE.receiver.detector.detect(video);
+              if (barcodes.length > 0) {
+                detectedRawValue = barcodes[0].rawValue;
+              }
+            } catch (err) {
+              // fallback to canvas capture
+            }
+          }
+
+          // Strategy B: Software jsQR fallback
+          if (!detectedRawValue && window.jsQR) {
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "dontInvert"
+            });
+            if (code) {
+              detectedRawValue = code.data;
+            }
+          }
+
+          if (detectedRawValue) {
+            handleDecodedQR(detectedRawValue);
+          }
+        }
+
+        STATE.receiver.animFrameId = requestAnimationFrame(scanFrame);
+      }
+
+      scanFrame();
+    }
+
+    // Parse received QR frame and store in reconstruction buffer
+    function handleDecodedQR(rawString) {
+      if (!rawString || !rawString.startsWith(PROTOCOL_PREFIX + ":")) return;
+
+      // Format: FD1:<id>:<idx>:<tot>:<crc32>:<b64>
+      const parts = rawString.split(':');
+      if (parts.length < 6) return;
+
+      const [prefix, sessionId, idxStr, totStr, crcStr, b64Data] = parts;
+      const chunkIdx = parseInt(idxStr, 10);
+      const totalChunks = parseInt(totStr, 10);
+      const expectedCrc = parseInt(crcStr, 16);
+
+      // If new session detected, reset reconstruction state
+      if (STATE.receiver.sessionId !== sessionId) {
+        STATE.receiver.sessionId = sessionId;
+        STATE.receiver.totalChunks = totalChunks;
+        STATE.receiver.expectedCrc = expectedCrc;
+        STATE.receiver.receivedMap.clear();
+        STATE.receiver.isCompleted = false;
+        
+        document.getElementById('lblSessionId').textContent = `ID Sesi: ${sessionId}`;
+        document.getElementById('downloadReadyCard').classList.add('hidden');
+        document.getElementById('decodedTextPreviewCard').classList.add('hidden');
+
+        buildChunkMatrixUI(totalChunks);
+        showToast(`Transmisi baru terdeteksi: ${totalChunks} paket`, false);
+      }
+
+      // Check if chunk is newly acquired
+      if (!STATE.receiver.receivedMap.has(chunkIdx)) {
+        try {
+          const chunkBytes = base64ToUint8(b64Data);
+          STATE.receiver.receivedMap.set(chunkIdx, chunkBytes);
+
+          playTickSound();
+          updateChunkMatrixUI(chunkIdx);
+          updateReceiverProgressUI();
+
+          // Check if all chunks have been collected
+          if (STATE.receiver.receivedMap.size === totalChunks && !STATE.receiver.isCompleted) {
+            finishReconstruction();
+          }
+        } catch (e) {
+          console.warn('Gagal mendekode data chunk:', e);
+        }
+      }
+    }
+
+    function buildChunkMatrixUI(total) {
+      const container = document.getElementById('chunkMatrixContainer');
+      container.innerHTML = '';
+      
+      for (let i = 0; i < total; i++) {
+        const cell = document.createElement('div');
+        cell.id = `chunk-cell-${i}`;
+        cell.className = 'w-4 h-4 rounded bg-surface-800 text-[8px] font-mono flex items-center justify-center text-slate-500 transition-colors';
+        cell.textContent = i + 1;
+        cell.title = `Paket ${i + 1}`;
+        container.appendChild(cell);
+      }
+    }
+
+    function updateChunkMatrixUI(index) {
+      const cell = document.getElementById(`chunk-cell-${index}`);
+      if (cell) {
+        cell.className = 'w-4 h-4 rounded bg-emerald-500 text-surface-950 font-bold text-[8px] font-mono flex items-center justify-center chunk-just-received shadow-sm';
+      }
+    }
+
+    function updateReceiverProgressUI() {
+      const received = STATE.receiver.receivedMap.size;
+      const total = STATE.receiver.totalChunks;
+      const percent = Math.floor((received / total) * 100);
+
+      document.getElementById('lblReceiverRatio').textContent = `${received} / ${total}`;
+      document.getElementById('lblReceiverPercent').textContent = `${percent}% selesai`;
+      document.getElementById('receiverProgressBar').style.width = `${percent}%`;
+
+      // Missing chunks tracker
+      const missing = [];
+      for (let i = 0; i < total; i++) {
+        if (!STATE.receiver.receivedMap.has(i)) {
+          missing.push(i + 1);
+        }
+      }
+      if (missing.length > 0) {
+        document.getElementById('lblMissingChunksHint').textContent = `Menunggu: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '...' : ''}`;
+      } else {
+        document.getElementById('lblMissingChunksHint').textContent = 'Semua paket lengkap!';
+      }
+    }
+
+    // Assemble chunks, verify CRC32, decompress, and prepare download
+    async function finishReconstruction() {
+      STATE.receiver.isCompleted = true;
+      playSuccessChime();
+
+      document.getElementById('lblMissingChunksHint').textContent = 'Memverifikasi integritas...';
+
+      try {
+        // 1. Calculate total length of combined envelope
+        let totalByteLength = 0;
+        for (let i = 0; i < STATE.receiver.totalChunks; i++) {
+          totalByteLength += STATE.receiver.receivedMap.get(i).length;
+        }
+
+        // 2. Concatenate binary chunks in sequential order
+        const fullEnvelope = new Uint8Array(totalByteLength);
+        let writeOffset = 0;
+        for (let i = 0; i < STATE.receiver.totalChunks; i++) {
+          const chunk = STATE.receiver.receivedMap.get(i);
+          fullEnvelope.set(chunk, writeOffset);
+          writeOffset += chunk.length;
+        }
+
+        // 3. Verify Checksum CRC32
+        const computedCrc = calculateCRC32(fullEnvelope);
+        if (computedCrc !== STATE.receiver.expectedCrc) {
+          showToast('Peringatan: Checksum CRC32 tidak cocok! Berkas mungkin rusak.', true);
+          document.getElementById('lblCompletedDetail').textContent = 'CRC32 Mismatch (Korup)';
+          document.getElementById('lblCompletedDetail').className = 'text-xs text-rose-400 font-mono';
+        } else {
+          document.getElementById('lblCompletedDetail').textContent = 'Integritas CRC32 Terverifikasi (100% Cocok)';
+          document.getElementById('lblCompletedDetail').className = 'text-xs text-emerald-400 font-mono';
+        }
+
+        // 4. Decode envelope header & uncompress payload
+        const { fileName, mimeType, payload } = decodeBinaryEnvelope(fullEnvelope);
+        const originalBytes = await decompressGzip(payload);
+
+        // 5. Create Object URL Blob
+        const blob = new Blob([originalBytes], { type: mimeType || 'application/octet-stream' });
+        STATE.receiver.reconstructedBlob = blob;
+        STATE.receiver.fileName = fileName || 'downloaded-file';
+        STATE.receiver.mimeType = mimeType;
+
+        // Update UI
+        document.getElementById('lblReceiverFileName').textContent = `Berkas: ${STATE.receiver.fileName} (${(originalBytes.length / 1024).toFixed(1)} KB)`;
+        document.getElementById('downloadReadyCard').classList.remove('hidden');
+
+        // If payload is plain text, display preview
+        if (mimeType.startsWith('text/') || mimeType === 'application/json') {
+          const textContent = new TextDecoder().decode(originalBytes);
+          document.getElementById('decodedTextContent').textContent = textContent;
+          document.getElementById('decodedTextPreviewCard').classList.remove('hidden');
+        }
+
+        showToast('Berkas berhasil dirakit dan siap diunduh!');
+
+      } catch (err) {
+        console.error('Reconstruction error:', err);
+        showToast('Gagal merakit paket data.', true);
+      }
+    }
+
+    // ==========================================
+    // 5. EVENT LISTENERS & UI WIRING
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+
+      // Tab Switcher (Sender vs Receiver)
+      const tabSender = document.getElementById('tabSender');
+      const tabReceiver = document.getElementById('tabReceiver');
+      const sectionSender = document.getElementById('sectionSender');
+      const sectionReceiver = document.getElementById('sectionReceiver');
+
+      tabSender.addEventListener('click', () => {
+        STATE.activeTab = 'sender';
+        tabSender.className = 'flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 bg-brand-500 text-surface-950 shadow-md shadow-brand-500/25';
+        tabReceiver.className = 'flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 text-slate-400 hover:text-white hover:bg-surface-800/60';
+        sectionSender.classList.remove('hidden');
+        sectionReceiver.classList.add('hidden');
+        stopCamera();
+      });
+
+      tabReceiver.addEventListener('click', () => {
+        STATE.activeTab = 'receiver';
+        tabReceiver.className = 'flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 bg-brand-500 text-surface-950 shadow-md shadow-brand-500/25';
+        tabSender.className = 'flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 text-slate-400 hover:text-white hover:bg-surface-800/60';
+        sectionReceiver.classList.remove('hidden');
+        sectionSender.classList.add('hidden');
+        pauseSenderLoop();
+        initCamera();
+      });
+
+      // Data Source Switcher (File vs Text)
+      const btnSourceFile = document.getElementById('btnSourceFile');
+      const btnSourceText = document.getElementById('btnSourceText');
+      const wrapperFileSource = document.getElementById('wrapperFileSource');
+      const wrapperTextSource = document.getElementById('wrapperTextSource');
+
+      btnSourceFile.addEventListener('click', () => {
+        STATE.sender.sourceType = 'file';
+        btnSourceFile.className = 'px-3 py-1 rounded-md text-xs font-medium bg-surface-800 text-white transition-colors';
+        btnSourceText.className = 'px-3 py-1 rounded-md text-xs font-medium text-slate-400 hover:text-white transition-colors';
+        wrapperFileSource.classList.remove('hidden');
+        wrapperTextSource.classList.add('hidden');
+      });
+
+      btnSourceText.addEventListener('click', () => {
+        STATE.sender.sourceType = 'text';
+        btnSourceText.className = 'px-3 py-1 rounded-md text-xs font-medium bg-surface-800 text-white transition-colors';
+        btnSourceFile.className = 'px-3 py-1 rounded-md text-xs font-medium text-slate-400 hover:text-white transition-colors';
+        wrapperTextSource.classList.remove('hidden');
+        wrapperFileSource.classList.add('hidden');
+      });
+
+      // File Selection Handler
+      const fileInput = document.getElementById('fileInput');
+      fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+          showToast('Peringatan: Berkas di atas 2 MB akan membutuhkan transmisi yang sangat lama.', true);
+        }
+
+        const buffer = await file.arrayBuffer();
+        const rawBytes = new Uint8Array(buffer);
+        prepareSenderTransmission(rawBytes, file.name, file.type || 'application/octet-stream');
+      });
+
+      // Text Input Handler
+      const textInput = document.getElementById('textInput');
+      const charCount = document.getElementById('charCount');
+      textInput.addEventListener('input', () => {
+        charCount.textContent = `${textInput.value.length} karakter`;
+      });
+
+      document.getElementById('btnTextToPack').addEventListener('click', () => {
+        const text = textInput.value.trim();
+        if (!text) {
+          showToast('Ketik teks terlebih dahulu!', true);
+          return;
+        }
+        const enc = new TextEncoder();
+        const rawBytes = enc.encode(text);
+        prepareSenderTransmission(rawBytes, 'note.txt', 'text/plain');
+        showToast('Teks berhasil dikemas!');
+      });
+
+      // Cancel / Reset File in Sender
+      document.getElementById('btnCancelFile').addEventListener('click', () => {
+        pauseSenderLoop();
+        STATE.sender.chunks = [];
+        STATE.sender.rawBuffer = null;
+        document.getElementById('fileMetaCard').classList.add('hidden');
+        document.getElementById('qrPlaceholder').classList.remove('hidden');
+        document.getElementById('senderProgressBar').style.width = '0%';
+        fileInput.value = '';
+      });
+
+      // Sender Play/Pause & Step Controls
+      document.getElementById('btnPlayPause').addEventListener('click', () => {
+        if (STATE.sender.isPlaying) {
+          pauseSenderLoop();
+        } else {
+          startSenderLoop();
+        }
+      });
+
+      document.getElementById('btnPrevFrame').addEventListener('click', () => {
+        pauseSenderLoop();
+        if (STATE.sender.chunks.length > 0) {
+          STATE.sender.currentIndex = (STATE.sender.currentIndex - 1 + STATE.sender.chunks.length) % STATE.sender.chunks.length;
+          renderCurrentSenderChunk();
+        }
+      });
+
+      document.getElementById('btnNextFrame').addEventListener('click', () => {
+        pauseSenderLoop();
+        if (STATE.sender.chunks.length > 0) {
+          STATE.sender.currentIndex = (STATE.sender.currentIndex + 1) % STATE.sender.chunks.length;
+          renderCurrentSenderChunk();
+        }
+      });
+
+      // Sender Tuning Sliders
+      const sliderFps = document.getElementById('sliderFps');
+      sliderFps.addEventListener('input', (e) => {
+        const fps = parseInt(e.target.value, 10);
+        STATE.sender.fps = fps;
+        document.getElementById('lblFpsVal').textContent = fps;
+        document.getElementById('lblSpeedDetail').textContent = `FPS: ${fps} frame/detik`;
+        if (STATE.sender.isPlaying) {
+          startSenderLoop();
+        }
+      });
+
+      const sliderChunkSize = document.getElementById('sliderChunkSize');
+      sliderChunkSize.addEventListener('change', (e) => {
+        const size = parseInt(e.target.value, 10);
+        STATE.sender.chunkSize = size;
+        document.getElementById('lblChunkSizeVal').textContent = size;
+        document.getElementById('lblChunkSizeDetail').textContent = `Ukuran paket: ${size} byte`;
+        // Repack if data already loaded
+        if (STATE.sender.rawBuffer) {
+          prepareSenderTransmission(STATE.sender.rawBuffer, STATE.sender.fileName, STATE.sender.mimeType);
+        }
+      });
+
+      // Camera Switcher & Toggles
+      document.getElementById('cameraSelect').addEventListener('change', () => {
+        initCamera();
+      });
+
+      document.getElementById('btnToggleScanner').addEventListener('click', () => {
+        if (STATE.receiver.isScanning) {
+          stopCamera();
+        } else {
+          initCamera();
+        }
+      });
+
+      document.getElementById('btnRetryCamera').addEventListener('click', () => {
+        initCamera();
+      });
+
+      // Receiver Download & Copy Actions
+      document.getElementById('btnDownloadFile').addEventListener('click', () => {
+        if (!STATE.receiver.reconstructedBlob) return;
+        const url = URL.createObjectURL(STATE.receiver.reconstructedBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = STATE.receiver.fileName || 'filedrop-file';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast('Berkas berhasil disimpan!');
+      });
+
+      document.getElementById('btnCopyDecodedText').addEventListener('click', () => {
+        const text = document.getElementById('decodedTextContent').textContent;
+        if (!text) return;
+        
+        // Clipboard fallback using execCommand for sandbox safety
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          showToast('Teks berhasil disalin ke papan klip!');
+        } catch (e) {
+          showToast('Gagal menyalin teks.', true);
+        }
+        document.body.removeChild(textarea);
+      });
+
+      document.getElementById('btnResetReceiver').addEventListener('click', () => {
+        STATE.receiver.sessionId = null;
+        STATE.receiver.receivedMap.clear();
+        STATE.receiver.totalChunks = 0;
+        STATE.receiver.isCompleted = false;
+        STATE.receiver.reconstructedBlob = null;
+        document.getElementById('chunkMatrixContainer').innerHTML = '<div class="text-xs text-slate-500 m-auto">Matriks paket akan terbentuk otomatis saat QR pertama terbaca.</div>';
+        document.getElementById('receiverProgressBar').style.width = '0%';
+        document.getElementById('lblReceiverRatio').textContent = '0 / 0';
+        document.getElementById('lblReceiverPercent').textContent = '0% selesai';
+        document.getElementById('lblMissingChunksHint').textContent = 'Belum ada transmisi';
+        document.getElementById('lblReceiverFileName').textContent = 'Menunggu sinyal pertama...';
+        document.getElementById('downloadReadyCard').classList.add('hidden');
+        document.getElementById('decodedTextPreviewCard').classList.add('hidden');
+      });
+
+      // Info Modal Handlers
+      const infoModal = document.getElementById('infoModal');
+      document.getElementById('btnInfoModal').addEventListener('click', () => {
+        infoModal.classList.remove('hidden');
+      });
+      document.getElementById('btnCloseInfoModal').addEventListener('click', () => {
+        infoModal.classList.add('hidden');
+      });
+      document.getElementById('btnOkInfoModal').addEventListener('click', () => {
+        infoModal.classList.add('hidden');
+      });
+
+    });
+  </script>
+</body>
+</html>

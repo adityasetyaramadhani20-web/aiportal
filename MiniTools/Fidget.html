@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fidget</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(-45deg, #e0eafc, #cfdef3, #d4e4ff, #e6eeff);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            overscroll-behavior: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Neomorphism Utility Classes */
+        .neo-shadow {
+            box-shadow: 8px 8px 16px #b8c6db, -8px -8px 16px #ffffff;
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .neo-shadow:active:not(.no-active) {
+            box-shadow: 4px 4px 8px #b8c6db, -4px -4px 8px #ffffff;
+            transform: translateY(2px);
+        }
+        .neo-inset {
+            box-shadow: inset 6px 6px 10px #b8c6db, inset -6px -6px 10px #ffffff;
+        }
+        .neo-flat {
+            background: #e0eafc;
+            border-radius: 20px;
+        }
+
+        /* Mode Transition */
+        #active-area {
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Animations */
+        @keyframes cut-slash {
+            0% { transform: translateX(-150%) skewX(-20deg); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateX(150%) skewX(-20deg); opacity: 0; }
+        }
+
+        @keyframes breathe-anim {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.5); opacity: 0.3; }
+        }
+        
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            14% { transform: scale(1.1); }
+            28% { transform: scale(1); }
+            42% { transform: scale(1.1); }
+            70% { transform: scale(1); }
+        }
+        .heart-beat { animation: heartbeat 1.5s ease-in-out infinite; }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .shake-anim { animation: shake 0.5s; }
+
+        /* Pop It Styles */
+        .pop-bubble { transition: all 0.1s; cursor: pointer; }
+        .pop-bubble.popped {
+            background: linear-gradient(145deg, #d1d9e6, #ffffff);
+            box-shadow: inset 4px 4px 8px #b8c6db, inset -4px -4px 8px #ffffff;
+            transform: scale(0.95);
+        }
+
+        /* 3D Dice Presets */
+        .scene { perspective: 800px; }
+        .cube {
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .face {
+            position: absolute;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+            display: flex; align-items: center; justify-content: center;
+            backface-visibility: hidden;
+            font-size: 24px; font-weight: bold; color: #475569;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Cut Animation Classes */
+        .split-top, .split-bottom { transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .cut-active .split-top { transform: translateY(-15px) rotate(-10deg); }
+        .cut-active .split-bottom { transform: translateY(15px) rotate(10deg); }
+        .blade-line {
+            position: absolute; top: 50%; left: 0; width: 100%; height: 2px;
+            background: white; z-index: 10; transform: scaleX(0); transition: transform 0.1s;
+            box-shadow: 0 0 10px rgba(255,255,255,0.8);
+        }
+        .cut-active .blade-line { transform: scaleX(1.5); transition: transform 0.05s; }
+
+        /* Magic Ball */
+        .magic-ball-inner {
+            background: radial-gradient(circle at 30% 30%, #4a5568, #1a202c);
+            box-shadow: inset -10px -10px 20px rgba(0,0,0,0.5), inset 10px 10px 20px rgba(255,255,255,0.2), 10px 10px 20px #b8c6db, -10px -10px 20px #ffffff;
+        }
+
+        /* Number Input Reset */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center overflow-hidden text-gray-700 p-0 sm:p-4">
+
+    <!-- Main Container -->
+    <div class="relative w-full h-full sm:h-[90vh] sm:rounded-[40px] bg-[#e0eafc] sm:neo-shadow flex flex-col md:flex-row overflow-hidden max-w-md md:max-w-5xl transition-all duration-500 border border-white/40">
+        
+        <!-- Sidebar/Header -->
+        <header class="px-6 py-5 flex md:flex-col justify-between items-center md:items-start md:w-72 md:border-r border-slate-200/50 z-20 bg-[#e0eafc]/80 backdrop-blur-sm">
+            <div class="md:mb-8 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full neo-inset flex items-center justify-center text-indigo-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-extrabold tracking-tight text-slate-700">Fidget<span class="text-indigo-500">Box</span></h1>
+                    <p id="mode-title" class="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest mt-0.5">SELECT MODE</p>
+                </div>
+            </div>
+            
+            <div class="hidden md:flex flex-col w-full gap-3 overflow-y-auto no-scrollbar pb-10" id="nav-container-desktop"></div>
+
+            <div id="sound-toggle" class="cursor-pointer p-3 rounded-full neo-flat neo-shadow active:neo-inset transition-all text-slate-500 md:mt-auto absolute md:relative right-6 top-5 md:right-0 md:top-0">
+                <svg id="icon-vol-on" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+                <svg id="icon-vol-off" class="hidden" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+            </div>
+        </header>
+
+        <!-- Active Area -->
+        <main class="flex-1 relative overflow-hidden bg-[#e0eafc]">
+            <!-- Inner Wrapper for animations and scrolling content -->
+            <div id="active-area" class="absolute inset-0 flex items-center justify-center p-4 sm:p-8 overflow-y-auto no-scrollbar pb-24 md:pb-8">
+                <!-- Content Injected via JS -->
+            </div>
+        </main>
+
+        <!-- Mobile Nav -->
+        <nav class="absolute bottom-0 left-0 w-full pb-6 pt-3 px-2 z-30 md:hidden bg-gradient-to-t from-[#e0eafc] via-[#e0eafc] to-transparent">
+            <div class="flex overflow-x-auto no-scrollbar gap-4 px-4 py-2 snap-x" id="nav-container-mobile"></div>
+        </nav>
+
+    </div>
+
+<script>
+    const state = { currentMode: 'pop', soundEnabled: true, animFrame: null };
+
+    // Modes with the two new additions
+    const modes = [
+        { id: 'pop', name: 'Pop It', icon: '<rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" />' },
+        { id: 'spin', name: 'Putar', icon: '<path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/>' },
+        { id: 'switch', name: 'Sakelar', icon: '<rect x="2" y="6" width="20" height="12" rx="6" /><circle cx="8" cy="12" r="4" />' },
+        { id: 'throw', name: 'Dadu', icon: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/>' },
+        { id: 'cut', name: 'Potong', icon: '<circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><line x1="20" y1="4" x2="8.12" y2="15.88" /><line x1="14.47" y1="14.48" x2="20" y2="20" /><line x1="8.12" y1="8.12" x2="12" y2="12" />' },
+        { id: 'breathe', name: 'Napas', icon: '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />' },
+        { id: 'love', name: 'Jodoh', icon: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />' },
+        { id: 'magic', name: 'Tanya Aja', icon: '<circle cx="12" cy="12" r="10"/><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="bold" fill="currentColor">8</text>' },
+        { id: 'kalkmbg', name: 'Kalk MBG', icon: '<rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="10" y2="13"/><line x1="14" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="10" y2="17"/><line x1="14" y1="17" x2="16" y2="17"/>' }
+    ];
+
+    const AudioEngine = {
+        ctx: new (window.AudioContext || window.webkitAudioContext)(),
+        playTone(type) {
+            if (!state.soundEnabled) return;
+            if (this.ctx.state === 'suspended') this.ctx.resume();
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const now = this.ctx.currentTime;
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            switch(type) {
+                case 'pop':
+                    osc.type = 'triangle'; osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now); osc.stop(now + 0.1); break;
+                case 'cut':
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+                    gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0, now + 0.15);
+                    osc.start(now); osc.stop(now + 0.15); break;
+                case 'click':
+                    osc.type = 'square'; osc.frequency.setValueAtTime(800, now);
+                    gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now); osc.stop(now + 0.05); break;
+                case 'success': 
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.linearRampToValueAtTime(800, now + 0.2);
+                    gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                    osc.start(now); osc.stop(now + 0.5); break;
+                case 'switch':
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now); osc.stop(now + 0.1); break;
+                case 'breathe':
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(200, now);
+                    gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.2, now + 2); gain.gain.linearRampToValueAtTime(0, now + 4);
+                    osc.start(now); osc.stop(now + 4); break;
+                case 'mystic':
+                    osc.type = 'triangle'; osc.frequency.setValueAtTime(200, now);
+                    osc.frequency.exponentialRampToValueAtTime(500, now + 0.5);
+                    gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.3, now + 0.2); gain.gain.linearRampToValueAtTime(0, now + 0.8);
+                    osc.start(now); osc.stop(now + 0.8); break;
+                case 'cash':
+                    osc.type = 'square'; osc.frequency.setValueAtTime(1200, now);
+                    osc.frequency.setValueAtTime(1800, now + 0.05);
+                    gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 0.15);
+                    osc.start(now); osc.stop(now + 0.15); break;
+            }
+        },
+        vibrate(ms = 10) { if (navigator.vibrate) navigator.vibrate(ms); }
+    };
+
+    // --- RENDERERS ---
+
+    const renderPop = (container) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = "flex flex-col items-center justify-center w-full";
+        const grid = document.createElement('div');
+        grid.className = "grid grid-cols-4 gap-4 md:gap-6";
+        for(let i=0; i<16; i++) {
+            const btn = document.createElement('div');
+            const hue = (i * 25) % 360;
+            btn.className = `pop-bubble w-16 h-16 md:w-20 md:h-20 rounded-full neo-shadow bg-gradient-to-br from-[hsl(${hue},70%,90%)] to-[hsl(${hue},70%,80%)] flex items-center justify-center`;
+            const handlePop = () => {
+                if (btn.classList.contains('popped')) {
+                    btn.classList.remove('popped', 'neo-inset'); btn.classList.add('neo-shadow'); AudioEngine.playTone('pop');
+                } else {
+                    btn.classList.add('popped', 'neo-inset'); btn.classList.remove('neo-shadow'); AudioEngine.playTone('pop');
+                }
+                AudioEngine.vibrate(15);
+            };
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); handlePop(); });
+            btn.addEventListener('mousedown', handlePop);
+            grid.appendChild(btn);
+        }
+        wrapper.appendChild(grid);
+        container.appendChild(wrapper);
+    };
+
+    const renderSpin = (container) => {
+        let rotation = 0, speed = 0, lastTime = 0;
+        const spinnerWrap = document.createElement('div');
+        spinnerWrap.className = "relative w-64 h-64 md:w-80 md:h-80 flex items-center justify-center";
+        const spinner = document.createElement('div');
+        spinner.className = "w-full h-full relative cursor-pointer";
+        spinner.innerHTML = `
+            <div class="absolute inset-0 m-auto w-16 h-16 md:w-20 md:h-20 bg-white rounded-full border-4 border-gray-100 neo-shadow z-20 flex items-center justify-center"><div class="w-4 h-4 bg-gray-300 rounded-full neo-inset"></div></div>
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-32 md:w-20 md:h-40 bg-indigo-400 rounded-full neo-shadow origin-bottom" style="transform: rotate(0deg) translateY(-30px)"></div>
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-32 md:w-20 md:h-40 bg-indigo-400 rounded-full neo-shadow origin-bottom" style="transform: rotate(120deg) translateY(-30px)"></div>
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-32 md:w-20 md:h-40 bg-indigo-400 rounded-full neo-shadow origin-bottom" style="transform: rotate(240deg) translateY(-30px)"></div>
+        `;
+        spinnerWrap.appendChild(spinner); container.appendChild(spinnerWrap);
+        const animate = (time) => {
+            if (!lastTime) lastTime = time;
+            const delta = time - lastTime; lastTime = time;
+            rotation += speed * (delta / 16); speed *= 0.98; 
+            if (speed < 0.1) speed = 0;
+            spinner.style.transform = `rotate(${rotation}deg)`;
+            if (speed > 15 && Math.random() > 0.8) AudioEngine.vibrate(5);
+            state.animFrame = requestAnimationFrame(animate);
+        };
+        const boost = () => { speed = Math.min(speed + 40, 120); AudioEngine.vibrate(20); };
+        spinner.addEventListener('mousedown', boost); spinner.addEventListener('touchstart', (e) => { e.preventDefault(); boost(); });
+        state.animFrame = requestAnimationFrame(animate);
+    };
+
+    const renderSwitch = (container) => {
+        const wrap = document.createElement('div'); wrap.className = "flex flex-col items-center gap-8";
+        const switchBase = document.createElement('div');
+        switchBase.className = "w-40 h-72 md:w-56 md:h-96 neo-flat neo-shadow rounded-3xl p-4 flex items-center justify-center transition-colors duration-300";
+        const toggle = document.createElement('div');
+        toggle.className = "w-full h-full rounded-xl cursor-pointer neo-shadow flex flex-col items-center justify-between p-4 transition-all duration-200 bg-[#e0eafc]";
+        toggle.innerHTML = `
+            <div class="w-full h-3 rounded-full bg-red-400 shadow-[0_0_15px_rgba(248,113,113,0.6)] transition-opacity duration-300 opacity-0" id="light-on"></div>
+            <div class="w-8 h-20 md:w-12 md:h-32 rounded-full bg-[#d1d9e6] neo-inset border border-white/40"></div>
+            <div class="w-full h-3 rounded-full bg-slate-300 neo-inset" id="light-off"></div>
+        `;
+        let isOn = false;
+        const toggleSwitch = () => {
+            isOn = !isOn; AudioEngine.playTone('switch'); AudioEngine.vibrate(40);
+            if (isOn) {
+                toggle.classList.add('neo-inset'); toggle.classList.remove('neo-shadow');
+                toggle.style.transform = "perspective(500px) rotateX(10deg)"; switchBase.classList.add('shadow-[inset_0_0_30px_rgba(99,102,241,0.2)]');
+                document.getElementById('light-on').classList.remove('opacity-0'); document.getElementById('light-off').classList.add('opacity-0');
+            } else {
+                toggle.classList.remove('neo-inset'); toggle.classList.add('neo-shadow');
+                toggle.style.transform = "perspective(500px) rotateX(-10deg)"; switchBase.classList.remove('shadow-[inset_0_0_30px_rgba(99,102,241,0.2)]');
+                document.getElementById('light-on').classList.add('opacity-0'); document.getElementById('light-off').classList.remove('opacity-0');
+            }
+        };
+        toggle.style.transform = "perspective(500px) rotateX(-10deg)"; switchBase.appendChild(toggle); wrap.appendChild(switchBase);
+        toggle.addEventListener('mousedown', toggleSwitch); toggle.addEventListener('touchstart', (e) => { e.preventDefault(); toggleSwitch(); });
+        container.appendChild(wrap);
+    };
+
+    const renderLove = (container) => {
+        const wrap = document.createElement('div');
+        wrap.className = "w-full max-w-sm flex flex-col items-center gap-6 p-4";
+
+        const heartContainer = document.createElement('div');
+        heartContainer.className = "mb-2";
+        heartContainer.innerHTML = `
+            <svg class="w-24 h-24 text-pink-400 heart-beat drop-shadow-md" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.645 20.91l-.007-.003c-.022-.012-.045-.025-.07-.04-.051-.03-.12-.074-.203-.132a15.447 15.447 0 01-1.493-1.18c-1.28-1.09-3.116-2.822-4.085-5.321C4.77 11.737 4.5 9.942 4.5 8.25c0-2.622 1.83-4.5 4-4.5 1.458 0 2.684.812 3.5 1.777C12.816 4.562 14.042 3.75 15.5 3.75c2.17 0 4 1.878 4 4.5 0 1.692-.27 3.487-1.287 5.926-.97 2.499-2.805 4.23-4.085 5.321a15.445 15.445 0 01-1.696 1.312l-.07.04-.007.003-.002.001a.75.75 0 01-.79 0l-.002-.001z" />
+            </svg>
+        `;
+
+        const inputWrap = document.createElement('div');
+        inputWrap.className = "w-full flex flex-col gap-5";
+        
+        const createInput = (ph) => {
+            const inp = document.createElement('input');
+            inp.type = "text"; inp.placeholder = ph;
+            inp.className = "w-full h-14 rounded-2xl neo-inset px-5 bg-transparent outline-none text-slate-600 font-semibold placeholder-slate-400 transition-all focus:ring-2 focus:ring-pink-300 text-center";
+            return inp;
+        };
+
+        const name1 = createInput("Nama Kamu");
+        const name2 = createInput("Nama Pasangan");
+        inputWrap.appendChild(name1); inputWrap.appendChild(name2);
+
+        const resultDiv = document.createElement('div');
+        resultDiv.className = "hidden flex flex-col items-center mt-4 w-full";
+        resultDiv.innerHTML = `
+            <div class="relative w-40 h-40 flex items-center justify-center neo-inset rounded-full p-4 bg-white/30">
+                <svg class="w-full h-full transform -rotate-90 drop-shadow-sm">
+                    <circle cx="64" cy="64" r="56" stroke="rgba(255,255,255,0.5)" stroke-width="12" fill="transparent"></circle>
+                    <circle id="love-progress" cx="64" cy="64" r="56" stroke="#f472b6" stroke-width="12" fill="transparent" stroke-linecap="round"
+                        stroke-dasharray="351" stroke-dashoffset="351" class="transition-all duration-1000 ease-out"></circle>
+                </svg>
+                <span id="love-percent" class="absolute text-4xl font-extrabold text-slate-700">0%</span>
+            </div>
+            <h3 id="love-msg" class="text-2xl font-extrabold text-pink-500 mt-6"></h3>
+            <p id="love-desc" class="text-base text-center text-slate-500 mt-2 font-medium"></p>
+        `;
+
+        const btn = document.createElement('button');
+        btn.className = "w-full h-14 rounded-2xl neo-flat neo-shadow font-extrabold text-pink-500 no-active hover:text-pink-600 transition-all mt-4 text-lg border border-white/50";
+        btn.innerText = "Cek Kecocokan";
+
+        btn.onclick = () => {
+            const n1 = name1.value.trim().toLowerCase();
+            const n2 = name2.value.trim().toLowerCase();
+            if(!n1 || !n2) {
+                btn.innerText = "Isi nama dulu!";
+                setTimeout(() => btn.innerText = "Cek Kecocokan", 2000);
+                return;
+            }
+
+            AudioEngine.playTone('click'); AudioEngine.vibrate(20);
+            
+            const combined = [n1, n2].sort().join("");
+            let hash = 0;
+            for (let i = 0; i < combined.length; i++) {
+                hash = ((hash << 5) - hash) + combined.charCodeAt(i); hash |= 0; 
+            }
+            const result = Math.abs(hash % 66) + 35;
+
+            inputWrap.classList.add('hidden'); btn.classList.add('hidden');
+            heartContainer.classList.add('hidden');
+            resultDiv.classList.remove('hidden'); resultDiv.classList.add('flex');
+
+            setTimeout(() => {
+                const circle = document.getElementById('love-progress');
+                const text = document.getElementById('love-percent');
+                const msg = document.getElementById('love-msg');
+                const desc = document.getElementById('love-desc');
+                
+                const offset = 351 - (result / 100 * 351);
+                circle.style.strokeDashoffset = offset;
+
+                let current = 0;
+                const timer = setInterval(() => {
+                    if (current >= result) {
+                        clearInterval(timer); AudioEngine.playTone('success'); AudioEngine.vibrate([30, 50, 30]);
+                        if (result >= 95) { msg.innerText = "Jodoh Banget!"; desc.innerText = "Duo maut, pasangan surga dunia!"; }
+                        else if (result >= 80) { msg.innerText = "Serasi!"; desc.innerText = "Hubungan yang sangat kuat dan lengket."; }
+                        else if (result >= 60) { msg.innerText = "Cukup Cocok"; desc.innerText = "Ada potensi besar di sini, jalani aja dulu."; }
+                        else { msg.innerText = "Butuh Usaha"; desc.innerText = "Cinta itu diperjuangkan, semangat!"; }
+                        
+                        const resetBtn = document.createElement('button');
+                        resetBtn.className = "mt-8 px-6 py-3 rounded-full neo-flat neo-shadow font-bold text-slate-500 hover:text-pink-500 text-sm";
+                        resetBtn.innerText = "Coba Nama Lain";
+                        resetBtn.onclick = () => switchMode('love'); 
+                        resultDiv.appendChild(resetBtn);
+                    } else {
+                        current++; text.innerText = current + "%";
+                    }
+                }, 15);
+            }, 100);
+        };
+
+        wrap.appendChild(heartContainer); wrap.appendChild(inputWrap); wrap.appendChild(resultDiv); wrap.appendChild(btn);
+        container.appendChild(wrap);
+    };
+
+    const renderBreathe = (container) => {
+        const wrap = document.createElement('div');
+        wrap.className = "flex flex-col items-center justify-center relative w-full h-full";
+        const circle = document.createElement('div');
+        circle.className = "w-48 h-48 md:w-72 md:h-72 rounded-full neo-flat neo-shadow flex items-center justify-center text-2xl font-extrabold text-indigo-400 tracking-widest relative z-10 border-4 border-white/50 bg-[#e0eafc]";
+        circle.style.animation = "breathe-anim 8s ease-in-out infinite";
+        circle.innerText = "TARIK";
+        const ripple = document.createElement('div');
+        ripple.className = "absolute top-0 left-0 right-0 bottom-0 m-auto w-48 h-48 md:w-72 md:h-72 rounded-full bg-indigo-300 opacity-30 filter blur-2xl";
+        ripple.style.animation = "breathe-anim 8s ease-in-out infinite";
+        wrap.appendChild(ripple); wrap.appendChild(circle);
+        const instruction = document.createElement('p'); instruction.className = "absolute bottom-10 md:bottom-20 text-slate-500 font-bold text-center w-full"; instruction.innerText = "Ikuti irama lingkaran..."; wrap.appendChild(instruction); container.appendChild(wrap);
+        const breatheLoop = () => {
+             setTimeout(() => { if(circle && state.currentMode === 'breathe') { circle.innerText = "BUANG"; AudioEngine.vibrate([20, 50, 20]); } }, 4000);
+             setTimeout(() => { if(circle && state.currentMode === 'breathe') { circle.innerText = "TARIK"; AudioEngine.vibrate(20); breatheLoop(); } }, 8000);
+        };
+        AudioEngine.playTone('breathe'); breatheLoop();
+    };
+
+    const renderThrow = (container) => {
+        const scene = document.createElement('div'); scene.className = "scene w-40 h-40 md:w-64 md:h-64 flex-shrink-0";
+        const cube = document.createElement('div'); cube.className = "cube w-full h-full"; cube.style.transform = "rotateX(-20deg) rotateY(-20deg)";
+        const positions = [
+            { t: 'translateZ(80px)', d: 'translateZ(128px)', c: '1' }, { t: 'rotateY(180deg) translateZ(80px)', d: 'rotateY(180deg) translateZ(128px)', c: '6' },
+            { t: 'rotateY(90deg) translateZ(80px)', d: 'rotateY(90deg) translateZ(128px)', c: '3' }, { t: 'rotateY(-90deg) translateZ(80px)', d: 'rotateY(-90deg) translateZ(128px)', c: '4' },
+            { t: 'rotateX(90deg) translateZ(80px)', d: 'rotateX(90deg) translateZ(128px)', c: '2' }, { t: 'rotateX(-90deg) translateZ(80px)', d: 'rotateX(-90deg) translateZ(128px)', c: '5' }
+        ];
+        const isDesktop = window.innerWidth >= 768;
+        positions.forEach(pos => {
+            const face = document.createElement('div'); face.className = "face w-40 h-40 md:w-64 md:h-64 neo-flat bg-white/90 border border-white/50";
+            face.style.transform = pos.t; if (isDesktop) face.style.transform = pos.d;
+            
+            // Generate dots instead of numbers
+            let dotsHTML = '';
+            const dotClass = "w-4 h-4 md:w-6 md:h-6 bg-slate-700 rounded-full neo-inset";
+            const num = parseInt(pos.c);
+            if(num === 1) dotsHTML = `<div class="${dotClass}"></div>`;
+            else if(num === 2) dotsHTML = `<div class="flex flex-col gap-4 md:gap-8 transform rotate-45"><div class="${dotClass}"></div><div class="${dotClass}"></div></div>`;
+            else if(num === 3) dotsHTML = `<div class="flex flex-col gap-3 md:gap-5 transform rotate-45"><div class="${dotClass}"></div><div class="${dotClass}"></div><div class="${dotClass}"></div></div>`;
+            else if(num === 4) dotsHTML = `<div class="grid grid-cols-2 gap-4 md:gap-8"><div class="${dotClass}"></div><div class="${dotClass}"></div><div class="${dotClass}"></div><div class="${dotClass}"></div></div>`;
+            else if(num === 5) dotsHTML = `<div class="grid grid-cols-2 gap-4 md:gap-8 relative"><div class="${dotClass}"></div><div class="${dotClass}"></div><div class="absolute inset-0 m-auto ${dotClass}"></div><div class="${dotClass}"></div><div class="${dotClass}"></div></div>`;
+            else if(num === 6) dotsHTML = `<div class="grid grid-cols-2 gap-x-4 md:gap-x-8 gap-y-3 md:gap-y-6"><div class="${dotClass}"></div><div class="${dotClass}"></div><div class="${dotClass}"></div><div class="${dotClass}"></div><div class="${dotClass}"></div><div class="${dotClass}"></div></div>`;
+            
+            face.innerHTML = dotsHTML; cube.appendChild(face);
+        });
+        scene.appendChild(cube); 
+        const wrap = document.createElement('div'); wrap.className = "flex flex-col items-center gap-16 md:gap-20";
+        wrap.appendChild(scene);
+        
+        const rollBtn = document.createElement('button'); rollBtn.className = "px-10 py-4 rounded-full neo-flat neo-shadow font-extrabold text-indigo-500 no-active hover:text-indigo-600 transition-all tracking-wider border border-white/50"; rollBtn.innerText = "LEMPAR DADU";
+        const roll = () => {
+            const x = Math.floor(Math.random() * 4) * 360 + (Math.floor(Math.random() * 4) * 90);
+            const y = Math.floor(Math.random() * 4) * 360 + (Math.floor(Math.random() * 4) * 90);
+            cube.style.transform = `rotateX(${x}deg) rotateY(${y}deg)`; AudioEngine.playTone('click'); AudioEngine.vibrate([20, 20, 20]);
+        };
+        rollBtn.addEventListener('click', roll); wrap.appendChild(rollBtn);
+        container.appendChild(wrap);
+    };
+
+    const renderCut = (container) => {
+        const wrap = document.createElement('div'); wrap.className = "w-full max-w-xs md:max-w-md flex flex-col items-center gap-10";
+        const counter = document.createElement('div'); counter.className = "text-center text-5xl md:text-7xl font-extrabold text-slate-300 drop-shadow-sm"; counter.innerText = "00"; let count = 0;
+        const objectWrap = document.createElement('div'); objectWrap.className = "relative h-32 md:h-40 w-full cursor-pointer group";
+        const topHalf = document.createElement('div'); topHalf.className = "split-top absolute top-0 left-0 w-full h-[50%] bg-[#e0eafc] neo-shadow rounded-t-3xl z-20 border-b border-gray-300/30";
+        const bottomHalf = document.createElement('div'); bottomHalf.className = "split-bottom absolute bottom-0 left-0 w-full h-[50%] bg-[#e0eafc] neo-shadow rounded-b-3xl z-20 border-t border-gray-300/30";
+        const innerTop = document.createElement('div'); innerTop.className = "absolute inset-4 bottom-1 rounded-t-xl bg-indigo-500/10 neo-inset"; topHalf.appendChild(innerTop);
+        const innerBottom = document.createElement('div'); innerBottom.className = "absolute inset-4 top-1 rounded-b-xl bg-indigo-500/10 neo-inset"; bottomHalf.appendChild(innerBottom);
+        const blade = document.createElement('div'); blade.className = "blade-line";
+        const slashFx = document.createElement('div'); slashFx.className = "absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-white/60 skew-x-[-20deg] pointer-events-none opacity-0 drop-shadow-lg"; slashFx.style.zIndex = "30";
+        objectWrap.appendChild(topHalf); objectWrap.appendChild(bottomHalf); objectWrap.appendChild(blade); objectWrap.appendChild(slashFx);
+        const performCut = () => {
+            if (objectWrap.classList.contains('cut-active')) return;
+            count++; counter.innerText = count.toString().padStart(2, '0'); counter.classList.add('text-indigo-500');
+            AudioEngine.playTone('cut'); AudioEngine.vibrate([15, 40]);
+            objectWrap.classList.add('cut-active'); slashFx.style.animation = "cut-slash 0.3s forwards";
+            setTimeout(() => { counter.classList.remove('text-indigo-500'); }, 100);
+            setTimeout(() => { objectWrap.classList.remove('cut-active'); slashFx.style.animation = "none"; }, 350);
+        };
+        objectWrap.addEventListener('mousedown', performCut); objectWrap.addEventListener('touchstart', (e) => { e.preventDefault(); performCut(); });
+        wrap.appendChild(counter); wrap.appendChild(objectWrap);
+        const hint = document.createElement('p'); hint.className = "text-center text-slate-400 font-semibold"; hint.innerText = "Tebas batang ini!"; wrap.appendChild(hint); container.appendChild(wrap);
+    };
+
+    // --- NEW: MAGIC 8-BALL SURPRISE ---
+    const renderMagic = (container) => {
+        const wrap = document.createElement('div');
+        wrap.className = "flex flex-col items-center gap-10";
+        
+        const answers = [
+            "Gasskeun!", "Jangan Dulu Deh", "Bisa Jadi", "Mending Turu", "Coba Tanya Bapakmu", 
+            "Aman Terkendali", "Waduh, Berat", "Sikat Miring!", "Yakin?", "Kayaknya Sih Enggak", 
+            "Gaskeun Bosku!", "Jangan Ngadi-ngadi", "Lanjut!", "Tahan Dulu", "Rahasia Ilahi"
+        ];
+
+        const ball = document.createElement('div');
+        ball.className = "w-56 h-56 md:w-72 md:h-72 rounded-full magic-ball-inner flex items-center justify-center cursor-pointer relative overflow-hidden";
+        
+        // Window
+        const windowDiv = document.createElement('div');
+        windowDiv.className = "w-28 h-28 md:w-36 md:h-36 rounded-full bg-slate-900 border-4 border-slate-700 flex items-center justify-center p-4 relative neo-inset shadow-[inset_0_0_20px_rgba(0,0,0,1)]";
+        
+        // Triangle/Text area
+        const textDisplay = document.createElement('div');
+        textDisplay.className = "text-center text-blue-200 font-bold text-sm md:text-base leading-tight opacity-0 transition-opacity duration-1000 transform scale-90";
+        textDisplay.innerText = "8";
+        textDisplay.style.textShadow = "0 0 10px rgba(191,219,254,0.8)";
+        
+        // Initial figure 8
+        const initEight = document.createElement('div');
+        initEight.className = "absolute text-6xl font-extrabold text-white opacity-80 drop-shadow-md";
+        initEight.innerText = "8";
+
+        windowDiv.appendChild(initEight);
+        windowDiv.appendChild(textDisplay);
+        ball.appendChild(windowDiv);
+
+        const hint = document.createElement('p');
+        hint.className = "text-slate-500 font-bold text-center";
+        hint.innerText = "Pikirkan pertanyaan, lalu ketuk bolanya.";
+
+        let isShaking = false;
+        const shakeBall = () => {
+            if(isShaking) return;
+            isShaking = true;
+            AudioEngine.vibrate([20, 30, 20, 30]);
+            
+            ball.classList.add('shake-anim');
+            textDisplay.style.opacity = '0';
+            initEight.style.opacity = '0';
+            
+            setTimeout(() => {
+                AudioEngine.playTone('mystic');
+                const randomAns = answers[Math.floor(Math.random() * answers.length)];
+                textDisplay.innerText = randomAns;
+                textDisplay.style.opacity = '1';
+                textDisplay.style.transform = 'scale(1)';
+                ball.classList.remove('shake-anim');
+                isShaking = false;
+            }, 500);
+        };
+
+        ball.addEventListener('mousedown', shakeBall);
+        ball.addEventListener('touchstart', (e) => { e.preventDefault(); shakeBall(); });
+
+        wrap.appendChild(ball); wrap.appendChild(hint);
+        container.appendChild(wrap);
+    };
+
+    // --- NEW: KALKULATOR MBG ---
+    const renderKalkMBG = (container) => {
+        container.innerHTML = `
+            <div class="w-full max-w-md bg-[#e0eafc] neo-shadow rounded-3xl p-6 md:p-8 flex flex-col gap-6 border border-white/50">
+                <div class="text-center">
+                    <h2 class="text-2xl font-extrabold text-slate-700">Kalkulator <span class="text-indigo-500">MBG</span></h2>
+                    <p class="text-xs font-semibold text-slate-500 mt-1">1,2T Rupiah = 1 Hari Makan Bergizi Gratis</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider pl-2">Mata Uang</label>
+                        <select id="mbg-currency" class="w-full h-12 rounded-xl neo-inset bg-transparent px-4 text-slate-700 font-semibold outline-none appearance-none">
+                            <option value="IDR">🇮🇩 IDR - Rupiah</option>
+                            <option value="USD">🇺🇸 USD - Dolar AS</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-2 relative">
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider pl-2" id="mbg-label">Jumlah Uang</label>
+                        <span class="absolute left-4 top-[34px] text-slate-500 font-bold" id="mbg-symbol">Rp</span>
+                        <input type="text" id="mbg-amount" placeholder="0" inputmode="numeric" class="w-full h-12 rounded-xl neo-inset bg-transparent pl-12 pr-4 text-slate-700 font-bold outline-none placeholder-slate-400">
+                    </div>
+
+                    <button id="mbg-btn" class="w-full h-12 rounded-xl neo-flat neo-shadow font-extrabold text-indigo-500 no-active hover:text-indigo-600 transition-all mt-2 border border-white/40">
+                        HITUNG MBG
+                    </button>
+                </div>
+
+                <!-- Result Area -->
+                <div id="mbg-result" class="hidden flex-col items-center gap-4 pt-4 border-t border-slate-300/30">
+                    <div class="text-center w-full p-4 neo-inset rounded-2xl bg-white/20">
+                        <p class="text-xs font-bold text-slate-500 mb-1 uppercase">Setara Dengan</p>
+                        <p class="text-4xl md:text-5xl font-extrabold text-slate-700 drop-shadow-sm" id="mbg-res-hari">0</p>
+                        <p class="text-sm font-bold text-indigo-500 mt-1 uppercase tracking-widest">Hari MBG</p>
+                    </div>
+
+                    <div class="w-full bg-[#e0eafc] neo-shadow rounded-2xl p-4 text-sm font-semibold text-slate-600 space-y-2 border border-white/40">
+                        <p class="text-xs text-slate-400 font-bold uppercase mb-2">Detail Waktu Dasar:</p>
+                        <div class="flex justify-between border-b border-slate-300/30 pb-1"><span id="mbg-res-jam" class="text-slate-800">0</span> <span>Jam</span></div>
+                        <div class="flex justify-between border-b border-slate-300/30 pb-1"><span id="mbg-res-menit" class="text-slate-800">0</span> <span>Menit</span></div>
+                        <div class="flex justify-between"><span id="mbg-res-detik" class="text-slate-800">0</span> <span>Detik</span></div>
+                    </div>
+
+                    <div class="w-full p-4 neo-inset rounded-2xl bg-white/20 text-center">
+                        <p class="text-xs font-bold text-slate-500 mb-1 uppercase">Tepatnya</p>
+                        <p class="text-sm font-extrabold text-slate-700" id="mbg-res-tepatnya">-</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Logic from KalkMBG.html
+        const inputAmount = document.getElementById('mbg-amount');
+        const selectCurrency = document.getElementById('mbg-currency');
+        const btnHitung = document.getElementById('mbg-btn');
+        const resultArea = document.getElementById('mbg-result');
+        const symbol = document.getElementById('mbg-symbol');
+
+        const formatNumber = (num) => new Intl.NumberFormat('id-ID').format(num);
+        const formatDetailed = (num) => new Intl.NumberFormat('id-ID', { maximumFractionDigits: 4 }).format(num);
+        const parseNumber = (str) => parseFloat(str.replace(/\./g, '')) || 0;
+
+        selectCurrency.addEventListener('change', (e) => {
+            symbol.innerText = e.target.value === 'USD' ? '$' : 'Rp';
+        });
+
+        inputAmount.addEventListener('input', (e) => {
+            let rawValue = e.target.value.replace(/[^0-9]/g, '');
+            e.target.value = rawValue !== '' ? formatNumber(rawValue) : '';
+        });
+
+        const hitungMBG = () => {
+            const rawAmount = parseNumber(inputAmount.value);
+            if (rawAmount === 0) { resultArea.classList.add('hidden'); return; }
+
+            AudioEngine.playTone('cash'); AudioEngine.vibrate(30);
+
+            const RATE_USD = 17400; // Asumsi kurs
+            const NILAI_HARI = 1200000000000; // 1.2T
+            
+            const idrAmount = selectCurrency.value === 'USD' ? rawAmount * RATE_USD : rawAmount;
+            const totalDays = idrAmount / NILAI_HARI;
+            
+            const hours = totalDays * 24;
+            const minutes = hours * 60;
+            const seconds = minutes * 60;
+
+            let rem = seconds; 
+            const y = Math.floor(rem / 31536000); rem -= y * 31536000;
+            const mo = Math.floor(rem / 2592000); rem -= mo * 2592000;
+            const w = Math.floor(rem / 604800); rem -= w * 604800;
+            const d = Math.floor(rem / 86400); rem -= d * 86400;
+            const h = Math.floor(rem / 3600); rem -= h * 3600;
+            const m = Math.floor(rem / 60); rem -= m * 60;
+            const sec = rem;
+
+            let stringTepatnya = [];
+            if (y > 0) stringTepatnya.push(`${formatNumber(y)} thn`);
+            if (mo > 0) stringTepatnya.push(`${formatNumber(mo)} bln`);
+            if (w > 0) stringTepatnya.push(`${formatNumber(w)} mgg`);
+            if (d > 0) stringTepatnya.push(`${formatNumber(d)} hr`);
+            if (h > 0) stringTepatnya.push(`${formatNumber(h)} jam`);
+            if (m > 0) stringTepatnya.push(`${formatNumber(m)} mnt`);
+            if (sec > 0 || stringTepatnya.length === 0) stringTepatnya.push(`${formatDetailed(sec)} dtk`);
+
+            document.getElementById('mbg-res-hari').innerText = formatDetailed(totalDays);
+            document.getElementById('mbg-res-jam').innerText = formatDetailed(hours);
+            document.getElementById('mbg-res-menit').innerText = formatDetailed(minutes);
+            document.getElementById('mbg-res-detik').innerText = formatDetailed(seconds);
+            document.getElementById('mbg-res-tepatnya').innerText = stringTepatnya.join(', ');
+
+            resultArea.classList.remove('hidden');
+            resultArea.classList.add('flex');
+            
+            // Scroll to bottom smoothly on mobile
+            setTimeout(() => {
+                document.getElementById('active-area').scrollTo({ top: document.getElementById('active-area').scrollHeight, behavior: 'smooth' });
+            }, 100);
+        };
+
+        btnHitung.addEventListener('click', hitungMBG);
+        inputAmount.addEventListener('keypress', (e) => { if (e.key === 'Enter') hitungMBG(); });
+    };
+
+    // --- CORE ENGINE ---
+    function switchMode(modeId) {
+        if (state.currentMode === modeId && modeId !== 'love') return;
+        
+        cancelAnimationFrame(state.animFrame);
+        const container = document.getElementById('active-area');
+        
+        container.style.opacity = '0';
+        container.style.transform = 'scale(0.95)';
+        
+        setTimeout(() => {
+            state.currentMode = modeId;
+            container.innerHTML = ''; 
+            document.getElementById('mode-title').innerText = modes.find(m => m.id === modeId).name;
+
+            switch(modeId) {
+                case 'pop': renderPop(container); break;
+                case 'spin': renderSpin(container); break;
+                case 'switch': renderSwitch(container); break;
+                case 'throw': renderThrow(container); break;
+                case 'cut': renderCut(container); break;
+                case 'breathe': renderBreathe(container); break;
+                case 'love': renderLove(container); break;
+                case 'magic': renderMagic(container); break;
+                case 'kalkmbg': renderKalkMBG(container); break;
+            }
+            updateNav();
+            container.style.opacity = '1'; container.style.transform = 'scale(1)';
+        }, 250);
+    }
+
+    function updateNav() {
+        const navMobile = document.getElementById('nav-container-mobile');
+        const navDesktop = document.getElementById('nav-container-desktop');
+        
+        const generateNavHTML = (isDesktop) => {
+            return modes.map(mode => {
+                const isActive = state.currentMode === mode.id;
+                const baseClass = isDesktop 
+                    ? `w-full h-12 flex items-center px-4 rounded-xl transition-all duration-300 gap-3 mb-2 font-bold text-sm text-left border border-transparent`
+                    : `flex flex-col items-center justify-center min-w-[4.5rem] h-16 rounded-2xl transition-all duration-300 snap-center border border-transparent shrink-0`;
+                const activeClass = isActive 
+                    ? (isDesktop ? 'neo-inset text-indigo-500 border-white/30' : 'neo-inset text-indigo-500 transform scale-95 border-white/30')
+                    : (isDesktop ? 'hover:bg-white/20 text-slate-400 hover:text-indigo-400 no-active' : 'neo-flat neo-shadow text-slate-400 hover:text-indigo-400 no-active border-white/40');
+                const content = isDesktop 
+                    ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${mode.icon}</svg> <span>${mode.name}</span>`
+                    : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${mode.icon}</svg> <span class="text-[9px] font-extrabold mt-1 tracking-wide">${mode.name}</span>`;
+                return `<button class="${baseClass} ${activeClass}" onclick="switchMode('${mode.id}')">${content}</button>`;
+            }).join('');
+        };
+        if(navMobile) navMobile.innerHTML = generateNavHTML(false);
+        if(navDesktop) navDesktop.innerHTML = generateNavHTML(true);
+    }
+
+    window.onload = () => {
+        const soundBtn = document.getElementById('sound-toggle');
+        soundBtn.onclick = () => {
+            state.soundEnabled = !state.soundEnabled;
+            document.getElementById('icon-vol-on').classList.toggle('hidden'); document.getElementById('icon-vol-off').classList.toggle('hidden');
+            if(state.soundEnabled) AudioEngine.playTone('click');
+        };
+        updateNav(); switchMode('pop'); 
+    };
+</script>
+</body>
+</html>

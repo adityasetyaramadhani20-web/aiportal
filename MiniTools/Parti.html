@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parti</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Families: Inter, Playfair Display (Serif), JetBrains Mono (Retro/Monospace) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            serif: ['"Playfair Display"', 'serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Styling scrollbar halus */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Pengaturan Cetak Vektor Presisi */
+    @media print {
+      body {
+        background: white !important;
+        color: black !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .paper-sheet {
+        box-shadow: none !important;
+        border: none !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+        page-break-after: always;
+      }
+    }
+
+    /* Ukuran kertas standar dalam milimeter */
+    .paper-a4 { width: 210mm; min-height: 297mm; }
+    .paper-a4.landscape { width: 297mm; min-height: 210mm; }
+    .paper-letter { width: 215.9mm; min-height: 279.4mm; }
+    .paper-letter.landscape { width: 279.4mm; min-height: 215.9mm; }
+    .paper-f4 { width: 215mm; min-height: 330mm; }
+    .paper-f4.landscape { width: 330mm; min-height: 215mm; }
+    .paper-a5 { width: 148mm; min-height: 210mm; }
+    .paper-a5.landscape { width: 210mm; min-height: 148mm; }
+
+    /* Indikator pemutaran aktif pada baris musik */
+    .measure-playing {
+      background-color: rgba(59, 130, 246, 0.12);
+      border-radius: 4px;
+      transition: background-color 0.1s ease;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen flex flex-col selection:bg-blue-100 selection:text-blue-900">
+
+  <!-- Bilah Kendali Utama (Minimalis tanpa label versi atau dekorasi berlebih) -->
+  <header class="no-print bg-white border-b border-slate-200 sticky top-0 z-30 px-4 py-2 flex items-center justify-between shadow-sm">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center text-white font-bold text-lg tracking-wider">
+        P
+      </div>
+      <h1 class="text-base font-semibold tracking-tight text-slate-900">Parti</h1>
+      <span class="text-slate-300">|</span>
+      
+      <!-- Audio & Metronome Controls -->
+      <div class="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-md p-1">
+        <button id="btnPlayAll" title="Putar Semua" class="p-1.5 rounded hover:bg-slate-200 text-slate-700 transition">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button id="btnStop" title="Hentikan Audio" class="p-1.5 rounded hover:bg-slate-200 text-slate-700 transition">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>
+        </button>
+        <button id="btnMetronome" title="Metronom" class="px-2 py-1 text-xs rounded font-medium border border-transparent text-slate-600 hover:bg-slate-200 transition">
+          Metronom
+        </button>
+        <div class="h-4 w-px bg-slate-200 mx-1"></div>
+        <select id="instSelect" class="text-xs bg-transparent border-none text-slate-700 focus:ring-0 py-0.5 pl-1 pr-6 cursor-pointer">
+          <option value="piano">Piano</option>
+          <option value="organ">Organ</option>
+          <option value="flute">Flute</option>
+          <option value="violin">Biola</option>
+        </select>
+        <div class="flex items-center space-x-1 text-xs text-slate-600 px-1.5">
+          <span>BPM</span>
+          <input type="number" id="quickBpm" min="40" max="240" class="w-12 text-center bg-white border border-slate-200 rounded py-0.5 px-1 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-2">
+      <!-- Undo / Redo -->
+      <div class="flex items-center border border-slate-200 rounded-md bg-white">
+        <button id="btnUndo" title="Urungkan (Ctrl+Z)" class="p-1.5 hover:bg-slate-50 text-slate-600 disabled:opacity-30">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 0 1 5 5v2m0 0l-3-3m3 3l3-3M3 10l3-3m-3 3l3 3"/></svg>
+        </button>
+        <button id="btnRedo" title="Ulangi (Ctrl+Y)" class="p-1.5 hover:bg-slate-50 text-slate-600 disabled:opacity-30 border-l border-slate-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a5 5 0 0 0-5 5v2m0 0l3-3m-3 3l-3-3m17-7l-3-3m3 3l-3 3"/></svg>
+        </button>
+      </div>
+
+      <!-- Zoom -->
+      <div class="flex items-center border border-slate-200 rounded-md bg-white px-1">
+        <button id="btnZoomOut" class="p-1 text-slate-500 hover:text-slate-800 text-sm font-mono">-</button>
+        <span id="zoomLabel" class="text-xs text-slate-600 px-1 font-mono">100%</span>
+        <button id="btnZoomIn" class="p-1 text-slate-500 hover:text-slate-800 text-sm font-mono">+</button>
+      </div>
+
+      <!-- Modulasi Modal Button -->
+      <button id="btnOpenModulation" class="px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-md transition flex items-center space-x-1">
+        <span>Modulasi</span>
+      </button>
+
+      <!-- Ekspor Dropdown / Actions -->
+      <button id="btnPrint" class="px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-md transition flex items-center space-x-1" title="Cetak / Simpan PDF">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+        <span>PDF / Cetak</span>
+      </button>
+
+      <button id="btnExportPNG" class="px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-md transition" title="Unduh gambar PNG">
+        PNG
+      </button>
+
+      <button id="btnConfig" class="px-2.5 py-1.5 text-xs font-medium text-white bg-slate-800 hover:bg-slate-900 rounded-md transition">
+        File
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden">
+    <!-- Panel Samping / Pengaturan & Editor Baris -->
+    <aside id="sidebar" class="no-print w-96 bg-white border-r border-slate-200 flex flex-col z-20 transition-all duration-200 select-none">
+      <!-- Tab Header Panel -->
+      <div class="flex border-b border-slate-200 text-xs font-medium text-slate-600 bg-slate-50">
+        <button data-tab="tab-editor" class="tab-btn flex-1 py-2.5 text-center border-b-2 border-blue-600 text-blue-600 bg-white font-semibold">Baris</button>
+        <button data-tab="tab-symbols" class="tab-btn flex-1 py-2.5 text-center border-b-2 border-transparent hover:text-slate-900">Simbol</button>
+        <button data-tab="tab-info" class="tab-btn flex-1 py-2.5 text-center border-b-2 border-transparent hover:text-slate-900">Info Lagu</button>
+        <button data-tab="tab-doc" class="tab-btn flex-1 py-2.5 text-center border-b-2 border-transparent hover:text-slate-900">Kertas</button>
+      </div>
+
+      <!-- Tab Isi: Editor Baris -->
+      <div id="tab-editor" class="tab-content flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Struktur Baris</span>
+          <div class="flex space-x-1">
+            <button id="btnAddMusicLine" class="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-medium border border-blue-200">
+              + Notasi
+            </button>
+            <button id="btnAddSpacer" class="px-2 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded text-xs font-medium border border-slate-200">
+              + Spacer
+            </button>
+          </div>
+        </div>
+
+        <!-- Daftar Baris -->
+        <div id="lineListContainer" class="space-y-3">
+          <!-- Render dinamis item baris -->
+        </div>
+      </div>
+
+      <!-- Tab Isi: Palet Komponen & Simbol -->
+      <div id="tab-symbols" class="tab-content hidden flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="text-xs text-slate-600 mb-2 leading-relaxed">
+          Gunakan pintasan sintaks berikut di baris notasi untuk menghasilkan simbol standar notasi angka:
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md">
+            <div class="font-semibold text-slate-800 mb-1">Oktaf (Titik Atas / Bawah)</div>
+            <div class="text-slate-600 font-mono text-[11px] space-y-1">
+              <div><code class="bg-white px-1 border rounded text-blue-600">1'</code> = Oktaf atas (+1 titik)</div>
+              <div><code class="bg-white px-1 border rounded text-blue-600">5''</code> = 2 Oktaf atas (+2 titik)</div>
+              <div><code class="bg-white px-1 border rounded text-blue-600">5,</code> = Oktaf bawah (-1 titik)</div>
+              <div><code class="bg-white px-1 border rounded text-blue-600">1,,</code> = 2 Oktaf bawah (-2 titik)</div>
+            </div>
+          </div>
+
+          <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md">
+            <div class="font-semibold text-slate-800 mb-1">Garis Bendera (Nilai Not)</div>
+            <div class="text-slate-600 font-mono text-[11px] space-y-1">
+              <div><code class="bg-white px-1 border rounded text-blue-600">_1 2_</code> = 1 garis di atas (not 1/8)</div>
+              <div><code class="bg-white px-1 border rounded text-blue-600">=1 2=</code> = 2 garis di atas (not 1/16)</div>
+            </div>
+          </div>
+
+          <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md">
+            <div class="font-semibold text-slate-800 mb-1">Kres / Mol (Accidental)</div>
+            <div class="text-slate-600 font-mono text-[11px] space-y-1">
+              <div><code class="bg-white px-1 border rounded text-blue-600">1/</code> atau <code class="bg-white px-1 border rounded text-blue-600">1#</code> = Coret miring naik (Di)</div>
+              <div><code class="bg-white px-1 border rounded text-blue-600">7\</code> atau <code class="bg-white px-1 border rounded text-blue-600">7b</code> = Tanda mol turun (Sa)</div>
+            </div>
+          </div>
+
+          <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md">
+            <div class="font-semibold text-slate-800 mb-1">Lengkung Slur & Tanda Birama</div>
+            <div class="text-slate-600 font-mono text-[11px] space-y-1">
+              <div><code class="bg-white px-1 border rounded text-blue-600">~1 2 3~</code> = Lengkung legato (slur)</div>
+              <div><code class="bg-white px-1 border rounded text-blue-600">|</code> = Garis birama tunggal</div>
+              <div><code class="bg-white px-1 border rounded text-blue-600">||</code> = Garis akhir ganda</div>
+              <div><code class="bg-white px-1 border rounded text-blue-600">|:  :|</code> = Tanda birama pengulangan</div>
+            </div>
+          </div>
+
+          <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md">
+            <div class="font-semibold text-slate-800 mb-1">Ekspresi & Tanda Khusus</div>
+            <div class="grid grid-cols-2 gap-1 text-[11px] font-mono text-slate-700">
+              <div><code class="bg-white px-1 border rounded">[p]</code> Pianissimo</div>
+              <div><code class="bg-white px-1 border rounded">[f]</code> Forte</div>
+              <div><code class="bg-white px-1 border rounded">[mf]</code> Mezzo Forte</div>
+              <div><code class="bg-white px-1 border rounded">[coda]</code> Simbol Coda</div>
+              <div><code class="bg-white px-1 border rounded">[segno]</code> Simbol Segno</div>
+              <div><code class="bg-white px-1 border rounded">[volta:1.]</code> Garis Volta 1</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Isi: Info Lagu -->
+      <div id="tab-info" class="tab-content hidden flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
+        <div>
+          <label class="block text-slate-600 font-medium mb-1">Judul Lagu</label>
+          <input type="text" id="metaTitle" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-slate-600 font-medium mb-1">Subjudul / Deskripsi</label>
+          <input type="text" id="metaSubtitle" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-slate-600 font-medium mb-1">Pencipta</label>
+            <input type="text" id="metaComposer" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-slate-600 font-medium mb-1">Pengaransemen</label>
+            <input type="text" id="metaArranger" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-slate-600 font-medium mb-1">Nada Dasar (Tanda Mula)</label>
+            <input type="text" id="metaKey" placeholder="C = Do" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono">
+          </div>
+          <div>
+            <label class="block text-slate-600 font-medium mb-1">Sukat (Ketukan)</label>
+            <input type="text" id="metaTimeSig" placeholder="4/4" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-slate-600 font-medium mb-1">Tempo (BPM)</label>
+            <input type="number" id="metaBpm" min="40" max="240" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono">
+          </div>
+          <div>
+            <label class="block text-slate-600 font-medium mb-1">Oktaf Dasar</label>
+            <select id="metaBaseOctave" class="w-full border border-slate-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-blue-500 bg-white">
+              <option value="3">Oktaf 3 (Rendah)</option>
+              <option value="4" selected>Oktaf 4 (Standar C4)</option>
+              <option value="5">Oktaf 5 (Tinggi)</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-600 font-medium mb-1">Catatan Kaki (Footer)</label>
+          <input type="text" id="metaFooter" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div class="pt-2 border-t border-slate-200">
+          <label class="block text-slate-600 font-medium mb-1.5">Kustomisasi Warna Teks</label>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="flex items-center space-x-2">
+              <input type="color" id="colorChord" value="#2563eb" class="w-7 h-7 p-0.5 border rounded cursor-pointer">
+              <span class="text-slate-600">Akor (Chord)</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <input type="color" id="colorLyric" value="#334155" class="w-7 h-7 p-0.5 border rounded cursor-pointer">
+              <span class="text-slate-600">Lirik</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Isi: Pengaturan Dokumen / Kertas -->
+      <div id="tab-doc" class="tab-content hidden flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
+        <div>
+          <label class="block text-slate-600 font-medium mb-1">Ukuran Kertas</label>
+          <select id="docPaper" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 bg-white">
+            <option value="paper-a4">A4 (210 x 297 mm)</option>
+            <option value="paper-letter">Letter (8.5 x 11 in)</option>
+            <option value="paper-f4">F4 / Folio (215 x 330 mm)</option>
+            <option value="paper-a5">A5 (148 x 210 mm)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-slate-600 font-medium mb-1">Orientasi</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btnOrientPortrait" class="py-1.5 px-3 rounded border border-blue-600 bg-blue-50 text-blue-700 font-medium">Potret</button>
+            <button type="button" id="btnOrientLandscape" class="py-1.5 px-3 rounded border border-slate-200 text-slate-700 hover:bg-slate-50">Lanskap</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-600 font-medium mb-1">Tipografi Dokumen</label>
+          <select id="docTheme" class="w-full border border-slate-300 rounded px-2.5 py-1.5 focus:ring-1 focus:ring-blue-500 bg-white">
+            <option value="font-sans">Modern Sans (Inter)</option>
+            <option value="font-serif">Klasik Serif (Playfair)</option>
+            <option value="font-mono">Retro Mesin Ketik (Mono)</option>
+          </select>
+        </div>
+        <div class="pt-2 border-t border-slate-200 space-y-2">
+          <div class="font-semibold text-slate-700">Skala Ukuran Teks (px)</div>
+          <div>
+            <div class="flex justify-between text-slate-500 mb-0.5">
+              <span>Notasi Angka</span>
+              <span id="labelSizeNote">16px</span>
+            </div>
+            <input type="range" id="sizeNote" min="12" max="24" value="16" class="w-full">
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-500 mb-0.5">
+              <span>Lirik Lagu</span>
+              <span id="labelSizeLyric">13px</span>
+            </div>
+            <input type="range" id="sizeLyric" min="10" max="20" value="13" class="w-full">
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-500 mb-0.5">
+              <span>Chord</span>
+              <span id="labelSizeChord">13px</span>
+            </div>
+            <input type="range" id="sizeChord" min="10" max="20" value="13" class="w-full">
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Kanvas Dokumen Utama -->
+    <main class="flex-1 bg-slate-200 overflow-auto p-8 flex justify-center items-start">
+      <div id="zoomContainer" class="origin-top transition-transform duration-100 ease-out">
+        <!-- Lembar Partitur Kertas Nyata -->
+        <article id="scorePaper" class="paper-sheet paper-a4 bg-white shadow-xl mx-auto p-12 relative flex flex-col justify-between select-text border border-slate-300 font-sans">
+          
+          <!-- Area Konten Utama Partitur -->
+          <div>
+            <!-- Header Musik (Metadata Lagu) -->
+            <header id="scoreHeader" class="text-center mb-6 pb-4 border-b border-slate-200">
+              <h1 id="renderTitle" class="text-2xl font-bold tracking-tight text-slate-900 mb-0.5">Gugur Bunga</h1>
+              <p id="renderSubtitle" class="text-xs text-slate-500 italic mb-3">Lagu Perjuangan Nasional</p>
+              
+              <div class="flex justify-between items-end text-xs text-slate-700">
+                <!-- Info Kiri: Tanda Mula, Sukat, Tempo -->
+                <div class="text-left space-y-0.5">
+                  <div><span class="font-medium">Do = </span><span id="renderKey" class="font-semibold font-mono">C</span></div>
+                  <div><span class="font-medium">Sukat: </span><span id="renderTimeSig" class="font-mono">4/4</span></div>
+                  <div><span class="font-medium">Tempo: </span><span id="renderBpm" class="font-mono">72</span> BPM</div>
+                </div>
+
+                <!-- Info Kanan: Pencipta & Pengaransemen -->
+                <div class="text-right space-y-0.5">
+                  <div><span class="text-slate-500">Cipt.: </span><span id="renderComposer" class="font-medium">Ismail Marzuki</span></div>
+                  <div><span class="text-slate-500">Arr.: </span><span id="renderArranger" class="font-medium">Parti</span></div>
+                </div>
+              </div>
+            </header>
+
+            <!-- Wadah Render Baris Partitur -->
+            <div id="scoreBody" class="space-y-5">
+              <!-- Baris-baris notasi dirender di sini via JavaScript -->
+            </div>
+          </div>
+
+          <!-- Footer Musik -->
+          <footer id="scoreFooter" class="mt-8 pt-3 border-t border-slate-200 text-center text-[10px] text-slate-400">
+            <span id="renderFooter">Dokumen partitur disusun menggunakan Parti.</span>
+          </footer>
+        </article>
+      </div>
+    </main>
+  </div>
+
+  <!-- Dialog Modulasi (Transposisi Nada Dasar) -->
+  <div id="modalModulation" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg shadow-xl border border-slate-200 w-80 p-5 space-y-4">
+      <h3 class="text-sm font-bold text-slate-900">Modulasi Nada Dasar</h3>
+      <p class="text-xs text-slate-600">Pilih nada dasar baru. Sistem akan otomatis menyesuaikan Tanda Mula, transposisi akor, dan frekuensi audio.</p>
+      
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1">Pilih Nada Dasar Baru (Do =)</label>
+        <select id="modTargetKey" class="w-full border border-slate-300 rounded px-2.5 py-1.5 text-xs bg-white font-mono">
+          <option value="C">C</option>
+          <option value="C#">C# / Db</option>
+          <option value="D">D</option>
+          <option value="Eb">Eb / D#</option>
+          <option value="E">E</option>
+          <option value="F">F</option>
+          <option value="F#">F# / Gb</option>
+          <option value="G">G</option>
+          <option value="Ab">Ab / G#</option>
+          <option value="A">A</option>
+          <option value="Bb">Bb / A#</option>
+          <option value="B">B</option>
+        </select>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2">
+        <button id="btnCancelMod" class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded">Batal</button>
+        <button id="btnApplyMod" class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 font-medium">Terapkan Modulasi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dialog Konfigurasi File (Impor/Ekspor JSON) -->
+  <div id="modalConfig" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-lg shadow-xl border border-slate-200 w-96 p-5 space-y-4">
+      <h3 class="text-sm font-bold text-slate-900">Pengelolaan File Partitur</h3>
+      <div class="space-y-2 text-xs">
+        <button id="btnExportJSON" class="w-full text-left p-2.5 rounded border border-slate-200 hover:bg-slate-50 flex items-center justify-between">
+          <div>
+            <div class="font-medium text-slate-800">Unduh JSON Partitur</div>
+            <div class="text-slate-500 text-[11px]">Simpan berkas konfigurasi partitur ke penyimpanan lokal</div>
+          </div>
+          <span class="text-slate-400 font-mono">.json</span>
+        </button>
+
+        <label class="w-full text-left p-2.5 rounded border border-slate-200 hover:bg-slate-50 flex items-center justify-between cursor-pointer">
+          <div>
+            <div class="font-medium text-slate-800">Impor JSON Partitur</div>
+            <div class="text-slate-500 text-[11px]">Buka kembali berkas partitur yang telah disimpan</div>
+          </div>
+          <input type="file" id="fileImportJSON" accept=".json" class="hidden">
+        </label>
+
+        <button id="btnResetDefault" class="w-full text-left p-2.5 rounded border border-red-200 hover:bg-red-50 text-red-700 flex items-center justify-between">
+          <div>
+            <div class="font-medium">Muat Contoh Lagu Bawaan</div>
+            <div class="text-red-500 text-[11px]">Kembalikan ke lagu default (Gugur Bunga)</div>
+          </div>
+        </button>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button id="btnCloseConfig" class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notifikasi Toast -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-3.5 py-2 rounded shadow-lg text-xs transition-opacity duration-200 opacity-0 pointer-events-none z-50"></div>
+
+  <script>
+    /* State Tunggal Aplikasi (Single Source of Truth) */
+    const DEFAULT_SCORE = {
+      meta: {
+        title: "Gugur Bunga",
+        subtitle: "Lagu Perjuangan Nasional",
+        composer: "Ismail Marzuki",
+        arranger: "Parti Arr.",
+        key: "C",
+        timeSig: "4/4",
+        bpm: 72,
+        baseOctave: 4,
+        footer: "Dokumen partitur disusun menggunakan Parti.",
+        chordColor: "#2563eb",
+        lyricColor: "#334155"
+      },
+      doc: {
+        paper: "paper-a4",
+        landscape: false,
+        theme: "font-sans",
+        sizeNote: 16,
+        sizeLyric: 13,
+        sizeChord: 13,
+        zoom: 100
+      },
+      lines: [
+        {
+          id: "line_1",
+          type: "music",
+          volta: "",
+          dynamics: "mp",
+          chords: "   C              Am             Dm             G7",
+          notes:  "|  5 . 3 4  |  5 . 1' .  |  7 . 6 5  |  6 - - 0  |",
+          lyrics: "   Be- ta-pa    ha-ti   tak      kan pi-lu      ber-du-ka"
+        },
+        {
+          id: "line_2",
+          type: "music",
+          volta: "",
+          dynamics: "p",
+          chords: "   C              F              D7             G",
+          notes:  "|  1' . 7 6  |  5 . 3 .  |  2/ . 3 4/ |  5 - - 0  |",
+          lyrics: "   Ta-  kut gu-  gur pa-  hla-  wan- ku nan     per-ka-sa"
+        },
+        {
+          id: "line_spacer_1",
+          type: "spacer",
+          height: 12
+        },
+        {
+          id: "line_3",
+          type: "music",
+          volta: "1.",
+          dynamics: "mf",
+          chords: "   F              C              G7             C",
+          notes:  "|  6 . 5 4  |  3 . 5 .  |  2 . 3 2  |  1 - - 0  ||",
+          lyrics: "   Gu-  gur bu-  nga di   ta-  man ba-kti     bang-sa."
+        }
+      ]
+    };
+
+    let state = JSON.parse(JSON.stringify(DEFAULT_SCORE));
+    let historyStack = [];
+    let redoStack = [];
+    const MAX_HISTORY = 40;
+
+    function recordState() {
+      if (historyStack.length >= MAX_HISTORY) {
+        historyStack.shift();
+      }
+      historyStack.push(JSON.stringify(state));
+      redoStack = [];
+      updateUndoRedoButtons();
+      saveToCache();
+    }
+
+    function undo() {
+      if (historyStack.length === 0) return;
+      redoStack.push(JSON.stringify(state));
+      state = JSON.parse(historyStack.pop());
+      syncInputsFromState();
+      renderAll();
+      updateUndoRedoButtons();
+      saveToCache();
+      showToast("Urungkan perubahan");
+    }
+
+    function redo() {
+      if (redoStack.length === 0) return;
+      historyStack.push(JSON.stringify(state));
+      state = JSON.parse(redoStack.pop());
+      syncInputsFromState();
+      renderAll();
+      updateUndoRedoButtons();
+      saveToCache();
+      showToast("Ulangi perubahan");
+    }
+
+    function updateUndoRedoButtons() {
+      document.getElementById('btnUndo').disabled = historyStack.length === 0;
+      document.getElementById('btnRedo').disabled = redoStack.length === 0;
+    }
+
+    function saveToCache() {
+      try {
+        localStorage.setItem("parti_saved_state", JSON.stringify(state));
+      } catch (e) {
+        // Abaikan jika storage penuh
+      }
+    }
+
+    function loadFromCache() {
+      try {
+        const saved = localStorage.getItem("parti_saved_state");
+        if (saved) {
+          state = JSON.parse(saved);
+        }
+      } catch (e) {
+        state = JSON.parse(JSON.stringify(DEFAULT_SCORE));
+      }
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.remove("opacity-0");
+      toast.classList.add("opacity-100");
+      setTimeout(() => {
+        toast.classList.remove("opacity-100");
+        toast.classList.add("opacity-0");
+      }, 2000);
+    }
+
+    /* Web Audio API Engine Tanpa Ketergantungan Eksternal */
+    let audioCtx = null;
+    let isPlaying = false;
+    let playTimer = null;
+    let metronomeEnabled = false;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    /* Pemetaan Tangga Nada Diatonis & Frekuensi Matematis */
+    const NOTE_SEMITONES = {
+      "C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3,
+      "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8,
+      "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11
+    };
+
+    const SCALE_INTERVALS = {
+      1: 0,   // Do
+      2: 2,   // Re
+      3: 4,   // Mi
+      4: 5,   // Fa
+      5: 7,   // Sol
+      6: 9,   // La
+      7: 11   // Si
+    };
+
+    function pitchToFrequency(degree, octaveOffset, accidental, rootKey, baseOctave) {
+      if (degree === 0 || !SCALE_INTERVALS.hasOwnProperty(degree)) return null;
+      
+      const rootSemitone = NOTE_SEMITONES[rootKey] || 0;
+      let semitone = rootSemitone + SCALE_INTERVALS[degree];
+      
+      if (accidental === '#' || accidental === '/') semitone += 1;
+      if (accidental === 'b' || accidental === '\\') semitone -= 1;
+      
+      const totalOctave = baseOctave + octaveOffset;
+      const midiNumber = 12 + (totalOctave * 12) + semitone;
+      // Formula A440: f = 440 * 2^((midi - 69) / 12)
+      return 440 * Math.pow(2, (midiNumber - 69) / 12);
+    }
+
+    function playTone(freq, duration, type, startTime) {
+      if (!freq) return;
+      const ctx = getAudioContext();
+      const t = startTime || ctx.currentTime;
+
+      if (type === 'piano') {
+        // Piano Synthesis (Harmonik eksponensial lembut)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t);
+        
+        gain.gain.setValueAtTime(0.35, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + Math.max(duration * 1.5, 0.4));
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + Math.max(duration * 1.5, 0.4));
+
+      } else if (type === 'organ') {
+        // Organ Synthesis (Campuran pipa multi-oktaf)
+        [1, 2, 3].forEach((mult, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq * mult, t);
+          const amp = idx === 0 ? 0.2 : (0.1 / mult);
+          gain.gain.setValueAtTime(amp, t);
+          gain.gain.setValueAtTime(amp, t + duration * 0.85);
+          gain.gain.linearRampToValueAtTime(0.001, t + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + duration);
+        });
+
+      } else if (type === 'flute') {
+        // Flute Synthesis (Gelombang sinus dengan attack halus dan vibrato LFO)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.linearRampToValueAtTime(0.25, t + 0.05);
+        gain.gain.setValueAtTime(0.25, t + duration * 0.8);
+        gain.gain.linearRampToValueAtTime(0.001, t + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + duration);
+
+      } else if (type === 'violin') {
+        // Violin Synthesis (Sawtooth berfilter rendah)
+        const osc = ctx.createOscillator();
+        const filter = ctx.createBiquadFilter();
+        const gain = ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, t);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1400, t);
+
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.linearRampToValueAtTime(0.2, t + 0.06);
+        gain.gain.setValueAtTime(0.2, t + duration * 0.85);
+        gain.gain.linearRampToValueAtTime(0.001, t + duration);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + duration);
+      }
+    }
+
+    function playMetronomeClick(isAccent, time) {
+      const ctx = getAudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(isAccent ? 1200 : 800, time);
+      gain.gain.setValueAtTime(0.2, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(time);
+      osc.stop(time + 0.05);
+    }
+
+    function parseNotesForPlayback(notesString) {
+      const tokens = notesString.trim().split(/\s+/);
+      const events = [];
+      let currentAccidental = null;
+
+      tokens.forEach(tok => {
+        if (!tok || tok === '|' || tok === '||' || tok === '|:' || tok === ':|') return;
+        
+        let clean = tok.replace(/[_=~]/g, '');
+        if (!clean) return;
+
+        // Cek simbol ekstensi/sustain (.)
+        if (clean === '.') {
+          events.push({ pitch: 'sustain', durationBeats: 1 });
+          return;
+        }
+
+        // Cek tanda diam (0)
+        if (clean === '0') {
+          events.push({ pitch: 0, durationBeats: 1 });
+          return;
+        }
+
+        // Ekstraksi oktaf dan accidentals
+        let octOffset = 0;
+        let numMatches = clean.match(/^[1-7]/);
+        if (numMatches) {
+          let num = parseInt(numMatches[0], 10);
+          let accidental = null;
+          if (clean.includes('/') || clean.includes('#')) accidental = '#';
+          if (clean.includes('\\') || clean.includes('b')) accidental = 'b';
+          
+          let highOctaves = (clean.match(/'/g) || []).length;
+          let lowOctaves = (clean.match(/,/g) || []).length;
+          octOffset = highOctaves - lowOctaves;
+
+          events.push({
+            pitch: num,
+            octave: octOffset,
+            accidental: accidental,
+            durationBeats: 1
+          });
+        }
+      });
+      return events;
+    }
+
+    function stopPlayback() {
+      isPlaying = false;
+      if (playTimer) {
+        clearTimeout(playTimer);
+        playTimer = null;
+      }
+      document.querySelectorAll('.measure-row').forEach(el => el.classList.remove('measure-playing'));
+      document.getElementById('btnPlayAll').classList.remove('bg-blue-600', 'text-white');
+    }
+
+    function playScore(startLineIndex = 0, singleLineOnly = false) {
+      stopPlayback();
+      const ctx = getAudioContext();
+      isPlaying = true;
+      document.getElementById('btnPlayAll').classList.add('bg-blue-600', 'text-white');
+
+      const bpm = state.meta.bpm || 80;
+      const beatDurationSec = 60 / bpm;
+      const rootKey = state.meta.key || "C";
+      const baseOctave = parseInt(state.meta.baseOctave, 10) || 4;
+      const instrument = document.getElementById('instSelect').value;
+
+      // Kumpulkan seluruh nada
+      const queue = [];
+      const linesToPlay = singleLineOnly 
+        ? [state.lines[startLineIndex]] 
+        : state.lines.slice(startLineIndex);
+
+      linesToPlay.forEach((line) => {
+        if (!line || line.type !== 'music') return;
+        const events = parseNotesForPlayback(line.notes);
+        events.forEach(ev => {
+          queue.push({
+            event: ev,
+            lineId: line.id
+          });
+        });
+      });
+
+      if (queue.length === 0) {
+        stopPlayback();
+        return;
+      }
+
+      let currentIndex = 0;
+      let nextStartTime = ctx.currentTime + 0.05;
+      let beatCounter = 0;
+
+      function scheduleNext() {
+        if (!isPlaying) return;
+
+        while (currentIndex < queue.length && nextStartTime < ctx.currentTime + 0.25) {
+          const item = queue[currentIndex];
+          const ev = item.event;
+          const dur = ev.durationBeats * beatDurationSec;
+
+          // Highlight baris
+          const el = document.getElementById(item.lineId);
+          if (el) {
+            document.querySelectorAll('.measure-row').forEach(r => r.classList.remove('measure-playing'));
+            el.classList.add('measure-playing');
+          }
+
+          // Metronom
+          if (metronomeEnabled) {
+            playMetronomeClick(beatCounter % 4 === 0, nextStartTime);
+          }
+          beatCounter++;
+
+          // Bunyikan nada jika bukan rest (0) atau sustain (.)
+          if (ev.pitch !== 0 && ev.pitch !== 'sustain') {
+            const freq = pitchToFrequency(ev.pitch, ev.octave, ev.accidental, rootKey, baseOctave);
+            playTone(freq, dur * 0.9, instrument, nextStartTime);
+          }
+
+          nextStartTime += dur;
+          currentIndex++;
+        }
+
+        if (currentIndex < queue.length) {
+          playTimer = setTimeout(scheduleNext, 30);
+        } else {
+          playTimer = setTimeout(() => {
+            stopPlayback();
+          }, (nextStartTime - ctx.currentTime) * 1000 + 200);
+        }
+      }
+
+      scheduleNext();
+    }
+
+    /* Mesin Render Notasi Angka & Komponen Simbolik */
+    function formatCipherSegment(token) {
+      if (!token) return '';
+      
+      // Deteksi Tanda Birama
+      if (token === '|' || token === '||' || token === '|:' || token === ':|') {
+        const map = {
+          '|': '<span class="px-2 text-slate-400 font-light select-none">|</span>',
+          '||': '<span class="px-2 text-slate-700 font-semibold select-none">||</span>',
+          '|:': '<span class="px-2 text-slate-700 font-semibold select-none">|:</span>',
+          ':|': '<span class="px-2 text-slate-700 font-semibold select-none">: |</span>'
+        };
+        return map[token];
+      }
+
+      // Deteksi Bendera / Overline
+      let hasSingleBeam = token.startsWith('_') && token.endsWith('_');
+      let hasDoubleBeam = token.startsWith('=') && token.endsWith('=');
+      let clean = token.replace(/^[_=~]+|[_=~]+$/g, '');
+
+      // Deteksi Titik Oktaf
+      let highDots = (clean.match(/'/g) || []).length;
+      let lowDots = (clean.match(/,/g) || []).length;
+      clean = clean.replace(/['',]/g, '');
+
+      // Deteksi Coret Kres / Mol
+      let hasSharp = clean.includes('/') || clean.includes('#');
+      let hasFlat = clean.includes('\\') || clean.includes('b');
+      clean = clean.replace(/[/\\#b]/g, '');
+
+      let highDotsHtml = highDots > 0 
+        ? `<span class="absolute -top-2 left-1/2 -translate-x-1/2 flex space-x-0.5 pointer-events-none">${'<span class="w-1.5 h-1.5 bg-current rounded-full inline-block"></span>'.repeat(highDots)}</span>`
+        : '';
+        
+      let lowDotsHtml = lowDots > 0 
+        ? `<span class="absolute -bottom-2 left-1/2 -translate-x-1/2 flex space-x-0.5 pointer-events-none">${'<span class="w-1.5 h-1.5 bg-current rounded-full inline-block"></span>'.repeat(lowDots)}</span>`
+        : '';
+
+      let accidentalSlash = hasSharp 
+        ? `<span class="absolute inset-0 flex items-center justify-center font-mono pointer-events-none text-slate-900 font-bold scale-125 select-none">/</span>`
+        : (hasFlat ? `<span class="absolute -top-1 left-0 text-[10px] font-sans pointer-events-none text-slate-900 select-none">♭</span>` : '');
+
+      let beamLineHtml = '';
+      if (hasSingleBeam) {
+        beamLineHtml = `<div class="absolute -top-1 left-0 right-0 h-[2px] bg-slate-900"></div>`;
+      } else if (hasDoubleBeam) {
+        beamLineHtml = `<div class="absolute -top-1 left-0 right-0 h-[1.5px] bg-slate-900"></div>
+                        <div class="absolute -top-2 left-0 right-0 h-[1.5px] bg-slate-900"></div>`;
+      }
+
+      return `
+        <span class="relative inline-flex flex-col items-center justify-center px-1 font-mono leading-none">
+          ${beamLineHtml}
+          ${highDotsHtml}
+          <span class="relative inline-block px-0.5">${clean}${accidentalSlash}</span>
+          ${lowDotsHtml}
+        </span>
+      `;
+    }
+
+    function renderMusicLine(line) {
+      const chordColor = state.meta.chordColor || '#2563eb';
+      const lyricColor = state.meta.lyricColor || '#334155';
+
+      // Parse and construct token stream
+      const tokens = (line.notes || '').split(/\s+/).filter(t => t.length > 0);
+      const notesHtml = tokens.map(t => formatCipherSegment(t)).join(' ');
+
+      const voltaHtml = line.volta ? `
+        <div class="text-[10px] font-mono font-bold text-slate-700 border-l border-t border-slate-700 pl-1.5 pr-4 py-0.5 mb-1 inline-block">
+          ${line.volta}
+        </div>
+      ` : '';
+
+      const dynamicsHtml = line.dynamics ? `
+        <span class="italic font-serif font-bold text-slate-700 text-xs mr-2">${line.dynamics}</span>
+      ` : '';
+
+      return `
+        <div id="${line.id}" class="measure-row group relative p-2 rounded transition-colors duration-150">
+          ${voltaHtml}
+          <div class="flex items-center">
+            ${dynamicsHtml}
+            <div class="flex-1 space-y-1">
+              <!-- Baris Chord -->
+              <div class="font-mono font-semibold tracking-wide whitespace-pre select-text overflow-hidden" 
+                   style="color: ${chordColor}; font-size: ${state.doc.sizeChord}px;">${line.chords || ''}</div>
+              
+              <!-- Baris Notasi Angka -->
+              <div class="font-mono text-slate-900 font-medium tracking-normal whitespace-pre-wrap select-text flex flex-wrap items-center py-1" 
+                   style="font-size: ${state.doc.sizeNote}px;">
+                ${notesHtml}
+              </div>
+
+              <!-- Baris Lirik -->
+              <div class="tracking-normal whitespace-pre select-text overflow-hidden" 
+                   style="color: ${lyricColor}; font-size: ${state.doc.sizeLyric}px;">${line.lyrics || ''}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSpacerLine(line) {
+      return `
+        <div id="${line.id}" class="w-full flex items-center justify-center border-b border-dashed border-slate-200" style="height: ${line.height || 12}px;">
+        </div>
+      `;
+    }
+
+    function renderAll() {
+      // 1. Sinkronisasi Teks Header
+      document.getElementById('renderTitle').textContent = state.meta.title || 'Tanpa Judul';
+      document.getElementById('renderSubtitle').textContent = state.meta.subtitle || '';
+      document.getElementById('renderKey').textContent = state.meta.key || 'C';
+      document.getElementById('renderTimeSig').textContent = state.meta.timeSig || '4/4';
+      document.getElementById('renderBpm').textContent = state.meta.bpm || '80';
+      document.getElementById('renderComposer').textContent = state.meta.composer || '-';
+      document.getElementById('renderArranger').textContent = state.meta.arranger || '-';
+      document.getElementById('renderFooter').textContent = state.meta.footer || '';
+
+      // 2. Terapkan Pengaturan Kertas
+      const paper = document.getElementById('scorePaper');
+      paper.className = `paper-sheet ${state.doc.paper} ${state.doc.landscape ? 'landscape' : ''} ${state.doc.theme} bg-white shadow-xl mx-auto p-12 relative flex flex-col justify-between border border-slate-300`;
+
+      // 3. Render Setiap Baris
+      const body = document.getElementById('scoreBody');
+      body.innerHTML = '';
+
+      state.lines.forEach((line) => {
+        if (line.type === 'music') {
+          body.insertAdjacentHTML('beforeend', renderMusicLine(line));
+        } else if (line.type === 'spacer') {
+          body.insertAdjacentHTML('beforeend', renderSpacerLine(line));
+        }
+      });
+
+      // 4. Perbarui Daftar Editor Baris di Panel Samping
+      renderSidebarLineList();
+    }
+
+    function renderSidebarLineList() {
+      const container = document.getElementById('lineListContainer');
+      container.innerHTML = '';
+
+      state.lines.forEach((line, index) => {
+        const isMusic = line.type === 'music';
+        const card = document.createElement('div');
+        card.className = "p-3 bg-white border border-slate-200 rounded-md shadow-sm space-y-2 text-xs";
+        
+        if (isMusic) {
+          card.innerHTML = `
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-slate-700">Baris ${index + 1} (Notasi)</span>
+              <div class="flex items-center space-x-1">
+                <button title="Putar baris ini" class="btn-play-line p-1 text-slate-500 hover:text-blue-600">
+                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <button title="Naikkan" class="btn-move-up p-1 text-slate-400 hover:text-slate-800 disabled:opacity-30" ${index === 0 ? 'disabled' : ''}>↑</button>
+                <button title="Turunkan" class="btn-move-down p-1 text-slate-400 hover:text-slate-800 disabled:opacity-30" ${index === state.lines.length - 1 ? 'disabled' : ''}>↓</button>
+                <button title="Duplikat" class="btn-duplicate p-1 text-slate-400 hover:text-slate-800">⎘</button>
+                <button title="Hapus" class="btn-delete p-1 text-slate-400 hover:text-red-600">✕</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-1.5">
+              <div>
+                <label class="text-[10px] text-slate-500 font-medium">Dinamika</label>
+                <input type="text" value="${line.dynamics || ''}" placeholder="mp, f, pp" class="input-dyn w-full border border-slate-200 rounded px-1.5 py-0.5 font-serif italic text-xs">
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-500 font-medium">Volta</label>
+                <input type="text" value="${line.volta || ''}" placeholder="1., 2." class="input-volta w-full border border-slate-200 rounded px-1.5 py-0.5 text-xs font-mono">
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[10px] text-slate-500 font-medium">Akor (Chord)</label>
+              <input type="text" value="${line.chords || ''}" class="input-chord w-full border border-slate-200 rounded px-2 py-1 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="text-[10px] text-slate-500 font-medium">Not Angka (Sintaks)</label>
+              <textarea rows="2" class="input-notes w-full border border-slate-200 rounded px-2 py-1 font-mono text-xs focus:ring-1 focus:ring-blue-500">${line.notes || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="text-[10px] text-slate-500 font-medium">Lirik</label>
+              <input type="text" value="${line.lyrics || ''}" class="input-lyric w-full border border-slate-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500">
+            </div>
+          `;
+
+          // Bindings input
+          card.querySelector('.input-chord').addEventListener('input', (e) => {
+            line.chords = e.target.value;
+            renderAll();
+          });
+          card.querySelector('.input-notes').addEventListener('input', (e) => {
+            line.notes = e.target.value;
+            renderAll();
+          });
+          card.querySelector('.input-lyric').addEventListener('input', (e) => {
+            line.lyrics = e.target.value;
+            renderAll();
+          });
+          card.querySelector('.input-dyn').addEventListener('input', (e) => {
+            line.dynamics = e.target.value;
+            renderAll();
+          });
+          card.querySelector('.input-volta').addEventListener('input', (e) => {
+            line.volta = e.target.value;
+            renderAll();
+          });
+
+          // Play line button
+          card.querySelector('.btn-play-line').addEventListener('click', () => {
+            playScore(index, true);
+          });
+
+        } else {
+          // Spacer card
+          card.innerHTML = `
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-slate-500">Pemisah Ruang (Spacer)</span>
+              <div class="flex items-center space-x-1">
+                <button class="btn-move-up p-1 text-slate-400 hover:text-slate-800 disabled:opacity-30" ${index === 0 ? 'disabled' : ''}>↑</button>
+                <button class="btn-move-down p-1 text-slate-400 hover:text-slate-800 disabled:opacity-30" ${index === state.lines.length - 1 ? 'disabled' : ''}>↓</button>
+                <button class="btn-delete p-1 text-slate-400 hover:text-red-600">✕</button>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span class="text-slate-500">Tinggi (px):</span>
+              <input type="number" min="4" max="80" value="${line.height || 12}" class="input-spacer-h w-16 border rounded px-1.5 py-0.5 font-mono">
+            </div>
+          `;
+          card.querySelector('.input-spacer-h').addEventListener('input', (e) => {
+            line.height = parseInt(e.target.value, 10) || 12;
+            renderAll();
+          });
+        }
+
+        // Action bindings
+        card.querySelector('.btn-move-up')?.addEventListener('click', () => {
+          if (index > 0) {
+            recordState();
+            const temp = state.lines[index];
+            state.lines[index] = state.lines[index - 1];
+            state.lines[index - 1] = temp;
+            renderAll();
+          }
+        });
+
+        card.querySelector('.btn-move-down')?.addEventListener('click', () => {
+          if (index < state.lines.length - 1) {
+            recordState();
+            const temp = state.lines[index];
+            state.lines[index] = state.lines[index + 1];
+            state.lines[index + 1] = temp;
+            renderAll();
+          }
+        });
+
+        card.querySelector('.btn-duplicate')?.addEventListener('click', () => {
+          recordState();
+          const clone = JSON.parse(JSON.stringify(line));
+          clone.id = 'line_' + Date.now();
+          state.lines.splice(index + 1, 0, clone);
+          renderAll();
+          showToast("Baris berhasil digandakan");
+        });
+
+        card.querySelector('.btn-delete')?.addEventListener('click', () => {
+          if (state.lines.length <= 1) {
+            showToast("Minimal terdapat 1 baris partitur.");
+            return;
+          }
+          recordState();
+          state.lines.splice(index, 1);
+          renderAll();
+          showToast("Baris dihapus");
+        });
+
+        container.appendChild(card);
+      });
+    }
+
+    /* Algoritma Transposisi Nada Dasar (Modulasi) */
+    const CHROMATIC_SCALE = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+    
+    function transposeChord(chord, semitones) {
+      if (!chord) return chord;
+      // Regex mencocokkan root chord, cth: C#, Bb, G, F#m7 -> root: F#
+      return chord.replace(/([A-G][b#]?)/g, (match) => {
+        let idx = CHROMATIC_SCALE.indexOf(match);
+        if (idx === -1) {
+          // Normalisasi ekuivalen enharmonik
+          if (match === 'Db') idx = 1;
+          else if (match === 'D#') idx = 3;
+          else if (match === 'Gb') idx = 6;
+          else if (match === 'G#') idx = 8;
+          else if (match === 'A#') idx = 10;
+        }
+        if (idx === -1) return match;
+        let newIdx = (idx + semitones) % 12;
+        if (newIdx < 0) newIdx += 12;
+        return CHROMATIC_SCALE[newIdx];
+      });
+    }
+
+    function applyModulation(targetKey) {
+      const currentKey = state.meta.key || "C";
+      const fromIdx = CHROMATIC_SCALE.indexOf(currentKey);
+      const toIdx = CHROMATIC_SCALE.indexOf(targetKey);
+
+      if (fromIdx === -1 || toIdx === -1) {
+        showToast("Nada dasar tidak valid");
+        return;
+      }
+
+      let diff = toIdx - fromIdx;
+      if (diff === 0) {
+        showToast("Nada dasar sama persis.");
+        return;
+      }
+
+      recordState();
+
+      // 1. Perbarui akor di setiap baris
+      state.lines.forEach(line => {
+        if (line.type === 'music' && line.chords) {
+          line.chords = transposeChord(line.chords, diff);
+        }
+      });
+
+      // 2. Perbarui nada dasar di metadata
+      state.meta.key = targetKey;
+      syncInputsFromState();
+      renderAll();
+      showToast(`Modulasi ke Do = ${targetKey} berhasil!`);
+    }
+
+    function syncInputsFromState() {
+      document.getElementById('metaTitle').value = state.meta.title;
+      document.getElementById('metaSubtitle').value = state.meta.subtitle;
+      document.getElementById('metaComposer').value = state.meta.composer;
+      document.getElementById('metaArranger').value = state.meta.arranger;
+      document.getElementById('metaKey').value = state.meta.key;
+      document.getElementById('metaTimeSig').value = state.meta.timeSig;
+      document.getElementById('metaBpm').value = state.meta.bpm;
+      document.getElementById('quickBpm').value = state.meta.bpm;
+      document.getElementById('metaBaseOctave').value = state.meta.baseOctave || 4;
+      document.getElementById('metaFooter').value = state.meta.footer;
+      document.getElementById('colorChord').value = state.meta.chordColor;
+      document.getElementById('colorLyric').value = state.meta.lyricColor;
+
+      document.getElementById('docPaper').value = state.doc.paper;
+      document.getElementById('docTheme').value = state.doc.theme;
+      document.getElementById('sizeNote').value = state.doc.sizeNote;
+      document.getElementById('sizeLyric').value = state.doc.sizeLyric;
+      document.getElementById('sizeChord').value = state.doc.sizeChord;
+
+      document.getElementById('labelSizeNote').textContent = `${state.doc.sizeNote}px`;
+      document.getElementById('labelSizeLyric').textContent = `${state.doc.sizeLyric}px`;
+      document.getElementById('labelSizeChord').textContent = `${state.doc.sizeChord}px`;
+
+      updateOrientationButtons();
+      applyZoom(state.doc.zoom || 100);
+    }
+
+    function updateOrientationButtons() {
+      const btnP = document.getElementById('btnOrientPortrait');
+      const btnL = document.getElementById('btnOrientLandscape');
+      if (state.doc.landscape) {
+        btnL.className = "py-1.5 px-3 rounded border border-blue-600 bg-blue-50 text-blue-700 font-medium";
+        btnP.className = "py-1.5 px-3 rounded border border-slate-200 text-slate-700 hover:bg-slate-50";
+      } else {
+        btnP.className = "py-1.5 px-3 rounded border border-blue-600 bg-blue-50 text-blue-700 font-medium";
+        btnL.className = "py-1.5 px-3 rounded border border-slate-200 text-slate-700 hover:bg-slate-50";
+      }
+    }
+
+    function applyZoom(val) {
+      state.doc.zoom = Math.min(175, Math.max(50, val));
+      const container = document.getElementById('zoomContainer');
+      container.style.transform = `scale(${state.doc.zoom / 100})`;
+      document.getElementById('zoomLabel').textContent = `${state.doc.zoom}%`;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadFromCache();
+      syncInputsFromState();
+      renderAll();
+      updateUndoRedoButtons();
+
+      // Tab switcher
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => {
+            b.className = "tab-btn flex-1 py-2.5 text-center border-b-2 border-transparent hover:text-slate-900";
+          });
+          btn.className = "tab-btn flex-1 py-2.5 text-center border-b-2 border-blue-600 text-blue-600 bg-white font-semibold";
+          
+          document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+          document.getElementById(btn.dataset.tab).classList.remove('hidden');
+        });
+      });
+
+      // Quick BPM
+      const quickBpm = document.getElementById('quickBpm');
+      quickBpm.addEventListener('change', (e) => {
+        state.meta.bpm = parseInt(e.target.value, 10) || 80;
+        document.getElementById('metaBpm').value = state.meta.bpm;
+        renderAll();
+      });
+
+      // Play & Stop
+      document.getElementById('btnPlayAll').addEventListener('click', () => {
+        if (isPlaying) {
+          stopPlayback();
+        } else {
+          playScore(0, false);
+        }
+      });
+
+      document.getElementById('btnStop').addEventListener('click', stopPlayback);
+
+      // Metronome
+      const btnMetro = document.getElementById('btnMetronome');
+      btnMetro.addEventListener('click', () => {
+        metronomeEnabled = !metronomeEnabled;
+        btnMetro.className = metronomeEnabled 
+          ? "px-2 py-1 text-xs rounded font-medium border border-blue-500 bg-blue-50 text-blue-700 transition"
+          : "px-2 py-1 text-xs rounded font-medium border border-transparent text-slate-600 hover:bg-slate-200 transition";
+      });
+
+      // Undo / Redo
+      document.getElementById('btnUndo').addEventListener('click', undo);
+      document.getElementById('btnRedo').addEventListener('click', redo);
+
+      window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) redo(); else undo();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+          e.preventDefault();
+          redo();
+        }
+      });
+
+      // Zoom
+      document.getElementById('btnZoomIn').addEventListener('click', () => applyZoom(state.doc.zoom + 15));
+      document.getElementById('btnZoomOut').addEventListener('click', () => applyZoom(state.doc.zoom - 15));
+
+      // Tambah Baris Notasi
+      document.getElementById('btnAddMusicLine').addEventListener('click', () => {
+        recordState();
+        state.lines.push({
+          id: 'line_' + Date.now(),
+          type: 'music',
+          volta: '',
+          dynamics: '',
+          chords: '   C              G',
+          notes:  '|  1 2 3 4  |  5 - - 0  |',
+          lyrics: '   La la la la    la...'
+        });
+        renderAll();
+        showToast("Baris notasi ditambahkan");
+      });
+
+      // Tambah Spacer
+      document.getElementById('btnAddSpacer').addEventListener('click', () => {
+        recordState();
+        state.lines.push({
+          id: 'line_spacer_' + Date.now(),
+          type: 'spacer',
+          height: 14
+        });
+        renderAll();
+        showToast("Pemisah ruang ditambahkan");
+      });
+
+      // Metadata Bindings
+      const metaInputs = ['metaTitle', 'metaSubtitle', 'metaComposer', 'metaArranger', 'metaKey', 'metaTimeSig', 'metaBpm', 'metaFooter'];
+      metaInputs.forEach(id => {
+        document.getElementById(id).addEventListener('input', (e) => {
+          const prop = id.replace('meta', '');
+          const key = prop.charAt(0).toLowerCase() + prop.slice(1);
+          state.meta[key] = e.target.value;
+          renderAll();
+        });
+      });
+
+      document.getElementById('metaBaseOctave').addEventListener('change', (e) => {
+        state.meta.baseOctave = parseInt(e.target.value, 10);
+      });
+
+      document.getElementById('colorChord').addEventListener('input', (e) => {
+        state.meta.chordColor = e.target.value;
+        renderAll();
+      });
+
+      document.getElementById('colorLyric').addEventListener('input', (e) => {
+        state.meta.lyricColor = e.target.value;
+        renderAll();
+      });
+
+      // Document Settings Bindings
+      document.getElementById('docPaper').addEventListener('change', (e) => {
+        recordState();
+        state.doc.paper = e.target.value;
+        renderAll();
+      });
+
+      document.getElementById('btnOrientPortrait').addEventListener('click', () => {
+        recordState();
+        state.doc.landscape = false;
+        updateOrientationButtons();
+        renderAll();
+      });
+
+      document.getElementById('btnOrientLandscape').addEventListener('click', () => {
+        recordState();
+        state.doc.landscape = true;
+        updateOrientationButtons();
+        renderAll();
+      });
+
+      document.getElementById('docTheme').addEventListener('change', (e) => {
+        recordState();
+        state.doc.theme = e.target.value;
+        renderAll();
+      });
+
+      document.getElementById('sizeNote').addEventListener('input', (e) => {
+        state.doc.sizeNote = parseInt(e.target.value, 10);
+        document.getElementById('labelSizeNote').textContent = `${state.doc.sizeNote}px`;
+        renderAll();
+      });
+
+      document.getElementById('sizeLyric').addEventListener('input', (e) => {
+        state.doc.sizeLyric = parseInt(e.target.value, 10);
+        document.getElementById('labelSizeLyric').textContent = `${state.doc.sizeLyric}px`;
+        renderAll();
+      });
+
+      document.getElementById('sizeChord').addEventListener('input', (e) => {
+        state.doc.sizeChord = parseInt(e.target.value, 10);
+        document.getElementById('labelSizeChord').textContent = `${state.doc.sizeChord}px`;
+        renderAll();
+      });
+
+      // Modulasi Modal
+      const modalMod = document.getElementById('modalModulation');
+      document.getElementById('btnOpenModulation').addEventListener('click', () => {
+        document.getElementById('modTargetKey').value = state.meta.key || "C";
+        modalMod.classList.remove('hidden');
+      });
+
+      document.getElementById('btnCancelMod').addEventListener('click', () => {
+        modalMod.classList.add('hidden');
+      });
+
+      document.getElementById('btnApplyMod').addEventListener('click', () => {
+        const target = document.getElementById('modTargetKey').value;
+        applyModulation(target);
+        modalMod.classList.add('hidden');
+      });
+
+      // Config Modal (File)
+      const modalConfig = document.getElementById('modalConfig');
+      document.getElementById('btnConfig').addEventListener('click', () => {
+        modalConfig.classList.remove('hidden');
+      });
+
+      document.getElementById('btnCloseConfig').addEventListener('click', () => {
+        modalConfig.classList.add('hidden');
+      });
+
+      // Ekspor JSON
+      document.getElementById('btnExportJSON').addEventListener('click', () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+        const dlAnchor = document.createElement('a');
+        dlAnchor.setAttribute("href", dataStr);
+        dlAnchor.setAttribute("download", `${(state.meta.title || 'partitur').toLowerCase().replace(/\s+/g, '_')}.parti.json`);
+        dlAnchor.click();
+        modalConfig.classList.add('hidden');
+        showToast("Berkas JSON berhasil diunduh");
+      });
+
+      // Impor JSON
+      document.getElementById('fileImportJSON').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const imported = JSON.parse(event.target.result);
+            if (imported.lines && imported.meta) {
+              recordState();
+              state = imported;
+              syncInputsFromState();
+              renderAll();
+              modalConfig.classList.add('hidden');
+              showToast("Partitur berhasil dimuat dari file");
+            } else {
+              showToast("Format JSON tidak sesuai standar Parti");
+            }
+          } catch (err) {
+            showToast("Gagal membaca file JSON");
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Reset ke Default
+      document.getElementById('btnResetDefault').addEventListener('click', () => {
+        recordState();
+        state = JSON.parse(JSON.stringify(DEFAULT_SCORE));
+        syncInputsFromState();
+        renderAll();
+        modalConfig.classList.add('hidden');
+        showToast("Memuat partitur bawaan");
+      });
+
+      // Print PDF
+      document.getElementById('btnPrint').addEventListener('click', () => {
+        window.print();
+      });
+
+      // Ekspor PNG (Menggunakan Canvas Native)
+      document.getElementById('btnExportPNG').addEventListener('click', () => {
+        showToast("Menyiapkan ekspor gambar PNG...");
+        const paper = document.getElementById('scorePaper');
+        
+        // Simpan zoom asli lalu reset untuk rendering akurat
+        const prevZoom = state.doc.zoom;
+        applyZoom(100);
+
+        setTimeout(() => {
+          const rect = paper.getBoundingClientRect();
+          const canvas = document.createElement('canvas');
+          const scale = 2; // Resolusi tajam 2x
+          canvas.width = rect.width * scale;
+          canvas.height = rect.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.scale(scale, scale);
+
+          // Latar belakang putih
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, rect.width, rect.height);
+
+          // Buat elemen gambar dari serialisasi SVG ForeignObject
+          const data = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}">
+              <foreignObject width="100%" height="100%">
+                <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: inherit;">
+                  ${paper.outerHTML}
+                </div>
+              </foreignObject>
+            </svg>
+          `;
+
+          const img = new Image();
+          const svgBlob = new Blob([data], { type: 'image/svg+xml;charset=utf-8' });
+          const url = URL.createObjectURL(svgBlob);
+
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            
+            const link = document.createElement('a');
+            link.download = `${(state.meta.title || 'partitur').toLowerCase().replace(/\s+/g, '_')}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+
+            // Kembalikan zoom
+            applyZoom(prevZoom);
+            showToast("PNG berhasil diunduh!");
+          };
+
+          img.onerror = () => {
+            applyZoom(prevZoom);
+            showToast("Peramban membatasi konversi PNG langsung. Gunakan opsi Cetak/PDF.");
+          };
+
+          img.src = url;
+        }, 150);
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VidEdit</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    }
+                }
+            }
+        };
+    </script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0b0f19;
+            color: #f1f5f9;
+        }
+
+        /* Range Slider Styling Cross-Browser */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 12px;
+            border-radius: 3px;
+            background: #38bdf8;
+            cursor: pointer;
+            border: 1px solid #ffffff;
+            margin-top: -6px;
+            transition: background-color 0.15s ease;
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 20px;
+            width: 12px;
+            border-radius: 3px;
+            background: #38bdf8;
+            cursor: pointer;
+            border: 1px solid #ffffff;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #1e293b;
+            border-radius: 4px;
+        }
+
+        #endRange::-webkit-slider-thumb {
+            background: #10b981;
+        }
+        #endRange::-moz-range-thumb {
+            background: #10b981;
+        }
+
+        /* Preset Filter Preview */
+        .filter-normal { filter: none; }
+        .filter-bright { filter: brightness(1.2) contrast(1.1); }
+        .filter-contrast { filter: contrast(1.35); }
+        .filter-bw { filter: grayscale(100%); }
+        .filter-sepia { filter: sepia(85%); }
+        .filter-warm { filter: sepia(25%) saturate(135%) brightness(1.03); }
+        .filter-cool { filter: hue-rotate(170deg) saturate(115%); }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-sky-500 selection:text-white">
+
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-sky-600 flex items-center justify-center text-white shadow">
+                    <i class="fa-solid fa-scissors text-base" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base tracking-tight text-white">VidEdit</h1>
+                    <p class="text-xs text-slate-400">Pemotong video lokal di peramban</p>
+                </div>
+            </div>
+            
+            <div class="text-xs text-slate-400 hidden sm:flex items-center gap-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Proses di perangkat (tanpa unggah ke server)</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full flex flex-col justify-center">
+
+        <!-- LANGKAH 1: Area Unggah Berkas -->
+        <section id="uploadSection" class="w-full max-w-2xl mx-auto">
+            <div id="dropZone" class="border-2 border-dashed border-slate-700 hover:border-sky-500 rounded-2xl p-8 sm:p-12 text-center bg-slate-900/50 hover:bg-slate-900/80 transition cursor-pointer group shadow-xl">
+                <input type="file" id="videoInput" accept="video/*,.mp4,.webm,.mov,.mkv,.m4v" class="hidden">
+                
+                <div class="w-16 h-16 mx-auto mb-4 rounded-xl bg-slate-800 group-hover:bg-sky-500/10 flex items-center justify-center text-slate-400 group-hover:text-sky-400 border border-slate-700 group-hover:border-sky-500/30 transition">
+                    <i class="fa-solid fa-cloud-arrow-up text-2xl" aria-hidden="true"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-2 text-white">Pilih atau Tarik Berkas Video</h2>
+                <p class="text-xs text-slate-400 mb-6 max-w-md mx-auto leading-relaxed">
+                    Mendukung berkas MP4, WebM, MOV, dan format umum lainnya yang dapat diputar oleh peramban Anda.
+                </p>
+                <button type="button" id="browseFileBtn" class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs sm:text-sm transition shadow focus:ring-2 focus:ring-sky-400 focus:outline-none">
+                    <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                    Buka Berkas
+                </button>
+            </div>
+        </section>
+
+        <!-- LANGKAH 2: Dashboard Editor Video -->
+        <section id="editorSection" class="hidden flex-col gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Kolom Pemutar Video (Kiri) -->
+                <div class="lg:col-span-2 flex flex-col gap-3">
+                    <div class="relative bg-black rounded-xl overflow-hidden shadow-lg aspect-video border border-slate-800 flex items-center justify-center group">
+                        <video id="mainVideo" playsinline preload="auto" class="w-full h-full object-contain filter-normal"></video>
+                        
+                        <!-- Overlay Tombol Putar -->
+                        <button id="overlayPlayBtn" class="absolute inset-0 m-auto w-14 h-14 rounded-full bg-slate-900/80 hover:bg-sky-600 text-white flex items-center justify-center text-lg transition duration-150 backdrop-blur border border-white/20 shadow-md" aria-label="Putar atau Jeda Video">
+                            <i class="fa-solid fa-play ml-1" id="overlayPlayIcon" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <!-- Toolbar Kontrol Pemutaran -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <button id="playBtn" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-sky-600 text-white flex items-center justify-center transition" aria-label="Putar atau Jeda" title="Spasi / K">
+                                <i class="fa-solid fa-play text-xs" id="playBtnIcon" aria-hidden="true"></i>
+                            </button>
+                            <button id="stepBackBtn" class="px-2 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" aria-label="Mundur 1 Frame" title="Mundur 0.05 detik (Koma)">
+                                -1f
+                            </button>
+                            <button id="rewindBtn" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition" aria-label="Mundur 2 Detik" title="Mundur 2 Detik (Panah Kiri)">
+                                <i class="fa-solid fa-rotate-left text-xs" aria-hidden="true"></i>
+                            </button>
+                            <button id="forwardBtn" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition" aria-label="Maju 2 Detik" title="Maju 2 Detik (Panah Kanan)">
+                                <i class="fa-solid fa-rotate-right text-xs" aria-hidden="true"></i>
+                            </button>
+                            <button id="stepForwardBtn" class="px-2 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" aria-label="Maju 1 Frame" title="Maju 0.05 detik (Titik)">
+                                +1f
+                            </button>
+
+                            <div class="h-5 w-px bg-slate-800 mx-1 hidden sm:block"></div>
+
+                            <span class="font-mono text-slate-300 bg-slate-950 px-2.5 py-1.5 rounded border border-slate-800 text-[11px]">
+                                <span id="currentTimeText" class="text-sky-400 font-semibold">00:00.00</span> / <span id="totalDurationText" class="text-slate-400">00:00.00</span>
+                            </span>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button id="snapshotBtn" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition text-xs" title="Simpan gambar frame video saat ini">
+                                <i class="fa-solid fa-camera text-[11px]" aria-hidden="true"></i>
+                                <span>Tangkapan Gambar</span>
+                            </button>
+                            <button id="playSegmentBtn" class="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center gap-1.5 transition text-xs font-medium">
+                                <i class="fa-solid fa-play-circle" aria-hidden="true"></i>
+                                <span>Putar Klip Terpilih</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pengaturan & Informasi (Kanan) -->
+                <div class="flex flex-col gap-4">
+                    <!-- Kartu Informasi Berkas -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                            <h3 class="font-semibold text-slate-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-circle-info text-sky-400" aria-hidden="true"></i> Informasi Berkas
+                            </h3>
+                            <span id="resolutionBadge" class="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">0x0</span>
+                        </div>
+                        <div class="space-y-1.5">
+                            <div class="flex justify-between text-slate-300">
+                                <span class="text-slate-400">Nama berkas:</span>
+                                <span id="fileNameDisplay" class="font-medium truncate max-w-[160px]" title="video.mp4">video.mp4</span>
+                            </div>
+                            <div class="flex justify-between text-slate-300">
+                                <span class="text-slate-400">Ukuran:</span>
+                                <span id="fileSizeDisplay" class="font-medium">0 MB</span>
+                            </div>
+                            <div class="flex justify-between text-slate-300">
+                                <span class="text-slate-400">Durasi asli:</span>
+                                <span id="origDurationDisplay" class="font-medium">00:00.00</span>
+                            </div>
+                            <div class="flex justify-between pt-2 border-t border-slate-800 text-slate-200">
+                                <span class="text-emerald-400 font-medium">Durasi potongan:</span>
+                                <span id="trimmedDurationDisplay" class="font-bold text-emerald-400">00:00.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kartu Opsi Ekspor -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col justify-between gap-4 text-xs">
+                        <div class="space-y-3">
+                            <h3 class="font-semibold text-slate-300 flex items-center gap-1.5 pb-2 border-b border-slate-800">
+                                <i class="fa-solid fa-sliders text-sky-400" aria-hidden="true"></i> Pengaturan Ekspor
+                            </h3>
+                            
+                            <!-- Kecepatan -->
+                            <div>
+                                <label for="speedSelect" class="block text-slate-400 mb-1 text-[11px]">Kecepatan Pemutaran</label>
+                                <select id="speedSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                                    <option value="0.5">0.5x (Lambat)</option>
+                                    <option value="0.75">0.75x</option>
+                                    <option value="1.0" selected>1.0x (Normal)</option>
+                                    <option value="1.25">1.25x</option>
+                                    <option value="1.5">1.5x (Cepat)</option>
+                                    <option value="2.0">2.0x (Sangat Cepat)</option>
+                                </select>
+                            </div>
+
+                            <!-- Filter Warna -->
+                            <div>
+                                <label for="filterSelect" class="block text-slate-400 mb-1 text-[11px]">Filter Warna</label>
+                                <select id="filterSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                                    <option value="filter-normal">Asli (Tanpa Efek)</option>
+                                    <option value="filter-bright">Lebih Terang</option>
+                                    <option value="filter-contrast">Kontras Tinggi</option>
+                                    <option value="filter-bw">Monokrom (Hitam Putih)</option>
+                                    <option value="filter-sepia">Sepia Klasik</option>
+                                    <option value="filter-warm">Nuansa Hangat</option>
+                                    <option value="filter-cool">Nuansa Dingin</option>
+                                </select>
+                            </div>
+
+                            <!-- Resolusi & Format -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label for="exportResolutionSelect" class="block text-slate-400 mb-1 text-[11px]">Resolusi</label>
+                                    <select id="exportResolutionSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                                        <option value="original" selected>Asli</option>
+                                        <option value="1080">1080p</option>
+                                        <option value="720">720p</option>
+                                        <option value="480">480p</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="exportFormatSelect" class="block text-slate-400 mb-1 text-[11px]">Format Keluaran</label>
+                                    <select id="exportFormatSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                                        <option value="auto" selected>Otomatis (Didukung)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Mute Audio -->
+                            <label class="flex items-center justify-between p-2.5 bg-slate-950 rounded-lg border border-slate-800 cursor-pointer">
+                                <div>
+                                    <div class="font-medium text-slate-300">Bisukan Suara</div>
+                                    <div class="text-[10px] text-slate-500">Ekspor tanpa trek audio</div>
+                                </div>
+                                <input type="checkbox" id="muteAudioCheck" class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-sky-600 focus:ring-sky-500">
+                            </label>
+                        </div>
+
+                        <!-- Tombol Aksi -->
+                        <div class="space-y-2 pt-2 border-t border-slate-800">
+                            <button type="button" id="startExportBtn" class="w-full py-2.5 px-4 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition shadow">
+                                <i class="fa-solid fa-scissors" aria-hidden="true"></i>
+                                <span>Potong & Ekspor Video</span>
+                            </button>
+                            <button type="button" id="changeVideoBtn" class="w-full py-2 px-4 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-arrow-rotate-left text-[10px]" aria-hidden="true"></i>
+                                <span>Ganti Berkas Video</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- KONTROL TIMELINE PEMOTONGAN -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-film text-sky-400 text-xs" aria-hidden="true"></i>
+                        <h3 class="font-semibold text-xs sm:text-sm text-white">Batas Waktu Potongan</h3>
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="setStartBtn" class="px-2.5 py-1 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-xs border border-sky-500/30 flex items-center gap-1 transition" title="Pintasan keyboard: [">
+                            <span>Mulai di Posisi Ini [</span>
+                        </button>
+                        <button type="button" id="setEndBtn" class="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs border border-emerald-500/30 flex items-center gap-1 transition" title="Pintasan keyboard: ]">
+                            <span>Selesai di Posisi Ini ]</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Visual Strip Timeline -->
+                <div class="relative w-full select-none">
+                    <!-- Kontainer Thumbnail dengan Overlay Terbatas di dalamnya -->
+                    <div id="timelineTrack" class="relative w-full h-16 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 cursor-pointer shadow-inner">
+                        <!-- Strip Gambar Thumbnail -->
+                        <div id="thumbnailStrip" class="w-full h-full flex items-center">
+                            <div class="w-full text-slate-500 text-xs flex items-center justify-center" id="thumbLoadingText">
+                                <i class="fa-solid fa-spinner animate-spin mr-2 text-sky-400" aria-hidden="true"></i> Menyiapkan thumbnail...
+                            </div>
+                        </div>
+
+                        <!-- Sorotan Area Klip Terpilih -->
+                        <div id="cutRegionHighlight" class="absolute top-0 bottom-0 bg-sky-500/20 border-l-2 border-r-2 border-sky-400 pointer-events-none" style="left: 0%; right: 0%;">
+                            <span class="absolute top-1 left-1 text-[9px] font-mono text-sky-300 font-bold bg-slate-900/90 px-1 rounded">MULAI</span>
+                            <span class="absolute top-1 right-1 text-[9px] font-mono text-emerald-300 font-bold bg-slate-900/90 px-1 rounded">SELESAI</span>
+                        </div>
+
+                        <!-- Indikator Posisi Waktu Saat Ini (Playhead) -->
+                        <div id="playheadLine" class="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-20 pointer-events-none" style="left: 0%;">
+                            <div class="w-2.5 h-2.5 bg-rose-500 rounded-full -ml-[4px] mt-0.5 shadow"></div>
+                        </div>
+                    </div>
+
+                    <!-- Kontrol Geser & Input Manual -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 text-xs">
+                        <!-- Batas Awal -->
+                        <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label for="startRange" class="font-medium text-sky-400 flex items-center gap-1 text-xs">
+                                    <i class="fa-solid fa-arrow-right-to-bracket text-[10px]" aria-hidden="true"></i> Titik Mulai
+                                </label>
+                                <div class="flex items-center gap-1">
+                                    <input type="text" id="startTimeInput" class="w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-right font-mono text-xs text-sky-300 focus:outline-none focus:border-sky-500" value="00:00.00" aria-label="Waktu mulai manual">
+                                    <span class="text-slate-500 text-[10px]">detik</span>
+                                </div>
+                            </div>
+                            <input type="range" id="startRange" min="0" max="100" value="0" step="0.01" aria-label="Geser titik mulai">
+                        </div>
+
+                        <!-- Batas Akhir -->
+                        <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label for="endRange" class="font-medium text-emerald-400 flex items-center gap-1 text-xs">
+                                    <i class="fa-solid fa-arrow-right-from-bracket text-[10px]" aria-hidden="true"></i> Titik Selesai
+                                </label>
+                                <div class="flex items-center gap-1">
+                                    <input type="text" id="endTimeInput" class="w-20 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-right font-mono text-xs text-emerald-300 focus:outline-none focus:border-emerald-500" value="00:00.00" aria-label="Waktu selesai manual">
+                                    <span class="text-slate-500 text-[10px]">detik</span>
+                                </div>
+                            </div>
+                            <input type="range" id="endRange" min="0" max="100" value="100" step="0.01" aria-label="Geser titik selesai">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LANGKAH 3: Modal Proses Ekspor -->
+        <div id="exportModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-7 max-w-md w-full shadow-2xl text-center space-y-4">
+                
+                <!-- Status Sedang Memproses -->
+                <div id="processingState" class="space-y-4">
+                    <div class="w-12 h-12 rounded-xl bg-sky-500/10 text-sky-400 mx-auto flex items-center justify-center text-xl border border-sky-500/20">
+                        <i class="fa-solid fa-film" aria-hidden="true"></i>
+                    </div>
+                    <div>
+                        <h3 id="exportModalTitle" class="text-base font-bold text-white mb-1">Mengekspor Klip Video</h3>
+                        <p class="text-xs text-slate-400">Sedang memproses potongan frame. Mohon biarkan tab ini tetap terbuka.</p>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="progressBarAria">
+                        <div id="exportProgressBar" class="bg-sky-500 h-full rounded-full w-0 transition-all duration-100"></div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
+                        <span id="exportProgressText" class="text-sky-400 font-semibold">0%</span>
+                        <span id="exportTimeRemaining">Estimasi: Menghitung...</span>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="button" id="cancelExportBtn" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-rose-950 hover:text-rose-200 text-slate-300 text-xs border border-slate-700 transition">
+                            Batalkan Proses
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status Selesai -->
+                <div id="completedState" class="hidden space-y-4">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 mx-auto flex items-center justify-center text-xl border border-emerald-500/20">
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white">Ekspor Selesai</h3>
+                        <p class="text-xs text-slate-400">Klip video Anda siap diunduh atau dipratinjau di bawah.</p>
+                    </div>
+                    
+                    <!-- Pratinjau Video Hasil -->
+                    <div class="bg-black rounded-lg overflow-hidden aspect-video border border-slate-800">
+                        <video id="resultVideo" controls playsinline class="w-full h-full object-contain"></video>
+                    </div>
+
+                    <div class="flex flex-col gap-2 pt-1">
+                        <a id="downloadBtn" download="video_potongan.webm" class="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition shadow">
+                            <i class="fa-solid fa-download" aria-hidden="true"></i>
+                            <span id="downloadBtnText">Unduh Video</span>
+                        </a>
+                        <button type="button" id="closeExportModalBtn" class="w-full py-2 px-4 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="border-t border-slate-800/80 bg-slate-900/60 py-3.5 text-center text-xs text-slate-500">
+        <p>VidEdit &mdash; Pemotong Video di Peramban</p>
+    </footer>
+
+    <!-- Elemen Toast Notifikasi -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none" aria-live="polite"></div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // Elemen DOM
+            const dropZone = document.getElementById('dropZone');
+            const videoInput = document.getElementById('videoInput');
+            const browseFileBtn = document.getElementById('browseFileBtn');
+            const uploadSection = document.getElementById('uploadSection');
+            const editorSection = document.getElementById('editorSection');
+            const mainVideo = document.getElementById('mainVideo');
+            
+            const overlayPlayBtn = document.getElementById('overlayPlayBtn');
+            const overlayPlayIcon = document.getElementById('overlayPlayIcon');
+            const playBtn = document.getElementById('playBtn');
+            const playBtnIcon = document.getElementById('playBtnIcon');
+            const stepBackBtn = document.getElementById('stepBackBtn');
+            const rewindBtn = document.getElementById('rewindBtn');
+            const forwardBtn = document.getElementById('forwardBtn');
+            const stepForwardBtn = document.getElementById('stepForwardBtn');
+            const snapshotBtn = document.getElementById('snapshotBtn');
+            const playSegmentBtn = document.getElementById('playSegmentBtn');
+            
+            const currentTimeText = document.getElementById('currentTimeText');
+            const totalDurationText = document.getElementById('totalDurationText');
+            const fileNameDisplay = document.getElementById('fileNameDisplay');
+            const fileSizeDisplay = document.getElementById('fileSizeDisplay');
+            const origDurationDisplay = document.getElementById('origDurationDisplay');
+            const trimmedDurationDisplay = document.getElementById('trimmedDurationDisplay');
+            const resolutionBadge = document.getElementById('resolutionBadge');
+            
+            const speedSelect = document.getElementById('speedSelect');
+            const filterSelect = document.getElementById('filterSelect');
+            const exportResolutionSelect = document.getElementById('exportResolutionSelect');
+            const exportFormatSelect = document.getElementById('exportFormatSelect');
+            const muteAudioCheck = document.getElementById('muteAudioCheck');
+            const startExportBtn = document.getElementById('startExportBtn');
+            const changeVideoBtn = document.getElementById('changeVideoBtn');
+
+            const setStartBtn = document.getElementById('setStartBtn');
+            const setEndBtn = document.getElementById('setEndBtn');
+            const timelineTrack = document.getElementById('timelineTrack');
+            const thumbnailStrip = document.getElementById('thumbnailStrip');
+            const cutRegionHighlight = document.getElementById('cutRegionHighlight');
+            const playheadLine = document.getElementById('playheadLine');
+            const startRange = document.getElementById('startRange');
+            const endRange = document.getElementById('endRange');
+            const startTimeInput = document.getElementById('startTimeInput');
+            const endTimeInput = document.getElementById('endTimeInput');
+
+            const exportModal = document.getElementById('exportModal');
+            const processingState = document.getElementById('processingState');
+            const completedState = document.getElementById('completedState');
+            const exportProgressBar = document.getElementById('exportProgressBar');
+            const exportProgressText = document.getElementById('exportProgressText');
+            const exportTimeRemaining = document.getElementById('exportTimeRemaining');
+            const cancelExportBtn = document.getElementById('cancelExportBtn');
+            const closeExportModalBtn = document.getElementById('closeExportModalBtn');
+            const resultVideo = document.getElementById('resultVideo');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const downloadBtnText = document.getElementById('downloadBtnText');
+            const toastContainer = document.getElementById('toastContainer');
+
+            // Status State
+            let originalVideoUrl = null;
+            let resultVideoUrl = null;
+            let videoDuration = 0;
+            let trimStart = 0;
+            let trimEnd = 0;
+            let isSegmentPlaying = false;
+            let isExporting = false;
+            let exportAbortRequested = false;
+            let activeMediaRecorder = null;
+            let wakeLockSentinel = null;
+
+            // Audio Routing Nodes
+            let audioContext = null;
+            let mediaSourceNode = null;
+            let speakerGainNode = null;
+            let activeAudioDestinationNode = null;
+
+            // Pemetaan Filter Kanvas yang Seragam
+            const CANVAS_FILTER_MAP = {
+                'filter-normal': 'none',
+                'filter-bright': 'brightness(1.2) contrast(1.1)',
+                'filter-contrast': 'contrast(1.35)',
+                'filter-bw': 'grayscale(100%)',
+                'filter-sepia': 'sepia(85%)',
+                'filter-warm': 'sepia(25%) saturate(135%) brightness(1.03)',
+                'filter-cool': 'hue-rotate(170deg) saturate(115%)'
+            };
+
+            // Mencegah Peramban Navigasi Keluar saat Menjatuhkan Berkas di Luar Dropzone
+            window.addEventListener('dragover', (e) => e.preventDefault());
+            window.addEventListener('drop', (e) => e.preventDefault());
+
+            // Deteksi Format dan Inisialisasi Pilihan Format Ekspor
+            function initExportFormatOptions() {
+                exportFormatSelect.innerHTML = '';
+                const candidates = [
+                    { label: 'MP4 (H.264 / AAC)', mime: 'video/mp4;codecs=avc1,mp4a.40.2', ext: 'mp4' },
+                    { label: 'MP4 (Standar)', mime: 'video/mp4', ext: 'mp4' },
+                    { label: 'WebM (VP9 / Opus)', mime: 'video/webm;codecs=vp9,opus', ext: 'webm' },
+                    { label: 'WebM (VP8 / Opus)', mime: 'video/webm;codecs=vp8,opus', ext: 'webm' },
+                    { label: 'WebM (H.264)', mime: 'video/webm;codecs=h264,opus', ext: 'webm' },
+                    { label: 'WebM (Standar)', mime: 'video/webm', ext: 'webm' }
+                ];
+
+                let supportedCount = 0;
+                for (const item of candidates) {
+                    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(item.mime)) {
+                        const opt = document.createElement('option');
+                        opt.value = JSON.stringify({ mime: item.mime, ext: item.ext });
+                        opt.textContent = item.label;
+                        exportFormatSelect.appendChild(opt);
+                        supportedCount++;
+                    }
+                }
+
+                if (supportedCount === 0) {
+                    const fallbackOpt = document.createElement('option');
+                    fallbackOpt.value = JSON.stringify({ mime: '', ext: 'webm' });
+                    fallbackOpt.textContent = 'WebM (Bawaan Peramban)';
+                    exportFormatSelect.appendChild(fallbackOpt);
+                }
+            }
+            initExportFormatOptions();
+
+            // Pilihan Berkas
+            browseFileBtn.addEventListener('click', () => videoInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-sky-500', 'bg-slate-900/80');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-sky-500', 'bg-slate-900/80');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-sky-500', 'bg-slate-900/80');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    processVideoFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            videoInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    processVideoFile(e.target.files[0]);
+                }
+            });
+
+            function isValidVideoFile(file) {
+                if (file.type && file.type.startsWith('video/')) return true;
+                return /\.(mp4|webm|mov|mkv|avi|m4v|ogv)$/i.test(file.name);
+            }
+
+            function processVideoFile(file) {
+                if (!isValidVideoFile(file)) {
+                    showToast('Format berkas tidak dikenali sebagai video.', 'error');
+                    return;
+                }
+
+                if (originalVideoUrl) URL.revokeObjectURL(originalVideoUrl);
+                if (resultVideoUrl) URL.revokeObjectURL(resultVideoUrl);
+
+                originalVideoUrl = URL.createObjectURL(file);
+                mainVideo.src = originalVideoUrl;
+                mainVideo.load();
+
+                fileNameDisplay.textContent = file.name;
+                fileNameDisplay.title = file.name;
+                fileSizeDisplay.textContent = formatBytes(file.size);
+
+                mainVideo.onloadedmetadata = () => {
+                    videoDuration = mainVideo.duration;
+                    if (!videoDuration || isNaN(videoDuration) || videoDuration <= 0) {
+                        showToast('Tidak dapat membaca durasi video.', 'error');
+                        return;
+                    }
+
+                    trimStart = 0;
+                    trimEnd = videoDuration;
+
+                    startRange.max = videoDuration;
+                    startRange.value = 0;
+                    endRange.max = videoDuration;
+                    endRange.value = videoDuration;
+
+                    resolutionBadge.textContent = `${mainVideo.videoWidth}x${mainVideo.videoHeight}`;
+                    totalDurationText.textContent = formatTime(videoDuration);
+                    origDurationDisplay.textContent = formatTime(videoDuration);
+                    
+                    updateTrimControls(true);
+
+                    uploadSection.classList.add('hidden');
+                    editorSection.classList.remove('hidden');
+                    editorSection.classList.add('flex');
+
+                    generateThumbnails();
+                    showToast('Video berhasil dimuat.', 'info');
+                };
+
+                mainVideo.onerror = () => {
+                    showToast('Gagal memuat video. Format atau codec mungkin tidak didukung peramban.', 'error');
+                    resetEditor();
+                };
+            }
+
+            // Formatting Utilities
+            function formatTime(seconds) {
+                if (isNaN(seconds) || seconds < 0) seconds = 0;
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                const ms = Math.floor((seconds % 1) * 100);
+                return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+            }
+
+            function parseTime(str) {
+                if (!str) return NaN;
+                const parts = str.trim().split(':');
+                if (parts.length === 2) {
+                    const min = parseFloat(parts[0]);
+                    const sec = parseFloat(parts[1]);
+                    if (!isNaN(min) && !isNaN(sec)) return (min * 60) + sec;
+                } else if (parts.length === 1) {
+                    return parseFloat(parts[0]);
+                }
+                return NaN;
+            }
+
+            function formatBytes(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            // Audio Subsystem Setup
+            function ensureAudioGraph() {
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioCtx) return;
+                    if (!audioContext) {
+                        audioContext = new AudioCtx();
+                    }
+                    if (audioContext.state === 'suspended') {
+                        audioContext.resume();
+                    }
+                    if (!mediaSourceNode) {
+                        mediaSourceNode = audioContext.createMediaElementSource(mainVideo);
+                        speakerGainNode = audioContext.createGain();
+                        speakerGainNode.gain.value = 1.0;
+                        mediaSourceNode.connect(speakerGainNode);
+                        speakerGainNode.connect(audioContext.destination);
+                    }
+                } catch (err) {
+                    console.warn('Inisialisasi audio graph:', err);
+                }
+            }
+
+            // Pemutaran Video
+            function togglePlay() {
+                ensureAudioGraph();
+                if (mainVideo.paused) {
+                    mainVideo.play().then(() => {
+                        overlayPlayBtn.classList.add('opacity-0', 'pointer-events-none');
+                        playBtnIcon.className = 'fa-solid fa-pause text-xs';
+                    }).catch(err => {
+                        console.warn('Pemutaran dijeda atau diblokir:', err);
+                    });
+                } else {
+                    mainVideo.pause();
+                    overlayPlayBtn.classList.remove('opacity-0', 'pointer-events-none');
+                    playBtnIcon.className = 'fa-solid fa-play text-xs';
+                    isSegmentPlaying = false;
+                }
+            }
+
+            overlayPlayBtn.addEventListener('click', togglePlay);
+            playBtn.addEventListener('click', togglePlay);
+
+            mainVideo.addEventListener('timeupdate', () => {
+                if (isExporting) return;
+                const curr = mainVideo.currentTime;
+                currentTimeText.textContent = formatTime(curr);
+
+                if (videoDuration > 0) {
+                    const pct = (curr / videoDuration) * 100;
+                    playheadLine.style.left = `${Math.min(100, Math.max(0, pct))}%`;
+                }
+
+                if (isSegmentPlaying && curr >= trimEnd) {
+                    mainVideo.pause();
+                    mainVideo.currentTime = trimStart;
+                    isSegmentPlaying = false;
+                    overlayPlayBtn.classList.remove('opacity-0', 'pointer-events-none');
+                    playBtnIcon.className = 'fa-solid fa-play text-xs';
+                }
+            });
+
+            mainVideo.addEventListener('ended', () => {
+                overlayPlayBtn.classList.remove('opacity-0', 'pointer-events-none');
+                playBtnIcon.className = 'fa-solid fa-play text-xs';
+                isSegmentPlaying = false;
+            });
+
+            stepBackBtn.addEventListener('click', () => stepTime(-0.05));
+            stepForwardBtn.addEventListener('click', () => stepTime(0.05));
+            rewindBtn.addEventListener('click', () => stepTime(-2));
+            forwardBtn.addEventListener('click', () => stepTime(2));
+
+            function stepTime(delta) {
+                mainVideo.currentTime = Math.min(videoDuration, Math.max(0, mainVideo.currentTime + delta));
+            }
+
+            speedSelect.addEventListener('change', () => {
+                mainVideo.playbackRate = parseFloat(speedSelect.value) || 1.0;
+            });
+
+            filterSelect.addEventListener('change', () => {
+                mainVideo.className = `w-full h-full object-contain ${filterSelect.value}`;
+            });
+
+            playSegmentBtn.addEventListener('click', () => {
+                mainVideo.currentTime = trimStart;
+                isSegmentPlaying = true;
+                ensureAudioGraph();
+                mainVideo.play().then(() => {
+                    overlayPlayBtn.classList.add('opacity-0', 'pointer-events-none');
+                    playBtnIcon.className = 'fa-solid fa-pause text-xs';
+                }).catch(err => console.warn(err));
+            });
+
+            // Tangkapan Gambar (Snapshot PNG)
+            snapshotBtn.addEventListener('click', () => {
+                if (!mainVideo.videoWidth || !mainVideo.videoHeight) {
+                    showToast('Video belum siap diambil gambarnya.', 'error');
+                    return;
+                }
+                const snapCanvas = document.createElement('canvas');
+                snapCanvas.width = mainVideo.videoWidth;
+                snapCanvas.height = mainVideo.videoHeight;
+                const snapCtx = snapCanvas.getContext('2d');
+                
+                const filterClass = filterSelect.value;
+                snapCtx.filter = CANVAS_FILTER_MAP[filterClass] || 'none';
+                snapCtx.drawImage(mainVideo, 0, 0, snapCanvas.width, snapCanvas.height);
+
+                snapCanvas.toBlob((blob) => {
+                    if (!blob) return;
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    const base = (fileNameDisplay.textContent || 'video').replace(/\.[^/.]+$/, '');
+                    a.download = `${base}_frame_${mainVideo.currentTime.toFixed(2)}s.png`;
+                    a.href = url;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    showToast('Tangkapan gambar disimpan.', 'info');
+                }, 'image/png');
+            });
+
+            // Kontrol Timeline Klik
+            timelineTrack.addEventListener('click', (e) => {
+                const rect = timelineTrack.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                mainVideo.currentTime = ratio * videoDuration;
+            });
+
+            // Sinkronisasi Batas Trim
+            startRange.addEventListener('input', () => {
+                let startVal = parseFloat(startRange.value);
+                if (startVal >= trimEnd) {
+                    startVal = Math.max(0, trimEnd - 0.1);
+                    startRange.value = startVal;
+                }
+                trimStart = startVal;
+                mainVideo.currentTime = trimStart;
+                updateTrimControls(false);
+            });
+
+            endRange.addEventListener('input', () => {
+                let endVal = parseFloat(endRange.value);
+                if (endVal <= trimStart) {
+                    endVal = Math.min(videoDuration, trimStart + 0.1);
+                    endRange.value = endVal;
+                }
+                trimEnd = endVal;
+                mainVideo.currentTime = trimEnd;
+                updateTrimControls(false);
+            });
+
+            startTimeInput.addEventListener('change', () => {
+                const parsed = parseTime(startTimeInput.value);
+                if (!isNaN(parsed) && parsed >= 0 && parsed < trimEnd) {
+                    trimStart = parsed;
+                    startRange.value = trimStart;
+                    mainVideo.currentTime = trimStart;
+                }
+                updateTrimControls(true);
+            });
+
+            endTimeInput.addEventListener('change', () => {
+                const parsed = parseTime(endTimeInput.value);
+                if (!isNaN(parsed) && parsed > trimStart && parsed <= videoDuration) {
+                    trimEnd = parsed;
+                    endRange.value = trimEnd;
+                    mainVideo.currentTime = trimEnd;
+                }
+                updateTrimControls(true);
+            });
+
+            setStartBtn.addEventListener('click', () => {
+                const curr = mainVideo.currentTime;
+                if (curr < trimEnd) {
+                    trimStart = curr;
+                    startRange.value = curr;
+                    updateTrimControls(true);
+                    showToast(`Batas mulai: ${formatTime(curr)}`, 'info');
+                } else {
+                    showToast('Batas mulai harus sebelum batas akhir.', 'error');
+                }
+            });
+
+            setEndBtn.addEventListener('click', () => {
+                const curr = mainVideo.currentTime;
+                if (curr > trimStart) {
+                    trimEnd = curr;
+                    endRange.value = curr;
+                    updateTrimControls(true);
+                    showToast(`Batas akhir: ${formatTime(curr)}`, 'info');
+                } else {
+                    showToast('Batas akhir harus setelah batas mulai.', 'error');
+                }
+            });
+
+            function updateTrimControls(syncInputFields) {
+                if (syncInputFields) {
+                    startTimeInput.value = formatTime(trimStart);
+                    endTimeInput.value = formatTime(trimEnd);
+                } else {
+                    startTimeInput.value = trimStart.toFixed(2);
+                    endTimeInput.value = trimEnd.toFixed(2);
+                }
+
+                const diff = Math.max(0, trimEnd - trimStart);
+                trimmedDurationDisplay.textContent = formatTime(diff);
+
+                if (videoDuration > 0) {
+                    const leftPct = (trimStart / videoDuration) * 100;
+                    const rightPct = 100 - ((trimEnd / videoDuration) * 100);
+                    cutRegionHighlight.style.left = `${Math.max(0, leftPct)}%`;
+                    cutRegionHighlight.style.right = `${Math.max(0, rightPct)}%`;
+                }
+            }
+
+            // Pembuatan Thumbnail Progresif
+            function generateThumbnails() {
+                thumbnailStrip.innerHTML = '<div class="w-full text-slate-500 text-xs flex items-center justify-center" id="thumbLoadingText"><i class="fa-solid fa-spinner animate-spin mr-2 text-sky-400" aria-hidden="true"></i> Menyiapkan thumbnail...</div>';
+
+                const totalThumbs = 12;
+                const step = videoDuration / totalThumbs;
+                const tempVideo = document.createElement('video');
+                tempVideo.src = originalVideoUrl;
+                tempVideo.muted = true;
+                tempVideo.playsInline = true;
+
+                const canvas = document.createElement('canvas');
+                canvas.width = 120;
+                canvas.height = 68;
+                const ctx = canvas.getContext('2d', { alpha: false });
+
+                let currentIndex = 0;
+                let loadingRemoved = false;
+
+                tempVideo.onloadeddata = () => {
+                    seekNext();
+                };
+
+                tempVideo.onerror = () => {
+                    const loader = document.getElementById('thumbLoadingText');
+                    if (loader) loader.textContent = 'Thumbnail tidak tersedia';
+                };
+
+                function seekNext() {
+                    if (currentIndex >= totalThumbs) {
+                        tempVideo.src = '';
+                        return;
+                    }
+                    tempVideo.currentTime = Math.min(videoDuration - 0.05, currentIndex * step);
+                }
+
+                tempVideo.onseeked = () => {
+                    ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+                    const img = document.createElement('img');
+                    img.src = canvas.toDataURL('image/jpeg', 0.6);
+                    img.className = 'h-full flex-1 object-cover opacity-80 pointer-events-none border-r border-slate-900 last:border-r-0';
+                    img.alt = 'Thumbnail pratinjau';
+
+                    if (!loadingRemoved) {
+                        const loader = document.getElementById('thumbLoadingText');
+                        if (loader) loader.remove();
+                        loadingRemoved = true;
+                    }
+
+                    thumbnailStrip.appendChild(img);
+                    currentIndex++;
+                    seekNext();
+                };
+            }
+
+            // Manajemen Wake Lock saat Ekspor
+            async function requestScreenWakeLock() {
+                if ('wakeLock' in navigator) {
+                    try {
+                        wakeLockSentinel = await navigator.wakeLock.request('screen');
+                    } catch (err) {
+                        console.warn('Wake Lock tidak didukung atau ditolak:', err);
+                    }
+                }
+            }
+
+            function releaseScreenWakeLock() {
+                if (wakeLockSentinel) {
+                    wakeLockSentinel.release().catch(() => {});
+                    wakeLockSentinel = null;
+                }
+            }
+
+            // Proses Ekspor Video
+            startExportBtn.addEventListener('click', startExport);
+            cancelExportBtn.addEventListener('click', cancelExport);
+            closeExportModalBtn.addEventListener('click', closeExportModal);
+            changeVideoBtn.addEventListener('click', () => resetEditor(true));
+
+            async function startExport() {
+                const clipDuration = trimEnd - trimStart;
+                if (clipDuration < 0.2) {
+                    showToast('Durasi potongan minimal 0.2 detik.', 'error');
+                    return;
+                }
+
+                ensureAudioGraph();
+
+                // UI Modal Setup
+                exportModal.classList.remove('hidden');
+                exportModal.classList.add('flex');
+                processingState.classList.remove('hidden');
+                completedState.classList.add('hidden');
+                exportProgressBar.style.width = '0%';
+                exportProgressText.textContent = '0%';
+                exportTimeRemaining.textContent = 'Menyiapkan prosesor...';
+
+                isExporting = true;
+                exportAbortRequested = false;
+
+                await requestScreenWakeLock();
+
+                // Mute suara ke speaker pengguna selama render ekspor
+                if (speakerGainNode) {
+                    speakerGainNode.gain.value = 0;
+                }
+
+                const isMuted = muteAudioCheck.checked;
+                const filterClass = filterSelect.value;
+                const resChoice = exportResolutionSelect.value;
+                const formatData = JSON.parse(exportFormatSelect.value || '{}');
+                const targetMime = formatData.mime || 'video/webm';
+                const outputExt = formatData.ext || 'webm';
+
+                // Hitung Dimensi Kanvas Genap
+                let targetWidth = mainVideo.videoWidth || 1280;
+                let targetHeight = mainVideo.videoHeight || 720;
+
+                if (resChoice === '1080' && targetHeight > 1080) {
+                    targetWidth = Math.round((targetWidth * 1080) / targetHeight);
+                    targetHeight = 1080;
+                } else if (resChoice === '720' && targetHeight > 720) {
+                    targetWidth = Math.round((targetWidth * 720) / targetHeight);
+                    targetHeight = 720;
+                } else if (resChoice === '480' && targetHeight > 480) {
+                    targetWidth = Math.round((targetWidth * 480) / targetHeight);
+                    targetHeight = 480;
+                }
+
+                targetWidth = targetWidth - (targetWidth % 2);
+                targetHeight = targetHeight - (targetHeight % 2);
+
+                const exportCanvas = document.createElement('canvas');
+                exportCanvas.width = targetWidth;
+                exportCanvas.height = targetHeight;
+                const exportCtx = exportCanvas.getContext('2d', { desynchronized: true });
+                exportCtx.filter = CANVAS_FILTER_MAP[filterClass] || 'none';
+
+                // Target FPS berdasarkan video asli atau standar 30
+                const targetFps = 30;
+                const stream = exportCanvas.captureStream(targetFps);
+
+                // Jalur Audio ke Stream
+                if (!isMuted && audioContext && mediaSourceNode) {
+                    try {
+                        activeAudioDestinationNode = audioContext.createMediaStreamDestination();
+                        mediaSourceNode.connect(activeAudioDestinationNode);
+                        const audioTracks = activeAudioDestinationNode.stream.getAudioTracks();
+                        if (audioTracks.length > 0) {
+                            stream.addTrack(audioTracks[0]);
+                        }
+                    } catch (err) {
+                        console.warn('Gagal menghubungkan audio track:', err);
+                    }
+                }
+
+                // Inisialisasi MediaRecorder
+                const bitrateOptions = {
+                    mimeType: targetMime,
+                    videoBitsPerSecond: 6000000
+                };
+
+                let mediaRecorder;
+                try {
+                    mediaRecorder = new MediaRecorder(stream, bitrateOptions);
+                } catch (e1) {
+                    try {
+                        mediaRecorder = new MediaRecorder(stream, { mimeType: targetMime });
+                    } catch (e2) {
+                        mediaRecorder = new MediaRecorder(stream);
+                    }
+                }
+
+                activeMediaRecorder = mediaRecorder;
+                const recordedChunks = [];
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) {
+                        recordedChunks.push(e.data);
+                    }
+                };
+
+                const startTimestamp = performance.now();
+
+                mediaRecorder.onstop = () => {
+                    cleanupExportResources();
+
+                    if (exportAbortRequested) {
+                        closeExportModal();
+                        showToast('Ekspor dibatalkan.', 'info');
+                        return;
+                    }
+
+                    const outputBlob = new Blob(recordedChunks, { type: targetMime || 'video/webm' });
+                    if (resultVideoUrl) URL.revokeObjectURL(resultVideoUrl);
+                    resultVideoUrl = URL.createObjectURL(outputBlob);
+
+                    resultVideo.src = resultVideoUrl;
+                    downloadBtn.href = resultVideoUrl;
+
+                    const baseName = (fileNameDisplay.textContent || 'video').replace(/\.[^/.]+$/, '');
+                    const cleanFileName = `${baseName}_cut.${outputExt}`;
+                    downloadBtn.download = cleanFileName;
+                    downloadBtnText.textContent = `Unduh Video (.${outputExt})`;
+
+                    processingState.classList.add('hidden');
+                    completedState.classList.remove('hidden');
+                    showToast('Ekspor video selesai.', 'info');
+                };
+
+                // Posisikan ke titik awal potong
+                mainVideo.pause();
+                mainVideo.currentTime = trimStart;
+
+                mainVideo.onseeked = function onSeekReady() {
+                    mainVideo.onseeked = null;
+
+                    try {
+                        mediaRecorder.start(250);
+                    } catch (err) {
+                        showToast('Gagal memulai perekaman video.', 'error');
+                        cancelExport();
+                        return;
+                    }
+
+                    const playPromise = mainVideo.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch((err) => {
+                            console.warn('Video play saat ekspor ditolak:', err);
+                            showToast('Gagal memutar video untuk diproses.', 'error');
+                            cancelExport();
+                        });
+                    }
+
+                    function renderFrame() {
+                        if (exportAbortRequested) {
+                            return;
+                        }
+
+                        if (mainVideo.currentTime >= trimEnd || mainVideo.paused || mainVideo.ended) {
+                            mainVideo.pause();
+                            if (activeMediaRecorder && activeMediaRecorder.state === 'recording') {
+                                activeMediaRecorder.stop();
+                            }
+                            return;
+                        }
+
+                        exportCtx.drawImage(mainVideo, 0, 0, targetWidth, targetHeight);
+
+                        const currentPos = mainVideo.currentTime - trimStart;
+                        const progressRatio = Math.max(0, Math.min(1, currentPos / clipDuration));
+                        const progressPct = Math.round(progressRatio * 100);
+
+                        exportProgressBar.style.width = `${progressPct}%`;
+                        exportProgressText.textContent = `${progressPct}%`;
+
+                        const elapsed = performance.now() - startTimestamp;
+                        if (progressRatio > 0.04) {
+                            const totalEst = elapsed / progressRatio;
+                            const remainSec = Math.max(0, Math.round((totalEst - elapsed) / 1000));
+                            exportTimeRemaining.textContent = `Sisa ~${remainSec} detik`;
+                        }
+
+                        if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+                            mainVideo.requestVideoFrameCallback(renderFrame);
+                        } else {
+                            requestAnimationFrame(renderFrame);
+                        }
+                    }
+
+                    if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+                        mainVideo.requestVideoFrameCallback(renderFrame);
+                    } else {
+                        requestAnimationFrame(renderFrame);
+                    }
+                };
+            }
+
+            function cleanupExportResources() {
+                isExporting = false;
+                releaseScreenWakeLock();
+
+                if (speakerGainNode) {
+                    speakerGainNode.gain.value = 1.0;
+                }
+
+                if (mediaSourceNode && activeAudioDestinationNode) {
+                    try {
+                        mediaSourceNode.disconnect(activeAudioDestinationNode);
+                    } catch (e) {}
+                    activeAudioDestinationNode = null;
+                }
+            }
+
+            function cancelExport() {
+                if (!isExporting) return;
+                exportAbortRequested = true;
+                mainVideo.pause();
+
+                if (activeMediaRecorder && activeMediaRecorder.state === 'recording') {
+                    activeMediaRecorder.stop();
+                } else {
+                    cleanupExportResources();
+                    closeExportModal();
+                    showToast('Ekspor dibatalkan.', 'info');
+                }
+            }
+
+            function closeExportModal() {
+                exportModal.classList.add('hidden');
+                exportModal.classList.remove('flex');
+                resultVideo.pause();
+                isExporting = false;
+            }
+
+            function resetEditor(confirmFirst = false) {
+                if (confirmFirst && !confirm('Kembali ke menu awal dan ganti berkas video?')) {
+                    return;
+                }
+
+                mainVideo.pause();
+                mainVideo.src = '';
+                videoInput.value = '';
+
+                if (originalVideoUrl) {
+                    URL.revokeObjectURL(originalVideoUrl);
+                    originalVideoUrl = null;
+                }
+                if (resultVideoUrl) {
+                    URL.revokeObjectURL(resultVideoUrl);
+                    resultVideoUrl = null;
+                }
+
+                editorSection.classList.add('hidden');
+                editorSection.classList.remove('flex');
+                uploadSection.classList.remove('hidden');
+                closeExportModal();
+            }
+
+            // Pintasan Keyboard
+            window.addEventListener('keydown', (e) => {
+                const tag = e.target.tagName;
+                if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+                    if (e.key === 'Escape') {
+                        e.target.blur();
+                    }
+                    return;
+                }
+
+                if (!exportModal.classList.contains('hidden')) {
+                    if (e.key === 'Escape') {
+                        if (isExporting) cancelExport();
+                        else closeExportModal();
+                    }
+                    return;
+                }
+
+                if (editorSection.classList.contains('hidden')) return;
+
+                switch (e.code) {
+                    case 'Space':
+                    case 'KeyK':
+                        e.preventDefault();
+                        togglePlay();
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        stepTime(-2);
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        stepTime(2);
+                        break;
+                    case 'KeyJ':
+                        e.preventDefault();
+                        stepTime(-1);
+                        break;
+                    case 'KeyL':
+                        e.preventDefault();
+                        stepTime(1);
+                        break;
+                    case 'Comma':
+                        e.preventDefault();
+                        stepTime(-0.05);
+                        break;
+                    case 'Period':
+                        e.preventDefault();
+                        stepTime(0.05);
+                        break;
+                    case 'BracketLeft':
+                        setStartBtn.click();
+                        break;
+                    case 'BracketRight':
+                        setEndBtn.click();
+                        break;
+                }
+            });
+
+            // Sistem Notifikasi Toast
+            function showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                let bgClass = 'bg-slate-800 text-slate-100 border-slate-700';
+                let iconClass = 'fa-circle-info text-sky-400';
+
+                if (type === 'error') {
+                    bgClass = 'bg-rose-950 text-rose-100 border-rose-800';
+                    iconClass = 'fa-triangle-exclamation text-rose-400';
+                }
+
+                toast.className = `px-3.5 py-2.5 rounded-lg border ${bgClass} shadow-lg text-xs font-medium flex items-center gap-2 transition duration-200 opacity-0 transform translate-y-2`;
+                
+                const icon = document.createElement('i');
+                icon.className = `fa-solid ${iconClass}`;
+                icon.setAttribute('aria-hidden', 'true');
+
+                const textSpan = document.createElement('span');
+                textSpan.textContent = message;
+
+                toast.appendChild(icon);
+                toast.appendChild(textSpan);
+                toastContainer.appendChild(toast);
+
+                requestAnimationFrame(() => {
+                    toast.classList.remove('opacity-0', 'translate-y-2');
+                });
+
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-y-2');
+                    setTimeout(() => toast.remove(), 250);
+                }, 3000);
+            }
+        })();
+    </script>
+</body>
+</html>

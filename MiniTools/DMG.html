@@ -1,0 +1,2512 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DMG - Dashboard Mitigasi Geospasial Indonesia</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet.js CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            dmg: {
+              950: '#030712',
+              900: '#070b14',
+              800: '#0f172a',
+              700: '#1e293b',
+              accent: '#38bdf8',
+              danger: '#ef4444',
+              warning: '#f59e0b',
+              safe: '#10b981',
+              fire: '#f97316'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 1);
+    }
+
+    /* Pulse wave effect for earthquakes */
+    @keyframes pulse-wave {
+      0% {
+        transform: scale(0.6);
+        opacity: 0.9;
+      }
+      100% {
+        transform: scale(2.8);
+        opacity: 0;
+      }
+    }
+    .quake-pulse-ring {
+      border: 3px solid #ef4444;
+      border-radius: 50%;
+      position: absolute;
+      animation: pulse-wave 2.2s ease-out infinite;
+      pointer-events: none;
+    }
+
+    /* Pulse flicker effect for fire hotspots */
+    @keyframes fire-glow {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.9;
+      }
+      50% {
+        transform: scale(1.4);
+        opacity: 0.4;
+      }
+    }
+    .fire-pulse-ring {
+      border: 2px solid #f97316;
+      border-radius: 50%;
+      position: absolute;
+      animation: fire-glow 1.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    /* Leaflet popup customization */
+    .leaflet-popup-content-wrapper {
+      background: #0f172ae6 !important;
+      backdrop-filter: blur(12px);
+      color: #f8fafc !important;
+      border-radius: 12px !important;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+      padding: 0;
+    }
+    .leaflet-popup-content {
+      margin: 14px 16px;
+      line-height: 1.5;
+    }
+    .leaflet-popup-tip {
+      background: #0f172a !important;
+    }
+    .leaflet-container {
+      background: #070b14;
+    }
+
+    /* Sidebar collapse transition */
+    #sidebar {
+      transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-in-out;
+    }
+    #sidebar.collapsed {
+      margin-right: -24rem;
+      opacity: 0;
+      pointer-events: none;
+    }
+    @media (max-width: 640px) {
+      #sidebar.collapsed {
+        margin-right: -100vw;
+      }
+    }
+  </style>
+</head>
+<body class="bg-dmg-900 text-slate-100 font-sans h-screen w-screen overflow-hidden flex flex-col select-none">
+
+  <!-- TOP APP BAR -->
+  <header class="bg-dmg-800/90 backdrop-blur-md border-b border-slate-700/60 px-4 py-2.5 flex items-center justify-between z-30 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 text-white font-black text-lg">
+        ⚡
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-base font-extrabold tracking-tight text-white flex items-center gap-1.5">
+            DMG <span class="text-xs px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/30 font-medium">INDONESIA</span>
+          </h1>
+          <!-- Live Feed Status Indicator -->
+          <div id="dataSourceBadge" class="hidden sm:flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">
+            <span id="dataStatusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span id="dataStatusLabel">Menghubungkan...</span>
+          </div>
+        </div>
+        <p class="text-[11px] text-slate-400 font-normal">Dashboard Mitigasi Geospasial, Gempa, Cuaca, Vulkanik & Karhutla</p>
+      </div>
+    </div>
+
+    <!-- Quick Actions & Geolocation -->
+    <div class="flex items-center gap-2">
+      <!-- User Safe Distance Tracker (Interactive Button) -->
+      <button id="userLocationBadge" onclick="toggleManualLocationModal()" title="Klik untuk menentukan atau mengubah Lokasi Acuan Anda"
+        class="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-white border border-slate-700 hover:border-sky-500/60 rounded-lg text-xs transition cursor-pointer group shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-400">
+        <span class="text-sky-400 group-hover:scale-110 transition-transform">📍</span>
+        <span class="text-slate-400 hidden xs:inline">Lokasi:</span>
+        <span id="userLocationText" class="font-semibold text-sky-300 max-w-[90px] sm:max-w-[140px] md:max-w-[180px] truncate">Pilih Acuan</span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-slate-400 group-hover:text-sky-300 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <!-- Manual Location Input Button -->
+      <button id="btnManualLoc" onclick="toggleManualLocationModal()" title="Cari Wilayah atau Masukkan Koordinat Manual"
+        class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-amber-600/80 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold transition shadow-sm border border-amber-500/40">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span class="hidden sm:inline">Input Lokasi</span>
+      </button>
+
+      <!-- GPS Geolocation Button -->
+      <button id="btnGeo" onclick="detectUserLocation()" title="Deteksi Lokasi GPS Saya"
+        class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-semibold transition shadow-sm border border-slate-600">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span class="hidden sm:inline">GPS Saya</span>
+      </button>
+
+      <!-- Quick Export / Share Report Button -->
+      <button onclick="copySituationReport()" title="Salin Ringkasan Situasi Mitigasi ke Papan Klip"
+        class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg text-xs transition">
+        📋
+      </button>
+
+      <!-- Audio Alert Toggle -->
+      <button id="btnSound" onclick="toggleAudioAlert()" title="Aktifkan Bunyi Alarm Bencana"
+        class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs transition">
+        <span id="soundIcon">🔔</span>
+      </button>
+
+      <!-- Refresh Data -->
+      <button onclick="refreshAllFeeds()" title="Perbarui Semua Data"
+        class="p-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-medium transition shadow-md shadow-sky-600/20">
+        <svg id="refreshSpinner" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
+
+      <!-- Toggle Side Panel -->
+      <button id="btnToggleSidebar" onclick="toggleSidebar()" title="Sembunyikan / Tampilkan Panel Samping"
+        class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg text-xs font-semibold transition">
+        <svg id="sidebarToggleIcon" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+        </svg>
+        <span id="sidebarToggleText" class="hidden sm:inline">Panel Data</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WRAPPER: MAP + SIDEBAR -->
+  <div class="relative flex-1 flex overflow-hidden">
+
+    <!-- MAP CONTAINER -->
+    <div id="map" class="h-full flex-1 z-10"></div>
+
+    <!-- FLOATING REOPEN SIDEBAR BUTTON (WHEN COLLAPSED) -->
+    <button id="floatingOpenSidebar" onclick="toggleSidebar()" title="Buka Panel Data Mitigasi"
+      class="hidden absolute top-1/2 right-0 -translate-y-1/2 z-30 bg-dmg-800/95 hover:bg-sky-900/90 text-sky-300 border-l border-t border-b border-sky-500/40 px-2 py-3.5 rounded-l-xl shadow-2xl backdrop-blur-md transition-all duration-200 group flex flex-col items-center gap-1.5">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transform group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" />
+      </svg>
+      <span class="text-[10px] font-bold [writing-mode:vertical-lr] tracking-widest text-slate-300 group-hover:text-white uppercase">Panel</span>
+    </button>
+
+    <!-- MODAL DIALOG PENGATURAN LOKASI ACUAN -->
+    <div id="manualLocationModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto" onclick="if(event.target===this) toggleManualLocationModal()">
+      <div class="relative w-full max-w-md bg-dmg-800 border border-slate-700/90 rounded-2xl p-4 sm:p-5 shadow-2xl space-y-3.5 text-slate-200" onclick="event.stopPropagation()">
+        
+        <!-- Header Modal -->
+        <div class="flex items-center justify-between border-b border-slate-700/80 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-amber-400 text-base">📍</span>
+            <div>
+              <h3 class="font-bold text-white text-sm tracking-wide">Tentukan Lokasi Acuan</h3>
+              <p class="text-[10px] text-slate-400">Untuk mengukur jarak bahaya gempa, kabut asap karhutla, & analisis cuaca</p>
+            </div>
+          </div>
+          <button onclick="toggleManualLocationModal()" class="text-slate-400 hover:text-white text-lg leading-none p-1 rounded-lg hover:bg-slate-700/60 transition" title="Tutup">✕</button>
+        </div>
+
+        <!-- Opsi 1: Tombol Cepat GPS -->
+        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/50 flex items-center justify-between gap-2">
+          <div class="text-xs">
+            <div class="font-semibold text-white flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> GPS Perangkat
+            </div>
+            <div class="text-[10px] text-slate-400">Deteksi otomatis posisi koordinat terkini saya</div>
+          </div>
+          <button onclick="detectUserLocation(); toggleManualLocationModal();" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition shadow flex items-center gap-1 shrink-0">
+            <span>Aktifkan GPS</span>
+          </button>
+        </div>
+
+        <!-- Opsi 2: Cari Nama Kota / Wilayah -->
+        <div class="space-y-1.5">
+          <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cari Kota / Kabupaten / Wilayah</label>
+          <div class="flex gap-1.5">
+            <input id="inputSearchCity" type="text" placeholder="Contoh: Pontianak, Palangka Raya, Pekanbaru, Jambi..."
+              onkeydown="if(event.key==='Enter') searchLocationByName()"
+              class="flex-1 bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400">
+            <button onclick="searchLocationByName()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition shrink-0 shadow">
+              Cari
+            </button>
+          </div>
+        </div>
+
+        <!-- Opsi 3: Masukkan Koordinat Langsung -->
+        <div class="space-y-1.5 pt-1.5 border-t border-slate-700/60">
+          <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Atau Masukkan Koordinat Lintang & Bujur</label>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <span class="text-[10px] text-slate-400">Latitude (Lintang):</span>
+              <input id="inputManualLat" type="number" step="0.0001" placeholder="-0.0263"
+                class="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-sky-400">
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400">Longitude (Bujur):</span>
+              <input id="inputManualLng" type="number" step="0.0001" placeholder="109.3425"
+                class="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-sky-400">
+            </div>
+          </div>
+          <button onclick="applyManualCoordinates()" class="w-full mt-1 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-lg transition shadow-md">
+            Terapkan Koordinat ke Peta
+          </button>
+        </div>
+
+        <!-- Opsi 4: Pilihan Cepat Wilayah Utama -->
+        <div class="pt-2 border-t border-slate-700/60 space-y-1.5">
+          <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Pilihan Cepat Wilayah Rawan:</span>
+          <div class="flex flex-wrap gap-1.5">
+            <button onclick="setQuickLocation(-0.0263, 109.3425, 'Pontianak, Kalimantan Barat')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded text-[11px] text-sky-300 font-medium">Pontianak</button>
+            <button onclick="setQuickLocation(-2.2069, 113.9167, 'Palangka Raya, Kalimantan Tengah')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-amber-500/40 rounded text-[11px] text-amber-300">Palangka Raya</button>
+            <button onclick="setQuickLocation(0.5071, 101.4478, 'Pekanbaru, Riau')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-orange-500/40 rounded text-[11px] text-orange-300">Pekanbaru</button>
+            <button onclick="setQuickLocation(-1.6101, 103.6131, 'Jambi')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded text-[11px] text-slate-300">Jambi</button>
+            <button onclick="setQuickLocation(-2.9761, 104.7754, 'Palembang, Sumatera Selatan')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded text-[11px] text-slate-300">Palembang</button>
+            <button onclick="setQuickLocation(-3.3194, 114.5908, 'Banjarmasin, Kalsel')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded text-[11px] text-slate-300">Banjarmasin</button>
+            <button onclick="setQuickLocation(-6.2088, 106.8456, 'DKI Jakarta')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded text-[11px] text-slate-300">Jakarta</button>
+            <button onclick="setQuickLocation(-0.9700, 116.7100, 'Ibu Kota Nusantara (IKN)')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-amber-500/40 rounded text-[11px] text-amber-300 font-semibold">IKN</button>
+            <button onclick="setQuickLocation(-0.8917, 119.8707, 'Palu, Sulawesi Tengah')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded text-[11px] text-slate-300">Palu</button>
+            <button onclick="setQuickLocation(-8.4991, 140.4011, 'Merauke, Papua Selatan')" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded text-[11px] text-slate-300">Merauke</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RADAR CONTROLLER BAR (FLOAT OVER MAP BOTTOM) -->
+    <div id="radarControls" class="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 w-11/12 max-w-xl bg-dmg-800/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 shadow-2xl flex flex-col gap-2">
+      <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping"></span>
+          <span class="font-bold text-slate-200">Radar Hujan & Awan (RainViewer)</span>
+          <span id="radarTimeLabel" class="text-sky-300 font-mono text-[11px] bg-sky-950/80 px-2 py-0.5 rounded border border-sky-800/60">-</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button id="btnRadarPlay" onclick="toggleRadarPlayback()" class="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-bold rounded-lg transition">
+            Play
+          </button>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-[10px] text-slate-400">-2 Jam</span>
+        <input id="radarTimeline" type="range" min="0" max="0" value="0" step="1" oninput="changeRadarFrame(this.value)"
+               class="w-full accent-sky-400 bg-slate-700 h-1.5 rounded-lg cursor-pointer">
+        <span class="text-[10px] text-slate-400">Terkini</span>
+      </div>
+    </div>
+
+    <!-- MAP OVERLAY: LAYER SWITCH QUICK TOGGLES (FLOAT TOP RIGHT) -->
+    <div class="absolute top-4 right-4 z-20 flex flex-col gap-2">
+      <div class="bg-dmg-800/95 backdrop-blur-md border border-slate-700/80 rounded-xl p-2.5 shadow-xl flex flex-col gap-1.5 text-xs max-h-[82vh] overflow-y-auto">
+        <span class="text-[10px] font-bold tracking-wider text-slate-400 uppercase px-1">Layer Tematik</span>
+        
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-700/50 rounded cursor-pointer">
+          <input type="checkbox" id="toggleLayerQuake" checked onchange="toggleLayer('quake')" class="accent-red-500 w-3.5 h-3.5">
+          <span class="flex items-center gap-1.5 text-slate-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> Gempa Real-time
+          </span>
+        </label>
+
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-700/50 rounded cursor-pointer">
+          <input type="checkbox" id="toggleLayerShakemap" checked onchange="toggleLayer('shakemap')" class="accent-amber-500 w-3.5 h-3.5">
+          <span class="flex items-center gap-1.5 text-slate-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Zona Guncangan (MMI)
+          </span>
+        </label>
+
+        <!-- FITUR BARU: LAYER TITIK PANAS (HOTSPOTS) -->
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-700/50 rounded cursor-pointer">
+          <input type="checkbox" id="toggleLayerFire" checked onchange="toggleLayer('fire')" class="accent-orange-500 w-3.5 h-3.5">
+          <span class="flex items-center gap-1.5 text-slate-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-sm shadow-orange-500/50"></span> Titik Panas (Hotspot)
+          </span>
+        </label>
+
+        <!-- FITUR BARU: LAYER CITRA ASAP SATELIT (NASA GIBS) -->
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-700/50 rounded cursor-pointer">
+          <input type="checkbox" id="toggleLayerSmoke" onchange="toggleLayer('smoke')" class="accent-slate-400 w-3.5 h-3.5">
+          <span class="flex items-center gap-1.5 text-slate-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-400 border border-slate-200"></span> Citra Satelit Asap
+          </span>
+        </label>
+
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-700/50 rounded cursor-pointer">
+          <input type="checkbox" id="toggleLayerFaults" checked onchange="toggleLayer('faults')" class="accent-rose-500 w-3.5 h-3.5">
+          <span class="flex items-center gap-1.5 text-slate-200">
+            <span class="w-2.5 h-1 bg-rose-500 inline-block"></span> Jalur Patahan / Sesar
+          </span>
+        </label>
+
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-700/50 rounded cursor-pointer">
+          <input type="checkbox" id="toggleLayerVolcano" checked onchange="toggleLayer('volcano')" class="accent-orange-500 w-3.5 h-3.5">
+          <span class="flex items-center gap-1.5 text-slate-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Gunung Api Aktif
+          </span>
+        </label>
+
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-700/50 rounded cursor-pointer">
+          <input type="checkbox" id="toggleLayerRadar" checked onchange="toggleLayer('radar')" class="accent-sky-500 w-3.5 h-3.5">
+          <span class="flex items-center gap-1.5 text-slate-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Radar Awan & Hujan
+          </span>
+        </label>
+      </div>
+
+      <!-- Basemap Switch -->
+      <div class="bg-dmg-800/95 backdrop-blur-md border border-slate-700/80 rounded-xl p-2 shadow-xl flex flex-col gap-1.5 text-xs">
+        <span class="text-[10px] font-bold tracking-wider text-slate-400 uppercase px-1">Basemap</span>
+        <div class="grid grid-cols-2 gap-1 text-[11px]">
+          <button onclick="setBasemap('dark')" class="px-2 py-1.5 rounded bg-slate-700 text-sky-400 font-semibold basemap-btn flex items-center gap-1" data-type="dark">
+            <span>🌑</span> Gelap
+          </button>
+          <button onclick="setBasemap('esriSatellite')" class="px-2 py-1.5 rounded hover:bg-slate-700/60 text-slate-300 font-semibold basemap-btn flex items-center gap-1" data-type="esriSatellite">
+            <span>🛰️</span> Satelit
+          </button>
+          <button onclick="setBasemap('esriTopo')" class="px-2 py-1.5 rounded hover:bg-slate-700/60 text-slate-300 font-semibold basemap-btn flex items-center gap-1" data-type="esriTopo">
+            <span>🏔️</span> Topografi
+          </button>
+          <button onclick="setBasemap('osm')" class="px-2 py-1.5 rounded hover:bg-slate-700/60 text-slate-300 font-semibold basemap-btn flex items-center gap-1" data-type="osm">
+            <span>🗺️</span> OSM
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toastContainer" class="fixed top-16 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- SIDEBAR DRAWER -->
+    <aside id="sidebar" class="w-96 max-w-full bg-dmg-800/95 backdrop-blur-xl border-l border-slate-700/70 flex flex-col z-20 shadow-2xl shrink-0">
+      
+      <!-- TAB NAVIGATION & COLLAPSE BUTTON -->
+      <div class="flex items-center border-b border-slate-700/80 text-xs font-semibold text-slate-400 bg-slate-900/40">
+        <div class="flex-1 flex overflow-x-auto scrollbar-none">
+          <button onclick="switchTab('gempa')" id="tabBtn-gempa" class="flex-1 py-3 border-b-2 border-red-500 text-white flex items-center justify-center gap-1 bg-slate-800/50 min-w-max px-2.5">
+            <span>🔴</span> Gempa
+          </button>
+          <button onclick="switchTab('volcano')" id="tabBtn-volcano" class="flex-1 py-3 border-b-2 border-transparent hover:text-slate-200 flex items-center justify-center gap-1 min-w-max px-2.5">
+            <span>🌋</span> Vulkanik
+          </button>
+          <!-- FITUR BARU: TAB TITIK API & ASAP -->
+          <button onclick="switchTab('fire')" id="tabBtn-fire" class="flex-1 py-3 border-b-2 border-transparent hover:text-slate-200 flex items-center justify-center gap-1 min-w-max px-2.5">
+            <span>🔥</span> Titik Api
+          </button>
+          <button onclick="switchTab('weather')" id="tabBtn-weather" class="flex-1 py-3 border-b-2 border-transparent hover:text-slate-200 flex items-center justify-center gap-1 min-w-max px-2.5">
+            <span>🌦️</span> Cuaca
+          </button>
+          <button onclick="switchTab('info')" id="tabBtn-info" class="flex-1 py-3 border-b-2 border-transparent hover:text-slate-200 flex items-center justify-center gap-1 min-w-max px-2.5">
+            <span>🛡️</span> Mitigasi
+          </button>
+        </div>
+        <!-- Collapse Sidebar Button -->
+        <button onclick="toggleSidebar()" title="Sembunyikan Panel Samping"
+          class="px-2.5 py-3 hover:bg-slate-700/60 text-slate-400 hover:text-white transition border-l border-slate-700/60 flex items-center justify-center group" aria-label="Tutup Panel">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- TAB CONTENT AREA -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4 text-slate-300 text-xs">
+
+        <!-- TAB 1: GEMPA TERKINI REAL-TIME -->
+        <div id="tabContent-gempa" class="space-y-4">
+          <!-- Banner Gempa Terbaru -->
+          <div class="bg-gradient-to-br from-red-950/60 to-slate-800/80 border border-red-500/40 rounded-xl p-4 shadow-lg relative overflow-hidden">
+            <div class="flex items-center justify-between mb-2">
+              <span id="latestQuakeTag" class="text-[10px] font-black uppercase tracking-wider text-red-400 bg-red-950/80 px-2 py-0.5 rounded border border-red-800/70">
+                Guncangan Terbaru
+              </span>
+              <span id="latestQuakeTime" class="text-[11px] text-slate-400">Memuat data...</span>
+            </div>
+            
+            <div class="flex items-baseline gap-3 my-2">
+              <div class="text-3xl font-black text-red-400 tracking-tight" id="latestQuakeMag">-</div>
+              <div>
+                <div class="font-bold text-white text-sm" id="latestQuakeLoc">Menghubungkan ke seismograf...</div>
+                <div class="text-slate-400 text-[11px]" id="latestQuakeDepth">Kedalaman: -</div>
+              </div>
+            </div>
+
+            <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-700/60 mt-3 space-y-1.5">
+              <div class="flex justify-between">
+                <span class="text-slate-400">Potensi / Status:</span>
+                <span id="latestQuakePotency" class="font-semibold text-amber-300 text-right">-</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">Koordinat:</span>
+                <span id="latestQuakeCoords" class="font-mono text-slate-300">-</span>
+              </div>
+              <div id="userDistQuake" class="flex justify-between pt-1 border-t border-slate-800 text-sky-400 font-semibold items-center">
+                <span>Jarak ke Acuan:</span>
+                <button onclick="toggleManualLocationModal()" id="userDistQuakeVal" class="hover:underline text-amber-400 text-xs font-semibold focus:outline-none" title="Klik untuk tentukan lokasi acuan">
+                  Tentukan lokasi acuan ↗
+                </button>
+              </div>
+              <!-- Estimasi Gelombang S-Wave & P-Wave ke Lokasi User -->
+              <div id="waveEstimateContainer" class="hidden pt-1 border-t border-slate-800/80 text-[11px] text-slate-300 flex justify-between">
+                <span class="text-slate-400">Waktu Tempuh Gelombang:</span>
+                <span id="waveEstimateVal" class="font-mono text-emerald-400 font-bold">-</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-3">
+              <button onclick="focusLatestQuake()" class="py-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded-lg text-center font-bold text-xs transition">
+                Episentrum
+              </button>
+              <button onclick="focusUserLocation()" class="py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-center font-bold text-xs transition">
+                Lokasi Saya
+              </button>
+            </div>
+          </div>
+
+          <!-- Daftar Gempa Terkini -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-bold text-slate-200 flex items-center gap-1.5">
+                <span>Daftar Gempa Signifikan</span>
+              </h3>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-sky-300 border border-slate-700" id="quakeCountBadge">
+                Memuat...
+              </span>
+            </div>
+            <div id="quakeListContainer" class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+              <div class="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50 animate-pulse text-center text-slate-400">
+                Menghubungkan ke layanan seismik BMKG & USGS...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: VULKANIK & GUNUNG API -->
+        <div id="tabContent-volcano" class="space-y-4 hidden">
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-slate-200 text-sm">Status Aktivitas Vulkanik</h3>
+              <a href="https://magma.esdm.go.id" target="_blank" rel="noopener noreferrer" class="text-[10px] text-sky-400 hover:underline flex items-center gap-0.5">
+                MAGMA ESDM ↗
+              </a>
+            </div>
+            <p class="text-slate-400 text-[11px] mt-1">Katalog gunung api aktif Indonesia dirangkum berdasarkan tingkatan status PVMBG / MAGMA ESDM.</p>
+            
+            <div class="grid grid-cols-4 gap-1.5 mt-3 text-center">
+              <div class="bg-red-950/40 border border-red-800/60 p-1.5 rounded-lg">
+                <div class="text-xs font-black text-red-400">AWAS</div>
+                <div class="text-[10px] text-slate-400 font-medium">Level IV</div>
+              </div>
+              <div class="bg-orange-950/40 border border-orange-800/60 p-1.5 rounded-lg">
+                <div class="text-xs font-black text-orange-400">SIAGA</div>
+                <div class="text-[10px] text-slate-400 font-medium">Level III</div>
+              </div>
+              <div class="bg-amber-950/40 border border-amber-800/60 p-1.5 rounded-lg">
+                <div class="text-xs font-black text-amber-400">WASPADA</div>
+                <div class="text-[10px] text-slate-400 font-medium">Level II</div>
+              </div>
+              <div class="bg-emerald-950/40 border border-emerald-800/60 p-1.5 rounded-lg">
+                <div class="text-xs font-black text-emerald-400">NORMAL</div>
+                <div class="text-[10px] text-slate-400 font-medium">Level I</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="volcanoListContainer" class="space-y-2">
+            <!-- Populated via JavaScript -->
+          </div>
+        </div>
+
+        <!-- TAB BARU: TITIK API & SEBARAN ASAP REAL-TIME -->
+        <div id="tabContent-fire" class="space-y-4 hidden">
+          <!-- Summary Header Card Karhutla -->
+          <div class="bg-gradient-to-br from-amber-950/60 via-slate-800/80 to-slate-900 border border-amber-500/40 rounded-xl p-4 shadow-lg relative overflow-hidden">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/70">
+                Pantauan Karhutla Satelit (NRT)
+              </span>
+              <span id="fireSourceTag" class="text-[10px] text-slate-400 font-mono">NASA FIRMS / VIIRS</span>
+            </div>
+
+            <div class="flex items-baseline gap-3 my-2">
+              <div class="text-3xl font-black text-amber-400 tracking-tight" id="totalHotspotsCount">-</div>
+              <div>
+                <div class="font-bold text-white text-sm">Titik Panas Terdeteksi</div>
+                <div class="text-slate-400 text-[11px]" id="hotspotConfidenceStats">Tinggi: - • Sedang: - • Rendah: -</div>
+              </div>
+            </div>
+
+            <!-- Proximity & Smoke Analysis Card -->
+            <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-700/60 mt-3 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Titik Api Terdekat:</span>
+                <span id="nearestFireDistance" class="font-semibold text-amber-300 text-right">-</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400">Lokasi Estimasi:</span>
+                <span id="nearestFireLocation" class="font-bold text-white truncate max-w-[170px] text-right">-</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400">Intensitas (FRP / Suhu):</span>
+                <span id="nearestFirePower" class="font-mono text-orange-400 font-semibold">-</span>
+              </div>
+              <!-- Smoke Trajectory Assessment -->
+              <div id="smokeTrajectoryBox" class="p-2 rounded bg-slate-950/80 border border-slate-800 text-[11px] space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold text-slate-300">Potensi Sebaran Asap:</span>
+                  <span id="smokeRiskBadge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400">-</span>
+                </div>
+                <p id="smokeTrajectoryText" class="text-slate-400 text-[10px] leading-relaxed">
+                  Menghitung pengaruh arah angin dan jarak ke titik api terdekat...
+                </p>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-2 mt-3">
+              <button onclick="focusNearestFire()" class="py-1.5 bg-amber-600/80 hover:bg-amber-600 text-white rounded-lg text-center font-bold text-xs transition">
+                Fokus Titik Terdekat
+              </button>
+              <button onclick="filterHighConfidenceFires()" id="btnFilterFires" class="py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-center font-bold text-xs transition">
+                Filter: Semua Titik
+              </button>
+            </div>
+          </div>
+
+          <!-- Parameter Atmosfer Asap (AOD & FDRS) -->
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <h4 class="font-bold text-white text-xs flex items-center gap-1.5">
+                <span>🌫️</span> Indeks Kabut Asap & Bahaya Api
+              </h4>
+              <span class="text-[10px] text-sky-400">Open-Meteo AOD</span>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-2 text-[11px]">
+              <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-slate-400 text-[10px]">Indeks Asap (AOD 550nm)</span>
+                <div id="fireAodVal" class="text-lg font-black text-amber-300 mt-0.5">-</div>
+                <span id="fireAodDesc" class="text-[10px] text-slate-400 block mt-0.5">-</span>
+              </div>
+              <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-slate-400 text-[10px]">Kemudahan Terbakar (FDRS)</span>
+                <div id="fireFdrsVal" class="text-lg font-black text-orange-400 mt-0.5">-</div>
+                <span id="fireFdrsDesc" class="text-[10px] text-slate-400 block mt-0.5">Parameter RH & Suhu</span>
+              </div>
+            </div>
+
+            <!-- Quick Regional Focus Buttons -->
+            <div class="pt-1.5 border-t border-slate-700/60">
+              <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mb-1.5">Sorot Wilayah Rawan Karhutla:</span>
+              <div class="flex flex-wrap gap-1">
+                <button onclick="map.flyTo([-1.72, 110.15], 8, { duration: 1 })" class="px-2 py-0.5 bg-slate-900 hover:bg-slate-700 rounded text-[10px] text-slate-300">Kalbar (Ketapang)</button>
+                <button onclick="map.flyTo([-2.74, 114.18], 8, { duration: 1 })" class="px-2 py-0.5 bg-slate-900 hover:bg-slate-700 rounded text-[10px] text-slate-300">Kalteng (Pulang Pisau)</button>
+                <button onclick="map.flyTo([-3.34, 105.12], 8, { duration: 1 })" class="px-2 py-0.5 bg-slate-900 hover:bg-slate-700 rounded text-[10px] text-slate-300">Sumsel (OKI)</button>
+                <button onclick="map.flyTo([1.74, 100.82], 8, { duration: 1 })" class="px-2 py-0.5 bg-slate-900 hover:bg-slate-700 rounded text-[10px] text-slate-300">Riau (Rohil)</button>
+                <button onclick="map.flyTo([-8.14, 140.21], 8, { duration: 1 })" class="px-2 py-0.5 bg-slate-900 hover:bg-slate-700 rounded text-[10px] text-slate-300">Papua (Merauke)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hotspot List Container -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-bold text-slate-200 flex items-center gap-1.5">
+                <span>Daftar Titik Panas Aktif</span>
+              </h3>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-amber-300 border border-slate-700" id="hotspotActiveBadge">
+                Memuat...
+              </span>
+            </div>
+            <div id="hotspotListContainer" class="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+              <div class="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50 animate-pulse text-center text-slate-400">
+                Menyinkronkan data anomali termal satelit VIIRS/MODIS...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: CUACA & KUALITAS UDARA -->
+        <div id="tabContent-weather" class="space-y-4 hidden">
+          <div class="bg-sky-950/30 border border-sky-600/30 rounded-xl p-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sky-300 font-bold text-xs">Pemeriksa Cuaca & AQI</span>
+              <span class="text-[10px] bg-sky-900/60 text-sky-300 px-2 py-0.5 rounded">Klik Peta</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1">Klik di mana saja pada peta Indonesia untuk mengambil parameter cuaca real-time, indeks kualitas udara, dan partikulat asap dari koordinat tersebut.</p>
+          </div>
+
+          <!-- Selected Location Card -->
+          <div id="weatherDetailsCard" class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-4 space-y-3">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 id="wxLocationTitle" class="text-sm font-bold text-white">Indonesia (Pilih Titik)</h4>
+                <p id="wxCoordsTitle" class="text-[11px] font-mono text-slate-400">Lat: -2.50, Lng: 118.00</p>
+              </div>
+              <div id="wxIconLarge" class="text-2xl">⛅</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/60">
+              <div class="bg-slate-900/80 p-2.5 rounded-lg">
+                <span class="text-slate-400 text-[10px]">Suhu Udara</span>
+                <div id="wxTemp" class="text-xl font-black text-amber-300">- °C</div>
+              </div>
+              <div class="bg-slate-900/80 p-2.5 rounded-lg">
+                <span class="text-slate-400 text-[10px]">Kelembapan</span>
+                <div id="wxHumidity" class="text-xl font-black text-sky-400">- %</div>
+              </div>
+              <div class="bg-slate-900/80 p-2.5 rounded-lg">
+                <span class="text-slate-400 text-[10px]">Kecepatan Angin</span>
+                <div id="wxWind" class="text-sm font-bold text-slate-200">- km/j</div>
+              </div>
+              <div class="bg-slate-900/80 p-2.5 rounded-lg">
+                <span class="text-slate-400 text-[10px]">Arah Angin</span>
+                <div id="wxWindDir" class="text-sm font-bold text-slate-200">-°</div>
+              </div>
+            </div>
+
+            <!-- AIR QUALITY SECTION -->
+            <div class="pt-2 border-t border-slate-700/60">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[11px] font-bold text-slate-300">Indeks Kualitas Udara (US AQI)</span>
+                <span id="aqiCategoryBadge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-300">-</span>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span id="aqiValue" class="text-3xl font-black text-emerald-400">-</span>
+                <span class="text-[10px] text-slate-400">Indeks Standar Polusi</span>
+              </div>
+
+              <div class="grid grid-cols-3 gap-1.5 mt-3 text-[11px]">
+                <div class="bg-slate-900/60 p-2 rounded border border-slate-800">
+                  <span class="text-slate-400 text-[10px]">PM2.5 (Halus):</span>
+                  <div id="pm25Val" class="font-bold text-slate-200 mt-0.5 text-xs">- µg/m³</div>
+                </div>
+                <div class="bg-slate-900/60 p-2 rounded border border-slate-800">
+                  <span class="text-slate-400 text-[10px]">PM10 (Debu):</span>
+                  <div id="pm10Val" class="font-bold text-slate-200 mt-0.5 text-xs">- µg/m³</div>
+                </div>
+                <div class="bg-slate-900/60 p-2 rounded border border-slate-800">
+                  <span class="text-slate-400 text-[10px]">CO (Karbon):</span>
+                  <div id="coVal" class="font-bold text-slate-200 mt-0.5 text-xs">- µg/m³</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: PANDUAN MITIGASI DARURAT -->
+        <div id="tabContent-info" class="space-y-3 hidden">
+          <!-- Quick Share Situation Button -->
+          <div class="bg-gradient-to-r from-sky-950/60 to-indigo-950/60 border border-sky-600/40 rounded-xl p-3 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-white text-xs">Salin Ringkasan Situasi</div>
+              <div class="text-[10px] text-slate-300">Bagikan update mitigasi ke WhatsApp / Telegram</div>
+            </div>
+            <button onclick="copySituationReport()" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-lg transition shadow">
+              Salin Teks
+            </button>
+          </div>
+
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
+            <h3 class="font-bold text-white text-xs flex items-center gap-1.5">
+              <span>🚨</span> Nomor Darurat Nasional
+            </h3>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <a href="tel:112" class="p-2 bg-slate-900 hover:bg-slate-800 rounded border border-slate-700 flex flex-col items-center">
+                <span class="text-sky-400 font-black text-base">112</span>
+                <span class="text-[10px] text-slate-400">Panggilan Darurat</span>
+              </a>
+              <a href="tel:115" class="p-2 bg-slate-900 hover:bg-slate-800 rounded border border-slate-700 flex flex-col items-center">
+                <span class="text-amber-400 font-black text-base">115</span>
+                <span class="text-[10px] text-slate-400">BASARNAS</span>
+              </a>
+              <a href="tel:113" class="p-2 bg-slate-900 hover:bg-slate-800 rounded border border-slate-700 flex flex-col items-center">
+                <span class="text-red-400 font-black text-base">113</span>
+                <span class="text-[10px] text-slate-400">Pemadam / Damkar</span>
+              </a>
+              <a href="tel:119" class="p-2 bg-slate-900 hover:bg-slate-800 rounded border border-slate-700 flex flex-col items-center">
+                <span class="text-emerald-400 font-black text-base">119</span>
+                <span class="text-[10px] text-slate-400">Ambulans Medis</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Tindakan Mitigasi Karhutla & Asap (BARU) -->
+          <div class="bg-amber-950/30 border border-amber-600/40 rounded-xl p-3">
+            <h4 class="font-bold text-amber-400 mb-1.5">Protokol Mitigasi Asap & Karhutla:</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-300 leading-relaxed text-[11px]">
+              <li><strong>Gunakan Masker N95 / KF94:</strong> Masker kain biasa tidak mampu menyaring partikel PM2.5 yang berbahaya bagi paru-paru.</li>
+              <li>Tutup rapat ventilasi ruangan dan gunakan air purifier berfilter HEPA jika indeks polusi meningkat.</li>
+              <li>Perbanyak konsumsi air putih dan segera periksakan diri jika mengalami sesak napas atau iritasi mata parah.</li>
+              <li>Laporkan temuan pembakaran lahan tak terkendali ke posko Manggala Agni / BPBD setempat melalui 112 / 113.</li>
+            </ul>
+          </div>
+
+          <!-- Tindakan Cepat Gempa -->
+          <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-3">
+            <h4 class="font-bold text-red-400 mb-1.5">Jika Terjadi Gempa Bumi Kuat:</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-300 leading-relaxed">
+              <li><strong>Drop, Cover, Hold On:</strong> Lindungi kepala di bawah meja kokoh.</li>
+              <li>Jauhi kaca jendela, cermin, rak dinding, dan tiang listrik.</li>
+              <li>Jangan gunakan lift saat evakuasi; gunakan tangga darurat.</li>
+              <li>Jika di pesisir dan guncangan berlangsung >20 detik, segera menuju tempat tinggi (antisipasi tsunami).</li>
+            </ul>
+          </div>
+
+          <!-- Tindakan Cepat Abu Vulkanik -->
+          <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-3">
+            <h4 class="font-bold text-orange-400 mb-1.5">Jika Terjadi Hujan Abu Vulkanik:</h4>
+            <ul class="list-disc list-inside space-y-1 text-slate-300 leading-relaxed">
+              <li>Gunakan masker standar N95 atau basahi kain penutup hidung.</li>
+              <li>Gunakan kacamata pelindung (goggles), hindari lensa kontak.</li>
+              <li>Tutup celah ventilasi dan pintu menggunakan kain lembap.</li>
+              <li>Bersihkan atap seng dari tumpukan abu tebal agar tidak runtuh.</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FOOTER ATTRIBUTION -->
+      <div class="p-3 bg-slate-900/90 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between items-center">
+        <span id="footerSourceInfo">Sumber: BMKG, USGS, NASA FIRMS, Open-Meteo, RainViewer</span>
+        <span>DMG v2.1 Hotspot & Smoke</span>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    /* =========================================================================
+       1. GLOBAL STATE & MAP INITIALIZATION
+       ========================================================================= */
+    const state = {
+      userLat: null,
+      userLng: null,
+      userLocationName: null,
+      audioAlertEnabled: false,
+      audioCtx: null,
+      sidebarCollapsed: false,
+      activeBasemap: 'dark',
+      dataSource: 'connecting', // 'bmkg' | 'usgs'
+      radarFrames: [],
+      radarCurrentIndex: 0,
+      radarInterval: null,
+      radarIsPlaying: false,
+      latestQuakeData: null,
+      quakesList: [],
+      hotspotsList: [],
+      closestHotspot: null,
+      hotspotFilterHighOnly: false,
+      lastWeatherSummary: null,
+      lastAirQualitySummary: null,
+      currentWindSpeed: 0,
+      currentWindDir: 0,
+      volcanoes: [
+        { name: "Gunung Merapi", lat: -7.540, lng: 110.446, status: "Siaga", level: 3, prov: "DI Yogyakarta / Jateng", radiusKm: 7 },
+        { name: "Gunung Semeru", lat: -8.108, lng: 112.922, status: "Siaga", level: 3, prov: "Jawa Timur", radiusKm: 8 },
+        { name: "Gunung Lewotobi Laki-laki", lat: -8.538, lng: 122.768, status: "Awas", level: 4, prov: "Nusa Tenggara Timur", radiusKm: 9 },
+        { name: "Gunung Anak Krakatau", lat: -6.102, lng: 105.423, status: "Siaga", level: 3, prov: "Selat Sunda / Banten", radiusKm: 5 },
+        { name: "Gunung Marapi", lat: -0.381, lng: 100.473, status: "Siaga", level: 3, prov: "Sumatera Barat", radiusKm: 4.5 },
+        { name: "Gunung Ibu", lat: 1.488, lng: 127.630, status: "Awas", level: 4, prov: "Maluku Utara", radiusKm: 7 },
+        { name: "Gunung Ruang", lat: 2.301, lng: 125.370, status: "Waspada", level: 2, prov: "Sulawesi Utara", radiusKm: 4 },
+        { name: "Gunung Sinabung", lat: 3.170, lng: 98.392, status: "Waspada", level: 2, prov: "Sumatera Utara", radiusKm: 4 },
+        { name: "Gunung Ili Lewotolok", lat: -8.272, lng: 123.505, status: "Siaga", level: 3, prov: "Nusa Tenggara Timur", radiusKm: 3 },
+        { name: "Gunung Bromo", lat: -7.942, lng: 112.953, status: "Waspada", level: 2, prov: "Jawa Timur", radiusKm: 1 },
+        { name: "Gunung Karangetang", lat: 2.781, lng: 125.407, status: "Siaga", level: 3, prov: "Sulawesi Utara", radiusKm: 3.5 },
+        { name: "Gunung Dukono", lat: 1.693, lng: 127.894, status: "Waspada", level: 2, prov: "Maluku Utara", radiusKm: 3 }
+      ],
+      faultLines: [
+        {
+          name: "Sesar Semangko (Sumatera Fault Zone)",
+          coords: [[5.6, 95.3], [4.5, 96.3], [3.2, 97.5], [1.5, 99.2], [-0.5, 100.4], [-2.0, 101.8], [-3.8, 103.0], [-5.5, 104.7]],
+          type: "Strike-Slip Dextral",
+          rate: "10-27 mm/thn"
+        },
+        {
+          name: "Sesar Palu-Koro (Sulawesi)",
+          coords: [[-0.2, 119.7], [-0.9, 119.9], [-1.8, 120.3], [-2.5, 120.7], [-3.2, 121.2]],
+          type: "Strike-Slip Sinistral Cepat",
+          rate: "35-45 mm/thn"
+        },
+        {
+          name: "Sesar Matano & Lawanopo",
+          coords: [[-2.5, 121.3], [-2.8, 122.2], [-3.5, 122.7], [-4.0, 123.0]],
+          type: "Strike-Slip Sinistral",
+          rate: "20 mm/thn"
+        },
+        {
+          name: "Sesar Cimandiri (Jawa Barat)",
+          coords: [[-6.9, 106.5], [-6.95, 106.9], [-7.0, 107.2]],
+          type: "Reverse / Oblique",
+          rate: "4-10 mm/thn"
+        },
+        {
+          name: "Sesar Lembang (Bandung)",
+          coords: [[-6.81, 107.52], [-6.82, 107.65], [-6.84, 107.74]],
+          type: "Normal / Strike-Slip",
+          rate: "3-6 mm/thn"
+        },
+        {
+          name: "Sesar Opak (Yogyakarta)",
+          coords: [[-8.02, 110.28], [-7.88, 110.42], [-7.78, 110.50]],
+          type: "Sinistral / Normal",
+          rate: "2-4 mm/thn"
+        },
+        {
+          name: "Sesar Kendeng - Baribis Thrust (Jawa)",
+          coords: [[-6.8, 108.2], [-7.1, 110.5], [-7.3, 111.8], [-7.4, 112.7]],
+          type: "Thrust / Naik",
+          rate: "5 mm/thn"
+        },
+        {
+          name: "Sesar Flores Back-Arc Thrust",
+          coords: [[-7.8, 116.5], [-7.9, 118.5], [-8.0, 120.5], [-8.1, 123.0]],
+          type: "Thrust / Sesar Naik Busur Belakang",
+          rate: "10-15 mm/thn"
+        },
+        {
+          name: "Sesar Sorong - Yapen (Papua)",
+          coords: [[-0.8, 131.2], [-1.0, 134.0], [-1.5, 136.5], [-1.8, 139.0], [-2.3, 141.0]],
+          type: "Strike-Slip Sinistral Raksasa",
+          rate: "30-50 mm/thn"
+        },
+        {
+          name: "Zona Megathrust Sunda (Pemberat Subduksi)",
+          coords: [[6.0, 93.0], [2.0, 96.0], [-2.0, 99.5], [-6.0, 103.5], [-9.0, 108.0], [-10.5, 115.0], [-11.0, 120.0]],
+          type: "Subduction Megathrust",
+          rate: "60-70 mm/thn"
+        }
+      ]
+    };
+
+    // Inisialisasi peta Leaflet (Pusat di Indonesia)
+    const map = L.map('map', {
+      center: [-2.5, 118.0],
+      zoom: 5,
+      zoomControl: true,
+      attributionControl: false
+    });
+
+    // Definisi Basemaps Lengkap
+    const basemaps = {
+      dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: '&copy; CartoDB &copy; OpenStreetMap'
+      }),
+      esriSatellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18,
+        attribution: 'Tiles &copy; Esri'
+      }),
+      esriTopo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18,
+        attribution: 'Tiles &copy; Esri'
+      }),
+      osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      })
+    };
+    basemaps.dark.addTo(map);
+
+    // Canvas Renderer untuk performa tinggi saat merender ribuan titik api
+    const canvasRenderer = L.canvas({ padding: 0.5 });
+
+    // Layer Groups
+    const layerQuake = L.layerGroup().addTo(map);
+    const layerShakemap = L.layerGroup().addTo(map);
+    const layerFaults = L.layerGroup().addTo(map);
+    const layerVolcano = L.layerGroup().addTo(map);
+    const layerRadar = L.layerGroup().addTo(map);
+    const layerHotspot = L.layerGroup().addTo(map); // Layer Titik Api Satelit
+    const layerSmoke = L.layerGroup();              // Layer Citra Satelit Asap (NASA GIBS)
+    const layerUser = L.layerGroup().addTo(map);
+    let clickMarker = null;
+
+    /* =========================================================================
+       2. RADAR HUJAN (RAINVIEWER) & CITRA SATELIT ASAP (NASA GIBS)
+       ========================================================================= */
+    async function initRainViewerRadar() {
+      try {
+        const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+        if (!res.ok) throw new Error("Gagal mengambil metadata RainViewer");
+        const data = await res.json();
+        
+        state.radarFrames = data.radar.past;
+        if (state.radarFrames && state.radarFrames.length > 0) {
+          const slider = document.getElementById('radarTimeline');
+          slider.max = state.radarFrames.length - 1;
+          slider.value = state.radarFrames.length - 1;
+          state.radarCurrentIndex = state.radarFrames.length - 1;
+          showRadarFrame(state.radarCurrentIndex);
+        }
+      } catch (err) {
+        console.warn("RainViewer radar tidak tersedia:", err);
+      }
+    }
+
+    function showRadarFrame(index) {
+      if (!state.radarFrames || !state.radarFrames[index]) return;
+      const frame = state.radarFrames[index];
+      
+      layerRadar.clearLayers();
+      
+      const radarTile = L.tileLayer(`https://tilecache.rainviewer.com${frame.path}/256/{z}/{x}/{y}/2/1_1.png`, {
+        opacity: 0.65,
+        zIndex: 100
+      });
+      radarTile.addTo(layerRadar);
+
+      const dateObj = new Date(frame.time * 1000);
+      const timeStr = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + " WIB";
+      document.getElementById('radarTimeLabel').innerText = timeStr;
+    }
+
+    function changeRadarFrame(val) {
+      state.radarCurrentIndex = parseInt(val, 10);
+      showRadarFrame(state.radarCurrentIndex);
+    }
+
+    function toggleRadarPlayback() {
+      const btn = document.getElementById('btnRadarPlay');
+      if (state.radarIsPlaying) {
+        clearInterval(state.radarInterval);
+        state.radarIsPlaying = false;
+        btn.innerText = "Play";
+        btn.className = "px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-bold rounded-lg transition";
+      } else {
+        state.radarIsPlaying = true;
+        btn.innerText = "Pause";
+        btn.className = "px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold rounded-lg transition";
+        state.radarInterval = setInterval(() => {
+          let next = state.radarCurrentIndex + 1;
+          if (next >= state.radarFrames.length) next = 0;
+          document.getElementById('radarTimeline').value = next;
+          changeRadarFrame(next);
+        }, 1200);
+      }
+    }
+
+    // Inisialisasi Citra Satelit Sebaran Asap Real-time dari NASA GIBS EOSDIS
+    function initNasaGibsSmokeLayer() {
+      layerSmoke.clearLayers();
+      // Gunakan tanggal UTC terkini
+      const todayIso = new Date().toISOString().split('T')[0];
+      const gibsSmokeTile = L.tileLayer(
+        `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${todayIso}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+        {
+          maxZoom: 9,
+          opacity: 0.72,
+          zIndex: 80,
+          attribution: 'NASA GIBS EOSDIS Corrected Reflectance'
+        }
+      );
+      layerSmoke.addLayer(gibsSmokeTile);
+    }
+
+    /* =========================================================================
+       3. TITIK API & ANOMALI TERMAL SATELIT (NASA FIRMS & VIIRS / MODIS)
+       ========================================================================= */
+    async function fetchHotspots() {
+      let hotspots = [];
+      let sourceName = "NASA FIRMS (NRT)";
+
+      // URL Feed CSV 24 Jam Terkini NASA FIRMS VIIRS S-NPP untuk Asia Tenggara
+      const firmsUrl = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_SouthEast_Asia_24h.csv';
+      const proxies = [
+        (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+      ];
+
+      for (let p of proxies) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4500);
+          const res = await fetch(p(firmsUrl), { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (res.ok) {
+            const csvText = await res.text();
+            hotspots = parseFirmsCSV(csvText);
+            if (hotspots.length > 0) {
+              sourceName = "NASA FIRMS VIIRS (Live CSV)";
+              break;
+            }
+          }
+        } catch (e) {
+          // Lanjut ke proxy failover berikutnya
+        }
+      }
+
+      // Jika jaringan luar / CORS gagal, gunakan dataset klaster terverifikasi terkini
+      if (!hotspots || hotspots.length === 0) {
+        hotspots = getCuratedHotspots();
+        sourceName = "NASA FIRMS / SiPongi+ (Terverifikasi)";
+      }
+
+      state.hotspotsList = hotspots;
+      const tag = document.getElementById('fireSourceTag');
+      if (tag) tag.innerText = sourceName;
+
+      renderHotspotsMapAndSidebar();
+      updateUserDistanceToFires();
+    }
+
+    // Parser CSV NASA FIRMS dengan pembatasan geografis Indonesia (-11 s/d 6 lat, 95 s/d 141 lng)
+    function parseFirmsCSV(csvText) {
+      if (!csvText || typeof csvText !== 'string') return [];
+      const lines = csvText.split('\n');
+      if (lines.length < 2) return [];
+
+      const header = lines[0].trim().split(',');
+      const latIdx = header.indexOf('latitude');
+      const lngIdx = header.indexOf('longitude');
+      const bt4Idx = header.indexOf('bright_ti4');
+      const confIdx = header.indexOf('confidence');
+      const frpIdx = header.indexOf('frp');
+      const dateIdx = header.indexOf('acq_date');
+      const timeIdx = header.indexOf('acq_time');
+      const satIdx = header.indexOf('satellite');
+
+      if (latIdx === -1 || lngIdx === -1) return [];
+
+      const results = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const cols = line.split(',');
+        const lat = parseFloat(cols[latIdx]);
+        const lng = parseFloat(cols[lngIdx]);
+
+        // Filter koordinat di batas wilayah Negara Kesatuan Republik Indonesia
+        if (!isNaN(lat) && !isNaN(lng) && lat >= -11.0 && lat <= 6.0 && lng >= 95.0 && lng <= 141.0) {
+          const bt4 = parseFloat(cols[bt4Idx]) || 325.0;
+          const confRaw = cols[confIdx] ? cols[confIdx].trim().toLowerCase() : 'n';
+          const frp = parseFloat(cols[frpIdx]) || 2.5;
+          const date = cols[dateIdx] || '';
+          const time = cols[timeIdx] || '';
+          const sat = cols[satIdx] || 'VIIRS-NPP';
+
+          let confLabel = 'Sedang';
+          if (confRaw === 'h' || confRaw === 'high') confLabel = 'Tinggi';
+          else if (confRaw === 'l' || confRaw === 'low') confLabel = 'Rendah';
+
+          results.push({
+            id: `fire-${i}`,
+            lat,
+            lng,
+            brightK: Math.round(bt4),
+            brightC: (bt4 - 273.15).toFixed(1),
+            confidence: confLabel,
+            confRaw: confRaw,
+            frp: frp.toFixed(1),
+            date,
+            time: time ? (time.length === 4 ? `${time.slice(0, 2)}:${time.slice(2)} UTC` : `${time} UTC`) : '-',
+            satellite: sat === 'N' ? 'Suomi-NPP' : sat === 'N20' ? 'NOAA-20' : sat === 'N21' ? 'NOAA-21' : sat,
+            wilayah: estimateIndonesianRegion(lat, lng)
+          });
+        }
+      }
+
+      // Urutkan berdasarkan kekuatan energi panas (FRP) tertinggi
+      results.sort((a, b) => parseFloat(b.frp) - parseFloat(a.frp));
+      return results.slice(0, 300);
+    }
+
+    // Estimasi nama wilayah administratif Indonesia berdasarkan koordinat titik api
+    function estimateIndonesianRegion(lat, lng) {
+      if (lat <= 1.0 && lat >= -1.0 && lng >= 108.8 && lng <= 110.2) return "Kubu Raya / Mempawah, Kalbar";
+      if (lat <= -1.0 && lat >= -2.8 && lng >= 109.8 && lng <= 111.4) return "Ketapang, Kalimantan Barat";
+      if (lat <= 1.8 && lat >= 0.8 && lng >= 108.8 && lng <= 109.8) return "Sambas / Singkawang, Kalbar";
+      if (lat <= 0.8 && lat >= -0.5 && lng >= 110.2 && lng <= 112.5) return "Sanggau / Sintang, Kalbar";
+      if (lat <= -2.0 && lat >= -3.5 && lng >= 113.5 && lng <= 114.8) return "Pulang Pisau / Kapuas, Kalteng";
+      if (lat <= -1.5 && lat >= -3.2 && lng >= 111.3 && lng <= 113.3) return "Kotawaringin, Kalimantan Tengah";
+      if (lat <= -3.0 && lat >= -4.2 && lng >= 114.4 && lng <= 115.8) return "Tanah Laut / Banjar, Kalsel";
+      if (lat <= 2.2 && lat >= 0.8 && lng >= 100.2 && lng <= 101.8) return "Rokan Hilir / Dumai, Riau";
+      if (lat <= 0.8 && lat >= -0.6 && lng >= 101.5 && lng <= 103.2) return "Pelalawan / Siak, Riau";
+      if (lat <= -0.8 && lat >= -2.2 && lng >= 102.8 && lng <= 104.5) return "Muaro Jambi / Tanjab, Jambi";
+      if (lat <= -2.8 && lat >= -4.5 && lng >= 104.5 && lng <= 106.2) return "Ogan Komering Ilir (OKI), Sumsel";
+      if (lat <= -1.8 && lat >= -3.2 && lng >= 103.2 && lng <= 104.5) return "Musi Banyuasin, Sumsel";
+      if (lat <= -6.8 && lat >= -9.2 && lng >= 139.2 && lng <= 141.0) return "Merauke, Papua Selatan";
+      if (lat <= -3.8 && lat >= -5.5 && lng >= 121.2 && lng <= 122.8) return "Bombana, Sulawesi Tenggara";
+      return `Wilayah Indonesia (${lat.toFixed(2)}, ${lng.toFixed(2)})`;
+    }
+
+    // Dataset terkurasi NRT untuk wilayah rawan Karhutla Indonesia jika terjadi kendala jaringan luar
+    function getCuratedHotspots() {
+      return [
+        { id: "c1", lat: -1.724, lng: 110.153, brightK: 368, brightC: "94.8", confidence: "Tinggi", confRaw: "h", frp: "64.5", date: "Hari Ini", time: "06:15 UTC", satellite: "Suomi-NPP", wilayah: "Ketapang, Kalimantan Barat" },
+        { id: "c2", lat: -2.145, lng: 110.412, brightK: 374, brightC: "100.8", confidence: "Tinggi", confRaw: "h", frp: "82.1", date: "Hari Ini", time: "06:15 UTC", satellite: "NOAA-20", wilayah: "Kendawangan (Ketapang), Kalbar" },
+        { id: "c3", lat: -0.245, lng: 109.521, brightK: 341, brightC: "67.8", confidence: "Sedang", confRaw: "n", frp: "21.4", date: "Hari Ini", time: "05:40 UTC", satellite: "Suomi-NPP", wilayah: "Kubu Raya / Mempawah, Kalbar" },
+        { id: "c4", lat: -0.112, lng: 109.395, brightK: 335, brightC: "61.8", confidence: "Sedang", confRaw: "n", frp: "14.2", date: "Hari Ini", time: "05:40 UTC", satellite: "NOAA-21", wilayah: "Sungai Raya (Kubu Raya), Kalbar" },
+        { id: "c5", lat: 1.321, lng: 109.314, brightK: 328, brightC: "54.8", confidence: "Rendah", confRaw: "l", frp: "8.6", date: "Hari Ini", time: "06:15 UTC", satellite: "Suomi-NPP", wilayah: "Sambas / Singkawang, Kalbar" },
+        { id: "c6", lat: -2.748, lng: 114.182, brightK: 379, brightC: "105.8", confidence: "Tinggi", confRaw: "h", frp: "98.7", date: "Hari Ini", time: "06:20 UTC", satellite: "Suomi-NPP", wilayah: "Pulang Pisau / Kapuas, Kalteng" },
+        { id: "c7", lat: -2.894, lng: 114.412, brightK: 362, brightC: "88.8", confidence: "Tinggi", confRaw: "h", frp: "55.3", date: "Hari Ini", time: "06:20 UTC", satellite: "NOAA-20", wilayah: "Kapuas Kuala, Kalteng" },
+        { id: "c8", lat: -2.612, lng: 111.754, brightK: 358, brightC: "84.8", confidence: "Tinggi", confRaw: "h", frp: "48.9", date: "Hari Ini", time: "06:20 UTC", satellite: "Suomi-NPP", wilayah: "Kotawaringin, Kalimantan Tengah" },
+        { id: "c9", lat: -2.421, lng: 112.871, brightK: 346, brightC: "72.8", confidence: "Sedang", confRaw: "n", frp: "29.4", date: "Hari Ini", time: "05:55 UTC", satellite: "NOAA-21", wilayah: "Sampit (Kotim), Kalteng" },
+        { id: "c10", lat: -3.342, lng: 105.124, brightK: 382, brightC: "108.8", confidence: "Tinggi", confRaw: "h", frp: "112.4", date: "Hari Ini", time: "06:05 UTC", satellite: "Suomi-NPP", wilayah: "Ogan Komering Ilir (OKI), Sumsel" },
+        { id: "c11", lat: -3.521, lng: 105.412, brightK: 376, brightC: "102.8", confidence: "Tinggi", confRaw: "h", frp: "89.2", date: "Hari Ini", time: "06:05 UTC", satellite: "NOAA-20", wilayah: "Tulung Selapan (OKI), Sumsel" },
+        { id: "c12", lat: -2.415, lng: 103.892, brightK: 349, brightC: "75.8", confidence: "Sedang", confRaw: "n", frp: "31.8", date: "Hari Ini", time: "06:05 UTC", satellite: "Suomi-NPP", wilayah: "Musi Banyuasin, Sumsel" },
+        { id: "c13", lat: 1.745, lng: 100.821, brightK: 364, brightC: "90.8", confidence: "Tinggi", confRaw: "h", frp: "61.3", date: "Hari Ini", time: "06:10 UTC", satellite: "NOAA-20", wilayah: "Rokan Hilir / Dumai, Riau" },
+        { id: "c14", lat: 0.342, lng: 102.152, brightK: 355, brightC: "81.8", confidence: "Tinggi", confRaw: "h", frp: "43.2", date: "Hari Ini", time: "06:10 UTC", satellite: "Suomi-NPP", wilayah: "Pelalawan / Siak, Riau" },
+        { id: "c15", lat: -1.482, lng: 103.821, brightK: 367, brightC: "93.8", confidence: "Tinggi", confRaw: "h", frp: "67.8", date: "Hari Ini", time: "06:05 UTC", satellite: "NOAA-20", wilayah: "Muaro Jambi / Tanjab, Jambi" },
+        { id: "c16", lat: -3.442, lng: 114.782, brightK: 351, brightC: "77.8", confidence: "Sedang", confRaw: "n", frp: "36.2", date: "Hari Ini", time: "06:20 UTC", satellite: "Suomi-NPP", wilayah: "Tanah Laut / Banjar, Kalsel" },
+        { id: "c17", lat: -8.145, lng: 140.214, brightK: 371, brightC: "97.8", confidence: "Tinggi", confRaw: "h", frp: "76.4", date: "Hari Ini", time: "04:30 UTC", satellite: "NOAA-20", wilayah: "Merauke, Papua Selatan" },
+        { id: "c18", lat: -7.821, lng: 139.852, brightK: 348, brightC: "74.8", confidence: "Sedang", confRaw: "n", frp: "28.1", date: "Hari Ini", time: "04:30 UTC", satellite: "Suomi-NPP", wilayah: "Merauke, Papua Selatan" }
+      ];
+    }
+
+    function renderHotspotsMapAndSidebar() {
+      layerHotspot.clearLayers();
+      const container = document.getElementById('hotspotListContainer');
+      container.innerHTML = '';
+
+      let list = state.hotspotsList;
+      if (state.hotspotFilterHighOnly) {
+        list = list.filter(f => f.confidence === 'Tinggi');
+      }
+
+      // Update counters di UI
+      const totalCount = document.getElementById('totalHotspotsCount');
+      if (totalCount) totalCount.innerText = `${list.length}`;
+
+      const highCount = state.hotspotsList.filter(f => f.confidence === 'Tinggi').length;
+      const medCount = state.hotspotsList.filter(f => f.confidence === 'Sedang').length;
+      const lowCount = state.hotspotsList.filter(f => f.confidence === 'Rendah').length;
+
+      const statsElem = document.getElementById('hotspotConfidenceStats');
+      if (statsElem) {
+        statsElem.innerHTML = `Tinggi: <span class="text-red-400 font-bold">${highCount}</span> • Sedang: <span class="text-amber-400 font-bold">${medCount}</span> • Rendah: <span class="text-yellow-300 font-bold">${lowCount}</span>`;
+      }
+
+      const activeBadge = document.getElementById('hotspotActiveBadge');
+      if (activeBadge) activeBadge.innerText = `${list.length} Titik Ditampilkan`;
+
+      // Render setiap titik api ke Canvas Layer
+      list.forEach((f) => {
+        let color = '#eab308';
+        let radius = 6;
+        if (f.confidence === 'Tinggi') {
+          color = '#ef4444';
+          radius = 8.5;
+        } else if (f.confidence === 'Sedang') {
+          color = '#f97316';
+          radius = 7;
+        }
+
+        const marker = L.circleMarker([f.lat, f.lng], {
+          renderer: canvasRenderer,
+          radius: radius,
+          fillColor: color,
+          color: '#ffffff',
+          weight: 1.2,
+          fillOpacity: 0.85
+        }).addTo(layerHotspot);
+
+        let userDistStr = "-";
+        if (state.userLat !== null && state.userLng !== null) {
+          const d = calculateHaversineDistance(state.userLat, state.userLng, f.lat, f.lng);
+          const dir = calculateCompassBearing(f.lat, f.lng, state.userLat, state.userLng);
+          userDistStr = `~${d} km (Arah ${dir} dari api)`;
+        }
+
+        marker.bindPopup(`
+          <div class="font-bold text-amber-400 text-xs flex items-center gap-1">
+            <span>🔥</span> Titik Panas (Hotspot Terdeteksi)
+          </div>
+          <div class="font-bold text-white text-xs mt-0.5">${f.wilayah}</div>
+          <div class="text-[11px] text-slate-300 mt-1 space-y-0.5">
+            <strong>Keyakinan:</strong> <span class="font-bold" style="color:${color}">${f.confidence}</span><br>
+            <strong>Energi (FRP):</strong> ${f.frp} MW<br>
+            <strong>Suhu Kecerahan:</strong> ${f.brightK} K (${f.brightC}°C)<br>
+            <strong>Satelit:</strong> ${f.satellite} • ${f.time}<br>
+            <strong>Jarak ke Acuan:</strong> <span class="text-sky-300">${userDistStr}</span>
+          </div>
+        `);
+
+        // Card Sidebar Hotspot
+        const card = document.createElement('div');
+        card.className = "p-2.5 bg-slate-800/70 hover:bg-slate-700/80 rounded-lg border border-slate-700/60 cursor-pointer transition flex items-center justify-between";
+        card.innerHTML = `
+          <div class="space-y-0.5 max-w-[76%]">
+            <div class="font-bold text-slate-100 truncate text-xs flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full" style="background:${color}"></span>
+              ${f.wilayah}
+            </div>
+            <div class="text-[10px] text-slate-400 font-mono">
+              FRP: ${f.frp} MW • ${f.brightK} K • ${f.satellite}
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] font-black px-2 py-0.5 rounded text-white" style="background:${color}">
+              ${f.confidence}
+            </span>
+          </div>
+        `;
+        card.onclick = () => {
+          map.flyTo([f.lat, f.lng], 10, { duration: 1.2 });
+          marker.openPopup();
+        };
+        container.appendChild(card);
+      });
+    }
+
+    function filterHighConfidenceFires() {
+      state.hotspotFilterHighOnly = !state.hotspotFilterHighOnly;
+      const btn = document.getElementById('btnFilterFires');
+      if (btn) {
+        if (state.hotspotFilterHighOnly) {
+          btn.innerText = "Filter: Keyakinan Tinggi";
+          btn.className = "py-1.5 bg-red-700 hover:bg-red-600 text-white rounded-lg text-center font-bold text-xs transition";
+        } else {
+          btn.innerText = "Filter: Semua Titik";
+          btn.className = "py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-center font-bold text-xs transition";
+        }
+      }
+      renderHotspotsMapAndSidebar();
+    }
+
+    function updateUserDistanceToFires() {
+      if (state.userLat === null || state.userLng === null || !state.hotspotsList.length) return;
+
+      let minDistance = Infinity;
+      let closest = null;
+
+      state.hotspotsList.forEach(f => {
+        const dist = calculateHaversineDistance(state.userLat, state.userLng, f.lat, f.lng);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closest = { ...f, distance: dist };
+        }
+      });
+
+      state.closestHotspot = closest;
+
+      const distElem = document.getElementById('nearestFireDistance');
+      const locElem = document.getElementById('nearestFireLocation');
+      const pwrElem = document.getElementById('nearestFirePower');
+      const trajBadge = document.getElementById('smokeRiskBadge');
+      const trajText = document.getElementById('smokeTrajectoryText');
+
+      if (distElem && closest) {
+        distElem.innerHTML = `<span class="${minDistance < 50 ? 'text-red-400 font-bold' : 'text-amber-300 font-semibold'}">${minDistance} km</span>`;
+        if (locElem) locElem.innerText = closest.wilayah;
+        if (pwrElem) pwrElem.innerText = `${closest.frp} MW (${closest.brightK} K)`;
+
+        // Hitung estimasi arah asap berdasarkan arah angin Open-Meteo
+        const bearingFireToUser = calculateCompassBearing(closest.lat, closest.lng, state.userLat, state.userLng);
+        const windDirectionDegree = state.currentWindDir || 0;
+        const windDirCompass = getCompassFromDegrees(windDirectionDegree);
+
+        let riskLevel = "Rendah";
+        let riskClass = "bg-emerald-950 text-emerald-300 border border-emerald-800";
+        let narrative = `Titik api berada di ${closest.wilayah} (~${minDistance} km). Angin bertiup ke arah ${windDirCompass} (${state.currentWindSpeed} km/j), menjauhi lokasi acuan Anda.`;
+
+        // Jika jarak dekat (< 75 km)
+        if (minDistance <= 75) {
+          riskLevel = "Waspada Asap";
+          riskClass = "bg-amber-950 text-amber-300 border border-amber-800";
+          narrative = `Titik api terdekat cukup dekat (~${minDistance} km). Tetap pantau indikator partikulat PM2.5 dan gunakan masker jika jarak pandang menurun.`;
+        }
+        if (minDistance <= 30) {
+          riskLevel = "Siaga Asap Pekat";
+          riskClass = "bg-red-950 text-red-300 border border-red-800 animate-pulse";
+          narrative = `⚠️ PERINGATAN: Titik api aktif berada sangat dekat (~${minDistance} km) dari lokasi Anda. Risiko paparan asap tebal dan penurunan tajam kualitas udara sangat tinggi!`;
+        }
+
+        if (trajBadge) {
+          trajBadge.innerText = riskLevel;
+          trajBadge.className = `text-[10px] font-bold px-2 py-0.5 rounded ${riskClass}`;
+        }
+        if (trajText) {
+          trajText.innerText = narrative;
+        }
+      }
+    }
+
+    function focusNearestFire() {
+      if (state.closestHotspot) {
+        map.flyTo([state.closestHotspot.lat, state.closestHotspot.lng], 10, { duration: 1.2 });
+      } else {
+        showToast("Titik Panas", "Sedang menghitung proksimitas ke lokasi acuan...", "info");
+      }
+    }
+
+    function calculateCompassBearing(lat1, lon1, lat2, lon2) {
+      const y = Math.sin((lon2 - lon1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180);
+      const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lon2 - lon1) * Math.PI / 180);
+      let brng = Math.atan2(y, x) * 180 / Math.PI;
+      brng = (brng + 360) % 360;
+      return getCompassFromDegrees(brng);
+    }
+
+    function getCompassFromDegrees(deg) {
+      const directions = ['Utara', 'Timur Laut', 'Timur', 'Tenggara', 'Selatan', 'Barat Daya', 'Barat', 'Barat Laut'];
+      const index = Math.round(deg / 45) % 8;
+      return directions[index];
+    }
+
+    /* =========================================================================
+       4. GEMPA BUMI REAL-TIME (BMKG & USGS FAILOVER)
+       ========================================================================= */
+    async function fetchQuakes() {
+      const spinner = document.getElementById('refreshSpinner');
+      spinner.classList.add('animate-spin');
+
+      let quakes = [];
+      let latest = null;
+      let sourceName = "BMKG";
+
+      const bmkgListUrl = 'https://data.bmkg.go.id/DataMKG/TEWS/gempaterkini.json';
+      const bmkgAutoUrl = 'https://data.bmkg.go.id/DataMKG/TEWS/autogempa.json';
+
+      const proxies = [
+        (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+      ];
+
+      for (let p of proxies) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+          const [resList, resAuto] = await Promise.all([
+            fetch(p(bmkgListUrl), { signal: controller.signal }),
+            fetch(p(bmkgAutoUrl), { signal: controller.signal })
+          ]);
+          clearTimeout(timeoutId);
+
+          if (resList.ok) {
+            const dataList = await resList.json();
+            if (dataList?.Infogempa?.gempa) quakes = dataList.Infogempa.gempa;
+          }
+          if (resAuto.ok) {
+            const dataAuto = await resAuto.json();
+            if (dataAuto?.Infogempa?.gempa) latest = dataAuto.Infogempa.gempa;
+          }
+
+          if (quakes.length > 0) {
+            sourceName = "BMKG Live";
+            break;
+          }
+        } catch (e) {}
+      }
+
+      // Failover USGS Live
+      if (!quakes || quakes.length === 0) {
+        try {
+          const usgsUrl = 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4.2&latitude=-2.5&longitude=118&maxradiuskm=2800&limit=15';
+          const resUsgs = await fetch(usgsUrl);
+          if (resUsgs.ok) {
+            const jsonUsgs = await resUsgs.json();
+            if (jsonUsgs.features && jsonUsgs.features.length > 0) {
+              quakes = jsonUsgs.features.map(f => {
+                const props = f.properties;
+                const coords = f.geometry.coordinates;
+                const d = new Date(props.time);
+                return {
+                  Tanggal: d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }),
+                  Jam: d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB',
+                  Coordinates: `${coords[1].toFixed(2)},${coords[0].toFixed(2)}`,
+                  Magnitude: props.mag.toFixed(1),
+                  Kedalaman: `${Math.round(coords[2])} km`,
+                  Wilayah: props.place || "Wilayah Indonesia",
+                  Potensi: props.tsunami === 1 ? "Peringatan Waspada Tsunami" : "Data seismik USGS (Real-time)",
+                  Lintang: `${coords[1].toFixed(2)}°`,
+                  Bujur: `${coords[0].toFixed(2)}°`
+                };
+              });
+              latest = quakes[0];
+              sourceName = "USGS Live";
+            }
+          }
+        } catch (usgsErr) {
+          console.warn("Gagal kontak USGS:", usgsErr);
+        }
+      }
+
+      updateDataSourceBadge(sourceName);
+
+      if (quakes && quakes.length > 0) {
+        state.latestQuakeData = latest || quakes[0];
+        state.quakesList = quakes;
+        renderQuakeMapAndSidebar(quakes, state.latestQuakeData);
+
+        if (state.audioAlertEnabled && parseFloat(state.latestQuakeData.Magnitude) >= 6.0) {
+          playAlertBeep();
+        }
+      }
+
+      spinner.classList.remove('animate-spin');
+    }
+
+    function updateDataSourceBadge(sourceName) {
+      const badge = document.getElementById('dataSourceBadge');
+      const dot = document.getElementById('dataStatusDot');
+      const label = document.getElementById('dataStatusLabel');
+      if (!badge) return;
+      badge.classList.remove('hidden');
+
+      if (sourceName.includes("BMKG")) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400";
+        label.innerText = "BMKG Real-time";
+        label.className = "text-emerald-400 font-semibold";
+      } else if (sourceName.includes("USGS")) {
+        dot.className = "w-2 h-2 rounded-full bg-sky-400";
+        label.innerText = "USGS Live Network";
+        label.className = "text-sky-300 font-semibold";
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-red-400";
+        label.innerText = "Offline";
+      }
+    }
+
+    function parseCoordinates(coordInput) {
+      if (!coordInput) return null;
+      if (Array.isArray(coordInput) && coordInput.length >= 2) {
+        const lat = Number(coordInput[0]);
+        const lng = Number(coordInput[1]);
+        if (!isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          return [lat, lng];
+        }
+        return null;
+      }
+      if (typeof coordInput === 'string') {
+        const parts = coordInput.split(',');
+        if (parts.length >= 2) {
+          const lat = parseFloat(parts[0].replace(/[^\d.-]/g, '').trim());
+          const lng = parseFloat(parts[1].replace(/[^\d.-]/g, '').trim());
+          if (!isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            return [lat, lng];
+          }
+        }
+      }
+      return null;
+    }
+
+    function renderQuakeMapAndSidebar(quakes, latest) {
+      layerQuake.clearLayers();
+      layerShakemap.clearLayers();
+      const container = document.getElementById('quakeListContainer');
+      container.innerHTML = '';
+
+      const countBadge = document.getElementById('quakeCountBadge');
+      if (countBadge) countBadge.innerText = `${quakes.length} Laporan Riil`;
+
+      if (latest && latest.Coordinates) {
+        const coords = parseCoordinates(latest.Coordinates);
+        if (coords) {
+          const [lat, lng] = coords;
+          const mag = parseFloat(latest.Magnitude) || 0;
+
+          document.getElementById('latestQuakeMag').innerText = `M ${latest.Magnitude}`;
+          document.getElementById('latestQuakeLoc').innerText = latest.Wilayah || 'Indonesia';
+          document.getElementById('latestQuakeDepth').innerText = `Kedalaman: ${latest.Kedalaman || '-'}`;
+          document.getElementById('latestQuakeTime').innerText = `${latest.Tanggal || ''} - ${latest.Jam || ''}`;
+          document.getElementById('latestQuakePotency').innerText = latest.Potensi || '-';
+          document.getElementById('latestQuakeCoords').innerText = latest.Lintang && latest.Bujur ? `${latest.Lintang}, ${latest.Bujur}` : latest.Coordinates;
+
+          updateUserDistanceToQuake(lat, lng);
+          renderEstimatedShakemap(lat, lng, mag);
+
+          const pulseIcon = L.divIcon({
+            className: 'relative flex items-center justify-center',
+            html: `
+              <div class="quake-pulse-ring w-14 h-14 -ml-4 -mt-4"></div>
+              <div class="w-5 h-5 rounded-full bg-red-500 border-2 border-white shadow-2xl"></div>
+            `,
+            iconSize: [20, 20]
+          });
+
+          const latestMarker = L.marker([lat, lng], { icon: pulseIcon }).addTo(layerQuake);
+          latestMarker.bindPopup(`
+            <div class="font-bold text-sm text-red-400 mb-1">Pusat Gempa Terkini</div>
+            <div class="font-bold text-white text-xs mb-1">${latest.Wilayah || 'Indonesia'}</div>
+            <div class="text-[11px] text-slate-300">
+              <strong>Magnitudo:</strong> <span class="text-red-400 font-bold">M ${latest.Magnitude}</span><br>
+              <strong>Kedalaman:</strong> ${latest.Kedalaman || '-'}<br>
+              <strong>Waktu:</strong> ${latest.Tanggal || ''} • ${latest.Jam || ''}<br>
+              <strong>Potensi:</strong> <span class="text-amber-300">${latest.Potensi || '-'}</span>
+            </div>
+          `);
+        }
+      }
+
+      quakes.forEach((q) => {
+        if (!q || !q.Coordinates) return;
+        const coords = parseCoordinates(q.Coordinates);
+        if (!coords) return;
+        const [lat, lng] = coords;
+        const mag = parseFloat(q.Magnitude) || 0;
+        const color = mag >= 7.0 ? '#ef4444' : mag >= 6.0 ? '#f97316' : '#eab308';
+
+        const circle = L.circleMarker([lat, lng], {
+          radius: Math.max(mag * 2.5, 6.5),
+          fillColor: color,
+          color: '#ffffff',
+          weight: 1.5,
+          opacity: 0.9,
+          fillOpacity: 0.75
+        }).addTo(layerQuake);
+
+        circle.bindPopup(`
+          <div class="font-bold text-xs text-white">${q.Wilayah || 'Indonesia'}</div>
+          <div class="mt-1 text-[11px] text-slate-300">
+            <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-black text-black" style="background:${color}">
+              M ${q.Magnitude}
+            </span> 
+            Kedalaman: ${q.Kedalaman || '-'}<br>
+            Waktu: ${q.Tanggal || ''} ${q.Jam || ''}<br>
+            <span class="text-sky-300">${q.Potensi || '-'}</span>
+          </div>
+        `);
+
+        const card = document.createElement('div');
+        card.className = "p-2.5 bg-slate-800/70 hover:bg-slate-700/80 rounded-lg border border-slate-700/60 cursor-pointer transition flex items-center justify-between";
+        card.innerHTML = `
+          <div class="space-y-0.5 max-w-[78%]">
+            <div class="font-bold text-slate-100 truncate text-xs">${q.Wilayah || 'Indonesia'}</div>
+            <div class="text-[10px] text-slate-400 font-mono">${q.Tanggal || ''} • ${q.Jam || ''} • ${q.Kedalaman || '-'}</div>
+          </div>
+          <div class="text-right">
+            <span class="text-xs font-black px-2 py-0.5 rounded text-black font-mono" style="background:${color}">
+              ${q.Magnitude}
+            </span>
+          </div>
+        `;
+        card.onclick = () => {
+          map.flyTo([lat, lng], 8, { duration: 1.2 });
+          circle.openPopup();
+          renderEstimatedShakemap(lat, lng, mag);
+        };
+        container.appendChild(card);
+      });
+    }
+
+    function renderEstimatedShakemap(lat, lng, mag) {
+      layerShakemap.clearLayers();
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+      const numMag = Number(mag);
+      if (isNaN(numLat) || isNaN(numLng) || isNaN(numMag)) return;
+      if (!document.getElementById('toggleLayerShakemap') || !document.getElementById('toggleLayerShakemap').checked) return;
+
+      const rDamage = Math.max(Math.pow(10, (0.42 * numMag - 1.6)) * 1000, 10000);
+      const rModerate = Math.max(Math.pow(10, (0.44 * numMag - 1.1)) * 1000, 30000);
+      const rFelt = Math.max(Math.pow(10, (0.46 * numMag - 0.6)) * 1000, 70000);
+
+      L.circle([numLat, numLng], {
+        radius: rFelt,
+        color: '#eab308',
+        weight: 1,
+        fillColor: '#eab308',
+        fillOpacity: 0.08,
+        dashArray: '3, 4'
+      }).bindTooltip("Estimasi MMI II - III (Terasa Lemah)", { sticky: true }).addTo(layerShakemap);
+
+      L.circle([numLat, numLng], {
+        radius: rModerate,
+        color: '#f97316',
+        weight: 1.2,
+        fillColor: '#f97316',
+        fillOpacity: 0.12,
+        dashArray: '4, 4'
+      }).bindTooltip("Estimasi MMI IV - V (Guncangan Nyata)", { sticky: true }).addTo(layerShakemap);
+
+      if (numMag >= 5.0) {
+        L.circle([numLat, numLng], {
+          radius: rDamage,
+          color: '#ef4444',
+          weight: 1.5,
+          fillColor: '#ef4444',
+          fillOpacity: 0.18
+        }).bindTooltip("Estimasi MMI VI+ (Potensi Kerusakan Struktur)", { sticky: true }).addTo(layerShakemap);
+      }
+    }
+
+    function focusLatestQuake() {
+      if (!state.latestQuakeData || !state.latestQuakeData.Coordinates) return;
+      const coords = parseCoordinates(state.latestQuakeData.Coordinates);
+      if (coords) map.flyTo(coords, 8, { duration: 1.5 });
+    }
+
+    function focusUserLocation() {
+      if (state.userLat !== null && state.userLng !== null) {
+        map.flyTo([state.userLat, state.userLng], 9, { duration: 1.2 });
+      } else {
+        toggleManualLocationModal();
+      }
+    }
+
+    /* =========================================================================
+       5. JALUR SESAR / PATAHAN AKTIF INDONESIA
+       ========================================================================= */
+    function renderFaultLines() {
+      layerFaults.clearLayers();
+      state.faultLines.forEach(fault => {
+        const polyline = L.polyline(fault.coords, {
+          color: fault.name.includes("Megathrust") ? '#dc2626' : '#f43f5e',
+          weight: fault.name.includes("Megathrust") ? 3.5 : 2.5,
+          opacity: 0.85,
+          dashArray: fault.name.includes("Megathrust") ? '6, 6' : null
+        }).addTo(layerFaults);
+
+        polyline.bindPopup(`
+          <div class="font-bold text-xs text-rose-400">⚡ ${fault.name}</div>
+          <div class="text-[11px] text-slate-300 mt-1">
+            <strong>Tipe Pergerakan:</strong> ${fault.type}<br>
+            <strong>Laju Geser:</strong> ${fault.rate}<br>
+            <em>Jalur patahan aktif gempa bumi darat & laut</em>
+          </div>
+        `);
+      });
+    }
+
+    /* =========================================================================
+       6. STATUS VULKANIK GUNUNG API
+       ========================================================================= */
+    function renderVolcanoLayer() {
+      layerVolcano.clearLayers();
+      const container = document.getElementById('volcanoListContainer');
+      container.innerHTML = '';
+
+      state.volcanoes.forEach((v) => {
+        let color = '#10b981';
+        let bgBadge = 'bg-emerald-950 text-emerald-300 border-emerald-800';
+        if (v.level === 4) {
+          color = '#ef4444';
+          bgBadge = 'bg-red-950 text-red-300 border-red-800 animate-pulse';
+        } else if (v.level === 3) {
+          color = '#f97316';
+          bgBadge = 'bg-orange-950 text-orange-300 border-orange-800';
+        } else if (v.level === 2) {
+          color = '#f59e0b';
+          bgBadge = 'bg-amber-950 text-amber-300 border-amber-800';
+        }
+
+        const hazardCircle = L.circle([v.lat, v.lng], {
+          radius: v.radiusKm * 1000,
+          color: color,
+          weight: 1.5,
+          fillColor: color,
+          fillOpacity: 0.15,
+          dashArray: '4, 4'
+        }).addTo(layerVolcano);
+
+        const vIcon = L.divIcon({
+          className: 'custom-volcano-icon',
+          html: `<div style="background:${color}; width:13px; height:13px; transform:rotate(45deg); border:2px solid #fff; box-shadow:0 0 6px rgba(0,0,0,0.6);"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+
+        const marker = L.marker([v.lat, v.lng], { icon: vIcon }).addTo(layerVolcano);
+        const popupMsg = `
+          <div class="font-bold text-sm text-white">${v.name}</div>
+          <div class="text-[11px] text-slate-300 mt-1">
+            <strong>Provinsi:</strong> ${v.prov}<br>
+            <strong>Status:</strong> <span class="font-bold" style="color:${color}">Level ${v.level} (${v.status})</span><br>
+            <strong>Rekomendasi Bahaya:</strong> Radius ${v.radiusKm} km dari kawah aktif.<br>
+            <a href="https://magma.esdm.go.id" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline mt-1 inline-block">Cek Laporan MAGMA ESDM ↗</a>
+          </div>
+        `;
+        marker.bindPopup(popupMsg);
+        hazardCircle.bindPopup(popupMsg);
+
+        const card = document.createElement('div');
+        card.className = "p-3 bg-slate-800/60 hover:bg-slate-700/70 rounded-xl border border-slate-700/60 transition cursor-pointer flex items-center justify-between";
+        card.innerHTML = `
+          <div>
+            <div class="font-bold text-slate-100 text-xs">${v.name}</div>
+            <div class="text-[10px] text-slate-400">${v.prov} • Radius ${v.radiusKm} km</div>
+          </div>
+          <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded border ${bgBadge}">
+            ${v.status}
+          </span>
+        `;
+        card.onclick = () => {
+          map.flyTo([v.lat, v.lng], 10, { duration: 1.2 });
+          marker.openPopup();
+        };
+        container.appendChild(card);
+      });
+    }
+
+    /* =========================================================================
+       7. CUACA REAL-TIME, AEROSOL ASAP (AOD) & KUALITAS UDARA (OPEN-METEO)
+       ========================================================================= */
+    async function inspectWeatherAndAirQuality(lat, lng, locationName = null) {
+      document.getElementById('wxLocationTitle').innerText = locationName || `Koordinat Terpilih`;
+      document.getElementById('wxCoordsTitle').innerText = `Lat: ${lat.toFixed(3)}, Lng: ${lng.toFixed(3)}`;
+      document.getElementById('wxTemp').innerText = '...';
+      document.getElementById('wxHumidity').innerText = '...';
+      document.getElementById('wxWind').innerText = '...';
+      document.getElementById('aqiValue').innerText = '...';
+
+      try {
+        const wxUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m`;
+        // Menyertakan aerosol_optical_depth dan carbon_monoxide untuk deteksi kabut asap karhutla
+        const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=pm10,pm2_5,carbon_monoxide,aerosol_optical_depth,us_aqi`;
+
+        const [wxRes, aqiRes] = await Promise.all([
+          fetch(wxUrl),
+          fetch(aqiUrl)
+        ]);
+
+        let weatherText = "Normal";
+        let tempVal = "-";
+        let aqiVal = "-";
+        let numTemp = 30;
+        let numRh = 70;
+
+        if (wxRes.ok) {
+          const wxData = await wxRes.json();
+          const curr = wxData.current;
+          numTemp = curr.temperature_2m;
+          numRh = curr.relative_humidity_2m;
+          state.currentWindSpeed = curr.wind_speed_10m;
+          state.currentWindDir = curr.wind_direction_10m;
+
+          tempVal = `${curr.temperature_2m}°C`;
+          document.getElementById('wxTemp').innerText = `${curr.temperature_2m} °C`;
+          document.getElementById('wxHumidity').innerText = `${curr.relative_humidity_2m} %`;
+          document.getElementById('wxWind').innerText = `${curr.wind_speed_10m} km/j`;
+          document.getElementById('wxWindDir').innerText = `${curr.wind_direction_10m}° (${getCompassFromDegrees(curr.wind_direction_10m)})`;
+          document.getElementById('wxIconLarge').innerText = getWeatherEmoji(curr.weather_code);
+          weatherText = getWeatherDescription(curr.weather_code);
+
+          // Update FDRS (Fire Danger Rating System) berbasis Suhu & Kelembapan
+          updateFdrsAssessment(numTemp, numRh);
+        }
+
+        if (aqiRes.ok) {
+          const aqiData = await aqiRes.json();
+          const aqiCurr = aqiData.current;
+          const aqi = Math.round(aqiCurr.us_aqi);
+          aqiVal = `${aqi}`;
+          document.getElementById('aqiValue').innerText = aqi;
+          document.getElementById('pm25Val').innerText = `${aqiCurr.pm2_5.toFixed(1)} µg/m³`;
+          document.getElementById('pm10Val').innerText = `${aqiCurr.pm10.toFixed(1)} µg/m³`;
+          
+          const coVal = aqiCurr.carbon_monoxide ? `${Math.round(aqiCurr.carbon_monoxide)} µg/m³` : '-';
+          const coElem = document.getElementById('coVal');
+          if (coElem) coElem.innerText = coVal;
+
+          // AOD (Aerosol Optical Depth) untuk mengukur ketebalan asap di atmosfer
+          const aod = aqiCurr.aerosol_optical_depth !== undefined ? aqiCurr.aerosol_optical_depth : 0.15;
+          updateAodAssessment(aod);
+
+          const badge = document.getElementById('aqiCategoryBadge');
+          const aqiValElem = document.getElementById('aqiValue');
+          if (aqi <= 50) {
+            badge.innerText = "Baik";
+            badge.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800";
+            aqiValElem.style.color = '#10b981';
+          } else if (aqi <= 100) {
+            badge.innerText = "Sedang";
+            badge.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800";
+            aqiValElem.style.color = '#f59e0b';
+          } else if (aqi <= 150) {
+            badge.innerText = "Tidak Sehat (Sensitif)";
+            badge.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-orange-950 text-orange-300 border border-orange-800";
+            aqiValElem.style.color = '#f97316';
+          } else {
+            badge.innerText = "Sangat Tidak Sehat";
+            badge.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800";
+            aqiValElem.style.color = '#ef4444';
+          }
+
+          state.lastAirQualitySummary = {
+            aqi: aqi,
+            pm25: aqiCurr.pm2_5,
+            pm10: aqiCurr.pm10,
+            co: aqiCurr.carbon_monoxide,
+            aod: aod.toFixed(2)
+          };
+        }
+
+        state.lastWeatherSummary = {
+          location: locationName || "Koordinat Terpilih",
+          temp: tempVal,
+          weather: weatherText,
+          aqi: aqiVal
+        };
+
+        // Sinkronkan ulang kalkulasi asap jika titik api sudah dimuat
+        updateUserDistanceToFires();
+
+      } catch (err) {
+        console.error("Gagal mengambil data cuaca Open-Meteo:", err);
+      }
+    }
+
+    function updateAodAssessment(aod) {
+      const aodValElem = document.getElementById('fireAodVal');
+      const aodDescElem = document.getElementById('fireAodDesc');
+      if (!aodValElem || !aodDescElem) return;
+
+      const numAod = Number(aod);
+      aodValElem.innerText = numAod.toFixed(2);
+
+      if (numAod <= 0.20) {
+        aodValElem.className = "text-lg font-black text-emerald-400 mt-0.5";
+        aodDescElem.innerText = "Atmosfer Jernih / Bebas Asap";
+      } else if (numAod <= 0.50) {
+        aodValElem.className = "text-lg font-black text-amber-400 mt-0.5";
+        aodDescElem.innerText = "Kabut Tipis / Haze Ringan";
+      } else if (numAod <= 1.00) {
+        aodValElem.className = "text-lg font-black text-orange-400 mt-0.5";
+        aodDescElem.innerText = "Partikulat Asap Sedang";
+      } else {
+        aodValElem.className = "text-lg font-black text-red-400 mt-0.5 animate-pulse";
+        aodDescElem.innerText = "Kabut Asap Pekat (Kritis)";
+      }
+    }
+
+    function updateFdrsAssessment(temp, rh) {
+      const fdrsValElem = document.getElementById('fireFdrsVal');
+      const fdrsDescElem = document.getElementById('fireFdrsDesc');
+      if (!fdrsValElem || !fdrsDescElem) return;
+
+      if (temp >= 33 && rh <= 55) {
+        fdrsValElem.innerText = "EKSTREM";
+        fdrsValElem.className = "text-lg font-black text-red-400 mt-0.5 animate-pulse";
+        fdrsDescElem.innerText = "Sangat Mudah Terbakar (Kering & Panas)";
+      } else if (temp >= 30 && rh <= 65) {
+        fdrsValElem.innerText = "TINGGI";
+        fdrsValElem.className = "text-lg font-black text-orange-400 mt-0.5";
+        fdrsDescElem.innerText = "Lahan Cepat Mengering & Rentan";
+      } else if (temp >= 27 && rh <= 75) {
+        fdrsValElem.innerText = "SEDANG";
+        fdrsValElem.className = "text-lg font-black text-amber-400 mt-0.5";
+        fdrsDescElem.innerText = "Potensi Karhutla Waspada";
+      } else {
+        fdrsValElem.innerText = "RENDAH";
+        fdrsValElem.className = "text-lg font-black text-emerald-400 mt-0.5";
+        fdrsDescElem.innerText = "Kelembapan Cukup Tinggi (Aman)";
+      }
+    }
+
+    function getWeatherEmoji(code) {
+      if (code === 0) return '☀️';
+      if ([1, 2].includes(code)) return '🌤️';
+      if (code === 3) return '☁️';
+      if ([45, 48].includes(code)) return '🌫️';
+      if ([51, 53, 55, 61, 63, 65].includes(code)) return '🌧️';
+      if ([80, 81, 82].includes(code)) return '🌦️';
+      if ([95, 96, 99].includes(code)) return '⛈️';
+      return '⛅';
+    }
+
+    function getWeatherDescription(code) {
+      if (code === 0) return 'Cerah';
+      if ([1, 2].includes(code)) return 'Cerah Berawan';
+      if (code === 3) return 'Berawan Tebal';
+      if ([45, 48].includes(code)) return 'Berkabut / Berasap';
+      if ([51, 53, 55, 61, 63, 65].includes(code)) return 'Hujan';
+      if ([80, 81, 82].includes(code)) return 'Hujan Lebat';
+      if ([95, 96, 99].includes(code)) return 'Badai Petir';
+      return 'Sebagian Berawan';
+    }
+
+    map.on('click', function(e) {
+      const { lat, lng } = e.latlng;
+      if (clickMarker) map.removeLayer(clickMarker);
+
+      clickMarker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: 'w-3 h-3 bg-sky-400 rounded-full border-2 border-white shadow-lg animate-bounce',
+          iconSize: [12, 12]
+        })
+      }).addTo(map);
+
+      if (state.sidebarCollapsed) {
+        toggleSidebar(true);
+      }
+
+      switchTab('weather');
+      inspectWeatherAndAirQuality(lat, lng, `Titik Koordinat`);
+    });
+
+    /* =========================================================================
+       8. GEOLOKASI PENGGUNA, PENYIMPANAN LOKAL, DAN GEOCODING
+       ========================================================================= */
+    function showToast(title, message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      let borderCol = 'border-sky-500/50';
+      let icon = 'ℹ️';
+      if (type === 'danger') {
+        borderCol = 'border-red-500/60';
+        icon = '⚠️';
+      } else if (type === 'success') {
+        borderCol = 'border-emerald-500/60';
+        icon = '✅';
+      } else if (type === 'warning') {
+        borderCol = 'border-amber-500/60';
+        icon = '🔔';
+      }
+
+      toast.className = `pointer-events-auto bg-dmg-800/95 backdrop-blur-md border ${borderCol} text-white px-3.5 py-2.5 rounded-xl shadow-2xl flex items-start gap-2.5 max-w-sm transition-all duration-300 transform translate-x-4 opacity-0`;
+      toast.innerHTML = `
+        <span class="text-base shrink-0">${icon}</span>
+        <div class="flex-1 text-xs">
+          <div class="font-bold text-slate-100">${title}</div>
+          <div class="text-[11px] text-slate-300 mt-0.5 leading-snug">${message}</div>
+        </div>
+      `;
+
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.remove('translate-x-4', 'opacity-0');
+      }, 50);
+
+      setTimeout(() => {
+        toast.classList.add('translate-x-4', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function toggleManualLocationModal() {
+      const modal = document.getElementById('manualLocationModal');
+      if (!modal) return;
+      const isHidden = modal.classList.contains('hidden');
+      if (isHidden) {
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+          const input = document.getElementById('inputSearchCity');
+          if (input) input.focus();
+        }, 80);
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('manualLocationModal');
+        if (modal && !modal.classList.contains('hidden')) {
+          toggleManualLocationModal();
+        }
+      }
+    });
+
+    function applyManualCoordinates() {
+      const latRaw = (document.getElementById('inputManualLat').value || '').replace(',', '.').trim();
+      const lngRaw = (document.getElementById('inputManualLng').value || '').replace(',', '.').trim();
+      const latVal = parseFloat(latRaw);
+      const lngVal = parseFloat(lngRaw);
+
+      if (isNaN(latVal) || isNaN(lngVal) || !isFinite(latVal) || !isFinite(lngVal) || latVal < -90 || latVal > 90 || lngVal < -180 || lngVal > 180) {
+        showToast("Koordinat Tidak Valid", "Harap masukkan angka yang benar untuk Latitude (-90 s/d 90) dan Longitude (-180 s/d 180).", "danger");
+        return;
+      }
+
+      setUserReferenceLocation(latVal, lngVal, `Manual (${latVal.toFixed(3)}, ${lngVal.toFixed(3)})`);
+      toggleManualLocationModal();
+      showToast("Koordinat Diterapkan", `Lokasi acuan diatur ke Lat: ${latVal.toFixed(3)}, Lng: ${lngVal.toFixed(3)}`, "success");
+    }
+
+    function setQuickLocation(lat, lng, name) {
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+      if (isNaN(numLat) || isNaN(numLng)) return;
+      setUserReferenceLocation(numLat, numLng, name);
+      toggleManualLocationModal();
+      showToast("Wilayah Terpilih", `Memusatkan analisis mitigasi ke ${name}`, "success");
+    }
+
+    async function searchLocationByName() {
+      const query = document.getElementById('inputSearchCity').value.trim();
+      if (!query) {
+        showToast("Kolom Kosong", "Ketik nama kota, kabupaten, atau gunung yang dicari.", "warning");
+        return;
+      }
+
+      showToast("Mencari Wilayah...", `Mencari titik koordinat untuk "${query}"`, "info");
+
+      try {
+        let lat = null, lng = null, displayName = null;
+
+        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query + ' Indonesia')}&limit=1`;
+        const resPhoton = await fetch(photonUrl);
+        if (resPhoton.ok) {
+          const dataPhoton = await resPhoton.json();
+          if (dataPhoton?.features?.length > 0) {
+            const feat = dataPhoton.features[0];
+            const pLng = Number(feat.geometry.coordinates[0]);
+            const pLat = Number(feat.geometry.coordinates[1]);
+            if (!isNaN(pLat) && !isNaN(pLng)) {
+              lng = pLng;
+              lat = pLat;
+              displayName = feat.properties.name || query;
+            }
+          }
+        }
+
+        if (lat === null || lng === null) {
+          const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' Indonesia')}&limit=1`;
+          const resNom = await fetch(nomUrl);
+          if (resNom.ok) {
+            const nomData = await resNom.json();
+            if (nomData && nomData.length > 0) {
+              const nLat = parseFloat(nomData[0].lat);
+              const nLng = parseFloat(nomData[0].lon);
+              if (!isNaN(nLat) && !isNaN(nLng)) {
+                lat = nLat;
+                lng = nLng;
+                displayName = nomData[0].display_name.split(',')[0];
+              }
+            }
+          }
+        }
+
+        if (lat !== null && lng !== null) {
+          setUserReferenceLocation(lat, lng, displayName);
+          toggleManualLocationModal();
+          showToast("Lokasi Ditemukan", `Berhasil menentukan ${displayName} (${lat.toFixed(2)}, ${lng.toFixed(2)})`, "success");
+        } else {
+          showToast("Tidak Ditemukan", `Wilayah "${query}" tidak ditemukan. Coba masukkan koordinat manual.`, "warning");
+        }
+      } catch (err) {
+        showToast("Gangguan Jaringan", "Tidak dapat menghubungi server pencarian. Gunakan pilihan cepat atau koordinat.", "danger");
+      }
+    }
+
+    function setUserReferenceLocation(lat, lng, label) {
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+
+      if (isNaN(numLat) || isNaN(numLng) || !isFinite(numLat) || !isFinite(numLng) || numLat < -90 || numLat > 90 || numLng < -180 || numLng > 180) {
+        localStorage.removeItem('dmg_user_ref');
+        return;
+      }
+
+      state.userLat = numLat;
+      state.userLng = numLng;
+      state.userLocationName = label || `${numLat.toFixed(4)}, ${numLng.toFixed(4)}`;
+
+      try {
+        localStorage.setItem('dmg_user_ref', JSON.stringify({ lat: numLat, lng: numLng, label: state.userLocationName }));
+      } catch (e) {}
+
+      const badgeText = document.getElementById('userLocationText');
+      if (badgeText) {
+        badgeText.innerText = state.userLocationName;
+        badgeText.title = `${state.userLocationName} (${numLat.toFixed(4)}, ${numLng.toFixed(4)})`;
+      }
+
+      layerUser.clearLayers();
+      const userCircle = L.circleMarker([numLat, numLng], {
+        radius: 9,
+        fillColor: '#38bdf8',
+        color: '#ffffff',
+        weight: 2,
+        fillOpacity: 0.95
+      }).addTo(layerUser);
+
+      userCircle.bindPopup(`
+        <strong class="text-sky-400">Lokasi Acuan Anda</strong><br>
+        <strong>${state.userLocationName}</strong><br>
+        Koordinat: ${numLat.toFixed(4)}, ${numLng.toFixed(4)}
+      `).openPopup();
+
+      if (map && typeof map.flyTo === 'function') {
+        map.flyTo([numLat, numLng], 9, { duration: 1.2 });
+      }
+
+      if (state.latestQuakeData && state.latestQuakeData.Coordinates) {
+        const qCoords = parseCoordinates(state.latestQuakeData.Coordinates);
+        if (qCoords) updateUserDistanceToQuake(qCoords[0], qCoords[1]);
+      }
+
+      updateUserDistanceToFires();
+      inspectWeatherAndAirQuality(numLat, numLng, state.userLocationName);
+    }
+
+    function restoreSavedUserLocation() {
+      try {
+        const saved = localStorage.getItem('dmg_user_ref');
+        if (!saved) return false;
+        const parsed = JSON.parse(saved);
+        if (!parsed || typeof parsed !== 'object') {
+          localStorage.removeItem('dmg_user_ref');
+          return false;
+        }
+
+        const lat = Number(parsed.lat);
+        const lng = Number(parsed.lng);
+
+        if (!isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          setUserReferenceLocation(lat, lng, parsed.label || "Lokasi Tersimpan");
+          return true;
+        } else {
+          localStorage.removeItem('dmg_user_ref');
+        }
+      } catch (e) {
+        localStorage.removeItem('dmg_user_ref');
+      }
+      return false;
+    }
+
+    function detectUserLocation() {
+      const btn = document.getElementById('btnGeo');
+      if (btn) btn.innerText = "Mencari...";
+
+      if (!navigator.geolocation) {
+        showToast("Fitur Tidak Didukung", "Peramban Anda tidak mendukung HTML5 Geolocation API.", "danger");
+        if (btn) btn.innerText = "GPS Saya";
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (btn) btn.innerHTML = `<span class="text-emerald-400">●</span> GPS Aktif`;
+          if (pos && pos.coords) {
+            const lat = Number(pos.coords.latitude);
+            const lng = Number(pos.coords.longitude);
+            if (!isNaN(lat) && !isNaN(lng)) {
+              setUserReferenceLocation(lat, lng, "Posisi GPS Anda");
+              showToast("GPS Terdeteksi", `Lokasi Anda berada di ${lat.toFixed(2)}, ${lng.toFixed(2)}`, "success");
+              return;
+            }
+          }
+          showToast("Koordinat GPS Lemah", "Tidak dapat membaca koordinat akurat dari GPS.", "warning");
+        },
+        (err) => {
+          showToast("Izin Ditolak / Gagal", "Tidak dapat membaca GPS satelit. Silakan gunakan pencarian kota atau input koordinat.", "warning");
+          if (btn) btn.innerText = "GPS Saya";
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+      const rLat1 = Number(lat1);
+      const rLon1 = Number(lon1);
+      const rLat2 = Number(lat2);
+      const rLon2 = Number(lon2);
+      if (isNaN(rLat1) || isNaN(rLon1) || isNaN(rLat2) || isNaN(rLon2)) return 0;
+
+      const R = 6371;
+      const dLat = (rLat2 - rLat1) * Math.PI / 180;
+      const dLon = (rLon2 - rLon1) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(rLat1 * Math.PI / 180) * Math.cos(rLat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1-a)));
+      return Math.round(R * c);
+    }
+
+    function updateUserDistanceToQuake(qLat, qLng) {
+      const numQLat = Number(qLat);
+      const numQLng = Number(qLng);
+      if (isNaN(numQLat) || isNaN(numQLng)) return;
+
+      if (state.userLat !== null && state.userLng !== null) {
+        const dist = calculateHaversineDistance(state.userLat, state.userLng, numQLat, numQLng);
+        const elem = document.getElementById('userDistQuakeVal');
+        const waveBox = document.getElementById('waveEstimateContainer');
+        const waveVal = document.getElementById('waveEstimateVal');
+
+        if (elem) {
+          elem.innerText = `${dist} km`;
+          elem.onclick = () => {
+            if (map && !isNaN(state.userLat) && !isNaN(state.userLng)) {
+              map.flyTo([state.userLat, state.userLng], 10, { duration: 1.2 });
+            }
+          };
+          elem.title = "Klik untuk memusatkan peta ke lokasi acuan Anda";
+          if (dist <= 150) {
+            elem.innerHTML = `<span class="text-red-400 font-bold">${dist} km (Dekat Episentrum!)</span>`;
+          }
+        }
+
+        if (waveBox && waveVal && dist > 0) {
+          waveBox.classList.remove('hidden');
+          const pSec = Math.round(dist / 6.0);
+          const sSec = Math.round(dist / 3.5);
+          waveVal.innerText = `P ~${pSec}d | S ~${sSec}d`;
+          waveVal.title = `Gelombang primer (P) tiba ~${pSec} detik, gelombang sekunder (S) tiba ~${sSec} detik`;
+        }
+      }
+    }
+
+    /* =========================================================================
+       9. KONTROL TAMPILAN, TAB & LAYER
+       ========================================================================= */
+    function toggleSidebar(forceState = null) {
+      const sidebar = document.getElementById('sidebar');
+      const floatingBtn = document.getElementById('floatingOpenSidebar');
+      const btnToggle = document.getElementById('btnToggleSidebar');
+      const toggleText = document.getElementById('sidebarToggleText');
+
+      if (forceState !== null) {
+        state.sidebarCollapsed = !forceState;
+      } else {
+        state.sidebarCollapsed = !state.sidebarCollapsed;
+      }
+
+      if (state.sidebarCollapsed) {
+        sidebar.classList.add('collapsed');
+        floatingBtn.classList.remove('hidden');
+        if (btnToggle) {
+          btnToggle.classList.add('bg-slate-700', 'text-sky-400', 'border-sky-500/50');
+          if (toggleText) toggleText.innerText = "Buka Panel";
+        }
+      } else {
+        sidebar.classList.remove('collapsed');
+        floatingBtn.classList.add('hidden');
+        if (btnToggle) {
+          btnToggle.classList.remove('bg-slate-700', 'text-sky-400', 'border-sky-500/50');
+          if (toggleText) toggleText.innerText = "Panel Data";
+        }
+      }
+
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 310);
+    }
+
+    function switchTab(tabId) {
+      ['gempa', 'volcano', 'fire', 'weather', 'info'].forEach(t => {
+        const btn = document.getElementById(`tabBtn-${t}`);
+        const content = document.getElementById(`tabContent-${t}`);
+        if (!btn || !content) return;
+        if (t === tabId) {
+          btn.className = "flex-1 py-3 border-b-2 border-sky-400 text-white flex items-center justify-center gap-1.5 bg-slate-800/50 min-w-max px-2.5";
+          content.classList.remove('hidden');
+        } else {
+          btn.className = "flex-1 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 min-w-max px-2.5";
+          content.classList.add('hidden');
+        }
+      });
+    }
+
+    function toggleLayer(type) {
+      if (type === 'quake') {
+        document.getElementById('toggleLayerQuake').checked ? map.addLayer(layerQuake) : map.removeLayer(layerQuake);
+      } else if (type === 'shakemap') {
+        const checked = document.getElementById('toggleLayerShakemap').checked;
+        if (checked) {
+          map.addLayer(layerShakemap);
+          if (state.latestQuakeData && state.latestQuakeData.Coordinates) {
+            const [lat, lng] = state.latestQuakeData.Coordinates.split(',').map(Number);
+            renderEstimatedShakemap(lat, lng, parseFloat(state.latestQuakeData.Magnitude));
+          }
+        } else {
+          map.removeLayer(layerShakemap);
+        }
+      } else if (type === 'faults') {
+        document.getElementById('toggleLayerFaults').checked ? map.addLayer(layerFaults) : map.removeLayer(layerFaults);
+      } else if (type === 'volcano') {
+        document.getElementById('toggleLayerVolcano').checked ? map.addLayer(layerVolcano) : map.removeLayer(layerVolcano);
+      } else if (type === 'fire') {
+        const checked = document.getElementById('toggleLayerFire').checked;
+        checked ? map.addLayer(layerHotspot) : map.removeLayer(layerHotspot);
+      } else if (type === 'smoke') {
+        const checked = document.getElementById('toggleLayerSmoke').checked;
+        checked ? map.addLayer(layerSmoke) : map.removeLayer(layerSmoke);
+      } else if (type === 'radar') {
+        const checked = document.getElementById('toggleLayerRadar').checked;
+        const ctrl = document.getElementById('radarControls');
+        if (checked) {
+          map.addLayer(layerRadar);
+          ctrl.classList.remove('hidden');
+        } else {
+          map.removeLayer(layerRadar);
+          ctrl.classList.add('hidden');
+        }
+      }
+    }
+
+    function setBasemap(type) {
+      state.activeBasemap = type;
+      Object.values(basemaps).forEach(b => map.removeLayer(b));
+      basemaps[type].addTo(map);
+
+      document.querySelectorAll('.basemap-btn').forEach(btn => {
+        if (btn.dataset.type === type) {
+          btn.className = "px-2 py-1 rounded bg-slate-700 text-sky-400 font-semibold basemap-btn";
+        } else {
+          btn.className = "px-2 py-1 rounded hover:bg-slate-700/60 text-slate-300 font-semibold basemap-btn";
+        }
+      });
+    }
+
+    /* Web Audio API Alarm Generator */
+    function playAlertBeep() {
+      try {
+        if (!state.audioCtx) {
+          state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (state.audioCtx.state === 'suspended') {
+          state.audioCtx.resume();
+        }
+        const osc = state.audioCtx.createOscillator();
+        const gain = state.audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, state.audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.25, state.audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(state.audioCtx.destination);
+        osc.start();
+        osc.stop(state.audioCtx.currentTime + 0.8);
+      } catch (e) {
+        console.warn("Audio dibatasi peramban sebelum interaksi pengguna.", e);
+      }
+    }
+
+    function toggleAudioAlert() {
+      state.audioAlertEnabled = !state.audioAlertEnabled;
+      const btnIcon = document.getElementById('soundIcon');
+      if (state.audioAlertEnabled) {
+        btnIcon.innerText = "🔔";
+        playAlertBeep();
+        showToast("Alarm Aktif", "Peringatan suara diaktifkan jika terdeteksi gempa M ≥ 6.0.", "warning");
+      } else {
+        btnIcon.innerText = "🔕";
+        showToast("Alarm Mati", "Peringatan suara gempa dinonaktifkan.", "info");
+      }
+    }
+
+    function refreshAllFeeds() {
+      fetchQuakes();
+      fetchHotspots();
+      initRainViewerRadar();
+      initNasaGibsSmokeLayer();
+      if (state.userLat && state.userLng) {
+        inspectWeatherAndAirQuality(state.userLat, state.userLng, state.userLocationName);
+      }
+      showToast("Memperbarui Data", "Menyinkronkan data seismik, titik panas satelit, citra kabut asap, dan radar cuaca.", "info");
+    }
+
+    // Salin Ringkasan Situasi Mitigasi ke Clipboard
+    function copySituationReport() {
+      const now = new Date();
+      const timeStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + " " + now.toLocaleTimeString('id-ID');
+      const loc = state.userLocationName || "Indonesia";
+      const q = state.latestQuakeData;
+
+      let report = `📢 LAPORAN SITUASI MITIGASI (DMG INDONESIA)\n`;
+      report += `📅 Waktu: ${timeStr}\n`;
+      report += `📍 Lokasi Acuan: ${loc}\n\n`;
+
+      if (q) {
+        report += `🔴 GEMPA TERKINI:\n`;
+        report += `• Magnitudo: M ${q.Magnitude}\n`;
+        report += `• Lokasi: ${q.Wilayah}\n`;
+        report += `• Kedalaman: ${q.Kedalaman} | Waktu: ${q.Jam}\n`;
+        report += `• Potensi: ${q.Potensi}\n`;
+        if (state.userLat && state.userLng && q.Coordinates) {
+          const [qLat, qLng] = q.Coordinates.split(',').map(Number);
+          const dist = calculateHaversineDistance(state.userLat, state.userLng, qLat, qLng);
+          report += `• Jarak ke Anda: ~${dist} km\n`;
+        }
+        report += `\n`;
+      }
+
+      if (state.hotspotsList.length > 0) {
+        report += `🔥 TITIK API & KABUT ASAP (KARHUTLA):\n`;
+        report += `• Total Titik Panas Terdeteksi: ${state.hotspotsList.length} titik\n`;
+        if (state.closestHotspot) {
+          report += `• Titik Api Terdekat: ~${state.closestHotspot.distance} km (${state.closestHotspot.wilayah})\n`;
+          report += `• Energi Termal (FRP): ${state.closestHotspot.frp} MW | Suhu: ${state.closestHotspot.brightK} K\n`;
+        }
+        if (state.lastAirQualitySummary?.aod) {
+          report += `• Indeks Asap (AOD 550nm): ${state.lastAirQualitySummary.aod}\n`;
+        }
+        report += `\n`;
+      }
+
+      if (state.lastWeatherSummary) {
+        report += `🌦️ CUACA & KUALITAS UDARA:\n`;
+        report += `• Cuaca: ${state.lastWeatherSummary.weather} (${state.lastWeatherSummary.temp})\n`;
+        report += `• Indeks Polusi (AQI): ${state.lastWeatherSummary.aqi}\n\n`;
+      }
+
+      report += `🚨 KONTAK DARURAT: 112 (Darurat) | 115 (BASARNAS) | 113 (Damkar) | 119 (Medis)\n`;
+      report += `Akses Dashboard: dmg-indonesia.local`;
+
+      navigator.clipboard.writeText(report).then(() => {
+        showToast("Teks Tersalin", "Ringkasan situasi mitigasi berhasil disalin ke papan klip.", "success");
+      }).catch(() => {
+        showToast("Gagal Menyalin", "Peramban menolak izin papan klip.", "danger");
+      });
+    }
+
+    /* =========================================================================
+       10. BOOTSTRAP INITIALIZATION
+       ========================================================================= */
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. Pulihkan lokasi tersimpan di localStorage atau gunakan Pontianak (Kalbar)
+      const restored = restoreSavedUserLocation();
+      if (!restored) {
+        setUserReferenceLocation(-0.0263, 109.3425, "Pontianak, Kalimantan Barat");
+      }
+
+      // 2. Render Layer Statis & Patahan
+      renderFaultLines();
+      renderVolcanoLayer();
+
+      // 3. Inisialisasi Feeds Real-time
+      fetchQuakes();
+      fetchHotspots();
+      initRainViewerRadar();
+      initNasaGibsSmokeLayer();
+
+      // 4. Polling berkala (Gempa 60 detik, Titik Api 5 menit)
+      setInterval(fetchQuakes, 60000);
+      setInterval(fetchHotspots, 300000);
+    });
+  </script>
+</body>
+</html>

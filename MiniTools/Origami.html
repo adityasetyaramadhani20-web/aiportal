@@ -1,0 +1,4224 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Origami</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- jsPDF for vector dieline PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Import Map for Three.js and Exporters/Loaders -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg-app: #f4f4f6;
+      --bg-panel: #ffffff;
+      --bg-panel-alt: #f8fafc;
+      --bg-input: #f1f5f9;
+      --border-color: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --canvas-bg: #e5e7eb;
+      --cut-line: #0f172a;
+      --crease-line: #dc2626;
+    }
+
+    html.dark {
+      --bg-app: #090a0f;
+      --bg-panel: #12141c;
+      --bg-panel-alt: #171a24;
+      --bg-input: #1e2230;
+      --border-color: #262b3d;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --canvas-bg: #0d0f17;
+      --cut-line: #38bdf8;
+      --crease-line: #f43f5e;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-app);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .cad-panel {
+      background-color: var(--bg-panel);
+      border-color: var(--border-color);
+    }
+
+    .cad-panel-alt {
+      background-color: var(--bg-panel-alt);
+      border-color: var(--border-color);
+    }
+
+    .cad-input {
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .cad-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .cad-btn {
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      transition: all 0.15s ease;
+    }
+
+    .cad-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+      background-color: rgba(59, 130, 246, 0.12);
+    }
+
+    .cad-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .cad-btn-active {
+      background-color: var(--accent) !important;
+      border-color: var(--accent) !important;
+      color: #ffffff !important;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+
+    /* Range Slider Styling */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      background: var(--bg-input);
+      height: 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -5px;
+      background-color: var(--accent);
+      height: 14px;
+      width: 14px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen w-screen overflow-hidden text-xs">
+
+  <header class="cad-panel border-b h-12 px-3 flex items-center justify-between shrink-0 z-20">
+    <!-- Left: Identity & Mode Switcher -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 pr-2 border-r border-[var(--border-color)]">
+        <svg class="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+          <line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+        <span class="font-semibold text-sm tracking-tight">Origami</span>
+      </div>
+
+      <!-- Workspace Mode Tabs -->
+      <div class="flex items-center bg-[var(--bg-input)] p-0.5 rounded-md border border-[var(--border-color)]">
+        <button id="modeSplitBtn" class="px-2.5 py-1 rounded text-xs font-medium transition cad-btn-active" title="Tampilan Split 2D & 3D">
+          Split 2D/3D
+        </button>
+        <button id="mode2DBtn" class="px-2.5 py-1 rounded text-xs font-medium transition text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Fokus Pola Lipatan 2D">
+          Pola 2D
+        </button>
+        <button id="mode3DBtn" class="px-2.5 py-1 rounded text-xs font-medium transition text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title="Fokus Simulasi 3D">
+          Simulasi 3D
+        </button>
+        <button id="modeViewerBtn" class="px-2.5 py-1 rounded text-xs font-medium transition text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1" title="Viewer File 3D Eksternal (.GLB, .OBJ, .STL)">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          Viewer 3D
+        </button>
+      </div>
+
+      <!-- Preload Example Selector -->
+      <div class="hidden md:flex items-center gap-1.5">
+        <label for="preloadSelect" class="text-[var(--text-secondary)] font-medium">Contoh:</label>
+        <select id="preloadSelect" class="cad-input rounded px-2 py-1 text-xs font-medium cursor-pointer">
+          <option value="cosmetic_tuck">Kotak Kosmetik (Tuck End)</option>
+          <option value="shipping_rsc">Kardus Logistik (RSC)</option>
+          <option value="ecommerce_mailer">Mailer Box E-Commerce</option>
+          <option value="bakery_gable">Kotak Gable Top (Atap Prisma)</option>
+          <option value="custom_tray">Baki Kemasan Kustom (Hex/Tray)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Center/Right: History, Save, Import/Export, Clear, Theme -->
+    <div class="flex items-center gap-1.5">
+      <!-- Undo / Redo -->
+      <button id="undoBtn" class="cad-btn px-2 py-1.5 rounded flex items-center gap-1" title="Undo (Ctrl+Z)" disabled>
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+      </button>
+      <button id="redoBtn" class="cad-btn px-2 py-1.5 rounded flex items-center gap-1" title="Redo (Ctrl+Y)" disabled>
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+      </button>
+
+      <div class="h-4 w-px bg-[var(--border-color)] mx-0.5"></div>
+
+      <!-- Save to IndexedDB Cache -->
+      <button id="saveCacheBtn" class="cad-btn px-2.5 py-1.5 rounded flex items-center gap-1.5" title="Simpan ke Penyimpanan Lokal Browser">
+        <svg class="w-3.5 h-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span class="hidden sm:inline">Simpan</span>
+      </button>
+
+      <!-- Import JSON -->
+      <label class="cad-btn px-2.5 py-1.5 rounded flex items-center gap-1.5 cursor-pointer" title="Impor Proyek JSON">
+        <svg class="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span class="hidden sm:inline">Impor JSON</span>
+        <input type="file" id="importJsonInput" accept=".json" class="hidden" />
+      </label>
+
+      <!-- Export Dropdown Menu -->
+      <div class="relative" id="exportDropdownContainer">
+        <button id="exportMenuBtn" class="px-2.5 py-1.5 rounded flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Ekspor</span>
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="exportDropdown" class="hidden absolute right-0 mt-1.5 w-56 cad-panel border rounded-lg shadow-xl py-1.5 z-50">
+          <div class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Pola Lipatan 2D</div>
+          <button data-export="pdf" class="w-full px-3 py-1.5 text-left hover:bg-blue-500/10 flex items-center justify-between">
+            <span>PDF Lipatan (Vektor mm)</span>
+            <span class="font-mono text-[10px] text-[var(--text-muted)]">.pdf</span>
+          </button>
+          <button data-export="png2d" class="w-full px-3 py-1.5 text-left hover:bg-blue-500/10 flex items-center justify-between">
+            <span>Gambar Pola Lipatan 2D</span>
+            <span class="font-mono text-[10px] text-[var(--text-muted)]">.png</span>
+          </button>
+          <div class="my-1 border-t border-[var(--border-color)]"></div>
+          <div class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Model & Render 3D</div>
+          <button data-export="glb" class="w-full px-3 py-1.5 text-left hover:bg-blue-500/10 flex items-center justify-between">
+            <span>Objek 3D GLTF Binary</span>
+            <span class="font-mono text-[10px] text-[var(--text-muted)]">.glb</span>
+          </button>
+          <button data-export="obj" class="w-full px-3 py-1.5 text-left hover:bg-blue-500/10 flex items-center justify-between">
+            <span>Objek 3D Wavefront</span>
+            <span class="font-mono text-[10px] text-[var(--text-muted)]">.obj</span>
+          </button>
+          <button data-export="png3d" class="w-full px-3 py-1.5 text-left hover:bg-blue-500/10 flex items-center justify-between">
+            <span>Tangkapan Layar 3D</span>
+            <span class="font-mono text-[10px] text-[var(--text-muted)]">.png</span>
+          </button>
+          <div class="my-1 border-t border-[var(--border-color)]"></div>
+          <div class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Data Proyek</div>
+          <button data-export="json" class="w-full px-3 py-1.5 text-left hover:bg-blue-500/10 flex items-center justify-between">
+            <span>Simpan File Proyek</span>
+            <span class="font-mono text-[10px] text-[var(--text-muted)]">.json</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Clear / Reset -->
+      <button id="clearWorkspaceBtn" class="cad-btn px-2 py-1.5 rounded text-rose-500 hover:border-rose-500" title="Bersihkan / Reset Desain">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+
+      <!-- Theme Switcher -->
+      <button id="themeToggleBtn" class="cad-btn px-2 py-1.5 rounded" title="Ubah Tema Gelap/Terang">
+        <svg id="themeIconSun" class="w-3.5 h-3.5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg id="themeIconMoon" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- LEFT SIDEBAR: Packaging Design Parameters -->
+    <aside id="editorSidebar" class="cad-panel border-r w-72 md:w-80 flex flex-col shrink-0 z-10 overflow-hidden">
+      <!-- Sidebar Sub-navigation Tabs -->
+      <div class="grid grid-cols-3 border-b border-[var(--border-color)] cad-panel-alt p-1 gap-1 shrink-0">
+        <button data-side-tab="dimensi" class="side-tab-btn py-1.5 rounded font-medium cad-btn-active">Ukuran & Pola</button>
+        <button data-side-tab="material" class="side-tab-btn py-1.5 rounded font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Material & Warna</button>
+        <button data-side-tab="artwork" class="side-tab-btn py-1.5 rounded font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Logo & Grafis</button>
+      </div>
+
+      <!-- Sidebar Scrollable Content -->
+      <div class="flex-1 overflow-y-auto p-3.5 space-y-4">
+
+        <!-- TAB 1: UKURAN & POLA LIPATAN -->
+        <div id="sideTab-dimensi" class="space-y-4">
+          <div class="space-y-2">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Tipe Struktur Kemasan</label>
+            <select id="templateSelect" class="cad-input w-full rounded-md px-2.5 py-2 text-xs font-medium">
+              <option value="tuck_end">Tuck End Box (Kemasan Ritel/Kosmetik)</option>
+              <option value="rsc">Regular Slotted Container (Kardus RSC)</option>
+              <option value="mailer">Mailer Box (Kemasan E-Commerce)</option>
+              <option value="gable_top">Gable Top Box (Kemasan Atap Prisma)</option>
+              <option value="custom">Kerangka Kustom (Custom Builder)</option>
+            </select>
+            <button id="convertToCustomBtn" class="cad-btn w-full py-1.5 px-2.5 rounded text-[11px] font-medium flex items-center justify-center gap-1.5 text-blue-400 border-blue-500/40 hover:border-blue-500">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <span>Kustomisasi Panel Struktur Ini</span>
+            </button>
+          </div>
+
+          <!-- PARAMETER DIMENSI STANDAR (Disembunyikan saat mode Kerangka Kustom aktif) -->
+          <div id="standardDimensionSection" class="space-y-4">
+            <div class="space-y-3 pt-2 border-t border-[var(--border-color)]">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Dimensi Utama (mm)</span>
+                <span id="volumeBadge" class="font-mono text-[11px] text-blue-400">0.00 L</span>
+              </div>
+
+              <!-- Panjang (P) -->
+              <div class="space-y-1">
+                <div class="flex justify-between">
+                  <label class="text-[var(--text-secondary)]">Panjang (P)</label>
+                  <div class="flex items-center gap-1">
+                    <input type="number" id="numLength" min="30" max="600" step="1" class="cad-input w-16 px-1.5 py-0.5 rounded text-right font-mono" value="120">
+                    <span class="text-[var(--text-muted)] font-mono">mm</span>
+                  </div>
+                </div>
+                <input type="range" id="rangeLength" min="30" max="600" step="1" value="120" class="w-full">
+              </div>
+
+              <!-- Lebar (L) -->
+              <div class="space-y-1">
+                <div class="flex justify-between">
+                  <label class="text-[var(--text-secondary)]">Lebar (L)</label>
+                  <div class="flex items-center gap-1">
+                    <input type="number" id="numWidth" min="30" max="600" step="1" class="cad-input w-16 px-1.5 py-0.5 rounded text-right font-mono" value="80">
+                    <span class="text-[var(--text-muted)] font-mono">mm</span>
+                  </div>
+                </div>
+                <input type="range" id="rangeWidth" min="30" max="600" step="1" value="80" class="w-full">
+              </div>
+
+              <!-- Tinggi (T) -->
+              <div class="space-y-1">
+                <div class="flex justify-between">
+                  <label class="text-[var(--text-secondary)]">Tinggi (T)</label>
+                  <div class="flex items-center gap-1">
+                    <input type="number" id="numHeight" min="30" max="600" step="1" class="cad-input w-16 px-1.5 py-0.5 rounded text-right font-mono" value="160">
+                    <span class="text-[var(--text-muted)] font-mono">mm</span>
+                  </div>
+                </div>
+                <input type="range" id="rangeHeight" min="30" max="600" step="1" value="160" class="w-full">
+              </div>
+            </div>
+
+            <!-- Parameter Lipatan & Lidah -->
+            <div class="space-y-3 pt-2 border-t border-[var(--border-color)]">
+              <span class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Detail Flap & Lipatan</span>
+
+              <!-- Lebar Glue Flap -->
+              <div class="space-y-1">
+                <div class="flex justify-between">
+                  <label class="text-[var(--text-secondary)]">Lidah Perekat (Glue Flap)</label>
+                  <div class="flex items-center gap-1">
+                    <input type="number" id="numGlueFlap" min="10" max="60" step="1" class="cad-input w-16 px-1.5 py-0.5 rounded text-right font-mono" value="18">
+                    <span class="text-[var(--text-muted)] font-mono">mm</span>
+                  </div>
+                </div>
+                <input type="range" id="rangeGlueFlap" min="10" max="60" step="1" value="18" class="w-full">
+              </div>
+
+              <!-- Tinggi Tuck / Lidah Pengunci -->
+              <div class="space-y-1">
+                <div class="flex justify-between">
+                  <label class="text-[var(--text-secondary)]">Lidah Pengunci (Tuck Flap)</label>
+                  <div class="flex items-center gap-1">
+                    <input type="number" id="numTuckFlap" min="12" max="80" step="1" class="cad-input w-16 px-1.5 py-0.5 rounded text-right font-mono" value="22">
+                    <span class="text-[var(--text-muted)] font-mono">mm</span>
+                  </div>
+                </div>
+                <input type="range" id="rangeTuckFlap" min="12" max="80" step="1" value="22" class="w-full">
+              </div>
+            </div>
+          </div>
+
+          <!-- PEMBUAT KERANGKA KEMASAN KUSTOM (Tampil saat template === 'custom') -->
+          <div id="customStructureSection" class="space-y-3 pt-2 border-t border-[var(--border-color)] hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-blue-400">Builder Kerangka Kustom</span>
+              <span id="customPanelCountBadge" class="font-mono text-[10px] text-[var(--text-muted)]">0 panel</span>
+            </div>
+
+            <!-- Starter Basis Kerangka -->
+            <div class="space-y-1">
+              <label class="block text-[10px] text-[var(--text-muted)]">Muat Basis Struktur Awal:</label>
+              <div class="grid grid-cols-3 gap-1">
+                <button data-custom-preset="tray" class="cad-btn py-1 px-1.5 rounded text-[10px] font-medium">Kotak Baki</button>
+                <button data-custom-preset="sleeve" class="cad-btn py-1 px-1.5 rounded text-[10px] font-medium">Sabuk Sleeve</button>
+                <button data-custom-preset="single" class="cad-btn py-1 px-1.5 rounded text-[10px] font-medium">1 Panel Dasar</button>
+              </div>
+            </div>
+
+            <!-- Peringatan Tabrakan 2D (Jika ada) -->
+            <div id="overlapWarningBox" class="hidden px-2.5 py-1.5 rounded bg-amber-500/10 border border-amber-500/40 text-amber-400 text-[11px] flex items-center gap-1.5">
+              <span>⚠</span>
+              <span id="overlapWarningText">Terdapat panel yang saling bertumpukan di 2D.</span>
+            </div>
+
+            <!-- Daftar Pohon Panel -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[10px] text-[var(--text-muted)]">
+                <span>Daftar Panel (Klik untuk edit / klik di 2D)</span>
+              </div>
+              <div id="customPanelList" class="space-y-1 max-h-40 overflow-y-auto pr-0.5 cad-panel-alt p-1.5 rounded border">
+                <!-- Diisi secara dinamis -->
+              </div>
+            </div>
+
+            <!-- Inspektor Panel Terpilih -->
+            <div id="customPanelInspector" class="space-y-2.5 pt-2 border-t border-[var(--border-color)]">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Properti Panel Aktif</span>
+                <button id="deleteCustomPanelBtn" class="text-rose-400 hover:text-rose-300 text-[11px] font-medium disabled:opacity-30">Hapus Panel</button>
+              </div>
+
+              <!-- Label & Bentuk -->
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[10px] text-[var(--text-muted)] mb-0.5">Nama Label</label>
+                  <input type="text" id="custPanelLabel" class="cad-input w-full px-2 py-1 rounded text-xs">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-[var(--text-muted)] mb-0.5">Bentuk Potongan</label>
+                  <select id="custPanelShape" class="cad-input w-full px-1.5 py-1 rounded text-xs">
+                    <option value="rect">Persegi (Rect)</option>
+                    <option value="tuck_top">Lidah Tuck Atas</option>
+                    <option value="tuck_bottom">Lidah Tuck Bawah</option>
+                    <option value="dust_top">Dust Flap Atas</option>
+                    <option value="dust_bottom">Dust Flap Bawah</option>
+                    <option value="glue_left">Perekat Kiri</option>
+                    <option value="glue_right">Perekat Kanan</option>
+                    <option value="rsc_slot">Flap Slot RSC</option>
+                    <option value="gable_triangle">Segitiga Gusset</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Lebar (W) & Tinggi (H) -->
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[10px] text-[var(--text-muted)] mb-0.5">Lebar W (mm)</label>
+                  <input type="number" id="custPanelW" min="10" max="600" step="1" class="cad-input w-full px-2 py-1 rounded font-mono">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-[var(--text-muted)] mb-0.5">Tinggi H (mm)</label>
+                  <input type="number" id="custPanelH" min="10" max="600" step="1" class="cad-input w-full px-2 py-1 rounded font-mono">
+                </div>
+              </div>
+
+              <!-- Sudut Lipat Maksimal & Urutan Layer -->
+              <div id="custFoldConfigWrap" class="space-y-2">
+                <div class="space-y-1">
+                  <div class="flex justify-between">
+                    <label class="text-[10px] text-[var(--text-muted)]">Sudut Lipat 3D Maksimal</label>
+                    <span id="valCustAngle" class="font-mono text-[10px] text-blue-400">90°</span>
+                  </div>
+                  <input type="range" id="custPanelAngle" min="-180" max="180" step="1" value="90" class="w-full">
+                </div>
+
+                <div class="grid grid-cols-3 gap-1.5">
+                  <div>
+                    <label class="block text-[10px] text-[var(--text-muted)] mb-0.5">Mulai (%)</label>
+                    <input type="number" id="custPhaseStart" min="0" max="95" step="5" class="cad-input w-full px-1.5 py-1 rounded font-mono text-[11px]">
+                  </div>
+                  <div>
+                    <label class="block text-[10px] text-[var(--text-muted)] mb-0.5">Selesai (%)</label>
+                    <input type="number" id="custPhaseEnd" min="5" max="100" step="5" class="cad-input w-full px-1.5 py-1 rounded font-mono text-[11px]">
+                  </div>
+                  <div>
+                    <label class="block text-[10px] text-[var(--text-muted)] mb-0.5">Lapis Dalam</label>
+                    <select id="custPanelZLayer" class="cad-input w-full px-1 py-1 rounded font-mono text-[11px]">
+                      <option value="0">0 (Utama)</option>
+                      <option value="1">1 (Tutup)</option>
+                      <option value="2">2 (Flap)</option>
+                      <option value="3">3 (Tuck)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Opsi Root Panel: Alas Lantai Horizontal -->
+              <div id="custRootFloorWrap" class="hidden pt-1">
+                <label class="flex items-center justify-between cursor-pointer">
+                  <span class="text-[11px] text-[var(--text-secondary)]">Orientasi Dasar Horizontal (Alas)</span>
+                  <input type="checkbox" id="chkCustFloorRoot" class="accent-blue-500 w-4 h-4 rounded">
+                </label>
+              </div>
+
+              <!-- Tambah Panel Anak di Sisi -->
+              <div class="space-y-1.5 pt-1.5 border-t border-[var(--border-color)]">
+                <label class="block text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Tambah Panel / Flap di Sisi:</label>
+                <div class="grid grid-cols-4 gap-1">
+                  <button data-add-edge="top" class="add-edge-btn cad-btn py-1.5 rounded text-[10px] font-medium flex flex-col items-center">
+                    <span>↑ Atas</span>
+                  </button>
+                  <button data-add-edge="bottom" class="add-edge-btn cad-btn py-1.5 rounded text-[10px] font-medium flex flex-col items-center">
+                    <span>↓ Bawah</span>
+                  </button>
+                  <button data-add-edge="left" class="add-edge-btn cad-btn py-1.5 rounded text-[10px] font-medium flex flex-col items-center">
+                    <span>← Kiri</span>
+                  </button>
+                  <button data-add-edge="right" class="add-edge-btn cad-btn py-1.5 rounded text-[10px] font-medium flex flex-col items-center">
+                    <span>→ Kanan</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ketebalan Kertas / Karton (Berlaku untuk Semua Mode) -->
+          <div class="space-y-1 pt-2 border-t border-[var(--border-color)]">
+            <div class="flex justify-between">
+              <label class="text-[var(--text-secondary)]">Ketebalan Material</label>
+              <div class="flex items-center gap-1">
+                <input type="number" id="numThickness" min="0.3" max="4.0" step="0.1" class="cad-input w-16 px-1.5 py-0.5 rounded text-right font-mono" value="1.2">
+                <span class="text-[var(--text-muted)] font-mono">mm</span>
+              </div>
+            </div>
+            <input type="range" id="rangeThickness" min="0.3" max="4.0" step="0.1" value="1.2" class="w-full">
+          </div>
+
+          <!-- Opsi Tampilan Pola 2D -->
+          <div class="space-y-2 pt-2 border-t border-[var(--border-color)]">
+            <span class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Atribut Pola (Dieline)</span>
+            <label class="flex items-center justify-between cursor-pointer py-1">
+              <span class="text-[var(--text-secondary)]">Tampilkan Garis Ukur (mm)</span>
+              <input type="checkbox" id="chkShowDimensions" checked class="accent-blue-500 w-4 h-4 rounded">
+            </label>
+            <label class="flex items-center justify-between cursor-pointer py-1">
+              <span class="text-[var(--text-secondary)]">Tampilkan Nama Panel</span>
+              <input type="checkbox" id="chkShowLabels" checked class="accent-blue-500 w-4 h-4 rounded">
+            </label>
+            <label class="flex items-center justify-between cursor-pointer py-1">
+              <span class="text-[var(--text-secondary)]">Tampilkan Garis Lipat di 3D</span>
+              <input type="checkbox" id="chkDielineOn3D" class="accent-blue-500 w-4 h-4 rounded">
+            </label>
+          </div>
+        </div>
+
+        <!-- TAB 2: MATERIAL & WARNA -->
+        <div id="sideTab-material" class="space-y-4 hidden">
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">Preset Material Fisik</label>
+            <div class="grid grid-cols-2 gap-1.5" id="materialPresetGrid">
+              <button data-mat="kraft" class="mat-preset-btn cad-btn p-2 rounded text-left flex flex-col gap-0.5">
+                <span class="font-medium">Kraft Natural</span>
+                <span class="text-[10px] text-[var(--text-muted)]">Serat coklat matte</span>
+              </button>
+              <button data-mat="art_carton" class="mat-preset-btn cad-btn p-2 rounded text-left flex flex-col gap-0.5 cad-btn-active">
+                <span class="font-medium">Art Carton</span>
+                <span class="text-[10px] opacity-80">Halus & semi-glossy</span>
+              </button>
+              <button data-mat="corrugated" class="mat-preset-btn cad-btn p-2 rounded text-left flex flex-col gap-0.5">
+                <span class="font-medium">Corrugated Flute</span>
+                <span class="text-[10px] text-[var(--text-muted)]">Tekstur kardus gelombang</span>
+              </button>
+              <button data-mat="metallic" class="mat-preset-btn cad-btn p-2 rounded text-left flex flex-col gap-0.5">
+                <span class="font-medium">Metallic Foil</span>
+                <span class="text-[10px] text-[var(--text-muted)]">Kilap metalik reflektif</span>
+              </button>
+              <button data-mat="matte_black" class="mat-preset-btn cad-btn p-2 rounded text-left flex flex-col gap-0.5">
+                <span class="font-medium">Luxury Matte</span>
+                <span class="text-[10px] text-[var(--text-muted)]">Doff lembut eksklusif</span>
+              </button>
+              <button data-mat="gloss_laminated" class="mat-preset-btn cad-btn p-2 rounded text-left flex flex-col gap-0.5">
+                <span class="font-medium">UV High Gloss</span>
+                <span class="text-[10px] text-[var(--text-muted)]">Laminasi kilap penuh</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-3 pt-2 border-t border-[var(--border-color)]">
+            <span class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Warna Permukaan</span>
+
+            <!-- Exterior Color -->
+            <div class="flex items-center justify-between">
+              <label class="text-[var(--text-secondary)]">Warna Sisi Luar (Cetak)</label>
+              <div class="flex items-center gap-1.5">
+                <input type="color" id="colorExterior" value="#1e293b" class="w-7 h-7 rounded cursor-pointer border-0 bg-transparent">
+                <input type="text" id="hexExterior" value="#1E293B" class="cad-input w-20 px-2 py-1 rounded font-mono text-xs uppercase">
+              </div>
+            </div>
+
+            <!-- Quick Exterior Swatches -->
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button data-swatch-ext="#f8fafc" class="w-5 h-5 rounded-full border border-slate-400" style="background:#f8fafc" title="Putih Bersih"></button>
+              <button data-swatch-ext="#c89d66" class="w-5 h-5 rounded-full border border-slate-500" style="background:#c89d66" title="Kraft Coklat"></button>
+              <button data-swatch-ext="#1e293b" class="w-5 h-5 rounded-full border border-slate-500" style="background:#1e293b" title="Navy Gelap"></button>
+              <button data-swatch-ext="#0f172a" class="w-5 h-5 rounded-full border border-slate-500" style="background:#0f172a" title="Hitam Arang"></button>
+              <button data-swatch-ext="#065f46" class="w-5 h-5 rounded-full border border-slate-500" style="background:#065f46" title="Hijau Emerald"></button>
+              <button data-swatch-ext="#991b1b" class="w-5 h-5 rounded-full border border-slate-500" style="background:#991b1b" title="Merah Crimson"></button>
+              <button data-swatch-ext="#d97706" class="w-5 h-5 rounded-full border border-slate-500" style="background:#d97706" title="Amber Emas"></button>
+              <button data-swatch-ext="#4f46e5" class="w-5 h-5 rounded-full border border-slate-500" style="background:#4f46e5" title="Indigo Elektrik"></button>
+            </div>
+
+            <!-- Interior Color -->
+            <div class="flex items-center justify-between pt-2">
+              <label class="text-[var(--text-secondary)]">Warna Sisi Dalam</label>
+              <div class="flex items-center gap-1.5">
+                <input type="color" id="colorInterior" value="#d6b384" class="w-7 h-7 rounded cursor-pointer border-0 bg-transparent">
+                <input type="text" id="hexInterior" value="#D6B384" class="cad-input w-20 px-2 py-1 rounded font-mono text-xs uppercase">
+              </div>
+            </div>
+          </div>
+
+          <!-- Fine-tune PBR sliders -->
+          <div class="space-y-3 pt-2 border-t border-[var(--border-color)]">
+            <span class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Karakteristik Refleksi</span>
+
+            <div class="space-y-1">
+              <div class="flex justify-between">
+                <label class="text-[var(--text-secondary)]">Kekasaran (Roughness)</label>
+                <span id="valRoughness" class="font-mono text-[var(--text-muted)]">0.45</span>
+              </div>
+              <input type="range" id="rangeRoughness" min="0.05" max="1.0" step="0.05" value="0.45" class="w-full">
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex justify-between">
+                <label class="text-[var(--text-secondary)]">Kilap Metalik (Metalness)</label>
+                <span id="valMetalness" class="font-mono text-[var(--text-muted)]">0.05</span>
+              </div>
+              <input type="range" id="rangeMetalness" min="0.0" max="1.0" step="0.05" value="0.05" class="w-full">
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex justify-between">
+                <label class="text-[var(--text-secondary)]">Intensitas Serat Kertas</label>
+                <span id="valGrain" class="font-mono text-[var(--text-muted)]">25%</span>
+              </div>
+              <input type="range" id="rangeGrain" min="0" max="100" step="5" value="25" class="w-full">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: LOGO & GRAFIS (ARTWORK) -->
+        <div id="sideTab-artwork" class="space-y-4 hidden">
+          <!-- Upload Image / Logo -->
+          <div class="space-y-2">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Tambah Logo / Gambar</label>
+            <label class="w-full py-2.5 px-3 rounded-md border border-dashed border-blue-500/60 bg-blue-500/5 hover:bg-blue-500/10 flex items-center justify-center gap-2 cursor-pointer transition">
+              <svg class="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span class="font-medium text-blue-400">Unggah File Gambar (PNG/JPG/SVG)</span>
+              <input type="file" id="uploadArtworkInput" accept="image/*" class="hidden" />
+            </label>
+          </div>
+
+          <!-- Built-in Graphic Stamp Presets -->
+          <div class="space-y-1.5 pt-2 border-t border-[var(--border-color)]">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Stempel & Elemen Siap Pakai</label>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button data-stamp="brand_crest" class="cad-btn px-2 py-1.5 rounded text-left flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span>Emblem Merek</span>
+              </button>
+              <button data-stamp="eco_badge" class="cad-btn px-2 py-1.5 rounded text-left flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>Simbol Daur Ulang</span>
+              </button>
+              <button data-stamp="fragile_care" class="cad-btn px-2 py-1.5 rounded text-left flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                <span>Label Fragile</span>
+              </button>
+              <button data-stamp="barcode_sku" class="cad-btn px-2 py-1.5 rounded text-left flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span>Barcode Produk</span>
+              </button>
+              <button data-stamp="seam_stripe" class="cad-btn px-2 py-1.5 rounded text-left flex items-center gap-1.5 col-span-2">
+                <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span>Pita Dekoratif Lintas Lipatan (Cross-Seam)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Custom Text Badge Generator -->
+          <div class="space-y-1.5 pt-2 border-t border-[var(--border-color)]">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Tambah Teks Kemasan</label>
+            <div class="flex gap-1.5">
+              <input type="text" id="customTextInput" placeholder="Ketik teks/merek..." class="cad-input flex-1 px-2.5 py-1.5 rounded text-xs" value="ORIGAMI STUDIO">
+              <input type="color" id="customTextColor" value="#f8fafc" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent shrink-0">
+              <button id="addTextLayerBtn" class="cad-btn px-2.5 py-1.5 rounded font-medium shrink-0">Tambah</button>
+            </div>
+          </div>
+
+          <!-- Active Artwork Layers List -->
+          <div class="space-y-2 pt-2 border-t border-[var(--border-color)]">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Lapisan Grafis Aktif</span>
+              <span id="layerCountBadge" class="font-mono text-[10px] text-[var(--text-muted)]">0 item</span>
+            </div>
+            <div id="artworkLayerList" class="space-y-1 max-h-36 overflow-y-auto pr-0.5">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Selected Layer Inspector -->
+          <div id="selectedLayerPanel" class="space-y-2.5 pt-2 border-t border-[var(--border-color)] hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-blue-400">Transformasi Elemen</span>
+              <button id="deleteLayerBtn" class="text-rose-400 hover:text-rose-300 text-[11px] font-medium">Hapus</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] text-[var(--text-muted)] mb-0.5">Posisi X (mm)</label>
+                <input type="number" id="layerPosX" step="1" class="cad-input w-full px-2 py-1 rounded font-mono">
+              </div>
+              <div>
+                <label class="block text-[10px] text-[var(--text-muted)] mb-0.5">Posisi Y (mm)</label>
+                <input type="number" id="layerPosY" step="1" class="cad-input w-full px-2 py-1 rounded font-mono">
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex justify-between">
+                <label class="text-[var(--text-secondary)]">Ukuran Lebar (mm)</label>
+                <span id="valLayerScale" class="font-mono text-[var(--text-muted)]">60 mm</span>
+              </div>
+              <input type="range" id="rangeLayerWidth" min="10" max="500" step="1" value="60" class="w-full">
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex justify-between">
+                <label class="text-[var(--text-secondary)]">Rotasi Sudut</label>
+                <span id="valLayerRot" class="font-mono text-[var(--text-muted)]">0°</span>
+              </div>
+              <input type="range" id="rangeLayerRot" min="-180" max="180" step="1" value="0" class="w-full">
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex justify-between">
+                <label class="text-[var(--text-secondary)]">Opasitas</label>
+                <span id="valLayerOpacity" class="font-mono text-[var(--text-muted)]">100%</span>
+              </div>
+              <input type="range" id="rangeLayerOpacity" min="10" max="100" step="5" value="100" class="w-full">
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- CENTER WORKSPACE: Split 2D Dieline & 3D Simulator -->
+    <main id="workspaceContainer" class="flex-1 grid grid-cols-1 lg:grid-cols-2 overflow-hidden relative">
+
+      <!-- 2D DIELINE PANE -->
+      <section id="pane2D" class="relative flex flex-col h-full w-full overflow-hidden border-b lg:border-b-0 lg:border-r border-[var(--border-color)]" style="background-color: var(--canvas-bg);">
+        <!-- Top Overlay Bar for 2D -->
+        <div class="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
+          <div class="cad-panel/90 backdrop-blur px-2.5 py-1.5 rounded-md border flex items-center gap-3 pointer-events-auto shadow-sm">
+            <span class="font-semibold text-[11px] tracking-wide">POLA LIPATAN 2D</span>
+            <div class="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+              <span class="flex items-center gap-1"><i class="w-3 h-0.5 bg-sky-400 inline-block"></i> Potong (Cut)</span>
+              <span class="flex items-center gap-1"><i class="w-3 h-0.5 border-b border-dashed border-rose-500 inline-block"></i> Lipat (Crease)</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1 pointer-events-auto">
+            <button id="zoomIn2DBtn" class="cad-panel px-2 py-1 rounded border hover:border-blue-500 font-mono" title="Perbesar">+</button>
+            <button id="zoomFit2DBtn" class="cad-panel px-2 py-1 rounded border hover:border-blue-500 text-[11px]" title="Pas ke Layar">Fit</button>
+            <button id="zoomOut2DBtn" class="cad-panel px-2 py-1 rounded border hover:border-blue-500 font-mono" title="Perkecil">-</button>
+          </div>
+        </div>
+
+        <!-- Interactive 2D Canvas -->
+        <canvas id="dielineCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+
+        <!-- Bottom Left Helper Hint -->
+        <div class="absolute bottom-2.5 left-3 pointer-events-none">
+          <div id="canvas2DHint" class="cad-panel/80 backdrop-blur px-2 py-1 rounded border text-[10px] text-[var(--text-secondary)]">
+            Geser kanvas: Klik & Tarik ruang kosong • Klik logo untuk memindahkan • Mode Kustom: Klik panel untuk memilih
+          </div>
+        </div>
+      </section>
+
+      <!-- 3D FOLDING SIMULATOR PANE -->
+      <section id="pane3D" class="relative flex flex-col h-full w-full overflow-hidden" style="background-color: var(--canvas-bg);">
+        <!-- Top Overlay Bar for 3D -->
+        <div class="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
+          <div class="cad-panel/90 backdrop-blur px-2.5 py-1.5 rounded-md border flex items-center gap-2.5 pointer-events-auto shadow-sm">
+            <span class="font-semibold text-[11px] tracking-wide">SIMULASI 3D</span>
+            <select id="lightingPresetSelect" class="cad-input rounded px-1.5 py-0.5 text-[11px]">
+              <option value="studio">Studio Netral</option>
+              <option value="warm">Retail Hangat</option>
+              <option value="contrast">Kontras Tinggi</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1 pointer-events-auto">
+            <button id="toggleWireframeBtn" class="cad-panel px-2 py-1 rounded border hover:border-blue-500 text-[11px]" title="Tampilkan Rangka Wireframe">Wireframe</button>
+            <button id="toggleGrid3DBtn" class="cad-panel px-2 py-1 rounded border hover:border-blue-500 text-[11px] cad-btn-active" title="Tampilkan Grid Lantai">Grid</button>
+            <button id="resetCam3DBtn" class="cad-panel px-2 py-1 rounded border hover:border-blue-500 text-[11px]" title="Reset Sudut Kamera">Reset Kamera</button>
+          </div>
+        </div>
+
+        <!-- 3D WebGL Viewport Container -->
+        <div id="viewport3D" class="w-full h-full relative"></div>
+
+        <!-- Camera Quick Angles -->
+        <div class="absolute bottom-2.5 right-3 flex items-center gap-1 z-10">
+          <button data-cam-view="iso" class="cad-panel/90 backdrop-blur px-2 py-1 rounded border text-[10px] hover:border-blue-500">Isometrik</button>
+          <button data-cam-view="front" class="cad-panel/90 backdrop-blur px-2 py-1 rounded border text-[10px] hover:border-blue-500">Depan</button>
+          <button data-cam-view="top" class="cad-panel/90 backdrop-blur px-2 py-1 rounded border text-[10px] hover:border-blue-500">Atas</button>
+          <button data-cam-view="back" class="cad-panel/90 backdrop-blur px-2 py-1 rounded border text-[10px] hover:border-blue-500">Belakang</button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- STANDALONE 3D FILE VIEWER MODULE (Hidden unless Viewer 3D mode active) -->
+    <section id="standaloneViewerPane" class="hidden flex-1 flex overflow-hidden relative">
+      <!-- Viewer Left Inspector Sidebar -->
+      <aside class="cad-panel border-r w-72 p-3.5 flex flex-col gap-4 shrink-0 z-10 overflow-y-auto">
+        <div>
+          <h2 class="font-semibold text-xs uppercase tracking-wider text-[var(--text-secondary)] mb-1">Viewer Objek 3D</h2>
+          <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
+            Muat dan periksa file objek 3D eksternal (<span class="font-mono">.glb</span>, <span class="font-mono">.gltf</span>, <span class="font-mono">.obj</span>, <span class="font-mono">.stl</span>) atau kirim model kemasan aktif dari editor.
+          </p>
+        </div>
+
+        <!-- Dropzone / File Input -->
+        <label id="viewerDropzone" class="border-2 border-dashed border-blue-500/50 hover:border-blue-500 rounded-lg p-4 text-center cursor-pointer transition bg-blue-500/5 hover:bg-blue-500/10 flex flex-col items-center gap-2">
+          <svg class="w-7 h-7 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="font-medium text-blue-400">Pilih atau Tarik File 3D ke Sini</span>
+          <span class="text-[10px] text-[var(--text-muted)] font-mono">Mendukung GLB, GLTF, OBJ, STL</span>
+          <input type="file" id="viewerFileInput" accept=".glb,.gltf,.obj,.stl" class="hidden" />
+        </label>
+
+        <!-- Quick Actions -->
+        <div class="space-y-1.5 pt-2 border-t border-[var(--border-color)]">
+          <span class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Sumber Model Cepat</span>
+          <button id="loadCurrentBoxToViewerBtn" class="cad-btn w-full py-2 px-3 rounded text-left font-medium flex items-center justify-between">
+            <span>Muat Kemasan Origami Aktif</span>
+            <span class="text-blue-400">→</span>
+          </button>
+          <button id="loadSampleBottleToViewerBtn" class="cad-btn w-full py-2 px-3 rounded text-left font-medium flex items-center justify-between">
+            <span>Muat Sampel Botol Produk 3D</span>
+            <span class="text-emerald-400">→</span>
+          </button>
+        </div>
+
+        <!-- Display & Shading Options -->
+        <div class="space-y-2 pt-2 border-t border-[var(--border-color)]">
+          <span class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Kontrol Visual</span>
+          <label class="flex items-center justify-between cursor-pointer py-1">
+            <span class="text-[var(--text-secondary)]">Rotasi Otomatis</span>
+            <input type="checkbox" id="chkViewerAutoRotate" checked class="accent-blue-500 w-4 h-4 rounded">
+          </label>
+          <label class="flex items-center justify-between cursor-pointer py-1">
+            <span class="text-[var(--text-secondary)]">Mode Wireframe</span>
+            <input type="checkbox" id="chkViewerWireframe" class="accent-blue-500 w-4 h-4 rounded">
+          </label>
+          <label class="flex items-center justify-between cursor-pointer py-1">
+            <span class="text-[var(--text-secondary)]">Tampilkan Sumbu & Grid</span>
+            <input type="checkbox" id="chkViewerGrid" checked class="accent-blue-500 w-4 h-4 rounded">
+          </label>
+        </div>
+
+        <!-- Mesh Statistics & Dimensions -->
+        <div class="space-y-2 pt-2 border-t border-[var(--border-color)]">
+          <span class="block text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Informasi Geometri</span>
+          <div class="cad-panel-alt border rounded p-2.5 space-y-1.5 font-mono text-[11px]">
+            <div class="flex justify-between">
+              <span class="text-[var(--text-muted)]">Nama File:</span>
+              <span id="statFileName" class="truncate max-w-[130px]">Kemasan_Aktif.glb</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-[var(--text-muted)]">Vertices:</span>
+              <span id="statVertices">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-[var(--text-muted)]">Triangles:</span>
+              <span id="statTriangles">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-[var(--text-muted)]">Ukuran (X×Y×Z):</span>
+              <span id="statBounds">0 × 0 × 0</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Standalone 3D Viewport Area -->
+      <div class="flex-1 relative" style="background-color: var(--canvas-bg);">
+        <div id="standaloneViewport3D" class="w-full h-full"></div>
+        <div class="absolute top-3 right-3 flex gap-1.5">
+          <button id="viewerFitCamBtn" class="cad-panel px-2.5 py-1.5 rounded border hover:border-blue-500">Tengahkan Kamera</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- BOTTOM BAR: Folding Simulation Scrubber & Sheet Status -->
+  <footer class="cad-panel border-t h-12 px-3 flex items-center justify-between gap-4 shrink-0 z-20">
+    <!-- Left: Folding Simulation Controls -->
+    <div class="flex items-center gap-2.5 flex-1 max-w-2xl">
+      <button id="playFoldBtn" class="w-8 h-8 rounded-md bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shrink-0 transition" title="Putar/Jeda Animasi Buka-Tutup Lipatan">
+        <svg id="iconPlay" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <svg id="iconPause" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+
+      <div class="flex flex-col flex-1 gap-1">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-medium text-[var(--text-secondary)]">Simulasi Buka-Tutup Lipatan: <strong id="foldPhaseLabel" class="text-[var(--text-primary)]">Fase 3 — Penutupan Tutup & Lidah</strong></span>
+          <span id="foldPercentLabel" class="font-mono font-semibold text-blue-400">75%</span>
+        </div>
+        <input type="range" id="foldProgressSlider" min="0" max="100" step="0.5" value="75" class="w-full">
+      </div>
+
+      <!-- Quick Fold States -->
+      <div class="hidden sm:flex items-center gap-1">
+        <button data-fold-jump="0" class="cad-btn px-2 py-1 rounded text-[10px] font-mono">0% Rata</button>
+        <button data-fold-jump="45" class="cad-btn px-2 py-1 rounded text-[10px] font-mono">45% Dinding</button>
+        <button data-fold-jump="75" class="cad-btn px-2 py-1 rounded text-[10px] font-mono">75% Semi</button>
+        <button data-fold-jump="100" class="cad-btn px-2 py-1 rounded text-[10px] font-mono">100% Tutup</button>
+      </div>
+    </div>
+
+    <!-- Right: Flat Sheet Bounding Box & Storage Status -->
+    <div class="hidden lg:flex items-center gap-4 text-[11px] text-[var(--text-secondary)] shrink-0">
+      <div class="flex items-center gap-1.5">
+        <span>Bentangan Kertas:</span>
+        <span id="sheetSizeBadge" class="font-mono font-semibold text-[var(--text-primary)]">0 × 0 mm</span>
+      </div>
+      <div class="h-3.5 w-px bg-[var(--border-color)]"></div>
+      <div class="flex items-center gap-1.5">
+        <span id="cacheStatusDot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span id="cacheStatusText">Cache Aktif</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Custom Confirmation Modal (No native confirm/alert) -->
+  <div id="confirmModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="cad-panel border rounded-lg max-w-sm w-full p-4 shadow-2xl space-y-3">
+      <h3 class="font-semibold text-sm">Reset Ruang Kerja</h3>
+      <p class="text-xs text-[var(--text-secondary)] leading-relaxed">
+        Apakah Anda ingin mengembalikan ukuran kemasan dan menghapus seluruh lapisan logo/gambar kembali ke pengaturan awal?
+      </p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="cancelModalBtn" class="cad-btn px-3 py-1.5 rounded font-medium">Batal</button>
+        <button id="confirmResetBtn" class="px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium transition">Reset Desain</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-14 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+    import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+    import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+    /* ==========================================================================
+       1. APPLICATION STATE & PRELOAD TEMPLATES
+       ========================================================================== */
+    const DEFAULT_STATE = {
+      template: 'tuck_end',
+      length: 120,     // P (mm)
+      width: 80,       // L (mm)
+      height: 160,     // T (mm)
+      glueFlap: 18,    // G (mm)
+      tuckFlap: 22,    // Tuck height (mm)
+      thickness: 1.2,  // Material thickness (mm)
+      materialPreset: 'art_carton',
+      exteriorColor: '#1e293b',
+      interiorColor: '#d6b384',
+      roughness: 0.45,
+      metalness: 0.05,
+      grain: 25,
+      showDimensions: true,
+      showLabels: true,
+      dielineOn3D: false,
+      foldProgress: 75, // 0 to 100
+      customPanels: null, // Array of panel definitions when template === 'custom'
+      artworks: []      // Array of { id, name, type, dataUrl, x, y, width, aspect, rotation, opacity }
+    };
+
+    let appState = structuredClone(DEFAULT_STATE);
+    let selectedArtworkId = null;
+    let selectedCustomPanelId = 'front';
+
+    // History Stack for Undo / Redo
+    const historyStack = [];
+    let historyIndex = -1;
+    let isRestoringHistory = false;
+
+    // Loaded Image Cache (maps artwork.id -> HTMLImageElement)
+    const imageElementCache = new Map();
+
+    // Unfolded 2D Sheet computed bounds & panel list
+    let currentPanels = [];
+    let overlappingPanelIds = new Set();
+    let sheetBounds = { minX: -200, maxX: 200, minY: -200, maxY: 200, width: 400, height: 400 };
+
+    /* ==========================================================================
+       2. PROCEDURAL GRAPHIC STAMP GENERATOR (FOR LOGOS & PRELOAD EXAMPLES)
+       ========================================================================== */
+    function generateStampDataURL(type, customText = 'ORIGAMI STUDIO', customColor = '#f8fafc') {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      if (type === 'brand_crest') {
+        ctx.strokeStyle = '#fbbf24';
+        ctx.fillStyle = '#fbbf24';
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.arc(256, 256, 200, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(256, 256, 178, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(256, 115);
+        ctx.lineTo(340, 210);
+        ctx.lineTo(256, 265);
+        ctx.lineTo(172, 210);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.font = 'bold 38px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('ORIGAMI', 256, 335);
+        ctx.font = '600 20px JetBrains Mono, monospace';
+        ctx.fillText('PACKAGING LAB', 256, 372);
+      } else if (type === 'eco_badge') {
+        ctx.strokeStyle = '#10b981';
+        ctx.fillStyle = '#10b981';
+        ctx.lineWidth = 14;
+        ctx.beginPath();
+        ctx.arc(256, 256, 190, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(256, 240, 85, 0.2 * Math.PI, 1.3 * Math.PI);
+        ctx.quadraticCurveTo(340, 140, 325, 275);
+        ctx.stroke();
+
+        ctx.font = 'bold 34px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('100% RECYCLABLE', 256, 365);
+        ctx.font = '500 22px Inter, sans-serif';
+        ctx.fillText('ECO-FRIENDLY BOARD', 256, 398);
+      } else if (type === 'fragile_care') {
+        ctx.strokeStyle = '#ef4444';
+        ctx.fillStyle = '#ef4444';
+        ctx.lineWidth = 16;
+        ctx.strokeRect(46, 76, 420, 360);
+
+        ctx.beginPath();
+        ctx.arc(256, 175, 55, 0, Math.PI, false);
+        ctx.lineTo(201, 120);
+        ctx.lineTo(311, 120);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillRect(248, 230, 16, 65);
+        ctx.fillRect(206, 290, 100, 14);
+
+        ctx.font = 'bold 54px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('FRAGILE', 256, 368);
+        ctx.font = '600 22px Inter, sans-serif';
+        ctx.fillText('HANDLE WITH CARE', 256, 405);
+      } else if (type === 'barcode_sku') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(36, 116, 440, 280);
+        ctx.fillStyle = '#0f172a';
+        const bars = [12, 6, 18, 6, 6, 14, 8, 16, 6, 10, 18, 8, 6, 12, 16, 6, 10, 6, 18, 10, 8, 14];
+        let bx = 68;
+        bars.forEach((w, i) => {
+          if (i % 2 === 0) ctx.fillRect(bx, 145, w, 175);
+          bx += w + 8;
+        });
+        ctx.font = '600 28px JetBrains Mono, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('8 994026 108429', 256, 362);
+      } else if (type === 'seam_stripe') {
+        c.width = 1024;
+        c.height = 220;
+        const gCtx = c.getContext('2d');
+        const grad = gCtx.createLinearGradient(0, 0, 1024, 0);
+        grad.addColorStop(0, '#f59e0b');
+        grad.addColorStop(0.5, '#ec4899');
+        grad.addColorStop(1, '#3b82f6');
+        gCtx.fillStyle = grad;
+        gCtx.fillRect(0, 25, 1024, 170);
+
+        gCtx.fillStyle = 'rgba(255,255,255,0.92)';
+        gCtx.font = 'bold 42px Inter, sans-serif';
+        gCtx.textAlign = 'center';
+        gCtx.fillText('CONTINUOUS CROSS-SEAM GRAPHIC WRAP • ORIGAMI CAD', 512, 125);
+        return { dataUrl: c.toDataURL('image/png'), aspect: 1024 / 220 };
+      } else if (type === 'custom_text') {
+        c.width = 800;
+        c.height = 240;
+        const tCtx = c.getContext('2d');
+        tCtx.strokeStyle = customColor;
+        tCtx.fillStyle = customColor;
+        tCtx.lineWidth = 6;
+        tCtx.strokeRect(20, 30, 760, 180);
+        tCtx.font = 'bold 64px Inter, sans-serif';
+        tCtx.textAlign = 'center';
+        tCtx.textBaseline = 'middle';
+        tCtx.fillText(customText.slice(0, 22), 400, 120);
+        return { dataUrl: c.toDataURL('image/png'), aspect: 800 / 240 };
+      }
+
+      return { dataUrl: c.toDataURL('image/png'), aspect: 1 };
+    }
+
+    /* ==========================================================================
+       3. INDEXEDDB STORAGE & CACHING ENGINE
+       ========================================================================== */
+    const DB_NAME = 'OrigamiCADDatabase';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'projects';
+
+    function openDatabase() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function saveStateToIndexedDB(stateObj) {
+      try {
+        const db = await openDatabase();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).put(structuredClone(stateObj), 'autosave');
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+        setCacheStatus(true, 'Tersimpan di Cache');
+      } catch (err) {
+        try {
+          localStorage.setItem('origami_fallback_cache', JSON.stringify(stateObj));
+          setCacheStatus(true, 'Tersimpan (Lokal)');
+        } catch (e) {
+          setCacheStatus(false, 'Cache Penuh');
+        }
+      }
+    }
+
+    async function loadStateFromIndexedDB() {
+      try {
+        const db = await openDatabase();
+        const saved = await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const req = tx.objectStore(STORE_NAME).get('autosave');
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        if (saved && saved.template) return saved;
+      } catch (err) {
+        const fallback = localStorage.getItem('origami_fallback_cache');
+        if (fallback) return JSON.parse(fallback);
+      }
+      return null;
+    }
+
+    function setCacheStatus(ok, text) {
+      const dot = document.getElementById('cacheStatusDot');
+      const label = document.getElementById('cacheStatusText');
+      if (dot && label) {
+        dot.className = `w-2 h-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-amber-500'}`;
+        label.textContent = text;
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      const borderColor = type === 'success' ? 'border-emerald-500' : type === 'warn' ? 'border-amber-500' : 'border-blue-500';
+      el.className = `cad-panel border-l-4 ${borderColor} border px-3.5 py-2 rounded shadow-lg text-xs font-medium transition-all duration-300 opacity-0 translate-y-2`;
+      el.textContent = message;
+      container.appendChild(el);
+      requestAnimationFrame(() => {
+        el.classList.remove('opacity-0', 'translate-y-2');
+      });
+      setTimeout(() => {
+        el.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => el.remove(), 300);
+      }, 2600);
+    }
+
+    /* ==========================================================================
+       4. KINEMATIC PANEL TREE & DIELINE GEOMETRY GENERATOR (STANDARD & CUSTOM)
+       ========================================================================== */
+    function generateStandardTemplateDefinitions(templateName, state) {
+      const P = Math.max(30, Number(state.length) || 120);
+      const L = Math.max(30, Number(state.width) || 80);
+      const T = Math.max(30, Number(state.height) || 160);
+      const G = Math.max(10, Number(state.glueFlap) || 18);
+      const tuck = Math.max(12, Number(state.tuckFlap) || 22);
+      const dustH = Math.round(Math.min(L * 0.72, Math.max(18, L * 0.55)));
+      const panels = [];
+
+      if (templateName === 'tuck_end') {
+        panels.push({
+          id: 'front', label: 'Depan (P×T)', parent: null, edge: null,
+          w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 0, zLayer: 0
+        });
+        panels.push({
+          id: 'left', label: 'Kiri (L×T)', parent: 'front', edge: 'left',
+          w: L, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'glue_flap', label: 'Glue Flap', parent: 'left', edge: 'left',
+          w: G, h: T, shape: 'glue_left', phase: [0.35, 0.75], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'dust_top_left', label: 'Dust Flap', parent: 'left', edge: 'top',
+          w: L, h: dustH, shape: 'dust_top', phase: [0.35, 0.70], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'dust_bot_left', label: 'Dust Flap', parent: 'left', edge: 'bottom',
+          w: L, h: dustH, shape: 'dust_bottom', phase: [0.35, 0.70], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'right', label: 'Kanan (L×T)', parent: 'front', edge: 'right',
+          w: L, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'dust_top_right', label: 'Dust Flap', parent: 'right', edge: 'top',
+          w: L, h: dustH, shape: 'dust_top', phase: [0.35, 0.70], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'dust_bot_right', label: 'Dust Flap', parent: 'right', edge: 'bottom',
+          w: L, h: dustH, shape: 'dust_bottom', phase: [0.35, 0.70], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'back', label: 'Belakang (P×T)', parent: 'right', edge: 'right',
+          w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'top_lid', label: 'Tutup Atas (P×L)', parent: 'back', edge: 'top',
+          w: P, h: L, shape: 'rect', phase: [0.55, 0.88], maxAngle: 90, zLayer: 1
+        });
+        panels.push({
+          id: 'top_tuck', label: 'Tuck Atas', parent: 'top_lid', edge: 'top',
+          w: P, h: tuck, shape: 'tuck_top', phase: [0.75, 1.0], maxAngle: 90, zLayer: 3
+        });
+        panels.push({
+          id: 'bot_lid', label: 'Tutup Bawah (P×L)', parent: 'front', edge: 'bottom',
+          w: P, h: L, shape: 'rect', phase: [0.50, 0.85], maxAngle: 90, zLayer: 1
+        });
+        panels.push({
+          id: 'bot_tuck', label: 'Tuck Bawah', parent: 'bot_lid', edge: 'bottom',
+          w: P, h: tuck, shape: 'tuck_bottom', phase: [0.72, 1.0], maxAngle: 90, zLayer: 3
+        });
+
+      } else if (templateName === 'rsc') {
+        const flapH = Math.round(L / 2);
+        panels.push({
+          id: 'front', label: 'Panel A (P×T)', parent: null, edge: null,
+          w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 0, zLayer: 0
+        });
+        panels.push({
+          id: 'left', label: 'Panel B (L×T)', parent: 'front', edge: 'left',
+          w: L, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'glue_flap', label: 'Glue Joint', parent: 'left', edge: 'left',
+          w: G, h: T, shape: 'glue_left', phase: [0.30, 0.65], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'right', label: 'Panel D (L×T)', parent: 'front', edge: 'right',
+          w: L, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'back', label: 'Panel C (P×T)', parent: 'right', edge: 'right',
+          w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'top_minor_l', label: 'Minor Flap', parent: 'left', edge: 'top',
+          w: L, h: flapH, shape: 'rsc_slot', phase: [0.40, 0.72], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'bot_minor_l', label: 'Minor Flap', parent: 'left', edge: 'bottom',
+          w: L, h: flapH, shape: 'rsc_slot', phase: [0.35, 0.68], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'top_minor_r', label: 'Minor Flap', parent: 'right', edge: 'top',
+          w: L, h: flapH, shape: 'rsc_slot', phase: [0.40, 0.72], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'bot_minor_r', label: 'Minor Flap', parent: 'right', edge: 'bottom',
+          w: L, h: flapH, shape: 'rsc_slot', phase: [0.35, 0.68], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'top_major_f', label: 'Major Flap (P×½L)', parent: 'front', edge: 'top',
+          w: P, h: flapH, shape: 'rsc_slot', phase: [0.68, 1.0], maxAngle: 90, zLayer: 1
+        });
+        panels.push({
+          id: 'bot_major_f', label: 'Major Flap (P×½L)', parent: 'front', edge: 'bottom',
+          w: P, h: flapH, shape: 'rsc_slot', phase: [0.60, 0.92], maxAngle: 90, zLayer: 1
+        });
+        panels.push({
+          id: 'top_major_b', label: 'Major Flap (P×½L)', parent: 'back', edge: 'top',
+          w: P, h: flapH, shape: 'rsc_slot', phase: [0.68, 1.0], maxAngle: 90, zLayer: 1
+        });
+        panels.push({
+          id: 'bot_major_b', label: 'Major Flap (P×½L)', parent: 'back', edge: 'bottom',
+          w: P, h: flapH, shape: 'rsc_slot', phase: [0.60, 0.92], maxAngle: 90, zLayer: 1
+        });
+
+      } else if (templateName === 'mailer') {
+        const wingW = Math.round(Math.min(P * 0.35, Math.max(20, T * 0.65)));
+        const earW = Math.round(T * 0.75);
+        const tuckM = Math.round(Math.min(T * 0.85, tuck + 16));
+        panels.push({
+          id: 'base', label: 'Alas Bawah (P×L)', parent: null, edge: null,
+          w: P, h: L, shape: 'rect', phase: [0, 0.40], maxAngle: 0, zLayer: 0, isFloorRoot: true
+        });
+        panels.push({
+          id: 'wall_left', label: 'Sisi Kiri (T×L)', parent: 'base', edge: 'left',
+          w: T, h: L, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'wall_right', label: 'Sisi Kanan (T×L)', parent: 'base', edge: 'right',
+          w: T, h: L, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'wall_front', label: 'Dinding Depan (P×T)', parent: 'base', edge: 'bottom',
+          w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'wing_fl', label: 'Sayap Kiri', parent: 'wall_front', edge: 'left',
+          w: wingW, h: T, shape: 'glue_left', phase: [0.35, 0.70], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'wing_fr', label: 'Sayap Kanan', parent: 'wall_front', edge: 'right',
+          w: wingW, h: T, shape: 'glue_right', phase: [0.35, 0.70], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'wall_back', label: 'Dinding Belakang (P×T)', parent: 'base', edge: 'top',
+          w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'mailer_lid', label: 'Tutup Atas (P×L)', parent: 'wall_back', edge: 'top',
+          w: P, h: L, shape: 'rect', phase: [0.50, 0.85], maxAngle: 90, zLayer: 1
+        });
+        panels.push({
+          id: 'lid_dust_l', label: 'Ear Flap Kiri', parent: 'mailer_lid', edge: 'left',
+          w: earW, h: L, shape: 'glue_left', phase: [0.68, 0.96], maxAngle: 90, zLayer: 3
+        });
+        panels.push({
+          id: 'lid_dust_r', label: 'Ear Flap Kanan', parent: 'mailer_lid', edge: 'right',
+          w: earW, h: L, shape: 'glue_right', phase: [0.68, 0.96], maxAngle: 90, zLayer: 3
+        });
+        panels.push({
+          id: 'mailer_tuck', label: 'Lidah Depan (P×T)', parent: 'mailer_lid', edge: 'top',
+          w: P, h: tuckM, shape: 'tuck_top', phase: [0.72, 1.0], maxAngle: 90, zLayer: 2
+        });
+
+      } else if (templateName === 'gable_top') {
+        const roofH = Math.max(24, Math.round(L * 0.62));
+        const lipH = Math.max(14, Math.round(tuck * 0.75));
+        const botH = Math.round(L * 0.52);
+        // Exact trigonometric gable angle so front & back roofs meet at L/2 ridge
+        const sinTheta = Math.min(0.95, (L / 2) / roofH);
+        const gableDeg = Math.round((Math.asin(sinTheta) * 180) / Math.PI * 10) / 10;
+
+        panels.push({
+          id: 'front', label: 'Depan (P×T)', parent: null, edge: null,
+          w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 0, zLayer: 0
+        });
+        panels.push({
+          id: 'left', label: 'Kiri (L×T)', parent: 'front', edge: 'left',
+          w: L, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'glue_flap', label: 'Glue Flap', parent: 'left', edge: 'left',
+          w: G, h: T, shape: 'glue_left', phase: [0.35, 0.70], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'right', label: 'Kanan (L×T)', parent: 'front', edge: 'right',
+          w: L, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'back', label: 'Belakang (P×T)', parent: 'right', edge: 'right',
+          w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0
+        });
+        panels.push({
+          id: 'gable_front', label: 'Atap Depan', parent: 'front', edge: 'top',
+          w: P, h: roofH, shape: 'rect', phase: [0.55, 0.90], maxAngle: gableDeg, zLayer: 1
+        });
+        panels.push({
+          id: 'lip_front', label: 'Bibir Seal Depan', parent: 'gable_front', edge: 'top',
+          w: P, h: lipH, shape: 'tuck_top', phase: [0.75, 1.0], maxAngle: -gableDeg, zLayer: 1
+        });
+        panels.push({
+          id: 'gable_back', label: 'Atap Belakang', parent: 'back', edge: 'top',
+          w: P, h: roofH, shape: 'rect', phase: [0.55, 0.90], maxAngle: gableDeg, zLayer: 1
+        });
+        panels.push({
+          id: 'lip_back', label: 'Bibir Seal Belakang', parent: 'gable_back', edge: 'top',
+          w: P, h: lipH, shape: 'tuck_top', phase: [0.75, 1.0], maxAngle: -gableDeg, zLayer: 1
+        });
+        panels.push({
+          id: 'gusset_l', label: 'Gusset Kiri', parent: 'left', edge: 'top',
+          w: L, h: Math.round(roofH * 0.88), shape: 'gable_triangle', phase: [0.45, 0.85], maxAngle: Math.round(gableDeg + 6), zLayer: 2
+        });
+        panels.push({
+          id: 'gusset_r', label: 'Gusset Kanan', parent: 'right', edge: 'top',
+          w: L, h: Math.round(roofH * 0.88), shape: 'gable_triangle', phase: [0.45, 0.85], maxAngle: Math.round(gableDeg + 6), zLayer: 2
+        });
+        panels.push({
+          id: 'bot_l', label: 'Alas Kiri', parent: 'left', edge: 'bottom',
+          w: L, h: botH, shape: 'rsc_slot', phase: [0.35, 0.70], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'bot_r', label: 'Alas Kanan', parent: 'right', edge: 'bottom',
+          w: L, h: botH, shape: 'rsc_slot', phase: [0.35, 0.70], maxAngle: 90, zLayer: 2
+        });
+        panels.push({
+          id: 'bot_f', label: 'Alas Depan', parent: 'front', edge: 'bottom',
+          w: P, h: botH, shape: 'rsc_slot', phase: [0.60, 0.95], maxAngle: 90, zLayer: 1
+        });
+        panels.push({
+          id: 'bot_b', label: 'Alas Belakang', parent: 'back', edge: 'bottom',
+          w: P, h: botH, shape: 'rsc_slot', phase: [0.60, 0.95], maxAngle: 90, zLayer: 1
+        });
+      }
+
+      return panels;
+    }
+
+    function generateCustomPresetDefinitions(presetType, state) {
+      const P = Math.max(30, Number(state.length) || 140);
+      const L = Math.max(30, Number(state.width) || 100);
+      const T = Math.max(25, Number(state.height) || 55);
+
+      if (presetType === 'tray') {
+        // Self-locking Bakery / Retail Display Tray with Double Wall Rim
+        return [
+          { id: 'base', label: 'Alas Baki (P×L)', parent: null, edge: null, w: P, h: L, shape: 'rect', phase: [0, 0.4], maxAngle: 0, zLayer: 0, isFloorRoot: true },
+          { id: 'wall_f', label: 'Dinding Depan', parent: 'base', edge: 'bottom', w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0 },
+          { id: 'lip_f', label: 'Rim Lipat Depan', parent: 'wall_f', edge: 'bottom', w: P, h: Math.round(T * 0.45), shape: 'tuck_bottom', phase: [0.65, 1.0], maxAngle: 90, zLayer: 2 },
+          { id: 'wall_b', label: 'Dinding Belakang', parent: 'base', edge: 'top', w: P, h: T, shape: 'rect', phase: [0, 0.45], maxAngle: 90, zLayer: 0 },
+          { id: 'lip_b', label: 'Rim Lipat Belakang', parent: 'wall_b', edge: 'top', w: P, h: Math.round(T * 0.45), shape: 'tuck_top', phase: [0.65, 1.0], maxAngle: 90, zLayer: 2 },
+          { id: 'wall_l', label: 'Dinding Kiri', parent: 'base', edge: 'left', w: T, h: L, shape: 'rect', phase: [0.25, 0.70], maxAngle: 90, zLayer: 1 },
+          { id: 'tab_lt', label: 'Sayap Kunci Kiri-A', parent: 'wall_l', edge: 'top', w: T, h: Math.round(P * 0.25), shape: 'dust_top', phase: [0.55, 0.95], maxAngle: 90, zLayer: 2 },
+          { id: 'tab_lb', label: 'Sayap Kunci Kiri-B', parent: 'wall_l', edge: 'bottom', w: T, h: Math.round(P * 0.25), shape: 'dust_bottom', phase: [0.55, 0.95], maxAngle: 90, zLayer: 2 },
+          { id: 'wall_r', label: 'Dinding Kanan', parent: 'base', edge: 'right', w: T, h: L, shape: 'rect', phase: [0.25, 0.70], maxAngle: 90, zLayer: 1 },
+          { id: 'tab_rt', label: 'Sayap Kunci Kanan-A', parent: 'wall_r', edge: 'top', w: T, h: Math.round(P * 0.25), shape: 'dust_top', phase: [0.55, 0.95], maxAngle: 90, zLayer: 2 },
+          { id: 'tab_rb', label: 'Sayap Kunci Kanan-B', parent: 'wall_r', edge: 'bottom', w: T, h: Math.round(P * 0.25), shape: 'dust_bottom', phase: [0.55, 0.95], maxAngle: 90, zLayer: 2 }
+        ];
+      } else if (presetType === 'sleeve') {
+        // Wrap-around Packaging Sleeve / Belly Band
+        return [
+          { id: 'top_face', label: 'Atas Sleeve (P×L)', parent: null, edge: null, w: P, h: L, shape: 'rect', phase: [0, 0.45], maxAngle: 0, zLayer: 0 },
+          { id: 'side_l', label: 'Dinding Kiri (T×L)', parent: 'top_face', edge: 'left', w: T, h: L, shape: 'rect', phase: [0, 0.55], maxAngle: 90, zLayer: 0 },
+          { id: 'side_r', label: 'Dinding Kanan (T×L)', parent: 'top_face', edge: 'right', w: T, h: L, shape: 'rect', phase: [0, 0.55], maxAngle: 90, zLayer: 0 },
+          { id: 'bot_face', label: 'Alas Bawah (P×L)', parent: 'side_r', edge: 'right', w: P, h: L, shape: 'rect', phase: [0.40, 0.85], maxAngle: 90, zLayer: 1 },
+          { id: 'glue_seal', label: 'Lidah Perekat Sleeve', parent: 'side_l', edge: 'left', w: 22, h: L, shape: 'glue_left', phase: [0.60, 1.0], maxAngle: 90, zLayer: 2 }
+        ];
+      } else {
+        // Single Root Panel starter
+        return [
+          { id: 'root_panel', label: 'Panel Utama', parent: null, edge: null, w: 120, h: 120, shape: 'rect', phase: [0, 0.5], maxAngle: 0, zLayer: 0, isFloorRoot: false }
+        ];
+      }
+    }
+
+    function buildKinematicPanelTree(state) {
+      let rawPanels;
+      if (state.template === 'custom') {
+        if (!Array.isArray(state.customPanels) || state.customPanels.length === 0) {
+          state.customPanels = generateCustomPresetDefinitions('tray', state);
+        }
+        rawPanels = structuredClone(state.customPanels);
+      } else {
+        rawPanels = generateStandardTemplateDefinitions(state.template, state);
+      }
+
+      const panels = rawPanels.map(p => ({
+        ...p,
+        w: Math.max(10, Number(p.w) || 60),
+        h: Math.max(10, Number(p.h) || 60),
+        maxAngle: Number(p.maxAngle ?? 90),
+        zLayer: Number(p.zLayer ?? 0),
+        phase: Array.isArray(p.phase) ? [Number(p.phase[0]) || 0, Number(p.phase[1]) || 1] : [0, 1]
+      }));
+
+      // Compute 2D unfolded sheet coordinates for each panel
+      const panelMap = new Map();
+      panels.forEach(p => {
+        p.children = [];
+        p.sharedEdges = new Set();
+        panelMap.set(p.id, p);
+      });
+
+      let rootPanel = null;
+      panels.forEach(p => {
+        if (!p.parent) {
+          if (!rootPanel) rootPanel = p;
+        } else {
+          const parent = panelMap.get(p.parent);
+          if (parent) {
+            parent.children.push(p);
+            parent.sharedEdges.add(p.edge);
+            if (p.edge === 'top') p.sharedEdges.add('bottom');
+            if (p.edge === 'bottom') p.sharedEdges.add('top');
+            if (p.edge === 'left') p.sharedEdges.add('right');
+            if (p.edge === 'right') p.sharedEdges.add('left');
+          }
+        }
+      });
+
+      // Traverse from root to calculate 2D center (cx, cy), hinge point (hx, hy), and tree depth
+      const visitedPanels = [];
+      if (rootPanel) {
+        rootPanel.cx = 0;
+        rootPanel.cy = 0;
+        rootPanel.hx = 0;
+        rootPanel.hy = 0;
+        rootPanel.depth = 0;
+
+        const queue = [rootPanel];
+        while (queue.length > 0) {
+          const curr = queue.shift();
+          visitedPanels.push(curr);
+          curr.minX = curr.cx - curr.w / 2;
+          curr.maxX = curr.cx + curr.w / 2;
+          curr.minY = curr.cy - curr.h / 2;
+          curr.maxY = curr.cy + curr.h / 2;
+
+          for (const child of curr.children) {
+            child.depth = (curr.depth || 0) + 1;
+            if (child.edge === 'top') {
+              child.hx = curr.cx;
+              child.hy = curr.maxY;
+              child.cx = curr.cx;
+              child.cy = curr.maxY + child.h / 2;
+            } else if (child.edge === 'bottom') {
+              child.hx = curr.cx;
+              child.hy = curr.minY;
+              child.cx = curr.cx;
+              child.cy = curr.minY - child.h / 2;
+            } else if (child.edge === 'left') {
+              child.hx = curr.minX;
+              child.hy = curr.cy;
+              child.cx = curr.minX - child.w / 2;
+              child.cy = curr.cy;
+            } else if (child.edge === 'right') {
+              child.hx = curr.maxX;
+              child.hy = curr.cy;
+              child.cx = curr.maxX + child.w / 2;
+              child.cy = curr.cy;
+            }
+            queue.push(child);
+          }
+        }
+      }
+
+      // Compute exact 2D polygon contour and hinge crease segment for each panel
+      let sMinX = Infinity, sMaxX = -Infinity, sMinY = Infinity, sMaxY = -Infinity;
+      visitedPanels.forEach(p => {
+        p.localPoly = buildPanelPolygonInHingeSpace(p);
+        p.sheetPoly = p.localPoly.map(pt => ({
+          x: p.hx + pt.x,
+          y: p.hy + pt.y
+        }));
+        p.creaseSegment = computePanelHingeSegment(p);
+        p.sheetPoly.forEach(pt => {
+          if (pt.x < sMinX) sMinX = pt.x;
+          if (pt.x > sMaxX) sMaxX = pt.x;
+          if (pt.y < sMinY) sMinY = pt.y;
+          if (pt.y > sMaxY) sMaxY = pt.y;
+        });
+      });
+
+      // Detect 2D AABB overlaps (excluding normal shared hinges with 1mm margin)
+      overlappingPanelIds.clear();
+      const eps = 1.5;
+      for (let i = 0; i < visitedPanels.length; i++) {
+        for (let j = i + 1; j < visitedPanels.length; j++) {
+          const a = visitedPanels[i];
+          const b = visitedPanels[j];
+          const overlapX = (a.minX + eps < b.maxX - eps) && (a.maxX - eps > b.minX + eps);
+          const overlapY = (a.minY + eps < b.maxY - eps) && (a.maxY - eps > b.minY + eps);
+          if (overlapX && overlapY) {
+            overlappingPanelIds.add(a.id);
+            overlappingPanelIds.add(b.id);
+          }
+        }
+      }
+
+      if (!isFinite(sMinX)) {
+        sMinX = -100; sMaxX = 100; sMinY = -100; sMaxY = 100;
+      }
+
+      sheetBounds = {
+        minX: sMinX,
+        maxX: sMaxX,
+        minY: sMinY,
+        maxY: sMaxY,
+        width: Math.round(sMaxX - sMinX),
+        height: Math.round(sMaxY - sMinY)
+      };
+
+      currentPanels = visitedPanels;
+      return visitedPanels;
+    }
+
+    function computePanelHingeSegment(p) {
+      if (!p.parent) return null;
+      const slot = p.shape === 'rsc_slot' ? Math.min(p.w * 0.03, 4) : 0;
+      if (p.edge === 'top' || p.edge === 'bottom') {
+        const halfSpan = Math.max(2, p.w / 2 - slot);
+        return {
+          x1: p.hx - halfSpan,
+          y1: p.hy,
+          x2: p.hx + halfSpan,
+          y2: p.hy,
+          axis: 'h',
+          cVal: p.hy,
+          min: p.hx - halfSpan,
+          max: p.hx + halfSpan
+        };
+      } else {
+        const halfSpan = Math.max(2, p.h / 2 - slot);
+        return {
+          x1: p.hx,
+          y1: p.hy - halfSpan,
+          x2: p.hx,
+          y2: p.hy + halfSpan,
+          axis: 'v',
+          cVal: p.hx,
+          min: p.hy - halfSpan,
+          max: p.hy + halfSpan
+        };
+      }
+    }
+
+    // Subtracts crease intervals from a polygon edge so cut lines never draw over crease lines
+    function getExposedCutSubsegments(a, b, panel) {
+      const eps = 0.25;
+      const isHoriz = Math.abs(a.y - b.y) < eps;
+      const isVert = Math.abs(a.x - b.x) < eps;
+
+      if (!isHoriz && !isVert) {
+        return [[a, b]];
+      }
+
+      // Collect all crease segments belonging to this panel's parent hinge or child hinges
+      const creases = [];
+      if (panel.creaseSegment) creases.push(panel.creaseSegment);
+      if (panel.children) {
+        panel.children.forEach(ch => {
+          if (ch.creaseSegment) creases.push(ch.creaseSegment);
+        });
+      }
+
+      const axis = isHoriz ? 'h' : 'v';
+      const lineCoord = isHoriz ? (a.y + b.y) / 2 : (a.x + b.x) / 2;
+      const segMin = isHoriz ? Math.min(a.x, b.x) : Math.min(a.y, b.y);
+      const segMax = isHoriz ? Math.max(a.x, b.x) : Math.max(a.y, b.y);
+
+      let intervals = [[segMin, segMax]];
+
+      for (const cr of creases) {
+        if (cr.axis !== axis) continue;
+        if (Math.abs(cr.cVal - lineCoord) > eps) continue;
+
+        const nextIntervals = [];
+        for (const [iStart, iEnd] of intervals) {
+          if (cr.max <= iStart + eps || cr.min >= iEnd - eps) {
+            nextIntervals.push([iStart, iEnd]);
+          } else {
+            if (cr.min > iStart + eps) nextIntervals.push([iStart, cr.min]);
+            if (cr.max < iEnd - eps) nextIntervals.push([cr.max, iEnd]);
+          }
+        }
+        intervals = nextIntervals;
+        if (intervals.length === 0) break;
+      }
+
+      return intervals.map(([s, e]) =>
+        isHoriz
+          ? [{ x: s, y: a.y }, { x: e, y: b.y }]
+          : [{ x: a.x, y: s }, { x: b.x, y: e }]
+      );
+    }
+
+    function buildPanelPolygonInHingeSpace(p) {
+      const w = p.w;
+      const h = p.h;
+      const hw = w / 2;
+      const hh = h / 2;
+
+      let ox = 0, oy = 0;
+      if (p.edge === 'top') oy = hh;
+      else if (p.edge === 'bottom') oy = -hh;
+      else if (p.edge === 'left') ox = -hw;
+      else if (p.edge === 'right') ox = hw;
+
+      const x0 = ox - hw, x1 = ox + hw;
+      const y0 = oy - hh, y1 = oy + hh;
+
+      if (p.shape === 'glue_left') {
+        const taper = Math.min(h * 0.18, w * 0.85);
+        return [
+          { x: x1, y: y0 },
+          { x: x1, y: y1 },
+          { x: x0, y: y1 - taper },
+          { x: x0, y: y0 + taper }
+        ];
+      }
+      if (p.shape === 'glue_right') {
+        const taper = Math.min(h * 0.18, w * 0.85);
+        return [
+          { x: x0, y: y1 },
+          { x: x0, y: y0 },
+          { x: x1, y: y0 + taper },
+          { x: x1, y: y1 - taper }
+        ];
+      }
+      if (p.shape === 'tuck_top') {
+        const bevel = Math.min(w * 0.12, h * 0.65);
+        return [
+          { x: x0, y: y0 },
+          { x: x1, y: y0 },
+          { x: x1, y: y1 - bevel * 0.5 },
+          { x: x1 - bevel, y: y1 },
+          { x: x0 + bevel, y: y1 },
+          { x: x0, y: y1 - bevel * 0.5 }
+        ];
+      }
+      if (p.shape === 'tuck_bottom') {
+        const bevel = Math.min(w * 0.12, h * 0.65);
+        return [
+          { x: x1, y: y1 },
+          { x: x0, y: y1 },
+          { x: x0, y: y0 + bevel * 0.5 },
+          { x: x0 + bevel, y: y0 },
+          { x: x1 - bevel, y: y0 },
+          { x: x1, y: y0 + bevel * 0.5 }
+        ];
+      }
+      if (p.shape === 'dust_top') {
+        const cut = Math.min(w * 0.22, h * 0.45);
+        return [
+          { x: x0, y: y0 },
+          { x: x1, y: y0 },
+          { x: x1 - cut * 0.5, y: y1 },
+          { x: x0 + cut, y: y1 },
+          { x: x0, y: y1 - cut * 0.6 }
+        ];
+      }
+      if (p.shape === 'dust_bottom') {
+        const cut = Math.min(w * 0.22, h * 0.45);
+        return [
+          { x: x0, y: y1 },
+          { x: x1, y: y1 },
+          { x: x1 - cut * 0.5, y: y0 },
+          { x: x0 + cut, y: y0 },
+          { x: x0, y: y0 + cut * 0.6 }
+        ];
+      }
+      if (p.shape === 'rsc_slot') {
+        const slot = Math.min(w * 0.03, 4);
+        if (p.edge === 'top') {
+          return [
+            { x: x0 + slot, y: y0 },
+            { x: x1 - slot, y: y0 },
+            { x: x1 - slot, y: y1 },
+            { x: x0 + slot, y: y1 }
+          ];
+        } else if (p.edge === 'bottom') {
+          return [
+            { x: x0 + slot, y: y1 },
+            { x: x1 - slot, y: y1 },
+            { x: x1 - slot, y: y0 },
+            { x: x0 + slot, y: y0 }
+          ];
+        } else {
+          return [
+            { x: x0, y: y0 + slot },
+            { x: x1, y: y0 + slot },
+            { x: x1, y: y1 - slot },
+            { x: x0, y: y1 - slot }
+          ];
+        }
+      }
+      if (p.shape === 'gable_triangle') {
+        if (p.edge === 'bottom') {
+          return [{ x: x0, y: y1 }, { x: x1, y: y1 }, { x: ox, y: y0 }];
+        } else if (p.edge === 'left') {
+          return [{ x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: oy }];
+        } else if (p.edge === 'right') {
+          return [{ x: x0, y: y0 }, { x: x0, y: y1 }, { x: x1, y: oy }];
+        }
+        return [
+          { x: x0, y: y0 },
+          { x: x1, y: y0 },
+          { x: ox, y: y1 }
+        ];
+      }
+
+      return [
+        { x: x0, y: y0 },
+        { x: x1, y: y0 },
+        { x: x1, y: y1 },
+        { x: x0, y: y1 }
+      ];
+    }
+
+    /* ==========================================================================
+       5. UNIFIED TEXTURE ATLAS & GRAIN BUMP GENERATOR
+       ========================================================================== */
+    const atlasCanvas = document.createElement('canvas');
+    atlasCanvas.width = 2048;
+    atlasCanvas.height = 2048;
+    const atlasCtx = atlasCanvas.getContext('2d');
+    let sharedAtlasTexture = null;
+    let sharedBumpTexture = null;
+
+    // Pre-rendered grain pattern canvas for fast atlas compositing
+    const grainTileCanvas = document.createElement('canvas');
+    grainTileCanvas.width = 512;
+    grainTileCanvas.height = 512;
+    const grainTileCtx = grainTileCanvas.getContext('2d');
+    grainTileCtx.fillStyle = '#ffffff';
+    for (let i = 0; i < 160; i++) {
+      const rx = (i * 197) % 512;
+      const ry = (i * 353) % 512;
+      grainTileCtx.fillRect(rx, ry, 22, 2);
+    }
+    const cachedGrainPattern = atlasCtx.createPattern(grainTileCanvas, 'repeat');
+
+    function generateProceduralGrainBumpMap() {
+      if (sharedBumpTexture) {
+        sharedBumpTexture.dispose();
+      }
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#808080';
+      ctx.fillRect(0, 0, 512, 512);
+
+      const imgData = ctx.getImageData(0, 0, 512, 512);
+      const data = imgData.data;
+      const isCorrugated = appState.materialPreset === 'corrugated';
+
+      for (let y = 0; y < 512; y++) {
+        const fluteWave = isCorrugated ? Math.sin((y / 512) * Math.PI * 64) * 28 : 0;
+        for (let x = 0; x < 512; x++) {
+          const idx = (y * 512 + x) * 4;
+          const noise = (Math.random() - 0.5) * 32;
+          const val = Math.max(0, Math.min(255, 128 + noise + fluteWave));
+          data[idx] = val;
+          data[idx + 1] = val;
+          data[idx + 2] = val;
+          data[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(3, 3);
+      return tex;
+    }
+
+    function updateUnifiedTextureAtlas() {
+      const pad = 40;
+      const minX = sheetBounds.minX - pad;
+      const spanW = Math.max(100, sheetBounds.width + pad * 2);
+      const spanH = Math.max(100, sheetBounds.height + pad * 2);
+
+      const W = atlasCanvas.width;
+      const H = atlasCanvas.height;
+
+      atlasCtx.save();
+      atlasCtx.fillStyle = appState.exteriorColor || '#1e293b';
+      atlasCtx.fillRect(0, 0, W, H);
+
+      // Fast tiled paper fiber overlay
+      if (appState.grain > 0 && cachedGrainPattern) {
+        atlasCtx.save();
+        atlasCtx.globalAlpha = (appState.grain / 100) * 0.08;
+        atlasCtx.fillStyle = cachedGrainPattern;
+        atlasCtx.fillRect(0, 0, W, H);
+        atlasCtx.restore();
+      }
+
+      const mmToAtlasX = (x) => ((x - minX) / spanW) * W;
+      const mmToAtlasY = (y) => ((sheetBounds.maxY + pad - y) / spanH) * H;
+
+      // Render Artwork Layers onto the Unified Atlas
+      for (const art of appState.artworks) {
+        const img = imageElementCache.get(art.id);
+        if (!img || !img.complete) continue;
+
+        const cx = mmToAtlasX(art.x);
+        const cy = mmToAtlasY(art.y);
+        const drawW = (art.width / spanW) * W;
+        const aspect = art.aspect || 1;
+        const drawH = ((art.width / aspect) / spanH) * H;
+
+        atlasCtx.save();
+        atlasCtx.translate(cx, cy);
+        atlasCtx.rotate(((art.rotation || 0) * Math.PI) / 180);
+        atlasCtx.globalAlpha = (art.opacity ?? 100) / 100;
+        atlasCtx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        atlasCtx.restore();
+      }
+
+      // Optional: Render Dieline Crease & Cut Overlay onto 3D Surface
+      if (appState.dielineOn3D) {
+        atlasCtx.lineWidth = 4;
+        atlasCtx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+        atlasCtx.setLineDash([]);
+        currentPanels.forEach(p => {
+          const pts = p.sheetPoly;
+          for (let i = 0; i < pts.length; i++) {
+            const a = pts[i];
+            const b = pts[(i + 1) % pts.length];
+            const subSegs = getExposedCutSubsegments(a, b, p);
+            subSegs.forEach(([s, e]) => {
+              atlasCtx.beginPath();
+              atlasCtx.moveTo(mmToAtlasX(s.x), mmToAtlasY(s.y));
+              atlasCtx.lineTo(mmToAtlasX(e.x), mmToAtlasY(e.y));
+              atlasCtx.stroke();
+            });
+          }
+        });
+
+        atlasCtx.strokeStyle = 'rgba(244, 63, 94, 0.95)';
+        atlasCtx.setLineDash([14, 10]);
+        currentPanels.forEach(p => {
+          if (!p.creaseSegment) return;
+          const cr = p.creaseSegment;
+          atlasCtx.beginPath();
+          atlasCtx.moveTo(mmToAtlasX(cr.x1), mmToAtlasY(cr.y1));
+          atlasCtx.lineTo(mmToAtlasX(cr.x2), mmToAtlasY(cr.y2));
+          atlasCtx.stroke();
+        });
+      }
+
+      atlasCtx.restore();
+
+      if (sharedAtlasTexture) {
+        sharedAtlasTexture.needsUpdate = true;
+      }
+    }
+
+    function sheetMmToUV(x, y) {
+      const pad = 40;
+      const minX = sheetBounds.minX - pad;
+      const minY = sheetBounds.minY - pad;
+      const spanW = Math.max(100, sheetBounds.width + pad * 2);
+      const spanH = Math.max(100, sheetBounds.height + pad * 2);
+      return {
+        u: (x - minX) / spanW,
+        v: (y - minY) / spanH
+      };
+    }
+
+    /* ==========================================================================
+       6. 2D INTERACTIVE DIELINE CANVAS ENGINE
+       ========================================================================== */
+    const dielineCanvas = document.getElementById('dielineCanvas');
+
+    let view2D = {
+      zoom: 0.75,
+      panX: 0,
+      panY: 0,
+      isPanning: false,
+      isDraggingArt: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      downClientX: 0,
+      downClientY: 0,
+      artStartX: 0,
+      artStartY: 0
+    };
+
+    function resize2DCanvas() {
+      const rect = dielineCanvas.parentElement.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      dielineCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      dielineCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      render2DDieline();
+    }
+
+    function fit2DToScreen() {
+      const rect = dielineCanvas.parentElement.getBoundingClientRect();
+      if (rect.width < 20 || rect.height < 20) return;
+      const margin = 120;
+      const scaleX = (rect.width - margin) / Math.max(100, sheetBounds.width);
+      const scaleY = (rect.height - margin) / Math.max(100, sheetBounds.height);
+      view2D.zoom = Math.max(0.2, Math.min(2.5, Math.min(scaleX, scaleY)));
+      const centerX = (sheetBounds.minX + sheetBounds.maxX) / 2;
+      const centerY = (sheetBounds.minY + sheetBounds.maxY) / 2;
+      view2D.panX = -centerX * view2D.zoom;
+      view2D.panY = centerY * view2D.zoom;
+      render2DDieline();
+    }
+
+    function screenToSheetMm(clientX, clientY) {
+      const rect = dielineCanvas.getBoundingClientRect();
+      const sx = clientX - rect.left - rect.width / 2 - view2D.panX;
+      const sy = clientY - rect.top - rect.height / 2 - view2D.panY;
+      return {
+        x: sx / view2D.zoom,
+        y: -sy / view2D.zoom
+      };
+    }
+
+    // Point-in-polygon test for selecting custom panels in 2D canvas
+    function isPointInPolygon(pt, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i].x, yi = poly[i].y;
+        const xj = poly[j].x, yj = poly[j].y;
+        const intersect = ((yi > pt.y) !== (yj > pt.y)) &&
+          (pt.x < (xj - xi) * (pt.y - yi) / ((yj - yi) || 0.00001) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    // Rotation-aware hit test for artwork layers
+    function hitTestArtworkLayer(pt, art) {
+      const hw = art.width / 2;
+      const hh = (art.width / (art.aspect || 1)) / 2;
+      const dx = pt.x - art.x;
+      const dy = pt.y - art.y;
+      // Note: In 2D canvas, Y is inverted (-art.y) and rotated clockwise by art.rotation
+      const rad = ((art.rotation || 0) * Math.PI) / 180;
+      const cosR = Math.cos(rad);
+      const sinR = Math.sin(rad);
+      const localX = dx * cosR - dy * sinR;
+      const localY = dx * sinR + dy * cosR;
+      return Math.abs(localX) <= hw && Math.abs(localY) <= hh;
+    }
+
+    function render2DDieline(exportOptions = null) {
+      const targetCanvas = exportOptions?.canvas || dielineCanvas;
+      const ctx = targetCanvas.getContext('2d');
+      const dpr = exportOptions?.dpr || (window.devicePixelRatio || 1);
+      const w = targetCanvas.width / dpr;
+      const h = targetCanvas.height / dpr;
+      const isDark = document.documentElement.classList.contains('dark');
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+
+      if (exportOptions?.transparentBg) {
+        ctx.clearRect(0, 0, w, h);
+      } else {
+        ctx.fillStyle = isDark ? '#0d0f17' : '#e5e7eb';
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      const zoom = exportOptions?.zoom || view2D.zoom;
+      const panX = exportOptions?.panX ?? view2D.panX;
+      const panY = exportOptions?.panY ?? view2D.panY;
+
+      ctx.translate(w / 2 + panX, h / 2 + panY);
+      ctx.scale(zoom, zoom);
+
+      // Technical CAD millimeter grid (10mm minor, 50mm major)
+      if (!exportOptions?.hideGrid) {
+        const gridStep = 10;
+        const gMinX = Math.floor((sheetBounds.minX - 300) / 50) * 50;
+        const gMaxX = Math.ceil((sheetBounds.maxX + 300) / 50) * 50;
+        const gMinY = Math.floor((sheetBounds.minY - 300) / 50) * 50;
+        const gMaxY = Math.ceil((sheetBounds.maxY + 300) / 50) * 50;
+
+        ctx.lineWidth = 1 / zoom;
+        for (let gx = gMinX; gx <= gMaxX; gx += gridStep) {
+          ctx.strokeStyle = gx % 50 === 0
+            ? (isDark ? 'rgba(148,163,184,0.14)' : 'rgba(71,85,105,0.16)')
+            : (isDark ? 'rgba(148,163,184,0.05)' : 'rgba(71,85,105,0.06)');
+          ctx.beginPath();
+          ctx.moveTo(gx, -gMaxY);
+          ctx.lineTo(gx, -gMinY);
+          ctx.stroke();
+        }
+        for (let gy = gMinY; gy <= gMaxY; gy += gridStep) {
+          ctx.strokeStyle = gy % 50 === 0
+            ? (isDark ? 'rgba(148,163,184,0.14)' : 'rgba(71,85,105,0.16)')
+            : (isDark ? 'rgba(148,163,184,0.05)' : 'rgba(71,85,105,0.06)');
+          ctx.beginPath();
+          ctx.moveTo(gMinX, -gy);
+          ctx.lineTo(gMaxX, -gy);
+          ctx.stroke();
+        }
+      }
+
+      // 1. Fill Exterior Paper Color inside all panels
+      ctx.save();
+      ctx.beginPath();
+      currentPanels.forEach(p => {
+        p.sheetPoly.forEach((pt, idx) => {
+          if (idx === 0) ctx.moveTo(pt.x, -pt.y);
+          else ctx.lineTo(pt.x, -pt.y);
+        });
+        ctx.closePath();
+      });
+      ctx.fillStyle = appState.exteriorColor || '#1e293b';
+      ctx.fill();
+
+      // Clip Artwork to the Dieline Paper Silhouette
+      ctx.clip();
+
+      for (const art of appState.artworks) {
+        const img = imageElementCache.get(art.id);
+        if (!img || !img.complete) continue;
+        const drawW = art.width;
+        const drawH = art.width / (art.aspect || 1);
+
+        ctx.save();
+        ctx.translate(art.x, -art.y);
+        ctx.rotate(((art.rotation || 0) * Math.PI) / 180);
+        ctx.globalAlpha = (art.opacity ?? 100) / 100;
+        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.restore();
+      }
+      ctx.restore();
+
+      // 1b. Highlight Selected Custom Panel & Overlapping Panels (in Custom Mode)
+      if (!exportOptions && appState.template === 'custom') {
+        currentPanels.forEach(p => {
+          const isSelected = p.id === selectedCustomPanelId;
+          const isOverlapping = overlappingPanelIds.has(p.id);
+          if (!isSelected && !isOverlapping) return;
+
+          ctx.save();
+          ctx.beginPath();
+          p.sheetPoly.forEach((pt, idx) => {
+            if (idx === 0) ctx.moveTo(pt.x, -pt.y);
+            else ctx.lineTo(pt.x, -pt.y);
+          });
+          ctx.closePath();
+          if (isOverlapping) {
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+            ctx.fill();
+          }
+          if (isSelected) {
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.18)';
+            ctx.fill();
+            ctx.strokeStyle = '#60a5fa';
+            ctx.lineWidth = 3.2 / zoom;
+            ctx.stroke();
+          }
+          ctx.restore();
+        });
+      }
+
+      // 2. Draw Selected Artwork Bounding Box Handle
+      if (!exportOptions && selectedArtworkId) {
+        const selArt = appState.artworks.find(a => a.id === selectedArtworkId);
+        if (selArt) {
+          const aw = selArt.width;
+          const ah = selArt.width / (selArt.aspect || 1);
+          ctx.save();
+          ctx.translate(selArt.x, -selArt.y);
+          ctx.rotate(((selArt.rotation || 0) * Math.PI) / 180);
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2 / zoom;
+          ctx.setLineDash([4 / zoom, 3 / zoom]);
+          ctx.strokeRect(-aw / 2, -ah / 2, aw, ah);
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#3b82f6';
+          const hs = 5 / zoom;
+          [[-aw / 2, -ah / 2], [aw / 2, -ah / 2], [aw / 2, ah / 2], [-aw / 2, ah / 2]].forEach(([hx, hy]) => {
+            ctx.fillRect(hx - hs, hy - hs, hs * 2, hs * 2);
+          });
+          ctx.restore();
+        }
+      }
+
+      // 3. Draw Cut Lines (Only exposed outer segments — never overlapping crease lines!)
+      const cutColor = isDark ? '#38bdf8' : '#0284c7';
+      ctx.strokeStyle = cutColor;
+      ctx.lineWidth = 1.8 / zoom;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      currentPanels.forEach(p => {
+        const pts = p.sheetPoly;
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i];
+          const b = pts[(i + 1) % pts.length];
+          const subSegs = getExposedCutSubsegments(a, b, p);
+          subSegs.forEach(([s, e]) => {
+            ctx.moveTo(s.x, -s.y);
+            ctx.lineTo(e.x, -e.y);
+          });
+        }
+      });
+      ctx.stroke();
+
+      // 4. Draw Crease / Fold Lines (Exact shared hinge spans in red dashed)
+      const creaseColor = '#f43f5e';
+      ctx.strokeStyle = creaseColor;
+      ctx.lineWidth = 2.0 / zoom;
+      ctx.setLineDash([7 / zoom, 5 / zoom]);
+      ctx.beginPath();
+      currentPanels.forEach(p => {
+        if (!p.creaseSegment) return;
+        const cr = p.creaseSegment;
+        ctx.moveTo(cr.x1, -cr.y1);
+        ctx.lineTo(cr.x2, -cr.y2);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 5. Draw Panel Labels
+      if (appState.showLabels) {
+        ctx.font = `600 ${Math.max(9, Math.min(13, 11 / zoom))}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        currentPanels.forEach(p => {
+          if (p.w < 20 || p.h < 16) return;
+          const labelY = -p.cy;
+          const textW = ctx.measureText(p.label).width + 8 / zoom;
+          const textH = 16 / zoom;
+          const isSel = appState.template === 'custom' && p.id === selectedCustomPanelId;
+          ctx.fillStyle = isSel ? 'rgba(37, 99, 235, 0.92)' : 'rgba(15, 23, 42, 0.72)';
+          ctx.fillRect(p.cx - textW / 2, labelY - textH / 2, textW, textH);
+          ctx.fillStyle = '#f8fafc';
+          ctx.fillText(p.label, p.cx, labelY);
+        });
+      }
+
+      // 6. Draw Dimension Lines & Arrows (mm)
+      if (appState.showDimensions) {
+        drawDimensionLine2D(
+          ctx,
+          sheetBounds.minX, -sheetBounds.maxY - 26 / zoom,
+          sheetBounds.maxX, -sheetBounds.maxY - 26 / zoom,
+          `Total Lebar Bentangan: ${sheetBounds.width} mm`,
+          zoom, isDark
+        );
+        drawDimensionLine2D(
+          ctx,
+          sheetBounds.maxX + 28 / zoom, -sheetBounds.maxY,
+          sheetBounds.maxX + 28 / zoom, -sheetBounds.minY,
+          `Total Tinggi: ${sheetBounds.height} mm`,
+          zoom, isDark, true
+        );
+
+        const root = currentPanels[0];
+        if (root) {
+          drawDimensionLine2D(
+            ctx,
+            root.minX, -root.minY + 16 / zoom,
+            root.maxX, -root.minY + 16 / zoom,
+            `W = ${root.w} mm`,
+            zoom, isDark
+          );
+        }
+      }
+
+      ctx.restore();
+    }
+
+    function drawDimensionLine2D(ctx, x1, y1, x2, y2, text, zoom, isDark, vertical = false) {
+      const color = isDark ? '#94a3b8' : '#334155';
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 1.2 / zoom;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      const tick = 5 / zoom;
+      ctx.beginPath();
+      if (!vertical) {
+        ctx.moveTo(x1, y1 - tick); ctx.lineTo(x1, y1 + tick);
+        ctx.moveTo(x2, y2 - tick); ctx.lineTo(x2, y2 + tick);
+      } else {
+        ctx.moveTo(x1 - tick, y1); ctx.lineTo(x1 + tick, y1);
+        ctx.moveTo(x2 - tick, y2); ctx.lineTo(x2 + tick, y2);
+      }
+      ctx.stroke();
+
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2;
+      ctx.translate(mx, my);
+      if (vertical) ctx.rotate(-Math.PI / 2);
+
+      ctx.font = `600 ${11 / zoom}px "JetBrains Mono", monospace`;
+      const tw = ctx.measureText(text).width + 10 / zoom;
+      const th = 16 / zoom;
+      ctx.fillStyle = isDark ? '#12141c' : '#ffffff';
+      ctx.fillRect(-tw / 2, -th / 2, tw, th);
+      ctx.strokeStyle = color;
+      ctx.strokeRect(-tw / 2, -th / 2, tw, th);
+
+      ctx.fillStyle = isDark ? '#e2e8f0' : '#0f172a';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
+    }
+
+    /* ==========================================================================
+       7. 3D WEBGL FOLDING SIMULATOR ENGINE
+       ========================================================================== */
+    const viewport3D = document.getElementById('viewport3D');
+    const scene3D = new THREE.Scene();
+    const camera3D = new THREE.PerspectiveCamera(42, 1, 1, 5000);
+    camera3D.position.set(240, 190, 290);
+
+    const renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
+    renderer3D.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer3D.shadowMap.enabled = true;
+    renderer3D.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer3D.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer3D.toneMappingExposure = 1.1;
+    viewport3D.appendChild(renderer3D.domElement);
+
+    const controls3D = new OrbitControls(camera3D, renderer3D.domElement);
+    controls3D.enableDamping = true;
+    controls3D.dampingFactor = 0.07;
+    controls3D.maxDistance = 1800;
+    controls3D.minDistance = 40;
+
+    // Studio Lighting Group
+    const ambientLight3D = new THREE.AmbientLight(0xffffff, 0.75);
+    scene3D.add(ambientLight3D);
+
+    const keyLight3D = new THREE.DirectionalLight(0xffffff, 1.35);
+    keyLight3D.position.set(180, 320, 240);
+    keyLight3D.castShadow = true;
+    keyLight3D.shadow.mapSize.width = 2048;
+    keyLight3D.shadow.mapSize.height = 2048;
+    keyLight3D.shadow.camera.near = 20;
+    keyLight3D.shadow.camera.far = 1200;
+    const dCam = 300;
+    keyLight3D.shadow.camera.left = -dCam;
+    keyLight3D.shadow.camera.right = dCam;
+    keyLight3D.shadow.camera.top = dCam;
+    keyLight3D.shadow.camera.bottom = -dCam;
+    keyLight3D.shadow.bias = -0.0005;
+    scene3D.add(keyLight3D);
+
+    const fillLight3D = new THREE.DirectionalLight(0x93c5fd, 0.55);
+    fillLight3D.position.set(-220, 140, -180);
+    scene3D.add(fillLight3D);
+
+    const rimLight3D = new THREE.DirectionalLight(0xfef08a, 0.4);
+    rimLight3D.position.set(0, -180, -200);
+    scene3D.add(rimLight3D);
+
+    // Floor Grid & Shadow Catcher
+    const gridHelper3D = new THREE.GridHelper(600, 30, 0x3b82f6, 0x334155);
+    gridHelper3D.position.y = -110;
+    scene3D.add(gridHelper3D);
+
+    const shadowPlaneGeo = new THREE.PlaneGeometry(1000, 1000);
+    const shadowPlaneMat = new THREE.ShadowMaterial({ opacity: 0.22 });
+    const shadowPlaneMesh = new THREE.Mesh(shadowPlaneGeo, shadowPlaneMat);
+    shadowPlaneMesh.rotation.x = -Math.PI / 2;
+    shadowPlaneMesh.position.y = -110.1;
+    shadowPlaneMesh.receiveShadow = true;
+    scene3D.add(shadowPlaneMesh);
+
+    // Root 3D Group for the Packaging Box
+    const boxRootGroup = new THREE.Group();
+    scene3D.add(boxRootGroup);
+
+    // Shared Three.js Materials
+    sharedAtlasTexture = new THREE.CanvasTexture(atlasCanvas);
+    sharedAtlasTexture.colorSpace = THREE.SRGBColorSpace;
+    sharedAtlasTexture.anisotropy = 4;
+
+    sharedBumpTexture = generateProceduralGrainBumpMap();
+
+    let exteriorMaterial3D = new THREE.MeshStandardMaterial({
+      map: sharedAtlasTexture,
+      bumpMap: sharedBumpTexture,
+      bumpScale: 0.15,
+      roughness: appState.roughness,
+      metalness: appState.metalness,
+      side: THREE.FrontSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
+
+    let interiorMaterial3D = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(appState.interiorColor),
+      bumpMap: sharedBumpTexture,
+      bumpScale: 0.2,
+      roughness: Math.min(1.0, appState.roughness + 0.15),
+      metalness: 0.02,
+      side: THREE.BackSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
+
+    let edgeMaterial3D = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(appState.interiorColor),
+      roughness: 0.85,
+      metalness: 0.0
+    });
+
+    let isWireframe3D = false;
+    const pivotNodesMap = new Map();
+
+    function disposeHierarchy(node) {
+      node.traverse(child => {
+        if (child.isMesh && child.geometry) {
+          child.geometry.dispose();
+        }
+      });
+      while (node.children.length > 0) {
+        node.remove(node.children[0]);
+      }
+    }
+
+    function createPanelExtrudedMesh(panel, thickness) {
+      const shape = new THREE.Shape();
+      panel.localPoly.forEach((pt, idx) => {
+        if (idx === 0) shape.moveTo(pt.x, pt.y);
+        else shape.lineTo(pt.x, pt.y);
+      });
+      shape.closePath();
+
+      // True board thickness without artificial vertex separation
+      const halfT = thickness / 2;
+
+      // Front face (Exterior with Unified UV Atlas)
+      const frontGeo = new THREE.ShapeGeometry(shape);
+      const posAttr = frontGeo.attributes.position;
+      const uvAttr = frontGeo.attributes.uv;
+
+      for (let i = 0; i < posAttr.count; i++) {
+        const lx = posAttr.getX(i);
+        const ly = posAttr.getY(i);
+        const sx = panel.hx + lx;
+        const sy = panel.hy + ly;
+        const uv = sheetMmToUV(sx, sy);
+        uvAttr.setXY(i, uv.u, uv.v);
+        posAttr.setZ(i, halfT + 0.02);
+      }
+      frontGeo.computeVertexNormals();
+
+      // Back face (Interior cardboard face)
+      const backGeo = new THREE.ShapeGeometry(shape);
+      const backPos = backGeo.attributes.position;
+      for (let i = 0; i < backPos.count; i++) {
+        backPos.setZ(i, -halfT - 0.02);
+      }
+      backGeo.computeVertexNormals();
+
+      const panelVisualGroup = new THREE.Group();
+
+      const frontMesh = new THREE.Mesh(frontGeo, exteriorMaterial3D);
+      frontMesh.castShadow = true;
+      frontMesh.receiveShadow = true;
+
+      const backMesh = new THREE.Mesh(backGeo, interiorMaterial3D);
+      backMesh.castShadow = true;
+      backMesh.receiveShadow = true;
+
+      panelVisualGroup.add(frontMesh);
+      panelVisualGroup.add(backMesh);
+
+      // Solid cardboard edge rim matching exact thickness
+      if (thickness >= 0.3) {
+        const extrudeGeo = new THREE.ExtrudeGeometry(shape, {
+          depth: thickness,
+          bevelEnabled: false
+        });
+        extrudeGeo.translate(0, 0, -halfT);
+        const rimMesh = new THREE.Mesh(extrudeGeo, edgeMaterial3D);
+        panelVisualGroup.add(rimMesh);
+      }
+
+      return panelVisualGroup;
+    }
+
+    function rebuild3DFoldingRig() {
+      disposeHierarchy(boxRootGroup);
+      pivotNodesMap.clear();
+      boxRootGroup.position.set(0, 0, 0);
+
+      const thickness = Number(appState.thickness) || 1.2;
+
+      currentPanels.forEach(p => {
+        const pivot = new THREE.Group();
+        pivot.name = `pivot_${p.id}`;
+        const visualGroup = createPanelExtrudedMesh(p, thickness);
+        pivot.add(visualGroup);
+        pivotNodesMap.set(p.id, { pivot, visualGroup, panel: p });
+      });
+
+      currentPanels.forEach(p => {
+        const entry = pivotNodesMap.get(p.id);
+        if (!p.parent) {
+          boxRootGroup.add(entry.pivot);
+          if (p.isFloorRoot) {
+            // Rotate +90° around X so exterior (+Z) faces downward on the floor and walls fold upward (+Y)
+            entry.pivot.rotation.x = Math.PI / 2;
+          }
+        } else {
+          const parentEntry = pivotNodesMap.get(p.parent);
+          if (parentEntry) {
+            const dx = p.hx - parentEntry.panel.hx;
+            const dy = p.hy - parentEntry.panel.hy;
+            entry.pivot.position.set(dx, dy, 0);
+            parentEntry.pivot.add(entry.pivot);
+          }
+        }
+      });
+
+      applyFoldingAngles(appState.foldProgress);
+    }
+
+    function applyFoldingAngles(progressPercent) {
+      const tGlobal = Math.max(0, Math.min(100, progressPercent)) / 100;
+      const thickness = Number(appState.thickness) || 1.2;
+
+      const pctLabel = document.getElementById('foldPercentLabel');
+      const phaseLabel = document.getElementById('foldPhaseLabel');
+      const slider = document.getElementById('foldProgressSlider');
+      if (pctLabel) pctLabel.textContent = `${Math.round(progressPercent)}%`;
+      if (slider && Number(slider.value) !== progressPercent) {
+        slider.value = progressPercent;
+      }
+
+      if (phaseLabel) {
+        if (progressPercent <= 2) phaseLabel.textContent = 'Bentangan Rata (0°)';
+        else if (progressPercent < 45) phaseLabel.textContent = 'Fase 1 — Dinding Utama Berdiri';
+        else if (progressPercent < 75) phaseLabel.textContent = 'Fase 2 — Flap Dalam & Perekat';
+        else if (progressPercent < 99) phaseLabel.textContent = 'Fase 3 — Penutupan Tutup & Lidah';
+        else phaseLabel.textContent = 'Tertutup & Terkunci Penuh (100%)';
+      }
+
+      const smoothStep = (edge0, edge1, x) => {
+        const k = Math.max(0, Math.min(1, (x - edge0) / Math.max(0.0001, edge1 - edge0)));
+        return k * k * (3 - 2 * k);
+      };
+
+      pivotNodesMap.forEach(({ pivot, visualGroup, panel }) => {
+        if (!panel.parent) return;
+        const [pStart, pEnd] = panel.phase || [0, 1];
+        const localRatio = smoothStep(pStart, pEnd, tGlobal);
+        const angleRad = THREE.MathUtils.degToRad((panel.maxAngle ?? 90) * localRatio);
+
+        // True Hinge Clearance: subtly recess inner flaps (zLayer > 0) inward along -Z as they fold
+        const clearanceZ = -(panel.zLayer || 0) * Math.max(0.35, thickness * 0.42) * localRatio;
+        visualGroup.position.z = clearanceZ;
+
+        // Right-Hand Rule consistent inward (-Z) folding for all 4 hinge edges:
+        // Top (+Y) folds to -Z via -X rotation; Bottom (-Y) folds to -Z via +X rotation;
+        // Left (-X) folds to -Z via -Y rotation; Right (+X) folds to -Z via +Y rotation.
+        if (panel.edge === 'top') {
+          pivot.rotation.set(-angleRad, 0, 0);
+        } else if (panel.edge === 'bottom') {
+          pivot.rotation.set(angleRad, 0, 0);
+        } else if (panel.edge === 'left') {
+          pivot.rotation.set(0, -angleRad, 0);
+        } else if (panel.edge === 'right') {
+          pivot.rotation.set(0, angleRad, 0);
+        }
+      });
+
+      // Dynamically align floor grid and shadow catcher right below the 3D box's lowest point
+      boxRootGroup.updateMatrixWorld(true);
+      const box3 = new THREE.Box3().setFromObject(boxRootGroup);
+      if (!box3.isEmpty()) {
+        const groundY = box3.min.y - 4;
+        gridHelper3D.position.y = groundY;
+        shadowPlaneMesh.position.y = groundY - 0.15;
+      }
+    }
+
+    function syncMaterialProperties() {
+      exteriorMaterial3D.roughness = Number(appState.roughness);
+      exteriorMaterial3D.metalness = Number(appState.metalness);
+      exteriorMaterial3D.wireframe = isWireframe3D;
+
+      interiorMaterial3D.color.set(appState.interiorColor);
+      interiorMaterial3D.roughness = Math.min(1, Number(appState.roughness) + 0.15);
+      interiorMaterial3D.wireframe = isWireframe3D;
+
+      edgeMaterial3D.color.set(appState.interiorColor);
+      edgeMaterial3D.wireframe = isWireframe3D;
+
+      const bumpScale = (Number(appState.grain) / 100) * (appState.materialPreset === 'corrugated' ? 0.85 : 0.3);
+      exteriorMaterial3D.bumpScale = bumpScale;
+      interiorMaterial3D.bumpScale = bumpScale;
+      exteriorMaterial3D.needsUpdate = true;
+      interiorMaterial3D.needsUpdate = true;
+    }
+
+    /* ==========================================================================
+       8. STANDALONE 3D FILE VIEWER MODULE
+       ========================================================================== */
+    const standaloneViewport = document.getElementById('standaloneViewport3D');
+    const viewerScene = new THREE.Scene();
+    const viewerCamera = new THREE.PerspectiveCamera(42, 1, 0.5, 8000);
+    viewerCamera.position.set(220, 160, 260);
+
+    const viewerRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    viewerRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    viewerRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    standaloneViewport.appendChild(viewerRenderer.domElement);
+
+    const viewerControls = new OrbitControls(viewerCamera, viewerRenderer.domElement);
+    viewerControls.enableDamping = true;
+    viewerControls.autoRotate = true;
+    viewerControls.autoRotateSpeed = 1.6;
+
+    const viewerAmbient = new THREE.AmbientLight(0xffffff, 0.85);
+    viewerScene.add(viewerAmbient);
+    const viewerDirLight1 = new THREE.DirectionalLight(0xffffff, 1.4);
+    viewerDirLight1.position.set(200, 350, 250);
+    viewerScene.add(viewerDirLight1);
+    const viewerDirLight2 = new THREE.DirectionalLight(0x60a5fa, 0.65);
+    viewerDirLight2.position.set(-220, -150, -200);
+    viewerScene.add(viewerDirLight2);
+
+    const viewerGrid = new THREE.GridHelper(500, 25, 0x3b82f6, 0x334155);
+    viewerScene.add(viewerGrid);
+
+    const viewerModelHolder = new THREE.Group();
+    viewerScene.add(viewerModelHolder);
+
+    function setViewerModel(object3D, fileName = 'Model_3D.glb') {
+      disposeHierarchy(viewerModelHolder);
+
+      const box = new THREE.Box3().setFromObject(object3D);
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(center);
+
+      object3D.position.sub(center);
+      object3D.position.y += size.y / 2;
+      viewerModelHolder.add(object3D);
+
+      let verts = 0, tris = 0;
+      const wf = document.getElementById('chkViewerWireframe').checked;
+      object3D.traverse(child => {
+        if (child.isMesh && child.geometry) {
+          const pos = child.geometry.attributes.position;
+          if (pos) {
+            verts += pos.count;
+            tris += child.geometry.index ? child.geometry.index.count / 3 : pos.count / 3;
+          }
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach(m => m.wireframe = wf);
+            else child.material.wireframe = wf;
+          }
+        }
+      });
+
+      document.getElementById('statFileName').textContent = fileName;
+      document.getElementById('statVertices').textContent = verts.toLocaleString('id-ID');
+      document.getElementById('statTriangles').textContent = Math.round(tris).toLocaleString('id-ID');
+      document.getElementById('statBounds').textContent =
+        `${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)}`;
+
+      fitViewerCameraToObject(size);
+    }
+
+    function fitViewerCameraToObject(sizeVec) {
+      const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z, 40);
+      const dist = maxDim * 1.85;
+      viewerCamera.position.set(dist, dist * 0.75, dist);
+      viewerControls.target.set(0, sizeVec.y * 0.45, 0);
+      viewerControls.update();
+    }
+
+    function loadActivePackagingToViewer() {
+      const clonedBox = boxRootGroup.clone(true);
+      setViewerModel(clonedBox, `Origami_${appState.template}.glb`);
+      showToast('Model kemasan aktif dimuat ke Viewer 3D', 'info');
+    }
+
+    function loadSampleBottleToViewer() {
+      const bottleGroup = new THREE.Group();
+      const bodyGeo = new THREE.CylinderGeometry(32, 32, 110, 48);
+      const bodyMat = new THREE.MeshPhysicalMaterial({
+        color: 0x0f766e,
+        roughness: 0.15,
+        metalness: 0.1,
+        clearcoat: 0.9
+      });
+      const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+      bodyMesh.position.y = 55;
+      bottleGroup.add(bodyMesh);
+
+      const shoulderGeo = new THREE.SphereGeometry(32, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+      const shoulderMesh = new THREE.Mesh(shoulderGeo, bodyMat);
+      shoulderMesh.position.y = 110;
+      shoulderMesh.scale.set(1, 0.55, 1);
+      bottleGroup.add(shoulderMesh);
+
+      const neckGeo = new THREE.CylinderGeometry(13, 15, 22, 36);
+      const capMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.25, metalness: 0.85 });
+      const neckMesh = new THREE.Mesh(neckGeo, capMat);
+      neckMesh.position.y = 132;
+      bottleGroup.add(neckMesh);
+
+      const pumpGeo = new THREE.CylinderGeometry(15, 15, 18, 36);
+      const pumpMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 });
+      const pumpMesh = new THREE.Mesh(pumpGeo, pumpMat);
+      pumpMesh.position.y = 148;
+      bottleGroup.add(pumpMesh);
+
+      setViewerModel(bottleGroup, 'Botol_Serum_Sampel.glb');
+      showToast('Sampel botol produk 3D berhasil dimuat', 'success');
+    }
+
+    function handleExternal3DFile(file) {
+      if (!file) return;
+      const ext = file.name.split('.').pop().toLowerCase();
+      const url = URL.createObjectURL(file);
+
+      if (ext === 'glb' || ext === 'gltf') {
+        const loader = new GLTFLoader();
+        loader.load(url, (gltf) => {
+          setViewerModel(gltf.scene, file.name);
+          URL.revokeObjectURL(url);
+          showToast(`File ${file.name} berhasil dibuka`, 'success');
+        }, undefined, () => {
+          URL.revokeObjectURL(url);
+          showToast('Gagal memuat file GLB/GLTF', 'warn');
+        });
+      } else if (ext === 'obj') {
+        const loader = new OBJLoader();
+        loader.load(url, (obj) => {
+          obj.traverse(c => {
+            if (c.isMesh) {
+              c.material = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4, metalness: 0.1 });
+            }
+          });
+          setViewerModel(obj, file.name);
+          URL.revokeObjectURL(url);
+          showToast(`File ${file.name} berhasil dibuka`, 'success');
+        }, undefined, () => {
+          URL.revokeObjectURL(url);
+          showToast('Gagal memuat file OBJ', 'warn');
+        });
+      } else if (ext === 'stl') {
+        const loader = new STLLoader();
+        loader.load(url, (geometry) => {
+          geometry.computeVertexNormals();
+          const mat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35, metalness: 0.15 });
+          const mesh = new THREE.Mesh(geometry, mat);
+          setViewerModel(mesh, file.name);
+          URL.revokeObjectURL(url);
+          showToast(`File ${file.name} berhasil dibuka`, 'success');
+        }, undefined, () => {
+          URL.revokeObjectURL(url);
+          showToast('Gagal memuat file STL', 'warn');
+        });
+      } else {
+        URL.revokeObjectURL(url);
+        showToast('Format tidak didukung. Gunakan .GLB, .GLTF, .OBJ, atau .STL', 'warn');
+      }
+    }
+
+    /* ==========================================================================
+       9. STATE SYNCHRONIZATION, CUSTOM STRUCTURE UI & RAF SCHEDULER
+       ========================================================================== */
+    let rafRebuildPending = false;
+    let rafAtlasOnlyPending = false;
+
+    function scheduleRebuildViews(atlasOnly = false) {
+      if (atlasOnly && !rafRebuildPending) {
+        if (rafAtlasOnlyPending) return;
+        rafAtlasOnlyPending = true;
+        requestAnimationFrame(() => {
+          rafAtlasOnlyPending = false;
+          updateUnifiedTextureAtlas();
+          render2DDieline();
+        });
+        return;
+      }
+      if (rafRebuildPending) return;
+      rafRebuildPending = true;
+      requestAnimationFrame(() => {
+        rafRebuildPending = false;
+        rafAtlasOnlyPending = false;
+        rebuildAllViews();
+      });
+    }
+
+    function pushHistorySnapshot() {
+      if (isRestoringHistory) return;
+      const snap = JSON.stringify(appState);
+      if (historyIndex >= 0 && historyStack[historyIndex] === snap) return;
+
+      historyStack.splice(historyIndex + 1);
+      historyStack.push(snap);
+      if (historyStack.length > 35) {
+        historyStack.shift();
+      } else {
+        historyIndex++;
+      }
+      updateUndoRedoButtons();
+      saveStateToIndexedDB(appState);
+    }
+
+    function updateUndoRedoButtons() {
+      document.getElementById('undoBtn').disabled = historyIndex <= 0;
+      document.getElementById('redoBtn').disabled = historyIndex >= historyStack.length - 1;
+    }
+
+    async function restoreStateSnapshot(stateObj, recordHistory = false) {
+      isRestoringHistory = !recordHistory;
+      appState = structuredClone(stateObj);
+
+      await Promise.all(
+        (appState.artworks || []).map(art => ensureArtworkImageLoaded(art))
+      );
+
+      syncUIControlsFromState();
+      rebuildAllViews();
+      isRestoringHistory = false;
+      if (recordHistory) pushHistorySnapshot();
+    }
+
+    function ensureArtworkImageLoaded(art) {
+      return new Promise((resolve) => {
+        if (imageElementCache.has(art.id)) {
+          resolve(imageElementCache.get(art.id));
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          imageElementCache.set(art.id, img);
+          resolve(img);
+        };
+        img.onerror = () => resolve(null);
+        img.src = art.dataUrl;
+      });
+    }
+
+    function rebuildAllViews() {
+      buildKinematicPanelTree(appState);
+      updateUnifiedTextureAtlas();
+      syncMaterialProperties();
+      rebuild3DFoldingRig();
+      render2DDieline();
+      updateStatusBadges();
+      renderArtworkLayerList();
+      renderCustomStructureBuilderUI();
+    }
+
+    function updateStatusBadges() {
+      const volLiters = ((appState.length * appState.width * appState.height) / 1_000_000).toFixed(2);
+      document.getElementById('volumeBadge').textContent = `${volLiters} L`;
+      document.getElementById('sheetSizeBadge').textContent = `${sheetBounds.width} × ${sheetBounds.height} mm`;
+    }
+
+    function syncUIControlsFromState() {
+      document.getElementById('templateSelect').value = appState.template;
+      const isCustom = appState.template === 'custom';
+      document.getElementById('standardDimensionSection').classList.toggle('hidden', isCustom);
+      document.getElementById('customStructureSection').classList.toggle('hidden', !isCustom);
+      document.getElementById('convertToCustomBtn').classList.toggle('hidden', isCustom);
+
+      const syncPair = (numId, rangeId, val) => {
+        const n = document.getElementById(numId);
+        const r = document.getElementById(rangeId);
+        if (n) n.value = val;
+        if (r) r.value = val;
+      };
+
+      syncPair('numLength', 'rangeLength', appState.length);
+      syncPair('numWidth', 'rangeWidth', appState.width);
+      syncPair('numHeight', 'rangeHeight', appState.height);
+      syncPair('numGlueFlap', 'rangeGlueFlap', appState.glueFlap);
+      syncPair('numTuckFlap', 'rangeTuckFlap', appState.tuckFlap);
+      syncPair('numThickness', 'rangeThickness', appState.thickness);
+
+      document.getElementById('chkShowDimensions').checked = !!appState.showDimensions;
+      document.getElementById('chkShowLabels').checked = !!appState.showLabels;
+      document.getElementById('chkDielineOn3D').checked = !!appState.dielineOn3D;
+
+      document.getElementById('colorExterior').value = appState.exteriorColor;
+      document.getElementById('hexExterior').value = appState.exteriorColor.toUpperCase();
+      document.getElementById('colorInterior').value = appState.interiorColor;
+      document.getElementById('hexInterior').value = appState.interiorColor.toUpperCase();
+
+      document.getElementById('rangeRoughness').value = appState.roughness;
+      document.getElementById('valRoughness').textContent = Number(appState.roughness).toFixed(2);
+      document.getElementById('rangeMetalness').value = appState.metalness;
+      document.getElementById('valMetalness').textContent = Number(appState.metalness).toFixed(2);
+      document.getElementById('rangeGrain').value = appState.grain;
+      document.getElementById('valGrain').textContent = `${appState.grain}%`;
+
+      document.querySelectorAll('.mat-preset-btn').forEach(btn => {
+        btn.classList.toggle('cad-btn-active', btn.dataset.mat === appState.materialPreset);
+      });
+
+      document.getElementById('foldProgressSlider').value = appState.foldProgress;
+    }
+
+    function renderCustomStructureBuilderUI() {
+      const isCustom = appState.template === 'custom';
+      document.getElementById('standardDimensionSection').classList.toggle('hidden', isCustom);
+      document.getElementById('customStructureSection').classList.toggle('hidden', !isCustom);
+      document.getElementById('convertToCustomBtn').classList.toggle('hidden', isCustom);
+
+      if (!isCustom || !Array.isArray(appState.customPanels)) return;
+
+      const panels = appState.customPanels;
+      document.getElementById('customPanelCountBadge').textContent = `${panels.length} panel`;
+
+      // Overlap Warning
+      const warnBox = document.getElementById('overlapWarningBox');
+      if (overlappingPanelIds.size > 0) {
+        warnBox.classList.remove('hidden');
+        document.getElementById('overlapWarningText').textContent =
+          `${overlappingPanelIds.size} panel beririsan pada bentangan 2D.`;
+      } else {
+        warnBox.classList.add('hidden');
+      }
+
+      if (!panels.some(p => p.id === selectedCustomPanelId)) {
+        selectedCustomPanelId = panels[0]?.id || null;
+      }
+
+      const listEl = document.getElementById('customPanelList');
+      listEl.innerHTML = '';
+
+      const edgeBadgeMap = { top: '↑Atas', bottom: '↓Bawah', left: '←Kiri', right: '→Kanan' };
+
+      currentPanels.forEach(p => {
+        const row = document.createElement('div');
+        const isSel = p.id === selectedCustomPanelId;
+        const isOverlap = overlappingPanelIds.has(p.id);
+        const indentPx = Math.min(48, (p.depth || 0) * 10);
+
+        row.className = `px-2 py-1 rounded border cursor-pointer flex items-center justify-between transition text-[11px] ${
+          isSel
+            ? 'border-blue-500 bg-blue-500/20 font-semibold'
+            : isOverlap
+              ? 'border-amber-500/60 bg-amber-500/10'
+              : 'border-transparent hover:border-slate-600'
+        }`;
+        row.style.paddingLeft = `${6 + indentPx}px`;
+
+        const edgeTag = p.parent ? `<span class="text-[9px] font-mono px-1 rounded bg-slate-500/20 text-[var(--text-muted)]">${edgeBadgeMap[p.edge] || p.edge}</span>` : `<span class="text-[9px] font-mono px-1 rounded bg-blue-500/20 text-blue-400">Induk</span>`;
+
+        row.innerHTML = `
+          <div class="flex items-center gap-1.5 truncate">
+            ${edgeTag}
+            <span class="truncate">${p.label}</span>
+          </div>
+          <span class="font-mono text-[10px] text-[var(--text-muted)] shrink-0">${Math.round(p.w)}×${Math.round(p.h)}</span>
+        `;
+
+        row.addEventListener('click', () => {
+          selectedCustomPanelId = p.id;
+          renderCustomStructureBuilderUI();
+          render2DDieline();
+        });
+        listEl.appendChild(row);
+      });
+
+      // Populate Active Panel Inspector
+      const selRaw = panels.find(p => p.id === selectedCustomPanelId);
+      const selComputed = currentPanels.find(p => p.id === selectedCustomPanelId);
+      if (!selRaw) return;
+
+      document.getElementById('custPanelLabel').value = selRaw.label || '';
+      document.getElementById('custPanelShape').value = selRaw.shape || 'rect';
+      document.getElementById('custPanelW').value = Math.round(selRaw.w);
+      document.getElementById('custPanelH').value = Math.round(selRaw.h);
+
+      const isRoot = !selRaw.parent;
+      document.getElementById('deleteCustomPanelBtn').disabled = isRoot;
+      document.getElementById('custFoldConfigWrap').classList.toggle('hidden', isRoot);
+      document.getElementById('custRootFloorWrap').classList.toggle('hidden', !isRoot);
+
+      if (isRoot) {
+        document.getElementById('chkCustFloorRoot').checked = !!selRaw.isFloorRoot;
+      } else {
+        const ang = Number(selRaw.maxAngle ?? 90);
+        document.getElementById('custPanelAngle').value = ang;
+        document.getElementById('valCustAngle').textContent = `${ang}°`;
+        const pStart = Math.round((selRaw.phase?.[0] ?? 0) * 100);
+        const pEnd = Math.round((selRaw.phase?.[1] ?? 1) * 100);
+        document.getElementById('custPhaseStart').value = pStart;
+        document.getElementById('custPhaseEnd').value = pEnd;
+        document.getElementById('custPanelZLayer').value = String(selRaw.zLayer ?? 0);
+      }
+
+      // Disable Add Edge buttons if that edge is already occupied by a parent hinge or an existing child
+      const occupiedEdges = new Set();
+      if (selRaw.parent) {
+        if (selRaw.edge === 'top') occupiedEdges.add('bottom');
+        if (selRaw.edge === 'bottom') occupiedEdges.add('top');
+        if (selRaw.edge === 'left') occupiedEdges.add('right');
+        if (selRaw.edge === 'right') occupiedEdges.add('left');
+      }
+      panels.forEach(ch => {
+        if (ch.parent === selRaw.id && ch.edge) {
+          occupiedEdges.add(ch.edge);
+        }
+      });
+
+      document.querySelectorAll('.add-edge-btn').forEach(btn => {
+        const edge = btn.dataset.addEdge;
+        btn.disabled = occupiedEdges.has(edge);
+      });
+    }
+
+    function renderArtworkLayerList() {
+      const listEl = document.getElementById('artworkLayerList');
+      const countBadge = document.getElementById('layerCountBadge');
+      const inspector = document.getElementById('selectedLayerPanel');
+
+      countBadge.textContent = `${appState.artworks.length} item`;
+      listEl.innerHTML = '';
+
+      if (appState.artworks.length === 0) {
+        selectedArtworkId = null;
+        inspector.classList.add('hidden');
+        const empty = document.createElement('div');
+        empty.className = 'text-[11px] text-[var(--text-muted)] italic py-2 text-center';
+        empty.textContent = 'Belum ada elemen grafis pada pola.';
+        listEl.appendChild(empty);
+        return;
+      }
+
+      if (!appState.artworks.some(a => a.id === selectedArtworkId)) {
+        selectedArtworkId = appState.artworks[appState.artworks.length - 1].id;
+      }
+
+      appState.artworks.forEach((art, idx) => {
+        const row = document.createElement('div');
+        const isSel = art.id === selectedArtworkId;
+        row.className = `px-2.5 py-1.5 rounded border cursor-pointer flex items-center justify-between transition ${
+          isSel ? 'border-blue-500 bg-blue-500/15 font-medium' : 'border-[var(--border-color)] hover:border-slate-500'
+        }`;
+        row.innerHTML = `
+          <span class="truncate">${idx + 1}. ${art.name}</span>
+          <span class="font-mono text-[10px] text-[var(--text-muted)]">${Math.round(art.width)} mm</span>
+        `;
+        row.addEventListener('click', () => {
+          selectedArtworkId = art.id;
+          renderArtworkLayerList();
+          render2DDieline();
+        });
+        listEl.appendChild(row);
+      });
+
+      syncSelectedArtworkInspectorInputs();
+    }
+
+    function syncSelectedArtworkInspectorInputs() {
+      const inspector = document.getElementById('selectedLayerPanel');
+      const activeArt = appState.artworks.find(a => a.id === selectedArtworkId);
+      if (activeArt) {
+        inspector.classList.remove('hidden');
+        document.getElementById('layerPosX').value = Math.round(activeArt.x);
+        document.getElementById('layerPosY').value = Math.round(activeArt.y);
+        document.getElementById('rangeLayerWidth').value = Math.round(activeArt.width);
+        document.getElementById('valLayerScale').textContent = `${Math.round(activeArt.width)} mm`;
+        document.getElementById('rangeLayerRot').value = Math.round(activeArt.rotation || 0);
+        document.getElementById('valLayerRot').textContent = `${Math.round(activeArt.rotation || 0)}°`;
+        document.getElementById('rangeLayerOpacity').value = Math.round(activeArt.opacity ?? 100);
+        document.getElementById('valLayerOpacity').textContent = `${Math.round(activeArt.opacity ?? 100)}%`;
+      } else {
+        inspector.classList.add('hidden');
+      }
+    }
+
+    /* ==========================================================================
+       10. EXPORT FUNCTIONS (VECTOR PDF, PNG 2D, PNG 3D, GLB, OBJ, JSON)
+       ========================================================================== */
+    function triggerDownloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function exportVectorDielinePDF() {
+      const { jsPDF } = window.jspdf;
+      const margin = 25;
+      const pdfW = Math.max(210, sheetBounds.width + margin * 2);
+      const pdfH = Math.max(297, sheetBounds.height + margin * 2 + 20);
+      const orientation = pdfW > pdfH ? 'l' : 'p';
+
+      const doc = new jsPDF({
+        orientation,
+        unit: 'mm',
+        format: [pdfW, pdfH]
+      });
+
+      const offsetX = margin - sheetBounds.minX;
+      const offsetY = margin + sheetBounds.maxY;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`ORIGAMI — POLA LIPATAN KEMASAN (${appState.template.toUpperCase()})`, margin, 12);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.text(
+        `Dimensi: P=${appState.length}mm × L=${appState.width}mm × T=${appState.height}mm  |  Bentangan: ${sheetBounds.width}×${sheetBounds.height} mm  |  Skala 1:1 (mm)`,
+        margin, 17.5
+      );
+
+      // Legend
+      doc.setDrawColor(2, 132, 199);
+      doc.setLineWidth(0.4);
+      doc.line(pdfW - 85, 11, pdfW - 75, 11);
+      doc.text('Garis Potong (Cut)', pdfW - 73, 12);
+
+      doc.setDrawColor(220, 38, 38);
+      doc.setLineDashPattern([2, 1.5], 0);
+      doc.line(pdfW - 45, 11, pdfW - 35, 11);
+      doc.text('Garis Lipat (Crease)', pdfW - 33, 12);
+      doc.setLineDashPattern([], 0);
+
+      // Cut Lines (Only exposed outer segments — never overlapping creases)
+      doc.setDrawColor(2, 132, 199);
+      doc.setLineWidth(0.35);
+      currentPanels.forEach(p => {
+        const pts = p.sheetPoly;
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i];
+          const b = pts[(i + 1) % pts.length];
+          const subSegs = getExposedCutSubsegments(a, b, p);
+          subSegs.forEach(([s, e]) => {
+            doc.line(offsetX + s.x, offsetY - s.y, offsetX + e.x, offsetY - e.y);
+          });
+        }
+      });
+
+      // Crease Lines (Dashed Red)
+      doc.setDrawColor(220, 38, 38);
+      doc.setLineWidth(0.35);
+      doc.setLineDashPattern([2.5, 1.8], 0);
+      currentPanels.forEach(p => {
+        if (!p.creaseSegment) return;
+        const cr = p.creaseSegment;
+        doc.line(offsetX + cr.x1, offsetY - cr.y1, offsetX + cr.x2, offsetY - cr.y2);
+      });
+      doc.setLineDashPattern([], 0);
+
+      if (appState.showLabels) {
+        doc.setFontSize(7.5);
+        doc.setTextColor(71, 85, 105);
+        currentPanels.forEach(p => {
+          if (p.w >= 20 && p.h >= 15) {
+            doc.text(p.label, offsetX + p.cx, offsetY - p.cy, { align: 'center' });
+          }
+        });
+      }
+
+      doc.save(`Origami_Dieline_${appState.template}_${sheetBounds.width}x${sheetBounds.height}mm.pdf`);
+      showToast('PDF Vektor Pola Lipatan 1:1 berhasil diekspor', 'success');
+    }
+
+    function export2DPNG() {
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = 2400;
+      offCanvas.height = 1800;
+      const margin = 180;
+      const scaleX = (offCanvas.width - margin) / Math.max(100, sheetBounds.width);
+      const scaleY = (offCanvas.height - margin) / Math.max(100, sheetBounds.height);
+      const zoom = Math.min(scaleX, scaleY);
+      const cx = (sheetBounds.minX + sheetBounds.maxX) / 2;
+      const cy = (sheetBounds.minY + sheetBounds.maxY) / 2;
+
+      render2DDieline({
+        canvas: offCanvas,
+        dpr: 1,
+        zoom,
+        panX: -cx * zoom,
+        panY: cy * zoom,
+        hideGrid: false
+      });
+
+      offCanvas.toBlob(blob => {
+        if (blob) {
+          triggerDownloadBlob(blob, `Origami_Pola2D_${appState.template}.png`);
+          showToast('Gambar Pola Lipatan 2D (.png) berhasil diekspor', 'success');
+        }
+      }, 'image/png');
+    }
+
+    function export3DPNG() {
+      renderer3D.render(scene3D, camera3D);
+      renderer3D.domElement.toBlob(blob => {
+        if (blob) {
+          triggerDownloadBlob(blob, `Origami_Render3D_${appState.template}.png`);
+          showToast('Tangkapan layar 3D (.png) berhasil diekspor', 'success');
+        }
+      }, 'image/png');
+    }
+
+    function export3DGLB() {
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        boxRootGroup,
+        (result) => {
+          const blob = new Blob([result], { type: 'model/gltf-binary' });
+          triggerDownloadBlob(blob, `Origami_Model_${appState.template}.glb`);
+          showToast('Objek 3D (.glb) berhasil diekspor', 'success');
+        },
+        () => showToast('Gagal mengekspor GLB', 'warn'),
+        { binary: true }
+      );
+    }
+
+    function export3DOBJ() {
+      const exporter = new OBJExporter();
+      const objText = exporter.parse(boxRootGroup);
+      const blob = new Blob([objText], { type: 'text/plain;charset=utf-8' });
+      triggerDownloadBlob(blob, `Origami_Model_${appState.template}.obj`);
+      showToast('Objek 3D (.obj) berhasil diekspor', 'success');
+    }
+
+    function exportProjectJSON() {
+      const jsonStr = JSON.stringify(appState, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      triggerDownloadBlob(blob, `Origami_Project_${appState.template}.json`);
+      showToast('File proyek (.json) berhasil disimpan', 'success');
+    }
+
+    async function loadPreloadExample(key) {
+      const crest = generateStampDataURL('brand_crest');
+      const eco = generateStampDataURL('eco_badge');
+      const fragile = generateStampDataURL('fragile_care');
+      const stripe = generateStampDataURL('seam_stripe');
+
+      let preset = structuredClone(DEFAULT_STATE);
+
+      if (key === 'cosmetic_tuck') {
+        preset = {
+          ...preset,
+          template: 'tuck_end',
+          length: 110, width: 70, height: 155, glueFlap: 16, tuckFlap: 22, thickness: 0.9,
+          materialPreset: 'art_carton',
+          exteriorColor: '#1e293b', interiorColor: '#e2e8f0',
+          roughness: 0.35, metalness: 0.1, grain: 15, foldProgress: 78,
+          artworks: [
+            {
+              id: 'art_crest_1', name: 'Emblem Merek', x: 0, y: 12, width: 68,
+              aspect: crest.aspect, rotation: 0, opacity: 100, dataUrl: crest.dataUrl
+            },
+            {
+              id: 'art_stripe_1', name: 'Pita Lintas Lipatan', x: 55, y: -38, width: 220,
+              aspect: stripe.aspect, rotation: 0, opacity: 90, dataUrl: stripe.dataUrl
+            }
+          ]
+        };
+      } else if (key === 'shipping_rsc') {
+        preset = {
+          ...preset,
+          template: 'rsc',
+          length: 220, width: 150, height: 160, glueFlap: 28, tuckFlap: 25, thickness: 2.4,
+          materialPreset: 'corrugated',
+          exteriorColor: '#c89d66', interiorColor: '#b58952',
+          roughness: 0.8, metalness: 0.0, grain: 65, foldProgress: 72,
+          artworks: [
+            {
+              id: 'art_fragile_1', name: 'Label Fragile', x: 0, y: 0, width: 85,
+              aspect: fragile.aspect, rotation: 0, opacity: 95, dataUrl: fragile.dataUrl
+            },
+            {
+              id: 'art_eco_1', name: 'Simbol Daur Ulang', x: 370, y: 0, width: 75,
+              aspect: eco.aspect, rotation: 0, opacity: 90, dataUrl: eco.dataUrl
+            }
+          ]
+        };
+      } else if (key === 'ecommerce_mailer') {
+        preset = {
+          ...preset,
+          template: 'mailer',
+          length: 200, width: 140, height: 65, glueFlap: 20, tuckFlap: 26, thickness: 1.8,
+          materialPreset: 'matte_black',
+          exteriorColor: '#0f172a', interiorColor: '#c89d66',
+          roughness: 0.65, metalness: 0.05, grain: 30, foldProgress: 75,
+          artworks: [
+            {
+              id: 'art_crest_m', name: 'Emblem Atas Mailer', x: 0, y: 205, width: 82,
+              aspect: crest.aspect, rotation: 180, opacity: 100, dataUrl: crest.dataUrl
+            }
+          ]
+        };
+      } else if (key === 'bakery_gable') {
+        preset = {
+          ...preset,
+          template: 'gable_top',
+          length: 130, width: 95, height: 140, glueFlap: 18, tuckFlap: 24, thickness: 1.1,
+          materialPreset: 'kraft',
+          exteriorColor: '#065f46', interiorColor: '#d6b384',
+          roughness: 0.5, metalness: 0.05, grain: 35, foldProgress: 92,
+          artworks: [
+            {
+              id: 'art_crest_g', name: 'Emblem Gable Box', x: 0, y: 5, width: 74,
+              aspect: crest.aspect, rotation: 0, opacity: 100, dataUrl: crest.dataUrl
+            }
+          ]
+        };
+      } else if (key === 'custom_tray') {
+        preset = {
+          ...preset,
+          template: 'custom',
+          length: 160, width: 110, height: 55, thickness: 1.5,
+          materialPreset: 'kraft',
+          exteriorColor: '#991b1b', interiorColor: '#d6b384',
+          roughness: 0.55, metalness: 0.05, grain: 30, foldProgress: 88,
+          customPanels: generateCustomPresetDefinitions('tray', { length: 160, width: 110, height: 55 }),
+          artworks: [
+            {
+              id: 'art_crest_tray', name: 'Logo Alas Baki', x: 0, y: 0, width: 65,
+              aspect: crest.aspect, rotation: 0, opacity: 95, dataUrl: crest.dataUrl
+            }
+          ]
+        };
+      }
+
+      await restoreStateSnapshot(preset, true);
+      fit2DToScreen();
+      showToast('Contoh desain kemasan berhasil dimuat', 'info');
+    }
+
+    /* ==========================================================================
+       11. EVENT BINDINGS & INTERACTION HANDLERS
+       ========================================================================== */
+    function bindAllEvents() {
+      // Workspace Mode Switcher
+      const modeBtns = {
+        split: document.getElementById('modeSplitBtn'),
+        only2d: document.getElementById('mode2DBtn'),
+        only3d: document.getElementById('mode3DBtn'),
+        viewer: document.getElementById('modeViewerBtn')
+      };
+
+      const setWorkspaceMode = (mode) => {
+        Object.values(modeBtns).forEach(b => b.classList.remove('cad-btn-active'));
+        const ws = document.getElementById('workspaceContainer');
+        const p2d = document.getElementById('pane2D');
+        const p3d = document.getElementById('pane3D');
+        const side = document.getElementById('editorSidebar');
+        const viewerPane = document.getElementById('standaloneViewerPane');
+
+        if (mode === 'viewer') {
+          modeBtns.viewer.classList.add('cad-btn-active');
+          ws.classList.add('hidden');
+          side.classList.add('hidden');
+          viewerPane.classList.remove('hidden');
+          loadActivePackagingToViewer();
+          handleWindowResize();
+          return;
+        }
+
+        viewerPane.classList.add('hidden');
+        ws.classList.remove('hidden');
+        side.classList.remove('hidden');
+
+        if (mode === 'split') {
+          modeBtns.split.classList.add('cad-btn-active');
+          ws.className = 'flex-1 grid grid-cols-1 lg:grid-cols-2 overflow-hidden relative';
+          p2d.classList.remove('hidden');
+          p3d.classList.remove('hidden');
+        } else if (mode === 'only2d') {
+          modeBtns.only2d.classList.add('cad-btn-active');
+          ws.className = 'flex-1 grid grid-cols-1 overflow-hidden relative';
+          p2d.classList.remove('hidden');
+          p3d.classList.add('hidden');
+        } else if (mode === 'only3d') {
+          modeBtns.only3d.classList.add('cad-btn-active');
+          ws.className = 'flex-1 grid grid-cols-1 overflow-hidden relative';
+          p2d.classList.add('hidden');
+          p3d.classList.remove('hidden');
+        }
+        handleWindowResize();
+      };
+
+      modeBtns.split.addEventListener('click', () => setWorkspaceMode('split'));
+      modeBtns.only2d.addEventListener('click', () => setWorkspaceMode('only2d'));
+      modeBtns.only3d.addEventListener('click', () => setWorkspaceMode('only3d'));
+      modeBtns.viewer.addEventListener('click', () => setWorkspaceMode('viewer'));
+
+      // Sidebar Sub-tabs
+      document.querySelectorAll('.side-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.side-tab-btn').forEach(b => b.classList.remove('cad-btn-active'));
+          btn.classList.add('cad-btn-active');
+          const target = btn.dataset.sideTab;
+          ['dimensi', 'material', 'artwork'].forEach(tab => {
+            document.getElementById(`sideTab-${tab}`).classList.toggle('hidden', tab !== target);
+          });
+        });
+      });
+
+      // Preload Selector
+      document.getElementById('preloadSelect').addEventListener('change', (e) => {
+        loadPreloadExample(e.target.value);
+      });
+
+      // Template Structure Select
+      document.getElementById('templateSelect').addEventListener('change', (e) => {
+        const nextTemplate = e.target.value;
+        if (nextTemplate === 'custom' && (!appState.customPanels || appState.customPanels.length === 0)) {
+          // Initialize custom panels from the previously active template
+          const prevTemplate = appState.template === 'custom' ? 'tuck_end' : appState.template;
+          appState.customPanels = generateStandardTemplateDefinitions(prevTemplate, appState);
+          selectedCustomPanelId = appState.customPanels[0]?.id || null;
+        }
+        appState.template = nextTemplate;
+        rebuildAllViews();
+        fit2DToScreen();
+        pushHistorySnapshot();
+      });
+
+      // Convert Current Standard Template to Custom Builder
+      document.getElementById('convertToCustomBtn').addEventListener('click', () => {
+        if (appState.template !== 'custom') {
+          appState.customPanels = generateStandardTemplateDefinitions(appState.template, appState);
+          appState.template = 'custom';
+          selectedCustomPanelId = appState.customPanels[0]?.id || null;
+          document.getElementById('templateSelect').value = 'custom';
+          rebuildAllViews();
+          pushHistorySnapshot();
+          showToast('Struktur disalin ke Builder Kerangka Kustom', 'success');
+        }
+      });
+
+      // Custom Builder Starter Presets
+      document.querySelectorAll('[data-custom-preset]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const type = btn.dataset.customPreset;
+          appState.customPanels = generateCustomPresetDefinitions(type, appState);
+          selectedCustomPanelId = appState.customPanels[0]?.id || null;
+          rebuildAllViews();
+          fit2DToScreen();
+          pushHistorySnapshot();
+          showToast('Basis kerangka kustom dimuat', 'info');
+        });
+      });
+
+      // Custom Panel Inspector Controls
+      const mutateSelectedCustomPanel = (mutator, commit = false) => {
+        if (appState.template !== 'custom' || !Array.isArray(appState.customPanels)) return;
+        const p = appState.customPanels.find(item => item.id === selectedCustomPanelId);
+        if (!p) return;
+        mutator(p);
+        scheduleRebuildViews(false);
+        if (commit) pushHistorySnapshot();
+      };
+
+      document.getElementById('custPanelLabel').addEventListener('input', (e) => {
+        mutateSelectedCustomPanel(p => { p.label = e.target.value || 'Panel'; }, false);
+      });
+      document.getElementById('custPanelLabel').addEventListener('change', () => pushHistorySnapshot());
+
+      document.getElementById('custPanelShape').addEventListener('change', (e) => {
+        mutateSelectedCustomPanel(p => { p.shape = e.target.value; }, true);
+      });
+
+      document.getElementById('custPanelW').addEventListener('input', (e) => {
+        const val = Math.max(10, Math.min(600, Number(e.target.value) || 60));
+        mutateSelectedCustomPanel(p => { p.w = val; }, false);
+      });
+      document.getElementById('custPanelW').addEventListener('change', () => pushHistorySnapshot());
+
+      document.getElementById('custPanelH').addEventListener('input', (e) => {
+        const val = Math.max(10, Math.min(600, Number(e.target.value) || 60));
+        mutateSelectedCustomPanel(p => { p.h = val; }, false);
+      });
+      document.getElementById('custPanelH').addEventListener('change', () => pushHistorySnapshot());
+
+      document.getElementById('custPanelAngle').addEventListener('input', (e) => {
+        const ang = Number(e.target.value);
+        document.getElementById('valCustAngle').textContent = `${ang}°`;
+        mutateSelectedCustomPanel(p => { p.maxAngle = ang; }, false);
+      });
+      document.getElementById('custPanelAngle').addEventListener('change', () => pushHistorySnapshot());
+
+      document.getElementById('custPhaseStart').addEventListener('change', (e) => {
+        const st = Math.max(0, Math.min(95, Number(e.target.value) || 0)) / 100;
+        mutateSelectedCustomPanel(p => {
+          const end = Math.max(st + 0.05, p.phase?.[1] ?? 1);
+          p.phase = [st, end];
+        }, true);
+      });
+
+      document.getElementById('custPhaseEnd').addEventListener('change', (e) => {
+        const end = Math.max(5, Math.min(100, Number(e.target.value) || 100)) / 100;
+        mutateSelectedCustomPanel(p => {
+          const st = Math.min(end - 0.05, p.phase?.[0] ?? 0);
+          p.phase = [st, end];
+        }, true);
+      });
+
+      document.getElementById('custPanelZLayer').addEventListener('change', (e) => {
+        mutateSelectedCustomPanel(p => { p.zLayer = Number(e.target.value) || 0; }, true);
+      });
+
+      document.getElementById('chkCustFloorRoot').addEventListener('change', (e) => {
+        mutateSelectedCustomPanel(p => { p.isFloorRoot = e.target.checked; }, true);
+      });
+
+      // Add Child Panel on Selected Edge
+      document.querySelectorAll('.add-edge-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (appState.template !== 'custom' || !Array.isArray(appState.customPanels)) return;
+          const parent = appState.customPanels.find(p => p.id === selectedCustomPanelId);
+          if (!parent) return;
+
+          const edge = btn.dataset.addEdge;
+          const isHorizHinge = edge === 'top' || edge === 'bottom';
+          const newW = isHorizHinge ? parent.w : Math.max(25, Math.round(parent.w * 0.5));
+          const newH = isHorizHinge ? Math.max(25, Math.round(parent.h * 0.5)) : parent.h;
+          const edgeNames = { top: 'Atas', bottom: 'Bawah', left: 'Kiri', right: 'Kanan' };
+
+          const newPanel = {
+            id: `panel_${Date.now().toString(36)}_${Math.floor(Math.random() * 99)}`,
+            label: `Flap ${edgeNames[edge]}`,
+            parent: parent.id,
+            edge,
+            w: newW,
+            h: newH,
+            shape: 'rect',
+            phase: [0.35, 0.85],
+            maxAngle: 90,
+            zLayer: Math.min(3, (parent.zLayer || 0) + 1)
+          };
+
+          appState.customPanels.push(newPanel);
+          selectedCustomPanelId = newPanel.id;
+          rebuildAllViews();
+          pushHistorySnapshot();
+          showToast(`Panel baru ditambahkan di sisi ${edgeNames[edge]}`, 'success');
+        });
+      });
+
+      // Delete Selected Custom Panel & Descendants
+      document.getElementById('deleteCustomPanelBtn').addEventListener('click', () => {
+        if (appState.template !== 'custom' || !Array.isArray(appState.customPanels)) return;
+        const target = appState.customPanels.find(p => p.id === selectedCustomPanelId);
+        if (!target || !target.parent) return;
+
+        const toRemove = new Set([target.id]);
+        let added = true;
+        while (added) {
+          added = false;
+          for (const p of appState.customPanels) {
+            if (p.parent && toRemove.has(p.parent) && !toRemove.has(p.id)) {
+              toRemove.add(p.id);
+              added = true;
+            }
+          }
+        }
+
+        appState.customPanels = appState.customPanels.filter(p => !toRemove.has(p.id));
+        selectedCustomPanelId = target.parent;
+        rebuildAllViews();
+        pushHistorySnapshot();
+        showToast('Panel cabang dihapus', 'info');
+      });
+
+      // Dimension Number + Range Pairs
+      const bindDimensionPair = (numId, rangeId, key) => {
+        const numEl = document.getElementById(numId);
+        const rangeEl = document.getElementById(rangeId);
+
+        const onInput = (val, commit) => {
+          const parsed = Number(val);
+          if (isNaN(parsed)) return;
+          appState[key] = parsed;
+          numEl.value = parsed;
+          rangeEl.value = parsed;
+          scheduleRebuildViews(false);
+          if (commit) pushHistorySnapshot();
+        };
+
+        rangeEl.addEventListener('input', (e) => onInput(e.target.value, false));
+        rangeEl.addEventListener('change', (e) => onInput(e.target.value, true));
+        numEl.addEventListener('change', (e) => onInput(e.target.value, true));
+      };
+
+      bindDimensionPair('numLength', 'rangeLength', 'length');
+      bindDimensionPair('numWidth', 'rangeWidth', 'width');
+      bindDimensionPair('numHeight', 'rangeHeight', 'height');
+      bindDimensionPair('numGlueFlap', 'rangeGlueFlap', 'glueFlap');
+      bindDimensionPair('numTuckFlap', 'rangeTuckFlap', 'tuckFlap');
+      bindDimensionPair('numThickness', 'rangeThickness', 'thickness');
+
+      // Checkboxes
+      document.getElementById('chkShowDimensions').addEventListener('change', (e) => {
+        appState.showDimensions = e.target.checked;
+        render2DDieline();
+        pushHistorySnapshot();
+      });
+      document.getElementById('chkShowLabels').addEventListener('change', (e) => {
+        appState.showLabels = e.target.checked;
+        render2DDieline();
+        pushHistorySnapshot();
+      });
+      document.getElementById('chkDielineOn3D').addEventListener('change', (e) => {
+        appState.dielineOn3D = e.target.checked;
+        updateUnifiedTextureAtlas();
+        pushHistorySnapshot();
+      });
+
+      // Material Presets
+      const MATERIAL_PRESETS = {
+        kraft: { exteriorColor: '#c89d66', interiorColor: '#b58952', roughness: 0.78, metalness: 0.02, grain: 55 },
+        art_carton: { exteriorColor: '#1e293b', interiorColor: '#e2e8f0', roughness: 0.35, metalness: 0.08, grain: 15 },
+        corrugated: { exteriorColor: '#be8c54', interiorColor: '#a67640', roughness: 0.85, metalness: 0.0, grain: 80 },
+        metallic: { exteriorColor: '#d97706', interiorColor: '#f1f5f9', roughness: 0.22, metalness: 0.85, grain: 10 },
+        matte_black: { exteriorColor: '#0f172a', interiorColor: '#334155', roughness: 0.72, metalness: 0.05, grain: 20 },
+        gloss_laminated: { exteriorColor: '#2563eb', interiorColor: '#f8fafc', roughness: 0.1, metalness: 0.15, grain: 5 }
+      };
+
+      document.querySelectorAll('.mat-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.dataset.mat;
+          const p = MATERIAL_PRESETS[key];
+          if (!p) return;
+          appState.materialPreset = key;
+          Object.assign(appState, p);
+          sharedBumpTexture = generateProceduralGrainBumpMap();
+          exteriorMaterial3D.bumpMap = sharedBumpTexture;
+          interiorMaterial3D.bumpMap = sharedBumpTexture;
+          syncUIControlsFromState();
+          rebuildAllViews();
+          pushHistorySnapshot();
+        });
+      });
+
+      // Colors & Swatches
+      const setExteriorColor = (hex, commit = true) => {
+        if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
+        appState.exteriorColor = hex;
+        document.getElementById('colorExterior').value = hex;
+        document.getElementById('hexExterior').value = hex.toUpperCase();
+        scheduleRebuildViews(true);
+        if (commit) pushHistorySnapshot();
+      };
+
+      document.getElementById('colorExterior').addEventListener('input', (e) => setExteriorColor(e.target.value, false));
+      document.getElementById('colorExterior').addEventListener('change', (e) => setExteriorColor(e.target.value, true));
+      document.getElementById('hexExterior').addEventListener('change', (e) => setExteriorColor(e.target.value, true));
+
+      document.querySelectorAll('[data-swatch-ext]').forEach(sw => {
+        sw.addEventListener('click', () => setExteriorColor(sw.dataset.swatchExt, true));
+      });
+
+      const setInteriorColor = (hex, commit = true) => {
+        if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
+        appState.interiorColor = hex;
+        document.getElementById('colorInterior').value = hex;
+        document.getElementById('hexInterior').value = hex.toUpperCase();
+        syncMaterialProperties();
+        if (commit) pushHistorySnapshot();
+      };
+
+      document.getElementById('colorInterior').addEventListener('input', (e) => setInteriorColor(e.target.value, false));
+      document.getElementById('colorInterior').addEventListener('change', (e) => setInteriorColor(e.target.value, true));
+      document.getElementById('hexInterior').addEventListener('change', (e) => setInteriorColor(e.target.value, true));
+
+      // PBR Sliders
+      document.getElementById('rangeRoughness').addEventListener('input', (e) => {
+        appState.roughness = Number(e.target.value);
+        document.getElementById('valRoughness').textContent = appState.roughness.toFixed(2);
+        syncMaterialProperties();
+      });
+      document.getElementById('rangeRoughness').addEventListener('change', () => pushHistorySnapshot());
+
+      document.getElementById('rangeMetalness').addEventListener('input', (e) => {
+        appState.metalness = Number(e.target.value);
+        document.getElementById('valMetalness').textContent = appState.metalness.toFixed(2);
+        syncMaterialProperties();
+      });
+      document.getElementById('rangeMetalness').addEventListener('change', () => pushHistorySnapshot());
+
+      document.getElementById('rangeGrain').addEventListener('input', (e) => {
+        appState.grain = Number(e.target.value);
+        document.getElementById('valGrain').textContent = `${appState.grain}%`;
+        scheduleRebuildViews(true);
+        syncMaterialProperties();
+      });
+      document.getElementById('rangeGrain').addEventListener('change', () => pushHistorySnapshot());
+
+      // Artwork Upload & Built-in Stamps
+      const addArtworkToSheet = async (name, dataUrl, aspect = 1, defaultW = 75) => {
+        const newArt = {
+          id: `art_${Date.now()}_${Math.floor(Math.random() * 999)}`,
+          name,
+          dataUrl,
+          aspect,
+          x: 0,
+          y: 0,
+          width: defaultW,
+          rotation: 0,
+          opacity: 100
+        };
+        await ensureArtworkImageLoaded(newArt);
+        appState.artworks.push(newArt);
+        selectedArtworkId = newArt.id;
+        updateUnifiedTextureAtlas();
+        render2DDieline();
+        renderArtworkLayerList();
+        pushHistorySnapshot();
+      };
+
+      document.getElementById('uploadArtworkInput').addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const tempImg = new Image();
+          tempImg.onload = () => {
+            const aspect = (tempImg.naturalWidth || 1) / (tempImg.naturalHeight || 1);
+            addArtworkToSheet(file.name.slice(0, 18), reader.result, aspect, 80);
+            showToast(`Logo "${file.name}" ditambahkan ke pola`, 'success');
+          };
+          tempImg.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+      });
+
+      document.querySelectorAll('[data-stamp]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const type = btn.dataset.stamp;
+          const res = generateStampDataURL(type);
+          const w = type === 'seam_stripe' ? 220 : 72;
+          addArtworkToSheet(btn.textContent.trim(), res.dataUrl, res.aspect, w);
+        });
+      });
+
+      document.getElementById('addTextLayerBtn').addEventListener('click', () => {
+        const txt = document.getElementById('customTextInput').value.trim() || 'ORIGAMI';
+        const col = document.getElementById('customTextColor').value;
+        const res = generateStampDataURL('custom_text', txt, col);
+        addArtworkToSheet(`Teks: ${txt.slice(0, 12)}`, res.dataUrl, res.aspect, 95);
+      });
+
+      // Selected Artwork Inspector Controls
+      const updateSelectedArtwork = (mutator, commit = false) => {
+        const art = appState.artworks.find(a => a.id === selectedArtworkId);
+        if (!art) return;
+        mutator(art);
+        scheduleRebuildViews(true);
+        syncSelectedArtworkInspectorInputs();
+        if (commit) {
+          renderArtworkLayerList();
+          pushHistorySnapshot();
+        }
+      };
+
+      document.getElementById('layerPosX').addEventListener('change', (e) => {
+        updateSelectedArtwork(a => { a.x = Number(e.target.value) || 0; }, true);
+      });
+      document.getElementById('layerPosY').addEventListener('change', (e) => {
+        updateSelectedArtwork(a => { a.y = Number(e.target.value) || 0; }, true);
+      });
+      document.getElementById('rangeLayerWidth').addEventListener('input', (e) => {
+        updateSelectedArtwork(a => { a.width = Number(e.target.value); }, false);
+      });
+      document.getElementById('rangeLayerWidth').addEventListener('change', () => {
+        renderArtworkLayerList();
+        pushHistorySnapshot();
+      });
+
+      document.getElementById('rangeLayerRot').addEventListener('input', (e) => {
+        updateSelectedArtwork(a => { a.rotation = Number(e.target.value); }, false);
+      });
+      document.getElementById('rangeLayerRot').addEventListener('change', () => pushHistorySnapshot());
+
+      document.getElementById('rangeLayerOpacity').addEventListener('input', (e) => {
+        updateSelectedArtwork(a => { a.opacity = Number(e.target.value); }, false);
+      });
+      document.getElementById('rangeLayerOpacity').addEventListener('change', () => pushHistorySnapshot());
+
+      document.getElementById('deleteLayerBtn').addEventListener('click', () => {
+        appState.artworks = appState.artworks.filter(a => a.id !== selectedArtworkId);
+        selectedArtworkId = appState.artworks[appState.artworks.length - 1]?.id || null;
+        updateUnifiedTextureAtlas();
+        render2DDieline();
+        renderArtworkLayerList();
+        pushHistorySnapshot();
+      });
+
+      // 2D Canvas Interactive Pan, Zoom, Direct Artwork Dragging & Custom Panel Selection
+      dielineCanvas.addEventListener('mousedown', (e) => {
+        const pt = screenToSheetMm(e.clientX, e.clientY);
+        view2D.downClientX = e.clientX;
+        view2D.downClientY = e.clientY;
+
+        // 1. Hit-test artworks from top to bottom (with rotation-aware bounding check)
+        let hitArt = null;
+        for (let i = appState.artworks.length - 1; i >= 0; i--) {
+          const a = appState.artworks[i];
+          if (hitTestArtworkLayer(pt, a)) {
+            hitArt = a;
+            break;
+          }
+        }
+
+        if (hitArt) {
+          selectedArtworkId = hitArt.id;
+          view2D.isDraggingArt = true;
+          view2D.dragStartX = pt.x;
+          view2D.dragStartY = pt.y;
+          view2D.artStartX = hitArt.x;
+          view2D.artStartY = hitArt.y;
+          renderArtworkLayerList();
+          render2DDieline();
+        } else {
+          view2D.isPanning = true;
+          view2D.dragStartX = e.clientX - view2D.panX;
+          view2D.dragStartY = e.clientY - view2D.panY;
+        }
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (view2D.isDraggingArt && selectedArtworkId) {
+          const pt = screenToSheetMm(e.clientX, e.clientY);
+          const art = appState.artworks.find(a => a.id === selectedArtworkId);
+          if (art) {
+            art.x = Math.round(view2D.artStartX + (pt.x - view2D.dragStartX));
+            art.y = Math.round(view2D.artStartY + (pt.y - view2D.dragStartY));
+            syncSelectedArtworkInspectorInputs();
+            scheduleRebuildViews(true);
+          }
+        } else if (view2D.isPanning) {
+          view2D.panX = e.clientX - view2D.dragStartX;
+          view2D.panY = e.clientY - view2D.dragStartY;
+          render2DDieline();
+        }
+      });
+
+      window.addEventListener('mouseup', (e) => {
+        if (view2D.isDraggingArt) {
+          view2D.isDraggingArt = false;
+          renderArtworkLayerList();
+          pushHistorySnapshot();
+        } else if (view2D.isPanning) {
+          view2D.isPanning = false;
+          // Check if it was a short click (< 5px movement) to select a panel in Custom Mode
+          const moveDist = Math.hypot(e.clientX - view2D.downClientX, e.clientY - view2D.downClientY);
+          if (moveDist < 5 && appState.template === 'custom') {
+            const pt = screenToSheetMm(e.clientX, e.clientY);
+            for (let i = currentPanels.length - 1; i >= 0; i--) {
+              const p = currentPanels[i];
+              if (isPointInPolygon(pt, p.sheetPoly)) {
+                selectedCustomPanelId = p.id;
+                renderCustomStructureBuilderUI();
+                render2DDieline();
+                break;
+              }
+            }
+          }
+        }
+      });
+
+      dielineCanvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.12 : 0.89;
+        view2D.zoom = Math.max(0.18, Math.min(3.5, view2D.zoom * factor));
+        render2DDieline();
+      }, { passive: false });
+
+      document.getElementById('zoomIn2DBtn').addEventListener('click', () => {
+        view2D.zoom = Math.min(3.5, view2D.zoom * 1.2);
+        render2DDieline();
+      });
+      document.getElementById('zoomOut2DBtn').addEventListener('click', () => {
+        view2D.zoom = Math.max(0.18, view2D.zoom * 0.82);
+        render2DDieline();
+      });
+      document.getElementById('zoomFit2DBtn').addEventListener('click', fit2DToScreen);
+
+      // 3D Viewport Controls
+      document.getElementById('lightingPresetSelect').addEventListener('change', (e) => {
+        const mode = e.target.value;
+        if (mode === 'studio') {
+          ambientLight3D.intensity = 0.75;
+          keyLight3D.color.setHex(0xffffff); keyLight3D.intensity = 1.35;
+          fillLight3D.color.setHex(0x93c5fd); fillLight3D.intensity = 0.55;
+        } else if (mode === 'warm') {
+          ambientLight3D.intensity = 0.7;
+          keyLight3D.color.setHex(0xfde68a); keyLight3D.intensity = 1.5;
+          fillLight3D.color.setHex(0xfca5a5); fillLight3D.intensity = 0.5;
+        } else if (mode === 'contrast') {
+          ambientLight3D.intensity = 0.35;
+          keyLight3D.color.setHex(0xffffff); keyLight3D.intensity = 2.1;
+          fillLight3D.color.setHex(0x38bdf8); fillLight3D.intensity = 0.35;
+        }
+      });
+
+      document.getElementById('toggleWireframeBtn').addEventListener('click', (e) => {
+        isWireframe3D = !isWireframe3D;
+        e.currentTarget.classList.toggle('cad-btn-active', isWireframe3D);
+        syncMaterialProperties();
+      });
+
+      document.getElementById('toggleGrid3DBtn').addEventListener('click', (e) => {
+        gridHelper3D.visible = !gridHelper3D.visible;
+        e.currentTarget.classList.toggle('cad-btn-active', gridHelper3D.visible);
+      });
+
+      const setCameraPreset3D = (view) => {
+        const d = Math.max(appState.length, appState.width, appState.height, 140) * 2.1;
+        controls3D.target.set(0, 0, -appState.width * 0.35);
+        if (view === 'iso') camera3D.position.set(d * 0.85, d * 0.65, d * 0.9);
+        else if (view === 'front') camera3D.position.set(0, 0, d * 1.25);
+        else if (view === 'top') camera3D.position.set(0, d * 1.35, -appState.width * 0.35 + 0.01);
+        else if (view === 'back') camera3D.position.set(0, 0, -d * 1.35);
+        controls3D.update();
+      };
+
+      document.getElementById('resetCam3DBtn').addEventListener('click', () => setCameraPreset3D('iso'));
+      document.querySelectorAll('[data-cam-view]').forEach(btn => {
+        btn.addEventListener('click', () => setCameraPreset3D(btn.dataset.camView));
+      });
+
+      // Folding Timeline Scrubber & Auto-Play Animation
+      let isPlayingFold = false;
+      let foldAnimDirection = 1;
+
+      const togglePlayFold = () => {
+        isPlayingFold = !isPlayingFold;
+        document.getElementById('iconPlay').classList.toggle('hidden', isPlayingFold);
+        document.getElementById('iconPause').classList.toggle('hidden', !isPlayingFold);
+      };
+
+      document.getElementById('playFoldBtn').addEventListener('click', togglePlayFold);
+
+      document.getElementById('foldProgressSlider').addEventListener('input', (e) => {
+        if (isPlayingFold) togglePlayFold();
+        appState.foldProgress = Number(e.target.value);
+        applyFoldingAngles(appState.foldProgress);
+      });
+      document.getElementById('foldProgressSlider').addEventListener('change', () => pushHistorySnapshot());
+
+      document.querySelectorAll('[data-fold-jump]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (isPlayingFold) togglePlayFold();
+          appState.foldProgress = Number(btn.dataset.foldJump);
+          applyFoldingAngles(appState.foldProgress);
+          pushHistorySnapshot();
+        });
+      });
+
+      // Undo, Redo, Save, Import, Export, Clear, Theme
+      const triggerUndo = () => {
+        if (historyIndex > 0) {
+          historyIndex--;
+          restoreStateSnapshot(JSON.parse(historyStack[historyIndex]), false);
+          updateUndoRedoButtons();
+        }
+      };
+      const triggerRedo = () => {
+        if (historyIndex < historyStack.length - 1) {
+          historyIndex++;
+          restoreStateSnapshot(JSON.parse(historyStack[historyIndex]), false);
+          updateUndoRedoButtons();
+        }
+      };
+
+      document.getElementById('undoBtn').addEventListener('click', triggerUndo);
+      document.getElementById('redoBtn').addEventListener('click', triggerRedo);
+
+      window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) triggerRedo();
+          else triggerUndo();
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          triggerRedo();
+        }
+      });
+
+      document.getElementById('saveCacheBtn').addEventListener('click', async () => {
+        await saveStateToIndexedDB(appState);
+        showToast('Desain disimpan ke penyimpanan lokal browser', 'success');
+      });
+
+      document.getElementById('importJsonInput').addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const parsed = JSON.parse(reader.result);
+            if (!parsed.template) throw new Error('Invalid schema');
+            await restoreStateSnapshot(parsed, true);
+            fit2DToScreen();
+            showToast('Proyek JSON berhasil diimpor', 'success');
+          } catch (err) {
+            showToast('File JSON tidak valid untuk Origami', 'warn');
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      });
+
+      // Export Menu Dropdown
+      const expBtn = document.getElementById('exportMenuBtn');
+      const expMenu = document.getElementById('exportDropdown');
+      expBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        expMenu.classList.toggle('hidden');
+      });
+      window.addEventListener('click', () => expMenu.classList.add('hidden'));
+
+      document.querySelectorAll('[data-export]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const type = btn.dataset.export;
+          if (type === 'pdf') exportVectorDielinePDF();
+          else if (type === 'png2d') export2DPNG();
+          else if (type === 'png3d') export3DPNG();
+          else if (type === 'glb') export3DGLB();
+          else if (type === 'obj') export3DOBJ();
+          else if (type === 'json') exportProjectJSON();
+        });
+      });
+
+      // Clear / Reset Modal
+      const confirmModal = document.getElementById('confirmModal');
+      document.getElementById('clearWorkspaceBtn').addEventListener('click', () => {
+        confirmModal.classList.remove('hidden');
+      });
+      document.getElementById('cancelModalBtn').addEventListener('click', () => {
+        confirmModal.classList.add('hidden');
+      });
+      document.getElementById('confirmResetBtn').addEventListener('click', async () => {
+        confirmModal.classList.add('hidden');
+        await restoreStateSnapshot(DEFAULT_STATE, true);
+        fit2DToScreen();
+        showToast('Ruang kerja telah direset ke pengaturan awal', 'info');
+      });
+
+      // Dark / Light Theme Toggle
+      document.getElementById('themeToggleBtn').addEventListener('click', () => {
+        const html = document.documentElement;
+        const isDark = html.classList.toggle('dark');
+        document.getElementById('themeIconSun').classList.toggle('hidden', isDark);
+        document.getElementById('themeIconMoon').classList.toggle('hidden', !isDark);
+        sync3DBackgroundTheme();
+        render2DDieline();
+      });
+
+      // Standalone 3D Viewer Controls
+      document.getElementById('viewerFileInput').addEventListener('change', (e) => {
+        handleExternal3DFile(e.target.files?.[0]);
+        e.target.value = '';
+      });
+
+      const dropzone = document.getElementById('viewerDropzone');
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('border-blue-400', 'bg-blue-500/20');
+      });
+      dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('border-blue-400', 'bg-blue-500/20');
+      });
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('border-blue-400', 'bg-blue-500/20');
+        handleExternal3DFile(e.dataTransfer?.files?.[0]);
+      });
+
+      document.getElementById('loadCurrentBoxToViewerBtn').addEventListener('click', loadActivePackagingToViewer);
+      document.getElementById('loadSampleBottleToViewerBtn').addEventListener('click', loadSampleBottleToViewer);
+
+      document.getElementById('chkViewerAutoRotate').addEventListener('change', (e) => {
+        viewerControls.autoRotate = e.target.checked;
+      });
+      document.getElementById('chkViewerWireframe').addEventListener('change', (e) => {
+        const wf = e.target.checked;
+        viewerModelHolder.traverse(c => {
+          if (c.isMesh && c.material) {
+            if (Array.isArray(c.material)) c.material.forEach(m => m.wireframe = wf);
+            else c.material.wireframe = wf;
+          }
+        });
+      });
+      document.getElementById('chkViewerGrid').addEventListener('change', (e) => {
+        viewerGrid.visible = e.target.checked;
+      });
+      document.getElementById('viewerFitCamBtn').addEventListener('click', () => {
+        const box = new THREE.Box3().setFromObject(viewerModelHolder);
+        const sz = new THREE.Vector3();
+        box.getSize(sz);
+        fitViewerCameraToObject(sz);
+      });
+
+      // Main Animation Loop (with Conditional WebGL Rendering Optimization)
+      function animateLoop() {
+        requestAnimationFrame(animateLoop);
+
+        if (isPlayingFold) {
+          appState.foldProgress += foldAnimDirection * 0.45;
+          if (appState.foldProgress >= 100) {
+            appState.foldProgress = 100;
+            foldAnimDirection = -1;
+          } else if (appState.foldProgress <= 0) {
+            appState.foldProgress = 0;
+            foldAnimDirection = 1;
+          }
+          applyFoldingAngles(appState.foldProgress);
+        }
+
+        const viewerVisible = !document.getElementById('standaloneViewerPane').classList.contains('hidden');
+        const pane3DVisible = !document.getElementById('pane3D').classList.contains('hidden');
+        if (viewerVisible) {
+          viewerControls.update();
+          viewerRenderer.render(viewerScene, viewerCamera);
+        } else if (pane3DVisible) {
+          controls3D.update();
+          renderer3D.render(scene3D, camera3D);
+        }
+      }
+
+      animateLoop();
+    }
+
+    function sync3DBackgroundTheme() {
+      const isDark = document.documentElement.classList.contains('dark');
+      const bgHex = isDark ? 0x0d0f17 : 0xe5e7eb;
+      scene3D.background = new THREE.Color(bgHex);
+      viewerScene.background = new THREE.Color(bgHex);
+    }
+
+    function handleWindowResize() {
+      resize2DCanvas();
+
+      const rect3D = viewport3D.getBoundingClientRect();
+      if (rect3D.width > 10 && rect3D.height > 10) {
+        camera3D.aspect = rect3D.width / rect3D.height;
+        camera3D.updateProjectionMatrix();
+        renderer3D.setSize(rect3D.width, rect3D.height);
+      }
+
+      const rectViewer = standaloneViewport.getBoundingClientRect();
+      if (rectViewer.width > 10 && rectViewer.height > 10) {
+        viewerCamera.aspect = rectViewer.width / rectViewer.height;
+        viewerCamera.updateProjectionMatrix();
+        viewerRenderer.setSize(rectViewer.width, rectViewer.height);
+      }
+    }
+
+    window.addEventListener('resize', handleWindowResize);
+
+    // Bootstrap Application
+    (async function initOrigamiApp() {
+      sync3DBackgroundTheme();
+      bindAllEvents();
+      handleWindowResize();
+
+      const cachedState = await loadStateFromIndexedDB();
+      if (cachedState) {
+        await restoreStateSnapshot(cachedState, true);
+        fit2DToScreen();
+        setCacheStatus(true, 'Pulih dari Cache');
+      } else {
+        await loadPreloadExample('cosmetic_tuck');
+      }
+    })();
+  </script>
+</body>
+</html>

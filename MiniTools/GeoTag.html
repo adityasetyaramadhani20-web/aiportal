@@ -1,0 +1,2637 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoTag</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet Map Engine CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Turf.js for Spatial Calculations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+
+  <!-- PapaParse for CSV Import/Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <!-- Proj4js for Coordinate Reprojection (SHP/CAD) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
+
+  <!-- JSZip for KMZ and Zipped Shapefile Parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- shpjs for Shapefile (.zip) Parsing -->
+  <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+
+  <!-- toGeoJSON for KML and GPX Parsing -->
+  <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
+
+  <!-- GeoRaster & GeoRasterLayer for GeoTIFF (.tif) -->
+  <script src="https://unpkg.com/georaster"></script>
+  <script src="https://unpkg.com/georaster-layer-for-leaflet"></script>
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Google Fonts: Plus Jakarta Sans & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"Space Grotesk"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#FBF8F1',
+              100: '#F5EFE3',
+              200: '#EBDDC6',
+              300: '#DEC6A3',
+              500: '#D6684B',
+              600: '#B85338',
+              700: '#8C3D28',
+              800: '#3D352E',
+              900: '#231F1B',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background-color: #F8F5EE;
+    }
+
+    #map {
+      height: 100vh;
+      width: 100%;
+      z-index: 1;
+      background-color: #EBE5D8;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(230, 220, 205, 0.85);
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(240, 235, 225, 0.5);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(210, 195, 175, 0.8);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(180, 160, 140, 1);
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    .beacon-pulse {
+      position: relative;
+      width: 24px;
+      height: 24px;
+    }
+    .beacon-pulse::before {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background-color: #D6684B;
+      opacity: 0.8;
+      animation: pulse-wave 1.8s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+    }
+    .beacon-pulse::after {
+      content: '';
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background-color: #D6684B;
+      border: 2.5px solid #FFFFFF;
+      box-shadow: 0 0 10px rgba(0,0,0,0.35);
+    }
+    @keyframes pulse-wave {
+      0% { transform: scale(0.4); opacity: 0.9; }
+      100% { transform: scale(3.2); opacity: 0; }
+    }
+
+    .edit-vertex-handle {
+      background: #FFFFFF;
+      border: 2.5px solid #2563EB;
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      cursor: grab;
+      transition: transform 0.15s ease;
+    }
+    .edit-vertex-handle:active {
+      cursor: grabbing;
+      transform: scale(1.25);
+    }
+
+    .leaflet-popup-content-wrapper {
+      border-radius: 16px !important;
+      padding: 4px !important;
+      background: rgba(255, 255, 255, 0.97) !important;
+      backdrop-filter: blur(12px) !important;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+      border: 1px solid rgba(225, 215, 200, 0.9) !important;
+      font-family: 'Plus Jakarta Sans', sans-serif !important;
+    }
+    .leaflet-popup-content {
+      margin: 12px 14px !important;
+      line-height: 1.4 !important;
+    }
+    .leaflet-popup-tip {
+      background: rgba(255, 255, 255, 0.97) !important;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex flex-col font-sans select-none text-brand-900 bg-[#F8F5EE]">
+
+  <!-- Header -->
+  <header class="w-full h-16 glass-card border-b border-brand-200/90 px-3 sm:px-5 flex items-center justify-between z-30 shrink-0 shadow-sm gap-2">
+    <div class="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-500 to-amber-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+        <i class="fas fa-layer-group text-sm"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="font-extrabold text-base tracking-tight text-brand-900">GeoTag</h1>
+        </div>
+        <p class="text-[11px] text-brand-800/60 hidden md:block">Geospatial Tagging Studio</p>
+      </div>
+    </div>
+
+    <!-- Search & Location Bar -->
+    <div class="flex items-center max-w-md w-full mx-1 sm:mx-4">
+      <div class="relative w-full flex items-center">
+        <span class="absolute left-3 text-brand-800/40 text-xs">
+          <i class="fas fa-search"></i>
+        </span>
+        <input id="searchInput" type="text"
+          placeholder="Cari lokasi atau koordinat (-6.20, 106.81)..."
+          onkeydown="if(event.key==='Enter') executeSmartSearch()"
+          class="w-full bg-brand-50/90 hover:bg-white focus:bg-white text-xs text-brand-900 placeholder-brand-800/40 pl-8 pr-16 py-2 rounded-xl border border-brand-200 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition shadow-inner">
+        <button onclick="executeSmartSearch()"
+          class="absolute right-1 px-2.5 py-1 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-[11px] font-semibold transition active:scale-95 shadow-sm">
+          Cari
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Action Controls -->
+    <div class="flex items-center space-x-1 sm:space-x-2 shrink-0">
+      <button id="btnGPS" onclick="locateUserPosition()" title="Deteksi Lokasi GPS Saya Presisi"
+        class="flex items-center space-x-1 px-2.5 sm:px-3 py-1.5 bg-white hover:bg-brand-50 text-brand-800 border border-brand-200 rounded-xl text-xs font-semibold shadow-sm transition active:scale-95">
+        <i class="fas fa-crosshairs text-brand-500"></i>
+        <span class="hidden sm:inline">GPS Saya</span>
+      </button>
+
+      <!-- Basemap Selector -->
+      <div class="relative">
+        <select id="basemapSelector" onchange="switchBaseLayer(this.value)"
+          class="appearance-none bg-white hover:bg-brand-50 border border-brand-200 text-brand-900 text-xs font-semibold rounded-xl pl-2.5 sm:pl-3 pr-7 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/30 shadow-sm cursor-pointer">
+          <option value="osm" selected>OpenStreetMap (Standar)</option>
+          <option value="voyager">Carto Voyager (Elegan)</option>
+          <option value="satellite">Esri Satellite (Citra)</option>
+          <option value="topo">Esri Topografi</option>
+          <option value="dark">Carto Dark (Malam)</option>
+        </select>
+        <i class="fas fa-chevron-down absolute right-2.5 top-2.5 text-[9px] text-brand-800/50 pointer-events-none"></i>
+      </div>
+
+      <!-- Toggle Data Table Bottom Sheet -->
+      <button onclick="toggleDataTable()" title="Buka Tabel Data Spasial"
+        class="p-2 sm:px-3 sm:py-1.5 bg-white hover:bg-brand-50 text-brand-800 border border-brand-200 rounded-xl text-xs font-semibold shadow-sm transition flex items-center space-x-1.5">
+        <i class="fas fa-table text-emerald-600"></i>
+        <span class="hidden md:inline">Data Sheet</span>
+      </button>
+
+      <!-- Toggle Left Sidebar Button -->
+      <button onclick="toggleSidebar()" title="Buka / Tutup Panel Layer"
+        class="p-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-semibold shadow-md shadow-brand-500/20 transition active:scale-95">
+        <i class="fas fa-layer-group"></i>
+      </button>
+    </div>
+  </header>
+
+  <div class="relative flex-1 flex overflow-hidden">
+
+    <!-- Leaflet Map Element -->
+    <div id="map"></div>
+
+    <!-- Floating Drawing HUD -->
+    <div class="absolute top-3 left-1/2 -translate-x-1/2 z-20 max-w-[96vw] overflow-x-auto no-scrollbar">
+      <div class="flex items-center space-x-1 bg-white/95 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-xl border border-brand-200/90 text-xs font-medium whitespace-nowrap">
+        
+        <!-- Nav Mode -->
+        <button id="tool-nav" onclick="setDrawingMode('nav')" class="tool-btn active flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-brand-500 text-white font-semibold transition" title="Mode Navigasi Peta">
+          <i class="fas fa-mouse-pointer text-xs"></i>
+          <span class="hidden sm:inline">Navigasi</span>
+        </button>
+
+        <div class="w-[1px] h-5 bg-brand-200 mx-0.5 sm:mx-1 shrink-0"></div>
+
+        <!-- Point Tagging -->
+        <button id="tool-marker" onclick="setDrawingMode('marker')" class="tool-btn flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-brand-800 hover:bg-brand-100 transition" title="Tambah Titik (Marker)">
+          <i class="fas fa-map-pin text-rose-500 text-xs"></i>
+          <span class="hidden md:inline">Titik</span>
+        </button>
+
+        <!-- Polyline -->
+        <button id="tool-polyline" onclick="setDrawingMode('polyline')" class="tool-btn flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-brand-800 hover:bg-brand-100 transition" title="Gambar Garis (Polyline)">
+          <i class="fas fa-route text-amber-600 text-xs"></i>
+          <span class="hidden md:inline">Garis</span>
+        </button>
+
+        <!-- Polygon -->
+        <button id="tool-polygon" onclick="setDrawingMode('polygon')" class="tool-btn flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-brand-800 hover:bg-brand-100 transition" title="Gambar Poligon Bebas">
+          <i class="fas fa-draw-polygon text-indigo-600 text-xs"></i>
+          <span class="hidden md:inline">Poligon</span>
+        </button>
+
+        <!-- Rectangle -->
+        <button id="tool-rectangle" onclick="setDrawingMode('rectangle')" class="tool-btn flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-brand-800 hover:bg-brand-100 transition" title="Gambar Kotak">
+          <i class="fas fa-vector-square text-emerald-600 text-xs"></i>
+          <span class="hidden md:inline">Kotak</span>
+        </button>
+
+        <!-- Circle -->
+        <button id="tool-circle" onclick="setDrawingMode('circle')" class="tool-btn flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-brand-800 hover:bg-brand-100 transition" title="Gambar Radius Lingkaran">
+          <i class="fas fa-circle-notch text-sky-600 text-xs"></i>
+          <span class="hidden md:inline">Lingkaran</span>
+        </button>
+
+        <!-- Color Palette Picker -->
+        <div class="flex items-center pl-1 pr-1 space-x-1 border-l border-brand-200 ml-1 shrink-0">
+          <input type="color" id="drawingColorPicker" value="#D6684B" title="Pilih Warna Gambar Baru" class="w-6 h-6 rounded-lg cursor-pointer border-0 bg-transparent">
+        </div>
+      </div>
+    </div>
+
+    <!-- Spatial Vertex Edit Dock -->
+    <div id="spatialEditDock" class="hidden absolute top-16 left-1/2 -translate-x-1/2 z-20 glass-card px-4 py-2.5 rounded-2xl shadow-2xl border-2 border-blue-500 flex items-center space-x-3 text-xs">
+      <div class="flex items-center space-x-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping"></span>
+        <span class="font-bold text-blue-900" id="spatialEditTargetName">Mengubah Bentuk Geometri...</span>
+      </div>
+      <div class="text-[11px] text-brand-800/70 hidden sm:inline">Geser titik simpul biru di peta</div>
+      <div class="flex items-center space-x-1.5">
+        <button onclick="saveSpatialEditing()" class="px-3 py-1 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 shadow-sm transition">
+          <i class="fas fa-check mr-1"></i>Simpan
+        </button>
+        <button onclick="cancelSpatialEditing()" class="px-2.5 py-1 rounded-xl bg-brand-200 text-brand-800 font-bold text-xs hover:bg-brand-300 transition">
+          Batal
+        </button>
+      </div>
+    </div>
+
+    <!-- Drawing Guidance Pill -->
+    <div id="drawingGuidancePill" class="hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-20 glass-card px-4 py-2 rounded-2xl shadow-xl border border-brand-300 flex items-center space-x-2.5 text-xs max-w-[94vw] flex-wrap gap-y-2">
+      <span class="w-2.5 h-2.5 rounded-full bg-brand-500 animate-ping shrink-0"></span>
+      <span id="drawingGuideText" class="font-medium text-brand-900">Klik pada peta untuk meletakkan titik koordinat.</span>
+      
+      <div class="flex items-center space-x-1.5 ml-auto shrink-0">
+        <button onclick="undoLastDrawingPoint()" id="btnUndoPoint" class="hidden px-2.5 py-1 rounded-lg bg-brand-200 text-brand-800 font-bold text-[11px] hover:bg-brand-300 transition" title="Batalkan Titik Terakhir">
+          <i class="fas fa-undo mr-1"></i>Undo
+        </button>
+        <button onclick="finishActiveDrawing()" id="btnFinishDrawing" class="hidden px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 shadow-sm transition">
+          <i class="fas fa-check mr-1"></i>Selesai
+        </button>
+        <button onclick="cancelActiveDrawing()" class="px-2.5 py-1 rounded-lg bg-rose-500 text-white font-bold text-[11px] hover:bg-rose-600 shadow-sm transition">
+          Batal
+        </button>
+      </div>
+    </div>
+
+    <!-- Sidebar Catalog -->
+    <aside id="sidebar" class="absolute top-3 left-3 bottom-3 w-84 sm:w-96 max-w-[calc(100vw-24px)] glass-card rounded-3xl shadow-2xl z-20 flex flex-col transition-transform duration-300 transform translate-x-0 border border-brand-200/90 overflow-hidden">
+      
+      <!-- Panel Header -->
+      <div class="px-4 py-3 bg-brand-50/90 border-b border-brand-200 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-brand-800">Katalog Geodata</span>
+          <span id="badgeTotalFeatures" class="px-2 py-0.5 bg-brand-500/10 text-brand-600 rounded-full font-mono text-[10px] font-bold">0 Item</span>
+        </div>
+        <div class="flex items-center space-x-1">
+          <button onclick="toggleAllLayersVisibility()" id="btnToggleAllVis" title="Sembunyikan/Tampilkan Semua Objek" class="p-1.5 rounded-lg hover:bg-brand-200/60 text-brand-800 transition text-xs">
+            <i class="fas fa-eye text-emerald-600"></i>
+          </button>
+          <button onclick="toggleSidebar()" class="p-1 rounded-lg hover:bg-brand-200/60 text-brand-800 transition">
+            <i class="fas fa-times text-xs"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Feature Search & Type Filters -->
+      <div class="p-3 border-b border-brand-200/60 bg-white/50 space-y-2">
+        <div class="flex space-x-2">
+          <div class="relative flex-1">
+            <i class="fas fa-filter absolute left-2.5 top-2.5 text-[10px] text-brand-800/40"></i>
+            <input type="text" id="filterItemsInput" oninput="filterFeatureList()" placeholder="Cari nama, atribut..."
+              class="w-full pl-7 pr-2 py-1.5 bg-brand-50/70 border border-brand-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500">
+          </div>
+          <button onclick="openColumnManagerModal()" title="Kelola Kolom Atribut Tambahan" class="px-2.5 py-1.5 bg-white hover:bg-brand-100 border border-brand-200 rounded-xl text-xs font-semibold text-brand-800 transition flex items-center space-x-1 shrink-0">
+            <i class="fas fa-columns text-brand-500"></i>
+            <span class="hidden sm:inline">Field</span>
+          </button>
+        </div>
+
+        <!-- Geometry Quick Filter Badges -->
+        <div class="flex items-center space-x-1 overflow-x-auto no-scrollbar text-[10px]">
+          <button onclick="setTypeFilter('all')" id="filter-tab-all" class="px-2 py-0.5 rounded-full font-bold bg-brand-500 text-white">Semua</button>
+          <button onclick="setTypeFilter('Marker')" id="filter-tab-Marker" class="px-2 py-0.5 rounded-full font-bold bg-brand-100 text-brand-800 hover:bg-brand-200">Titik</button>
+          <button onclick="setTypeFilter('Polyline')" id="filter-tab-Polyline" class="px-2 py-0.5 rounded-full font-bold bg-brand-100 text-brand-800 hover:bg-brand-200">Garis</button>
+          <button onclick="setTypeFilter('Polygon')" id="filter-tab-Polygon" class="px-2 py-0.5 rounded-full font-bold bg-brand-100 text-brand-800 hover:bg-brand-200">Poligon</button>
+          <button onclick="setTypeFilter('Rectangle')" id="filter-tab-Rectangle" class="px-2 py-0.5 rounded-full font-bold bg-brand-100 text-brand-800 hover:bg-brand-200">Kotak</button>
+          <button onclick="setTypeFilter('Circle')" id="filter-tab-Circle" class="px-2 py-0.5 rounded-full font-bold bg-brand-100 text-brand-800 hover:bg-brand-200">Radius</button>
+        </div>
+      </div>
+
+      <!-- Feature List Container -->
+      <div class="flex-1 overflow-y-auto p-3 space-y-2" id="featureListContainer">
+        <div class="text-center py-10 text-brand-800/50 text-xs italic">
+          Belum ada objek geospasial.<br>Gunakan toolbar di atas atau impor data peta.
+        </div>
+      </div>
+
+      <!-- Extra Overlays / Raster Layers Container -->
+      <div id="rasterLayersSection" class="hidden px-3 py-2 border-t border-brand-200 bg-brand-100/40">
+        <div class="text-[10px] font-bold text-brand-800/80 uppercase tracking-wider mb-1 flex items-center justify-between">
+          <span>Layer Raster & Layanan</span>
+          <span id="rasterCountBadge" class="font-mono text-[9px] bg-brand-200 px-1.5 py-0.2 rounded-full">0</span>
+        </div>
+        <div id="rasterLayersList" class="space-y-1.5 max-h-28 overflow-y-auto"></div>
+      </div>
+
+      <!-- Action Panel -->
+      <div class="p-3 border-t border-brand-200 bg-brand-50/80 space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <!-- Open Universal Import Modal -->
+          <button onclick="openImportModal()" class="flex items-center justify-center space-x-1.5 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-semibold shadow-sm transition active:scale-95">
+            <i class="fas fa-file-import"></i>
+            <span>Impor Data</span>
+          </button>
+
+          <!-- Open Universal Export Modal -->
+          <button onclick="openExportModal()" class="flex items-center justify-center space-x-1.5 py-2 bg-white hover:bg-brand-100 text-brand-900 border border-brand-200 rounded-xl text-xs font-semibold shadow-sm transition active:scale-95">
+            <i class="fas fa-file-export text-brand-600"></i>
+            <span>Ekspor Data</span>
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between pt-1 text-[11px]">
+          <button onclick="promptClearAllData()" class="text-rose-600 hover:text-rose-700 font-medium">
+            <i class="fas fa-trash-alt mr-1"></i>Reset Kanvas
+          </button>
+          <span class="text-brand-800/50 italic text-[10px]" id="storageIndicator">IndexedDB Aktif</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Spreadsheet Data Sheet Drawer -->
+    <div id="dataTableDrawer" class="absolute bottom-0 inset-x-0 z-20 glass-card rounded-t-3xl shadow-2xl border-t border-brand-200 max-h-0 overflow-hidden transition-all duration-300 flex flex-col">
+      <div class="px-5 py-2.5 bg-brand-100/80 border-b border-brand-200 flex items-center justify-between shrink-0">
+        <div class="flex items-center space-x-3">
+          <i class="fas fa-table text-emerald-600"></i>
+          <h3 class="font-bold text-xs uppercase tracking-wider text-brand-900">Lembar Data Spasial Multidimensi</h3>
+          <span id="tableRecordBadge" class="text-[11px] font-mono font-medium text-brand-800/70 bg-white px-2 py-0.5 rounded-full border border-brand-200">0 Data</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="openColumnManagerModal()" class="px-2.5 py-1 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-[11px] font-semibold shadow-sm">
+            <i class="fas fa-plus mr-1"></i>Tambah Kolom
+          </button>
+          <button onclick="toggleDataTable()" class="p-1.5 text-brand-800 hover:bg-brand-200 rounded-lg">
+            <i class="fas fa-chevron-down text-xs"></i>
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto max-h-64 p-3 bg-white/75">
+        <table class="w-full text-left text-xs border-collapse" id="attributesSpreadsheet">
+          <!-- Populated by JS -->
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL: UNIVERSAL SPATIAL IMPORTER -->
+  <div id="importModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="glass-card w-full max-w-lg p-5 rounded-3xl shadow-2xl border border-brand-200 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-2 border-b border-brand-200">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-xl bg-brand-500 text-white flex items-center justify-center text-xs font-bold shadow">
+            <i class="fas fa-file-import"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-brand-900 text-sm">Impor Data Spasial</h3>
+            <span class="text-[10px] text-brand-800/70">Berkas lokal dan integrasi layanan online</span>
+          </div>
+        </div>
+        <button onclick="closeImportModal()" class="text-brand-800/60 hover:text-brand-900 text-lg leading-none p-1">✕</button>
+      </div>
+
+      <!-- Tab Navigator -->
+      <div class="flex border-b border-brand-200">
+        <button onclick="switchImportTab('file')" id="import-tab-btn-file" class="flex-1 pb-2 font-bold text-xs border-b-2 border-brand-500 text-brand-900">
+          <i class="fas fa-folder-open mr-1.5"></i>Berkas Lokal
+        </button>
+        <button onclick="switchImportTab('online')" id="import-tab-btn-online" class="flex-1 pb-2 font-semibold text-xs border-b-2 border-transparent text-brand-800/60 hover:text-brand-900">
+          <i class="fas fa-globe mr-1.5"></i>Layanan Daring (API)
+        </button>
+      </div>
+
+      <!-- Tab 1: Local Files -->
+      <div id="import-tab-file" class="space-y-3">
+        <div id="dropZoneContainer"
+          ondragover="event.preventDefault(); this.classList.add('border-brand-500', 'bg-brand-50');"
+          ondragleave="this.classList.remove('border-brand-500', 'bg-brand-50');"
+          ondrop="handleFileDrop(event)"
+          class="border-2 border-dashed border-brand-300 rounded-2xl p-6 text-center hover:bg-brand-50/60 transition cursor-pointer flex flex-col items-center justify-center">
+          <i class="fas fa-cloud-upload-alt text-3xl text-brand-500 mb-2"></i>
+          <p class="text-xs font-bold text-brand-900 mb-1">Klik atau seret berkas ke sini</p>
+          <p class="text-[10px] text-brand-800/60 max-w-xs leading-relaxed">
+            Mendukung .geojson, .kml, .kmz, .gpx, .shp (.zip), .tif (GeoTIFF), dan .csv
+          </p>
+          <input type="file" id="universalFileInput" class="hidden"
+            accept=".geojson, .json, .kml, .kmz, .gpx, .zip, .shp, .tif, .tiff, .csv, .txt, .pbf"
+            onchange="handleSelectedFiles(this.files)">
+          <button onclick="document.getElementById('universalFileInput').click()" class="mt-3 px-3 py-1.5 bg-brand-100 hover:bg-brand-200 text-brand-900 font-bold text-xs rounded-xl transition">
+            Pilih Berkas
+          </button>
+        </div>
+
+        <div id="importFileInfoBox" class="hidden p-3 bg-brand-50 rounded-2xl border border-brand-200 text-xs space-y-1">
+          <div class="font-bold text-brand-900 flex items-center justify-between">
+            <span id="importFileName">nama_berkas.ext</span>
+            <span id="importFileSize" class="font-mono text-[10px] text-brand-800/60">0 KB</span>
+          </div>
+          <div id="importFileStatus" class="text-[11px] text-brand-800/80">Siap diproses...</div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Online APIs -->
+      <div id="import-tab-online" class="hidden space-y-3">
+        <div>
+          <label class="block text-[11px] font-bold text-brand-800 uppercase tracking-wider mb-1">Tipe Layanan</label>
+          <select id="onlineServiceType" class="w-full px-3 py-2 bg-brand-50/70 border border-brand-200 rounded-xl text-xs text-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="arcgis">ArcGIS REST FeatureServer / MapServer</option>
+            <option value="geojson_url">URL Berkas GeoJSON Publik</option>
+            <option value="wms">Layanan Tile OGC WMS</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-brand-800 uppercase tracking-wider mb-1">URL Endpoint <span class="text-rose-500">*</span></label>
+          <input type="url" id="onlineServiceUrl" placeholder="https://domain.com/arcgis/rest/services/.../FeatureServer/0"
+            class="w-full px-3 py-2 bg-brand-50/70 border border-brand-200 rounded-xl text-xs text-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <div id="wmsLayerNameContainer" class="hidden">
+          <label class="block text-[11px] font-bold text-brand-800 uppercase tracking-wider mb-1">Nama Layer WMS</label>
+          <input type="text" id="onlineWmsLayerName" placeholder="Contoh: bataskabupaten, citra_satelit"
+            class="w-full px-3 py-2 bg-brand-50/70 border border-brand-200 rounded-xl text-xs text-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="onlineUseCorsProxy" class="rounded text-brand-500 focus:ring-brand-500 h-3.5 w-3.5">
+          <label for="onlineUseCorsProxy" class="text-[11px] text-brand-800 cursor-pointer">
+            Gunakan CORS Proxy jika server memblokir akses browser
+          </label>
+        </div>
+
+        <button onclick="fetchOnlineSpatialData()" id="btnFetchOnline" class="w-full py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold shadow-md transition">
+          <i class="fas fa-cloud-download-alt mr-1.5"></i>Tarik Data Daring
+        </button>
+      </div>
+
+      <div class="flex justify-end pt-2 border-t border-brand-200">
+        <button onclick="closeImportModal()" class="px-4 py-1.5 rounded-xl bg-brand-100 hover:bg-brand-200 text-brand-900 text-xs font-semibold">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EXPORT DATA -->
+  <div id="exportModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="glass-card w-full max-w-sm p-5 rounded-3xl shadow-2xl border border-brand-200 space-y-3">
+      <div class="flex items-center justify-between pb-2 border-b border-brand-200">
+        <h3 class="font-bold text-brand-900 text-sm">Pilih Format Ekspor</h3>
+        <button onclick="closeExportModal()" class="text-brand-800/60 hover:text-brand-900 text-sm">✕</button>
+      </div>
+      <p class="text-[11px] text-brand-800/70">
+        Unduh seluruh objek geospasial vektor beserta atribut lengkapnya:
+      </p>
+
+      <div class="space-y-2 pt-1">
+        <button onclick="exportToGeoJSON(); closeExportModal();" class="w-full p-2.5 bg-white hover:bg-brand-50 border border-brand-200 rounded-2xl flex items-center justify-between text-xs font-semibold text-brand-900 transition">
+          <span class="flex items-center space-x-2">
+            <i class="fas fa-code text-brand-500 text-sm"></i>
+            <span>GeoJSON Standar (.json)</span>
+          </span>
+          <i class="fas fa-download text-brand-400"></i>
+        </button>
+
+        <button onclick="exportToCSV(); closeExportModal();" class="w-full p-2.5 bg-white hover:bg-brand-50 border border-brand-200 rounded-2xl flex items-center justify-between text-xs font-semibold text-brand-900 transition">
+          <span class="flex items-center space-x-2">
+            <i class="fas fa-file-csv text-emerald-600 text-sm"></i>
+            <span>CSV (OGC WKT Format)</span>
+          </span>
+          <i class="fas fa-download text-brand-400"></i>
+        </button>
+
+        <button onclick="exportToKML(); closeExportModal();" class="w-full p-2.5 bg-white hover:bg-brand-50 border border-brand-200 rounded-2xl flex items-center justify-between text-xs font-semibold text-brand-900 transition">
+          <span class="flex items-center space-x-2">
+            <i class="fas fa-earth-americas text-sky-600 text-sm"></i>
+            <span>Keyhole Markup Language (.kml)</span>
+          </span>
+          <i class="fas fa-download text-brand-400"></i>
+        </button>
+      </div>
+
+      <div class="flex justify-end pt-2 border-t border-brand-200">
+        <button onclick="closeExportModal()" class="px-4 py-1.5 rounded-xl bg-brand-100 hover:bg-brand-200 text-brand-900 text-xs font-semibold">
+          Batal
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ATRIBUT, FIELD DINAMIS & GAYA GEOMETRI -->
+  <div id="featureModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="glass-card w-full max-w-md p-5 rounded-3xl shadow-2xl border border-brand-200 space-y-3.5 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-2 border-b border-brand-200">
+        <div class="flex items-center space-x-2">
+          <div id="modalTypeBadge" class="w-8 h-8 rounded-xl bg-brand-500 text-white flex items-center justify-center text-xs font-bold shadow">
+            <i class="fas fa-tag"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-brand-900 text-sm" id="modalFeatureTitle">Detail Objek Geospasial</h3>
+            <span id="modalMeasurementSub" class="text-[10px] text-brand-800/70 font-mono">-</span>
+          </div>
+        </div>
+        <button onclick="closeFeatureModal()" class="text-brand-800/60 hover:text-brand-900 text-lg leading-none p-1">✕</button>
+      </div>
+
+      <div class="space-y-2.5">
+        <div>
+          <label class="block text-[11px] font-bold text-brand-800 uppercase tracking-wider mb-1">Nama Objek <span class="text-rose-500">*</span></label>
+          <input type="text" id="modalInputName" placeholder="Contoh: Titik Pantau A, Wilayah Konservasi"
+            class="w-full px-3 py-2 bg-brand-50/70 border border-brand-200 rounded-xl text-xs text-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-brand-800 uppercase tracking-wider mb-1">Deskripsi / Catatan</label>
+          <textarea id="modalInputDesc" rows="2" placeholder="Catatan informasi singkat objek ini..."
+            class="w-full px-3 py-2 bg-brand-50/70 border border-brand-200 rounded-xl text-xs text-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+
+        <div class="p-3 bg-brand-50/80 rounded-2xl border border-brand-200/80 space-y-2">
+          <div class="text-[11px] font-bold text-brand-800 uppercase tracking-wider flex items-center justify-between">
+            <span><i class="fas fa-palette mr-1 text-brand-500"></i>Kustomisasi Tampilan</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-[10px] text-brand-800 font-semibold mb-0.5">Warna</label>
+              <div class="flex items-center space-x-1.5">
+                <input type="color" id="modalStyleColor" class="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent">
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] text-brand-800 font-semibold mb-0.5">Tebal Garis</label>
+              <select id="modalStyleWeight" class="w-full px-2 py-1.5 bg-white border border-brand-200 rounded-lg text-xs font-semibold">
+                <option value="1">1 px</option>
+                <option value="2">2 px</option>
+                <option value="3" selected>3 px</option>
+                <option value="5">5 px</option>
+                <option value="8">8 px</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-brand-800 font-semibold mb-0.5">Opasitas</label>
+              <select id="modalStyleOpacity" class="w-full px-2 py-1.5 bg-white border border-brand-200 rounded-lg text-xs font-semibold">
+                <option value="0.1">10%</option>
+                <option value="0.25" selected>25%</option>
+                <option value="0.5">50%</option>
+                <option value="0.75">75%</option>
+                <option value="1.0">100%</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-brand-800 uppercase tracking-wider mb-1">Kolom Kustom Atribut</label>
+          <div id="dynamicFieldsInputs" class="space-y-1.5 max-h-36 overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2 border-t border-brand-200">
+        <button onclick="closeFeatureModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-brand-800 hover:bg-brand-100 transition">
+          Batal
+        </button>
+        <button onclick="saveFeatureAttributes()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white shadow-md transition">
+          Simpan Data
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: COLUMN MANAGER -->
+  <div id="columnModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="glass-card w-full max-w-sm p-5 rounded-3xl shadow-2xl border border-brand-200 space-y-4">
+      <div class="flex items-center justify-between pb-2 border-b border-brand-200">
+        <h3 class="font-bold text-brand-900 text-sm">Kelola Kolom Kustom</h3>
+        <button onclick="closeColumnModal()" class="text-brand-800/60 hover:text-brand-900 text-sm">✕</button>
+      </div>
+      <p class="text-[11px] text-brand-800/70 leading-relaxed">
+        Tambahkan parameter dinamis (misal: <em>kategori</em>, <em>status</em>, <em>penanggung_jawab</em>) yang tersinkronisasi dalam tabel &amp; berkas ekspor.
+      </p>
+
+      <div class="flex space-x-1.5">
+        <input type="text" id="newColumnNameInput" placeholder="Nama kolom baru..."
+          onkeydown="if(event.key==='Enter') createCustomColumn()"
+          class="flex-1 px-3 py-1.5 bg-brand-50 border border-brand-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500">
+        <button onclick="createCustomColumn()" class="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold">
+          Tambah
+        </button>
+      </div>
+
+      <div class="space-y-1.5 max-h-40 overflow-y-auto" id="activeColumnsList"></div>
+
+      <div class="flex justify-end pt-2 border-t border-brand-200">
+        <button onclick="closeColumnModal()" class="px-4 py-1.5 rounded-xl bg-brand-100 hover:bg-brand-200 text-brand-900 text-xs font-semibold">
+          Selesai
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: KONFIRMASI -->
+  <div id="confirmModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="glass-card w-full max-w-sm p-5 rounded-3xl shadow-2xl border border-rose-200 space-y-4 text-center">
+      <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-xl shadow-inner">
+        <i class="fas fa-exclamation-triangle"></i>
+      </div>
+      <h3 class="font-bold text-brand-900 text-base" id="confirmModalTitle">Konfirmasi Tindakan</h3>
+      <p class="text-xs text-brand-800/70" id="confirmModalText">Apakah Anda yakin ingin melanjutkan tindakan ini?</p>
+      <div class="flex justify-center space-x-2 pt-2">
+        <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-brand-800 hover:bg-brand-100">Batal</button>
+        <button id="btnExecuteConfirm" class="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-md">Ya, Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed top-20 right-4 z-50 flex flex-col space-y-2 pointer-events-none max-w-sm w-full"></div>
+
+  <script>
+    /* =========================================================================
+       1. STORAGE ENGINE: NATIVE INDEXEDDB WITH LOCALSTORAGE FALLBACK
+       ========================================================================= */
+    const IDB_CONFIG = { dbName: 'GeoTagAppDB', storeName: 'geotag_store', version: 1 };
+
+    function openIndexedDB() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) {
+          reject(new Error("IndexedDB tidak didukung oleh browser"));
+          return;
+        }
+        const req = indexedDB.open(IDB_CONFIG.dbName, IDB_CONFIG.version);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(IDB_CONFIG.storeName)) {
+            db.createObjectStore(IDB_CONFIG.storeName);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function idbSet(key, val) {
+      try {
+        const db = await openIndexedDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(IDB_CONFIG.storeName, 'readwrite');
+          tx.objectStore(IDB_CONFIG.storeName).put(val, key);
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => reject(tx.error);
+        });
+      } catch (err) {
+        localStorage.setItem(key, JSON.stringify(val));
+      }
+    }
+
+    async function idbGet(key) {
+      try {
+        const db = await openIndexedDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(IDB_CONFIG.storeName, 'readonly');
+          const req = tx.objectStore(IDB_CONFIG.storeName).get(key);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      } catch (err) {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : null;
+      }
+    }
+
+    /* =========================================================================
+       2. GLOBAL STATE & SYSTEM DEFINITIONS
+       ========================================================================= */
+    const appState = {
+      mode: 'nav',
+      typeFilter: 'all',
+      features: [],
+      rasterLayers: [], // Holds GeoTIFFs, WMS, and Image Overlays
+      customColumns: ['kategori', 'status'],
+      activeBaseMapKey: 'osm',
+      currentColor: '#D6684B',
+      tempPoints: [],
+      tempLayer: null,
+      tempMarkers: [],
+      editTargetId: null,
+      tempSaveData: null,
+      beaconMarker: null,
+      gpsAccuracyCircle: null,
+      isTableOpen: false,
+      spatialEdit: null
+    };
+
+    let map = null;
+    let baseLayers = {};
+    const featureLayerGroup = L.layerGroup();
+    const rasterLayerGroup = L.layerGroup();
+    const tempDrawingGroup = L.layerGroup();
+    const spatialEditGroup = L.layerGroup();
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /* =========================================================================
+       3. MAP INITIALIZATION & BASEMAP CONTROLS
+       ========================================================================= */
+    function initMapEngine() {
+      baseLayers = {
+        voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; CartoDB &copy; OpenStreetMap',
+          maxZoom: 19
+        }),
+        osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+          maxZoom: 19
+        }),
+        satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Tiles &copy; Esri World Imagery',
+          maxZoom: 18
+        }),
+        topo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Tiles &copy; Esri Topo',
+          maxZoom: 18
+        }),
+        dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; CartoDB Dark',
+          maxZoom: 19
+        })
+      };
+
+      map = L.map('map', {
+        center: [-2.5489, 118.0149],
+        zoom: 5,
+        zoomControl: false,
+        layers: [baseLayers.osm]
+      });
+
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      rasterLayerGroup.addTo(map);
+      featureLayerGroup.addTo(map);
+      tempDrawingGroup.addTo(map);
+      spatialEditGroup.addTo(map);
+
+      map.on('click', handleMapClick);
+      map.on('mousemove', handleMapMouseMove);
+
+      document.getElementById('drawingColorPicker').addEventListener('input', (e) => {
+        appState.currentColor = e.target.value;
+      });
+
+      document.getElementById('onlineServiceType').addEventListener('change', (e) => {
+        const wmsBox = document.getElementById('wmsLayerNameContainer');
+        if (e.target.value === 'wms') {
+          wmsBox.classList.remove('hidden');
+        } else {
+          wmsBox.classList.add('hidden');
+        }
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (appState.mode !== 'nav') {
+          if ((e.key === 'z' && (e.ctrlKey || e.metaKey)) || e.key === 'Backspace') {
+            if (['polyline', 'polygon'].includes(appState.mode) && appState.tempPoints.length > 0) {
+              e.preventDefault();
+              undoLastDrawingPoint();
+            }
+          } else if (e.key === 'Escape') {
+            cancelActiveDrawing();
+          }
+        } else if (appState.spatialEdit && e.key === 'Escape') {
+          cancelSpatialEditing();
+        }
+      });
+
+      restoreFromStorage();
+    }
+
+    function switchBaseLayer(key) {
+      if (baseLayers[key]) {
+        Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+        baseLayers[key].addTo(map);
+        appState.activeBaseMapKey = key;
+        showToast("Tampilan Peta Berubah", `Tema dasar diubah ke ${key.toUpperCase()}`);
+      }
+    }
+
+    function locateUserPosition() {
+      const btn = document.getElementById('btnGPS');
+      btn.innerHTML = `<i class="fas fa-spinner fa-spin text-brand-500"></i><span class="hidden sm:inline"> Mencari...</span>`;
+
+      if (!navigator.geolocation) {
+        showToast("Tidak Didukung", "Browser Anda tidak mendukung geolokasi GPS.", "error");
+        btn.innerHTML = `<i class="fas fa-crosshairs text-brand-500"></i><span class="hidden sm:inline">GPS Saya</span>`;
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const accuracy = Math.round(pos.coords.accuracy);
+          btn.innerHTML = `<i class="fas fa-check text-emerald-600"></i><span class="hidden sm:inline"> Terkunci</span>`;
+          
+          triggerPulsingBeacon(lat, lng, `Posisi GPS Saya (±${accuracy}m)`, 16, accuracy);
+          showToast("GPS Terkunci", `Akurasi ±${accuracy}m (${lat.toFixed(5)}, ${lng.toFixed(5)})`, "success");
+        },
+        (err) => {
+          btn.innerHTML = `<i class="fas fa-crosshairs text-brand-500"></i><span class="hidden sm:inline">GPS Saya</span>`;
+          showToast("Gagal GPS", "Akses izin GPS ditolak atau sinyal lemah.", "error");
+        },
+        { enableHighAccuracy: true, timeout: 9000 }
+      );
+    }
+
+    async function executeSmartSearch() {
+      const query = document.getElementById('searchInput').value.trim();
+      if (!query) return;
+
+      const cleaned = query.replace(/[()\[\]]/g, '').trim();
+      const coordRegex = /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)[,\s]+[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/;
+
+      if (coordRegex.test(cleaned)) {
+        const parts = cleaned.split(/[,\s]+/).map(parseFloat);
+        if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+          const [lat, lng] = parts;
+          if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            triggerPulsingBeacon(lat, lng, `Koordinat: ${lat.toFixed(5)}, ${lng.toFixed(5)}`, 16);
+            showToast("Koordinat Ditemukan", `Menuju ke Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`);
+            return;
+          }
+        }
+      }
+
+      showToast("Mencari Lokasi...", `Menghubungi direktori peta untuk "${query}"`, "info");
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'id' } });
+        if (!res.ok) throw new Error("Gagal mengambil respon geocoding.");
+        const data = await res.json();
+
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lng = parseFloat(data[0].lon);
+          const name = data[0].display_name.split(',').slice(0, 3).join(',');
+          triggerPulsingBeacon(lat, lng, name, 15);
+          showToast("Lokasi Ditemukan", name, "success");
+        } else {
+          showToast("Tidak Ditemukan", `Tidak ada hasil untuk kata kunci "${query}".`, "warning");
+        }
+      } catch (err) {
+        showToast("Gagal Pencarian", "Terjadi gangguan koneksi geocoding.", "error");
+      }
+    }
+
+    function triggerPulsingBeacon(lat, lng, label = "Titik Acuan", zoomLevel = 16, accuracy = null) {
+      if (appState.beaconMarker) map.removeLayer(appState.beaconMarker);
+      if (appState.gpsAccuracyCircle) map.removeLayer(appState.gpsAccuracyCircle);
+
+      const beaconIcon = L.divIcon({
+        className: 'beacon-pulse',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      if (accuracy && accuracy > 0) {
+        appState.gpsAccuracyCircle = L.circle([lat, lng], {
+          radius: accuracy,
+          color: '#D6684B',
+          weight: 1.5,
+          dashArray: '4, 4',
+          fillColor: '#D6684B',
+          fillOpacity: 0.12
+        }).addTo(map);
+      }
+
+      appState.beaconMarker = L.marker([lat, lng], { icon: beaconIcon }).addTo(map);
+      appState.beaconMarker.bindPopup(`
+        <div class="font-bold text-xs text-brand-900">${escapeHtml(label)}</div>
+        <div class="text-[10px] text-brand-800/70 font-mono mt-0.5">Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}</div>
+      `).openPopup();
+
+      map.flyTo([lat, lng], zoomLevel, { duration: 1.4 });
+    }
+
+    /* =========================================================================
+       4. DRAWING HUD & SPATIAL EDITING WORKFLOW
+       ========================================================================= */
+    function clearDrawingState() {
+      appState.tempPoints = [];
+      appState.tempMarkers = [];
+      tempDrawingGroup.clearLayers();
+      appState.tempLayer = null;
+      const pill = document.getElementById('drawingGuidancePill');
+      if (pill) pill.classList.add('hidden');
+      if (map && map.doubleClickZoom) map.doubleClickZoom.enable();
+    }
+
+    function setDrawingMode(mode) {
+      clearDrawingState();
+      cancelSpatialEditing();
+      appState.mode = mode;
+
+      document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-brand-500', 'text-white');
+        btn.classList.add('text-brand-800');
+      });
+
+      const activeBtn = document.getElementById(`tool-${mode}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'bg-brand-500', 'text-white');
+        activeBtn.classList.remove('text-brand-800');
+      }
+
+      const pill = document.getElementById('drawingGuidancePill');
+      const guideText = document.getElementById('drawingGuideText');
+      const btnFinish = document.getElementById('btnFinishDrawing');
+      const btnUndo = document.getElementById('btnUndoPoint');
+
+      if (mode === 'nav') {
+        pill.classList.add('hidden');
+        map.getContainer().style.cursor = 'grab';
+        map.doubleClickZoom.enable();
+      } else {
+        pill.classList.remove('hidden');
+        map.getContainer().style.cursor = 'crosshair';
+        map.doubleClickZoom.disable();
+
+        btnUndo.classList.add('hidden');
+        if (mode === 'marker') {
+          guideText.innerText = "Klik pada peta untuk meletakkan titik penanda (Point).";
+          btnFinish.classList.add('hidden');
+        } else if (mode === 'polyline') {
+          guideText.innerText = "Klik titik rute. Klik Selesai jika rampung.";
+          btnFinish.classList.remove('hidden');
+        } else if (mode === 'polygon') {
+          guideText.innerText = "Klik keliling poligon. Klik titik awal kembali untuk menutup.";
+          btnFinish.classList.remove('hidden');
+        } else if (mode === 'rectangle') {
+          guideText.innerText = "Klik sudut pertama, lalu klik sudut diagonal kedua.";
+          btnFinish.classList.add('hidden');
+        } else if (mode === 'circle') {
+          guideText.innerText = "Klik titik pusat, lalu klik titik tepi untuk jari-jari.";
+          btnFinish.classList.add('hidden');
+        }
+      }
+    }
+
+    function handleMapClick(e) {
+      if (appState.mode === 'nav') return;
+      const latlng = e.latlng;
+
+      if (appState.mode === 'marker') {
+        openModalForNewFeature('Marker', { lat: latlng.lat, lng: latlng.lng });
+      } else if (appState.mode === 'polyline') {
+        appState.tempPoints.push([latlng.lat, latlng.lng]);
+        addTempVertexMarker(latlng);
+        renderTempDrawingPreview();
+        updateDrawingActionButtons();
+      } else if (appState.mode === 'polygon') {
+        if (appState.tempPoints.length >= 3) {
+          const firstPoint = L.latLng(appState.tempPoints[0][0], appState.tempPoints[0][1]);
+          if (latlng.distanceTo(firstPoint) < 18) {
+            finishActiveDrawing();
+            return;
+          }
+        }
+        appState.tempPoints.push([latlng.lat, latlng.lng]);
+        addTempVertexMarker(latlng);
+        renderTempDrawingPreview();
+        updateDrawingActionButtons();
+      } else if (appState.mode === 'rectangle') {
+        appState.tempPoints.push([latlng.lat, latlng.lng]);
+        if (appState.tempPoints.length === 1) {
+          addTempVertexMarker(latlng);
+          showToast("Sudut 1 Disimpan", "Klik sudut diagonal kedua untuk membentuk kotak.");
+        } else if (appState.tempPoints.length === 2) {
+          const bounds = L.latLngBounds(appState.tempPoints[0], appState.tempPoints[1]);
+          const corners = [
+            [bounds.getSouthWest().lat, bounds.getSouthWest().lng],
+            [bounds.getNorthWest().lat, bounds.getNorthWest().lng],
+            [bounds.getNorthEast().lat, bounds.getNorthEast().lng],
+            [bounds.getSouthEast().lat, bounds.getSouthEast().lng],
+            [bounds.getSouthWest().lat, bounds.getSouthWest().lng]
+          ];
+          openModalForNewFeature('Rectangle', corners);
+        }
+      } else if (appState.mode === 'circle') {
+        appState.tempPoints.push([latlng.lat, latlng.lng]);
+        if (appState.tempPoints.length === 1) {
+          addTempVertexMarker(latlng);
+          showToast("Titik Pusat Diatur", "Klik titik kedua untuk menetapkan radius.");
+        } else if (appState.tempPoints.length === 2) {
+          const center = L.latLng(appState.tempPoints[0][0], appState.tempPoints[0][1]);
+          const edge = L.latLng(appState.tempPoints[1][0], appState.tempPoints[1][1]);
+          const radiusMeters = center.distanceTo(edge);
+          openModalForNewFeature('Circle', {
+            center: [center.lat, center.lng],
+            radius: Math.round(radiusMeters)
+          });
+        }
+      }
+    }
+
+    function addTempVertexMarker(latlng) {
+      const isFirst = appState.tempPoints.length === 1;
+      const marker = L.circleMarker(latlng, {
+        radius: isFirst ? 6 : 5,
+        color: isFirst ? '#10B981' : appState.currentColor,
+        fillColor: '#FFFFFF',
+        fillOpacity: 1,
+        weight: isFirst ? 3 : 2
+      }).addTo(tempDrawingGroup);
+
+      if (isFirst && appState.mode === 'polygon') {
+        marker.on('click', () => {
+          if (appState.tempPoints.length >= 3) finishActiveDrawing();
+        });
+      }
+      appState.tempMarkers.push(marker);
+    }
+
+    function handleMapMouseMove(e) {
+      if (appState.tempPoints.length === 0 || appState.mode === 'nav') return;
+      const currentLatLng = e.latlng;
+
+      if (appState.mode === 'rectangle' && appState.tempPoints.length === 1) {
+        if (appState.tempLayer) tempDrawingGroup.removeLayer(appState.tempLayer);
+        const bounds = L.latLngBounds(appState.tempPoints[0], [currentLatLng.lat, currentLatLng.lng]);
+        appState.tempLayer = L.rectangle(bounds, {
+          color: appState.currentColor,
+          weight: 2,
+          dashArray: '4, 4',
+          fillOpacity: 0.15
+        }).addTo(tempDrawingGroup);
+      } else if (appState.mode === 'circle' && appState.tempPoints.length === 1) {
+        if (appState.tempLayer) tempDrawingGroup.removeLayer(appState.tempLayer);
+        const center = L.latLng(appState.tempPoints[0][0], appState.tempPoints[0][1]);
+        const radius = center.distanceTo(currentLatLng);
+        appState.tempLayer = L.circle(center, {
+          radius: radius,
+          color: appState.currentColor,
+          weight: 2,
+          dashArray: '4, 4',
+          fillOpacity: 0.15
+        }).addTo(tempDrawingGroup);
+      }
+    }
+
+    function renderTempDrawingPreview() {
+      if (appState.tempLayer) tempDrawingGroup.removeLayer(appState.tempLayer);
+
+      if (appState.mode === 'polyline' && appState.tempPoints.length > 1) {
+        appState.tempLayer = L.polyline(appState.tempPoints, {
+          color: appState.currentColor,
+          weight: 3,
+          dashArray: '5, 5'
+        }).addTo(tempDrawingGroup);
+      } else if (appState.mode === 'polygon' && appState.tempPoints.length > 1) {
+        appState.tempLayer = L.polygon(appState.tempPoints, {
+          color: appState.currentColor,
+          weight: 2,
+          fillColor: appState.currentColor,
+          fillOpacity: 0.2,
+          dashArray: '5, 5'
+        }).addTo(tempDrawingGroup);
+      }
+    }
+
+    function updateDrawingActionButtons() {
+      const btnUndo = document.getElementById('btnUndoPoint');
+      if (appState.tempPoints.length > 0 && ['polyline', 'polygon'].includes(appState.mode)) {
+        btnUndo.classList.remove('hidden');
+      } else {
+        btnUndo.classList.add('hidden');
+      }
+    }
+
+    function undoLastDrawingPoint() {
+      if (appState.tempPoints.length === 0) return;
+      appState.tempPoints.pop();
+      const lastMarker = appState.tempMarkers.pop();
+      if (lastMarker) tempDrawingGroup.removeLayer(lastMarker);
+
+      renderTempDrawingPreview();
+      updateDrawingActionButtons();
+      showToast("Titik Dihapus", "Titik terakhir dibatalkan.", "info");
+    }
+
+    function finishActiveDrawing() {
+      if (appState.mode === 'polyline') {
+        if (appState.tempPoints.length < 2) {
+          showToast("Titik Kurang", "Garis membutuhkan minimal 2 titik.", "warning");
+          return;
+        }
+        openModalForNewFeature('Polyline', [...appState.tempPoints]);
+      } else if (appState.mode === 'polygon') {
+        if (appState.tempPoints.length < 3) {
+          showToast("Titik Kurang", "Poligon membutuhkan minimal 3 sudut.", "warning");
+          return;
+        }
+        const closed = [...appState.tempPoints];
+        if (closed[0][0] !== closed[closed.length - 1][0] || closed[0][1] !== closed[closed.length - 1][1]) {
+          closed.push(closed[0]);
+        }
+        openModalForNewFeature('Polygon', closed);
+      }
+    }
+
+    function cancelActiveDrawing() {
+      clearDrawingState();
+      if (appState.mode !== 'nav') {
+        setDrawingMode('nav');
+      }
+    }
+
+    function startSpatialEditing(id) {
+      const feat = appState.features.find(f => f.id === id);
+      if (!feat) return;
+
+      clearDrawingState();
+      cancelSpatialEditing();
+
+      appState.spatialEdit = {
+        id: feat.id,
+        type: feat.type,
+        handles: [],
+        tempCoords: JSON.parse(JSON.stringify(feat.coordinates))
+      };
+
+      featureLayerGroup.eachLayer(layer => {
+        if (layer.featureId === id) layer.setOpacity ? layer.setOpacity(0.2) : layer.setStyle && layer.setStyle({ opacity: 0.2, fillOpacity: 0.05 });
+      });
+
+      document.getElementById('spatialEditDock').classList.remove('hidden');
+      document.getElementById('spatialEditTargetName').innerText = `Edit: ${feat.name}`;
+
+      if (feat.type === 'Marker') {
+        const handle = L.marker([feat.coordinates.lat, feat.coordinates.lng], {
+          draggable: true,
+          icon: L.divIcon({ className: 'edit-vertex-handle', iconSize: [16, 16], iconAnchor: [8, 8] })
+        }).addTo(spatialEditGroup);
+
+        handle.on('drag', (e) => {
+          const latlng = e.target.getLatLng();
+          appState.spatialEdit.tempCoords = { lat: latlng.lat, lng: latlng.lng };
+        });
+        appState.spatialEdit.handles.push(handle);
+        map.panTo([feat.coordinates.lat, feat.coordinates.lng]);
+
+      } else if (feat.type === 'Polyline' || feat.type === 'Polygon' || feat.type === 'Rectangle') {
+        const coords = feat.coordinates;
+        const previewLayer = feat.type === 'Polyline'
+          ? L.polyline(coords, { color: '#2563EB', weight: 3, dashArray: '4, 4' }).addTo(spatialEditGroup)
+          : L.polygon(coords, { color: '#2563EB', weight: 3, fillColor: '#3B82F6', fillOpacity: 0.2, dashArray: '4, 4' }).addTo(spatialEditGroup);
+
+        coords.forEach((pt, idx) => {
+          if (feat.type !== 'Polyline' && idx === coords.length - 1 && pt[0] === coords[0][0] && pt[1] === coords[0][1]) return;
+
+          const handle = L.marker([pt[0], pt[1]], {
+            draggable: true,
+            icon: L.divIcon({ className: 'edit-vertex-handle', iconSize: [14, 14], iconAnchor: [7, 7] })
+          }).addTo(spatialEditGroup);
+
+          handle.on('drag', (e) => {
+            const pos = e.target.getLatLng();
+            appState.spatialEdit.tempCoords[idx] = [pos.lat, pos.lng];
+
+            if (feat.type !== 'Polyline' && idx === 0) {
+              appState.spatialEdit.tempCoords[coords.length - 1] = [pos.lat, pos.lng];
+            }
+            previewLayer.setLatLngs(appState.spatialEdit.tempCoords);
+          });
+          appState.spatialEdit.handles.push(handle);
+        });
+
+        if (coords.length > 0) map.panTo([coords[0][0], coords[0][1]]);
+      } else if (feat.type === 'Circle') {
+        const centerHandle = L.marker(feat.coordinates.center, {
+          draggable: true,
+          icon: L.divIcon({ className: 'edit-vertex-handle', iconSize: [16, 16], iconAnchor: [8, 8] })
+        }).addTo(spatialEditGroup);
+
+        const previewCircle = L.circle(feat.coordinates.center, {
+          radius: feat.radius,
+          color: '#2563EB',
+          weight: 2,
+          dashArray: '4, 4',
+          fillOpacity: 0.15
+        }).addTo(spatialEditGroup);
+
+        centerHandle.on('drag', (e) => {
+          const pos = e.target.getLatLng();
+          appState.spatialEdit.tempCoords.center = [pos.lat, pos.lng];
+          previewCircle.setLatLng(pos);
+        });
+        appState.spatialEdit.handles.push(centerHandle);
+        map.panTo(feat.coordinates.center);
+      }
+
+      showToast("Mode Edit Geometri", "Geser titik simpul biru di peta untuk menyesuaikan bentuk.", "info");
+    }
+
+    function saveSpatialEditing() {
+      if (!appState.spatialEdit) return;
+      const feat = appState.features.find(f => f.id === appState.spatialEdit.id);
+      if (feat) {
+        feat.coordinates = appState.spatialEdit.tempCoords;
+        rebuildMapLayers();
+        renderFeatureList();
+        renderSpreadsheetTable();
+        persistData();
+        showToast("Geometri Diperbarui", `Bentuk spasial "${feat.name}" berhasil disimpan!`, "success");
+      }
+      cancelSpatialEditing();
+    }
+
+    function cancelSpatialEditing() {
+      if (!appState.spatialEdit) return;
+      spatialEditGroup.clearLayers();
+      document.getElementById('spatialEditDock').classList.add('hidden');
+      appState.spatialEdit = null;
+      rebuildMapLayers();
+    }
+
+    function calculateFeatureMetric(type, coordinates, radius = null) {
+      try {
+        if (type === 'Polyline') {
+          const turfCoords = coordinates.map(c => [c[1], c[0]]);
+          const line = turf.lineString(turfCoords);
+          const km = turf.length(line, { units: 'kilometers' });
+          return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(2)} km`;
+        } else if (type === 'Polygon' || type === 'Rectangle') {
+          const turfCoords = coordinates.map(c => [c[1], c[0]]);
+          const poly = turf.polygon([turfCoords]);
+          const sqMeters = turf.area(poly);
+          if (sqMeters >= 10000) {
+            return `${(sqMeters / 10000).toFixed(2)} ha (${Math.round(sqMeters).toLocaleString('id-ID')} m²)`;
+          }
+          return `${Math.round(sqMeters).toLocaleString('id-ID')} m²`;
+        } else if (type === 'Circle' && radius) {
+          const sqMeters = Math.PI * radius * radius;
+          if (sqMeters >= 10000) {
+            return `Radius ${radius}m • ${(sqMeters / 10000).toFixed(2)} ha`;
+          }
+          return `Radius ${radius}m • ${Math.round(sqMeters).toLocaleString('id-ID')} m²`;
+        } else if (type === 'Marker') {
+          return `Lat: ${coordinates.lat.toFixed(5)}, Lng: ${coordinates.lng.toFixed(5)}`;
+        }
+      } catch (err) {
+        console.warn("Kalkulasi spasial:", err);
+      }
+      return "-";
+    }
+
+    /* =========================================================================
+       5. UNIVERSAL INGESTION PIPELINE (GEOJSON/SHP/KMZ/GPX/ONLINE)
+       ========================================================================= */
+    function ingestGeoJSONCollection(geojson, sourceTitle = "Data Eksternal") {
+      if (!geojson || (!geojson.features && geojson.type !== "FeatureCollection" && geojson.type !== "Feature")) {
+        throw new Error("Objek data bukan struktur GeoJSON yang valid.");
+      }
+
+      const featuresArray = geojson.features ? geojson.features : (geojson.type === "Feature" ? [geojson] : []);
+      let count = 0;
+
+      featuresArray.forEach(feat => {
+        if (!feat.geometry) return;
+        const geom = feat.geometry;
+        const props = feat.properties || {};
+        const name = String(props.name || props.Nama || props.NAMA || props.label || `${sourceTitle} #${appState.features.length + 1}`).trim();
+        const desc = String(props.desc || props.description || props.Keterangan || '').trim();
+
+        // Style resolution
+        const color = props.stroke || props.color || props.marker_color || appState.currentColor;
+        const style = {
+          color: color,
+          fillColor: color,
+          fillOpacity: props['fill-opacity'] !== undefined ? parseFloat(props['fill-opacity']) : 0.25,
+          weight: props['stroke-width'] ? parseInt(props['stroke-width'], 10) : 3
+        };
+
+        // Auto-extract dynamic columns into spreadsheet
+        Object.keys(props).forEach(k => {
+          const norm = k.toLowerCase().trim();
+          const reserved = ['name', 'nama', 'desc', 'description', 'stroke', 'color', 'fill', 'fill-opacity', 'stroke-width', 'id', 'createdat', 'hidden', 'type'];
+          if (!reserved.includes(norm) && !appState.customColumns.includes(norm)) {
+            appState.customColumns.push(norm);
+          }
+        });
+
+        const now = new Date().toISOString();
+        const baseId = `ingest_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
+        if (geom.type === 'Point') {
+          appState.features.push({
+            id: baseId,
+            type: 'Marker',
+            name: name,
+            desc: desc,
+            coordinates: { lat: geom.coordinates[1], lng: geom.coordinates[0] },
+            style,
+            properties: props,
+            hidden: false,
+            createdAt: now
+          });
+          count++;
+        } else if (geom.type === 'LineString') {
+          appState.features.push({
+            id: baseId,
+            type: 'Polyline',
+            name: name,
+            desc: desc,
+            coordinates: geom.coordinates.map(c => [c[1], c[0]]),
+            style,
+            properties: props,
+            hidden: false,
+            createdAt: now
+          });
+          count++;
+        } else if (geom.type === 'MultiLineString') {
+          geom.coordinates.forEach((line, idx) => {
+            appState.features.push({
+              id: `${baseId}_part${idx}`,
+              type: 'Polyline',
+              name: `${name} (Bagian ${idx + 1})`,
+              desc: desc,
+              coordinates: line.map(c => [c[1], c[0]]),
+              style,
+              properties: props,
+              hidden: false,
+              createdAt: now
+            });
+            count++;
+          });
+        } else if (geom.type === 'Polygon') {
+          appState.features.push({
+            id: baseId,
+            type: 'Polygon',
+            name: name,
+            desc: desc,
+            coordinates: geom.coordinates[0].map(c => [c[1], c[0]]),
+            style,
+            properties: props,
+            hidden: false,
+            createdAt: now
+          });
+          count++;
+        } else if (geom.type === 'MultiPolygon') {
+          geom.coordinates.forEach((poly, idx) => {
+            appState.features.push({
+              id: `${baseId}_poly${idx}`,
+              type: 'Polygon',
+              name: `${name} (Bagian ${idx + 1})`,
+              desc: desc,
+              coordinates: poly[0].map(c => [c[1], c[0]]),
+              style,
+              properties: props,
+              hidden: false,
+              createdAt: now
+            });
+            count++;
+          });
+        }
+      });
+
+      rebuildMapLayers();
+      filterFeatureList();
+      renderSpreadsheetTable();
+      persistData();
+      return count;
+    }
+
+    /* =========================================================================
+       6. LOCAL FILE IMPORT CONTROLLERS (GEOJSON, GPX, KML, KMZ, SHP, TIF, CSV)
+       ========================================================================= */
+    function openImportModal() {
+      document.getElementById('importModal').classList.remove('hidden');
+      document.getElementById('importFileInfoBox').classList.add('hidden');
+    }
+
+    function closeImportModal() {
+      document.getElementById('importModal').classList.add('hidden');
+    }
+
+    function switchImportTab(tab) {
+      const fileTab = document.getElementById('import-tab-file');
+      const onlineTab = document.getElementById('import-tab-online');
+      const btnFile = document.getElementById('import-tab-btn-file');
+      const btnOnline = document.getElementById('import-tab-btn-online');
+
+      if (tab === 'file') {
+        fileTab.classList.remove('hidden');
+        onlineTab.classList.add('hidden');
+        btnFile.className = "flex-1 pb-2 font-bold text-xs border-b-2 border-brand-500 text-brand-900";
+        btnOnline.className = "flex-1 pb-2 font-semibold text-xs border-b-2 border-transparent text-brand-800/60 hover:text-brand-900";
+      } else {
+        fileTab.classList.add('hidden');
+        onlineTab.classList.remove('hidden');
+        btnOnline.className = "flex-1 pb-2 font-bold text-xs border-b-2 border-brand-500 text-brand-900";
+        btnFile.className = "flex-1 pb-2 font-semibold text-xs border-b-2 border-transparent text-brand-800/60 hover:text-brand-900";
+      }
+    }
+
+    function handleFileDrop(e) {
+      e.preventDefault();
+      document.getElementById('dropZoneContainer').classList.remove('border-brand-500', 'bg-brand-50');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleSelectedFiles(e.dataTransfer.files);
+      }
+    }
+
+    async function handleSelectedFiles(files) {
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      const filename = file.name;
+      const ext = filename.split('.').pop().toLowerCase();
+
+      const infoBox = document.getElementById('importFileInfoBox');
+      const nameEl = document.getElementById('importFileName');
+      const sizeEl = document.getElementById('importFileSize');
+      const statusEl = document.getElementById('importFileStatus');
+
+      infoBox.classList.remove('hidden');
+      nameEl.innerText = filename;
+      sizeEl.innerText = `${(file.size / 1024).toFixed(1)} KB`;
+      statusEl.innerHTML = `<i class="fas fa-spinner fa-spin text-brand-500 mr-1"></i>Mengekstrak data spasial...`;
+
+      try {
+        if (ext === 'geojson' || ext === 'json') {
+          const text = await file.text();
+          const json = JSON.parse(text);
+          const count = ingestGeoJSONCollection(json, filename);
+          statusEl.innerText = `Selesai: ${count} objek berhasil diimpor.`;
+          showToast("Impor Berhasil", `${count} objek dimuat dari ${filename}`, "success");
+          setTimeout(closeImportModal, 900);
+
+        } else if (ext === 'kml') {
+          const text = await file.text();
+          const dom = new DOMParser().parseFromString(text, 'text/xml');
+          const geojson = toGeoJSON.kml(dom);
+          const count = ingestGeoJSONCollection(geojson, filename);
+          statusEl.innerText = `Selesai: ${count} objek diekstrak dari KML.`;
+          showToast("KML Dimuat", `${count} objek berhasil ditambahkan.`, "success");
+          setTimeout(closeImportModal, 900);
+
+        } else if (ext === 'kmz') {
+          const buffer = await file.arrayBuffer();
+          const zip = await JSZip.loadAsync(buffer);
+          const kmlFile = Object.values(zip.files).find(f => f.name.toLowerCase().endsWith('.kml'));
+          if (!kmlFile) throw new Error("Tidak ada file KML di dalam arsip KMZ.");
+          const kmlText = await kmlFile.async("string");
+          const dom = new DOMParser().parseFromString(kmlText, 'text/xml');
+          const geojson = toGeoJSON.kml(dom);
+          const count = ingestGeoJSONCollection(geojson, filename);
+          statusEl.innerText = `Selesai: ${count} objek diekstrak dari KMZ.`;
+          showToast("KMZ Dimuat", `${count} objek berhasil diekstrak.`, "success");
+          setTimeout(closeImportModal, 900);
+
+        } else if (ext === 'gpx') {
+          const text = await file.text();
+          const dom = new DOMParser().parseFromString(text, 'text/xml');
+          const geojson = toGeoJSON.gpx(dom);
+          const count = ingestGeoJSONCollection(geojson, filename);
+          statusEl.innerText = `Selesai: ${count} objek lintasan/titik GPX dimuat.`;
+          showToast("GPX Dimuat", `${count} waypoint/track berhasil dimasukkan.`, "success");
+          setTimeout(closeImportModal, 900);
+
+        } else if (ext === 'zip') {
+          // Shapefile Archive
+          const buffer = await file.arrayBuffer();
+          const geojson = await shp(buffer);
+          let total = 0;
+          if (Array.isArray(geojson)) {
+            geojson.forEach(g => { total += ingestGeoJSONCollection(g, filename); });
+          } else {
+            total = ingestGeoJSONCollection(geojson, filename);
+          }
+          statusEl.innerText = `Selesai: ${total} objek shapefile berhasil diuraikan.`;
+          showToast("Shapefile Dimuat", `${total} fitur vektor berhasil diimpor.`, "success");
+          setTimeout(closeImportModal, 900);
+
+        } else if (ext === 'tif' || ext === 'tiff') {
+          // GeoTIFF Raster Handling
+          const buffer = await file.arrayBuffer();
+          const georaster = await parseGeoraster(buffer);
+          const layer = new GeoRasterLayer({
+            georaster: georaster,
+            opacity: 0.8,
+            resolution: 256
+          });
+
+          const rasterId = `raster_${Date.now()}`;
+          rasterLayerGroup.addLayer(layer);
+          map.fitBounds(layer.getBounds());
+
+          appState.rasterLayers.push({
+            id: rasterId,
+            name: filename,
+            type: 'GeoTIFF',
+            layer: layer,
+            opacity: 0.8
+          });
+
+          renderRasterLayersList();
+          statusEl.innerText = "GeoTIFF berhasil dirender sebagai Image Overlay.";
+          showToast("Citra GeoTIFF Aktif", "Peta difokuskan ke cakupan raster.", "success");
+          setTimeout(closeImportModal, 900);
+
+        } else if (ext === 'csv' || ext === 'txt') {
+          importFromCSV(file);
+          statusEl.innerText = "CSV berhasil diparsing.";
+          setTimeout(closeImportModal, 900);
+
+        } else if (ext === 'pbf') {
+          throw new Error("Berkas .pbf mentah merupakan binary protocol buffer per-kotak (tile/OSM). Harap gunakan format GeoJSON atau hubungkan via Vector Tile URL.");
+        } else {
+          throw new Error(`Format berkas .${ext} belum didukung.`);
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span class="text-rose-600 font-semibold"><i class="fas fa-exclamation-circle mr-1"></i>${escapeHtml(err.message)}</span>`;
+        showToast("Gagal Membaca Berkas", err.message, "error");
+      }
+    }
+
+    /* =========================================================================
+       7. ONLINE SPATIAL DATA CONSUMER (ARCGIS REST / GEOJSON URL / WMS)
+       ========================================================================= */
+    async function fetchOnlineSpatialData() {
+      const type = document.getElementById('onlineServiceType').value;
+      let url = document.getElementById('onlineServiceUrl').value.trim();
+      const useProxy = document.getElementById('onlineUseCorsProxy').checked;
+      const btn = document.getElementById('btnFetchOnline');
+
+      if (!url) {
+        showToast("URL Kosong", "Masukkan URL layanan peta online yang valid.", "warning");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1.5"></i>Menghubungi Server...`;
+
+      try {
+        if (type === 'arcgis') {
+          let queryUrl = url;
+          if (!queryUrl.toLowerCase().includes('/query')) {
+            queryUrl = queryUrl.replace(/\/+$/, '') + '/query?where=1=1&outFields=*&f=geojson&returnGeometry=true';
+          } else if (!queryUrl.toLowerCase().includes('f=geojson')) {
+            queryUrl += '&f=geojson';
+          }
+
+          const targetUrl = useProxy ? `https://api.allorigins.win/raw?url=${encodeURIComponent(queryUrl)}` : queryUrl;
+          const res = await fetch(targetUrl);
+          if (!res.ok) throw new Error(`HTTP Error ${res.status}: Gagal memuat data dari ArcGIS REST.`);
+          const data = await res.json();
+          const count = ingestGeoJSONCollection(data, "ArcGIS REST");
+          showToast("ArcGIS Terhubung", `${count} fitur berhasil diunduh.`, "success");
+          closeImportModal();
+
+        } else if (type === 'geojson_url') {
+          const targetUrl = useProxy ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` : url;
+          const res = await fetch(targetUrl);
+          if (!res.ok) throw new Error(`HTTP Error ${res.status}: Gagal mengambil berkas GeoJSON.`);
+          const data = await res.json();
+          const count = ingestGeoJSONCollection(data, "Online Feed");
+          showToast("GeoJSON Dimuat", `${count} objek berhasil diunduh.`, "success");
+          closeImportModal();
+
+        } else if (type === 'wms') {
+          const layerName = document.getElementById('onlineWmsLayerName').value.trim();
+          if (!layerName) throw new Error("Nama Layer WMS wajib diisi.");
+
+          const wmsLayer = L.tileLayer.wms(url, {
+            layers: layerName,
+            format: 'image/png',
+            transparent: true,
+            version: '1.3.0',
+            attribution: 'Layanan WMS Eksternal'
+          });
+
+          const rasterId = `wms_${Date.now()}`;
+          rasterLayerGroup.addLayer(wmsLayer);
+
+          appState.rasterLayers.push({
+            id: rasterId,
+            name: `WMS: ${layerName}`,
+            type: 'WMS',
+            layer: wmsLayer,
+            opacity: 1
+          });
+
+          renderRasterLayersList();
+          showToast("WMS Aktif", `Layer "${layerName}" berhasil ditambahkan ke kanvas.`, "success");
+          closeImportModal();
+        }
+      } catch (err) {
+        showToast("Koneksi Gagal", err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-cloud-download-alt mr-1.5"></i>Tarik Data Daring`;
+      }
+    }
+
+    function renderRasterLayersList() {
+      const container = document.getElementById('rasterLayersList');
+      const section = document.getElementById('rasterLayersSection');
+      const badge = document.getElementById('rasterCountBadge');
+
+      if (appState.rasterLayers.length === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+
+      section.classList.remove('hidden');
+      badge.innerText = appState.rasterLayers.length;
+      container.innerHTML = '';
+
+      appState.rasterLayers.forEach((r, idx) => {
+        const item = document.createElement('div');
+        item.className = "flex items-center justify-between p-1.5 bg-white rounded-xl border border-brand-200 text-xs";
+        item.innerHTML = `
+          <div class="truncate flex-1 pr-2">
+            <div class="font-bold text-brand-900 truncate">${escapeHtml(r.name)}</div>
+            <div class="text-[9px] text-brand-800/60">${escapeHtml(r.type)}</div>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <button onclick="removeRasterLayer('${r.id}')" class="text-rose-500 hover:text-rose-700 p-1" title="Hapus Layer Raster">
+              <i class="fas fa-trash-alt text-[10px]"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function removeRasterLayer(id) {
+      const item = appState.rasterLayers.find(r => r.id === id);
+      if (item) {
+        rasterLayerGroup.removeLayer(item.layer);
+        appState.rasterLayers = appState.rasterLayers.filter(r => r.id !== id);
+        renderRasterLayersList();
+        showToast("Layer Dihapus", `Layer "${item.name}" telah dilepas dari kanvas.`);
+      }
+    }
+
+    /* =========================================================================
+       8. MODAL & ATTRIBUTE RECORD EDITING
+       ========================================================================= */
+    function openModalForNewFeature(type, data) {
+      appState.editTargetId = null;
+      appState.tempSaveData = { type, data };
+
+      document.getElementById('modalFeatureTitle').innerText = `Tambah ${type} Baru`;
+      document.getElementById('modalInputName').value = `${type} #${appState.features.length + 1}`;
+      document.getElementById('modalInputDesc').value = '';
+
+      const measurement = calculateFeatureMetric(type, type === 'Circle' ? null : data, type === 'Circle' ? data.radius : null);
+      document.getElementById('modalMeasurementSub').innerText = `Metrik: ${measurement}`;
+
+      document.getElementById('modalStyleColor').value = appState.currentColor;
+      document.getElementById('modalStyleWeight').value = '3';
+      document.getElementById('modalStyleOpacity').value = '0.25';
+
+      renderDynamicFieldsInModal({});
+      document.getElementById('featureModal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('modalInputName').focus(), 80);
+    }
+
+    function openModalForEditFeature(id) {
+      const feat = appState.features.find(f => f.id === id);
+      if (!feat) return;
+
+      appState.editTargetId = id;
+      appState.tempSaveData = null;
+
+      document.getElementById('modalFeatureTitle').innerText = `Edit ${feat.type}: ${feat.name}`;
+      document.getElementById('modalInputName').value = feat.name;
+      document.getElementById('modalInputDesc').value = feat.desc || '';
+
+      const measurement = calculateFeatureMetric(feat.type, feat.coordinates, feat.radius);
+      document.getElementById('modalMeasurementSub').innerText = `Metrik: ${measurement}`;
+
+      document.getElementById('modalStyleColor').value = feat.style.color || appState.currentColor;
+      document.getElementById('modalStyleWeight').value = String(feat.style.weight || 3);
+      document.getElementById('modalStyleOpacity').value = String(feat.style.fillOpacity !== undefined ? feat.style.fillOpacity : 0.25);
+
+      renderDynamicFieldsInModal(feat.properties || {});
+      document.getElementById('featureModal').classList.remove('hidden');
+    }
+
+    function renderDynamicFieldsInModal(existingProperties) {
+      const container = document.getElementById('dynamicFieldsInputs');
+      container.innerHTML = '';
+
+      if (appState.customColumns.length === 0) {
+        container.innerHTML = `<p class="text-[10px] text-brand-800/50 italic">Tidak ada kolom kustom. Buat kolom lewat tombol 'Field'.</p>`;
+        return;
+      }
+
+      appState.customColumns.forEach(col => {
+        const val = existingProperties[col] || '';
+        const fieldRow = document.createElement('div');
+        fieldRow.className = "flex items-center space-x-2";
+        fieldRow.innerHTML = `
+          <label class="w-24 text-[10px] font-bold text-brand-800 capitalize truncate">${escapeHtml(col)}:</label>
+          <input type="text" data-custom-col="${escapeHtml(col)}" value="${escapeHtml(val)}" placeholder="Isi ${escapeHtml(col)}..."
+            class="flex-1 px-2.5 py-1 bg-white border border-brand-200 rounded-xl text-xs text-brand-900 focus:outline-none focus:ring-1 focus:ring-brand-500">
+        `;
+        container.appendChild(fieldRow);
+      });
+    }
+
+    function closeFeatureModal() {
+      document.getElementById('featureModal').classList.add('hidden');
+      cancelActiveDrawing();
+    }
+
+    function saveFeatureAttributes() {
+      const name = document.getElementById('modalInputName').value.trim();
+      const desc = document.getElementById('modalInputDesc').value.trim();
+      const color = document.getElementById('modalStyleColor').value;
+      const weight = parseInt(document.getElementById('modalStyleWeight').value, 10) || 3;
+      const fillOpacity = parseFloat(document.getElementById('modalStyleOpacity').value) || 0.25;
+
+      if (!name) {
+        showToast("Nama Kosong", "Harap beri nama objek geospasial.", "warning");
+        return;
+      }
+
+      const properties = {};
+      document.querySelectorAll('#dynamicFieldsInputs input[data-custom-col]').forEach(input => {
+        const col = input.getAttribute('data-custom-col');
+        properties[col] = input.value.trim();
+      });
+
+      const styleConfig = { color, fillColor: color, fillOpacity, weight };
+
+      if (appState.editTargetId) {
+        const feat = appState.features.find(f => f.id === appState.editTargetId);
+        if (feat) {
+          feat.name = name;
+          feat.desc = desc;
+          feat.style = styleConfig;
+          feat.properties = properties;
+          rebuildMapLayers();
+          renderFeatureList();
+          renderSpreadsheetTable();
+          persistData();
+          showToast("Data Diperbarui", `${feat.name} berhasil disimpan!`, "success");
+        }
+      } else if (appState.tempSaveData) {
+        const newFeat = {
+          id: `geo_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          type: appState.tempSaveData.type,
+          name: name,
+          desc: desc,
+          coordinates: appState.tempSaveData.data,
+          radius: appState.tempSaveData.type === 'Circle' ? appState.tempSaveData.data.radius : null,
+          style: styleConfig,
+          properties: properties,
+          hidden: false,
+          createdAt: new Date().toISOString()
+        };
+
+        appState.features.push(newFeat);
+        rebuildMapLayers();
+        renderFeatureList();
+        renderSpreadsheetTable();
+        persistData();
+        showToast("Objek Disimpan", `${newFeat.name} berhasil ditambahkan!`, "success");
+      }
+
+      closeFeatureModal();
+    }
+
+    /* =========================================================================
+       9. LAYER RENDERING, SIDEBAR LIST, & SPREADSHEET TABLE
+       ========================================================================= */
+    function rebuildMapLayers() {
+      featureLayerGroup.clearLayers();
+
+      appState.features.forEach(feat => {
+        if (feat.hidden) return;
+
+        let layer = null;
+        const metric = calculateFeatureMetric(feat.type, feat.coordinates, feat.radius);
+
+        let popupHtml = `
+          <div class="space-y-1.5 min-w-[180px]">
+            <div class="flex items-center justify-between gap-2 border-b border-brand-200 pb-1">
+              <span class="font-black text-xs text-brand-900">${escapeHtml(feat.name)}</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase bg-brand-100 text-brand-800">${escapeHtml(feat.type)}</span>
+            </div>
+            <div class="text-[11px] text-brand-800/80 leading-snug">${feat.desc ? escapeHtml(feat.desc) : '<em class="text-brand-800/40">Tanpa keterangan</em>'}</div>
+            <div class="text-[10px] font-mono text-brand-700 font-bold bg-brand-50 p-1.5 rounded-lg border border-brand-200/80">${escapeHtml(metric)}</div>
+        `;
+
+        if (feat.properties && Object.keys(feat.properties).length > 0) {
+          popupHtml += `<div class="text-[10px] pt-1 space-y-0.5 border-t border-brand-200">`;
+          for (const [k, v] of Object.entries(feat.properties)) {
+            if (v) popupHtml += `<div><strong class="capitalize">${escapeHtml(k)}:</strong> ${escapeHtml(v)}</div>`;
+          }
+          popupHtml += `</div>`;
+        }
+
+        popupHtml += `
+            <div class="flex items-center justify-between gap-1 pt-1.5 mt-1 border-t border-brand-200">
+              <button onclick="startSpatialEditing('${feat.id}')" class="px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded-lg text-[10px] font-bold text-blue-800 transition" title="Ubah Bentuk/Titik">
+                <i class="fas fa-bezier-curve mr-1"></i>Bentuk
+              </button>
+              <div class="flex items-center space-x-1">
+                <button onclick="openModalForEditFeature('${feat.id}')" class="px-2 py-1 bg-brand-100 hover:bg-brand-200 rounded-lg text-[10px] font-bold text-brand-900 transition">
+                  <i class="fas fa-edit mr-0.5"></i>Data
+                </button>
+                <button onclick="requestDeleteFeature('${feat.id}')" class="px-2 py-1 bg-rose-100 hover:bg-rose-200 rounded-lg text-[10px] font-bold text-rose-700 transition">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        if (feat.type === 'Marker') {
+          const icon = L.divIcon({
+            className: 'custom-pin',
+            html: `<div style="background-color: ${feat.style.color}; width:16px; height:16px; border-radius:50%; border:2.5px solid white; box-shadow:0 0 8px rgba(0,0,0,0.35);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+          });
+          layer = L.marker([feat.coordinates.lat, feat.coordinates.lng], { icon: icon });
+        } else if (feat.type === 'Polyline') {
+          layer = L.polyline(feat.coordinates, feat.style);
+        } else if (feat.type === 'Polygon' || feat.type === 'Rectangle') {
+          layer = L.polygon(feat.coordinates, feat.style);
+        } else if (feat.type === 'Circle') {
+          layer = L.circle(feat.coordinates.center, { radius: feat.radius, ...feat.style });
+        }
+
+        if (layer) {
+          layer.bindPopup(popupHtml);
+          layer.featureId = feat.id;
+          featureLayerGroup.addLayer(layer);
+        }
+      });
+
+      document.getElementById('badgeTotalFeatures').innerText = `${appState.features.length} Item`;
+    }
+
+    function setTypeFilter(type) {
+      appState.typeFilter = type;
+      ['all', 'Marker', 'Polyline', 'Polygon', 'Rectangle', 'Circle'].forEach(t => {
+        const btn = document.getElementById(`filter-tab-${t}`);
+        if (btn) {
+          if (t === type) {
+            btn.className = "px-2 py-0.5 rounded-full font-bold bg-brand-500 text-white";
+          } else {
+            btn.className = "px-2 py-0.5 rounded-full font-bold bg-brand-100 text-brand-800 hover:bg-brand-200";
+          }
+        }
+      });
+      filterFeatureList();
+    }
+
+    function filterFeatureList() {
+      const keyword = (document.getElementById('filterItemsInput').value || '').toLowerCase().trim();
+      const typeFilter = appState.typeFilter;
+
+      const filtered = appState.features.filter(feat => {
+        const matchesType = (typeFilter === 'all' || feat.type === typeFilter);
+        if (!matchesType) return false;
+
+        if (!keyword) return true;
+        const matchName = feat.name.toLowerCase().includes(keyword);
+        const matchDesc = (feat.desc || '').toLowerCase().includes(keyword);
+        const matchProp = Object.values(feat.properties || {}).some(v => String(v).toLowerCase().includes(keyword));
+        return matchName || matchDesc || matchProp;
+      });
+
+      renderFeatureList(filtered);
+    }
+
+    function renderFeatureList(listToRender = null) {
+      const container = document.getElementById('featureListContainer');
+      const list = listToRender !== null ? listToRender : appState.features;
+      container.innerHTML = '';
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-brand-800/50 text-xs italic">
+            ${appState.features.length === 0 ? 'Belum ada objek geospasial.<br>Gunakan toolbar di atas atau impor data peta.' : 'Tidak ada objek yang sesuai kriteria filter.'}
+          </div>
+        `;
+        return;
+      }
+
+      list.forEach(item => {
+        const metric = calculateFeatureMetric(item.type, item.coordinates, item.radius);
+        let iconClass = 'fa-map-pin text-rose-500';
+        if (item.type === 'Polyline') iconClass = 'fa-route text-amber-600';
+        if (item.type === 'Polygon') iconClass = 'fa-draw-polygon text-indigo-600';
+        if (item.type === 'Rectangle') iconClass = 'fa-vector-square text-emerald-600';
+        if (item.type === 'Circle') iconClass = 'fa-circle-notch text-sky-600';
+
+        const isHidden = item.hidden === true;
+        const card = document.createElement('div');
+        card.className = `p-2.5 ${isHidden ? 'bg-brand-100/50 opacity-60' : 'bg-white/90 hover:bg-white'} rounded-2xl border border-brand-200/80 shadow-sm transition flex items-center justify-between group`;
+
+        card.innerHTML = `
+          <div class="cursor-pointer flex-1 min-w-0 pr-2" onclick="focusOnFeature('${item.id}')">
+            <div class="flex items-center space-x-1.5">
+              <i class="fas ${iconClass} text-xs"></i>
+              <span class="font-bold text-xs text-brand-900 truncate">${escapeHtml(item.name)}</span>
+              <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${item.style.color}"></span>
+            </div>
+            <div class="text-[10px] text-brand-800/60 truncate mt-0.5">${escapeHtml(item.desc || metric)}</div>
+          </div>
+          <div class="flex items-center space-x-1 shrink-0">
+            <button onclick="toggleFeatureVisibility('${item.id}')" class="p-1 text-brand-800/60 hover:text-brand-900 transition" title="${isHidden ? 'Tampilkan Layer' : 'Sembunyikan Layer'}">
+              <i class="fas ${isHidden ? 'fa-eye-slash text-brand-800/40' : 'fa-eye text-emerald-600'} text-xs"></i>
+            </button>
+            <button onclick="startSpatialEditing('${item.id}')" class="p-1 text-brand-800/60 hover:text-blue-600 transition" title="Ubah Bentuk">
+              <i class="fas fa-bezier-curve text-xs"></i>
+            </button>
+            <button onclick="openModalForEditFeature('${item.id}')" class="p-1 text-brand-800/60 hover:text-brand-900 transition" title="Edit Data">
+              <i class="fas fa-pencil-alt text-xs"></i>
+            </button>
+            <button onclick="requestDeleteFeature('${item.id}')" class="p-1 text-brand-800/60 hover:text-rose-600 transition" title="Hapus">
+              <i class="fas fa-trash-alt text-xs"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function toggleFeatureVisibility(id) {
+      const feat = appState.features.find(f => f.id === id);
+      if (feat) {
+        feat.hidden = !feat.hidden;
+        rebuildMapLayers();
+        filterFeatureList();
+        renderSpreadsheetTable();
+        persistData();
+      }
+    }
+
+    function toggleAllLayersVisibility() {
+      const anyVisible = appState.features.some(f => !f.hidden);
+      appState.features.forEach(f => f.hidden = anyVisible);
+      
+      const btn = document.getElementById('btnToggleAllVis');
+      btn.innerHTML = anyVisible ? `<i class="fas fa-eye-slash text-brand-800/50"></i>` : `<i class="fas fa-eye text-emerald-600"></i>`;
+      
+      rebuildMapLayers();
+      filterFeatureList();
+      renderSpreadsheetTable();
+      persistData();
+      showToast("Visibilitas Diubah", anyVisible ? "Semua layer disembunyikan." : "Semua layer ditampilkan.");
+    }
+
+    function focusOnFeature(id) {
+      const feat = appState.features.find(f => f.id === id);
+      if (!feat) return;
+
+      if (feat.hidden) {
+        feat.hidden = false;
+        rebuildMapLayers();
+        filterFeatureList();
+      }
+
+      featureLayerGroup.eachLayer(layer => {
+        if (layer.featureId === id) {
+          if (layer.getBounds) {
+            map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 16 });
+          } else if (layer.getLatLng) {
+            map.flyTo(layer.getLatLng(), 16);
+          }
+          layer.openPopup();
+        }
+      });
+    }
+
+    function toggleDataTable() {
+      const drawer = document.getElementById('dataTableDrawer');
+      appState.isTableOpen = !appState.isTableOpen;
+
+      if (appState.isTableOpen) {
+        drawer.classList.remove('max-h-0');
+        drawer.classList.add('max-h-80');
+        renderSpreadsheetTable();
+      } else {
+        drawer.classList.remove('max-h-80');
+        drawer.classList.add('max-h-0');
+      }
+    }
+
+    function renderSpreadsheetTable() {
+      const table = document.getElementById('attributesSpreadsheet');
+      document.getElementById('tableRecordBadge').innerText = `${appState.features.length} Data`;
+
+      let headerHTML = `
+        <thead>
+          <tr class="bg-brand-100 text-brand-900 border-b border-brand-200">
+            <th class="p-2 font-bold">#</th>
+            <th class="p-2 font-bold">Nama Objek</th>
+            <th class="p-2 font-bold">Tipe Geometri</th>
+            <th class="p-2 font-bold">Metrik / Ukuran</th>
+            <th class="p-2 font-bold">Deskripsi</th>
+      `;
+
+      appState.customColumns.forEach(col => {
+        headerHTML += `<th class="p-2 font-bold capitalize bg-amber-500/10 text-brand-800">${escapeHtml(col)}</th>`;
+      });
+
+      headerHTML += `
+            <th class="p-2 font-bold text-center">Status</th>
+            <th class="p-2 font-bold text-center">Aksi</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-brand-100">
+      `;
+
+      if (appState.features.length === 0) {
+        headerHTML += `<tr><td colspan="${7 + appState.customColumns.length}" class="text-center p-4 text-brand-800/40 italic">Tidak ada catatan data spasial.</td></tr>`;
+      } else {
+        appState.features.forEach((feat, idx) => {
+          const metric = calculateFeatureMetric(feat.type, feat.coordinates, feat.radius);
+          headerHTML += `
+            <tr class="hover:bg-brand-50/70 transition">
+              <td class="p-2 font-mono text-[11px] text-brand-800/60">${idx + 1}</td>
+              <td class="p-2 font-semibold text-brand-900 flex items-center space-x-1.5">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${feat.style.color}"></span>
+                <span class="truncate max-w-[120px] sm:max-w-xs">${escapeHtml(feat.name)}</span>
+              </td>
+              <td class="p-2"><span class="px-1.5 py-0.5 bg-brand-100 rounded text-[10px] font-bold uppercase text-brand-800">${escapeHtml(feat.type)}</span></td>
+              <td class="p-2 font-mono text-[11px]">${escapeHtml(metric)}</td>
+              <td class="p-2 text-brand-800/70 truncate max-w-xs">${feat.desc ? escapeHtml(feat.desc) : '-'}</td>
+          `;
+
+          appState.customColumns.forEach(col => {
+            const val = feat.properties && feat.properties[col] ? feat.properties[col] : '-';
+            headerHTML += `<td class="p-2 text-brand-900">${escapeHtml(val)}</td>`;
+          });
+
+          headerHTML += `
+              <td class="p-2 text-center">
+                <button onclick="toggleFeatureVisibility('${feat.id}')" class="p-1 hover:text-brand-600">
+                  <i class="fas ${feat.hidden ? 'fa-eye-slash text-brand-800/30' : 'fa-eye text-emerald-600'}"></i>
+                </button>
+              </td>
+              <td class="p-2 text-center space-x-1 whitespace-nowrap">
+                <button onclick="focusOnFeature('${feat.id}')" class="p-1 hover:text-brand-500" title="Arahkan Peta"><i class="fas fa-crosshairs"></i></button>
+                <button onclick="startSpatialEditing('${feat.id}')" class="p-1 hover:text-blue-600" title="Ubah Bentuk"><i class="fas fa-bezier-curve"></i></button>
+                <button onclick="openModalForEditFeature('${feat.id}')" class="p-1 hover:text-brand-500" title="Ubah Data"><i class="fas fa-edit"></i></button>
+                <button onclick="requestDeleteFeature('${feat.id}')" class="p-1 hover:text-rose-600" title="Hapus"><i class="fas fa-trash"></i></button>
+              </td>
+            </tr>
+          `;
+        });
+      }
+
+      headerHTML += `</tbody>`;
+      table.innerHTML = headerHTML;
+    }
+
+    function openColumnManagerModal() {
+      const container = document.getElementById('activeColumnsList');
+      container.innerHTML = '';
+
+      appState.customColumns.forEach(col => {
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2 bg-white rounded-xl border border-brand-200 text-xs";
+        row.innerHTML = `
+          <span class="font-bold capitalize text-brand-900">${escapeHtml(col)}</span>
+          <button onclick="removeCustomColumn('${escapeHtml(col)}')" class="text-rose-500 hover:text-rose-700 text-xs" title="Hapus Kolom">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        `;
+        container.appendChild(row);
+      });
+
+      document.getElementById('columnModal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('newColumnNameInput').focus(), 80);
+    }
+
+    function closeColumnModal() {
+      document.getElementById('columnModal').classList.add('hidden');
+    }
+
+    function createCustomColumn() {
+      const input = document.getElementById('newColumnNameInput');
+      const val = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+
+      if (!val) return;
+
+      const reserved = ['id', 'name', 'type', 'coordinates', 'desc', 'radius', 'style', 'hidden', 'metric', 'latitude', 'longitude', 'wkt_geometry'];
+      if (reserved.includes(val)) {
+        showToast("Kolom Terlarang", "Nama kolom ini digunakan sistem.", "warning");
+        return;
+      }
+
+      if (!appState.customColumns.includes(val)) {
+        appState.customColumns.push(val);
+        input.value = '';
+        openColumnManagerModal();
+        renderSpreadsheetTable();
+        persistData();
+        showToast("Kolom Dibuat", `Field "${val}" berhasil ditambahkan.`);
+      }
+    }
+
+    function removeCustomColumn(col) {
+      appState.customColumns = appState.customColumns.filter(c => c !== col);
+      appState.features.forEach(feat => {
+        if (feat.properties && feat.properties[col] !== undefined) {
+          delete feat.properties[col];
+        }
+      });
+
+      openColumnManagerModal();
+      renderSpreadsheetTable();
+      persistData();
+      showToast("Kolom Dihapus", `Field "${col}" dibersihkan.`);
+    }
+
+    /* =========================================================================
+       10. EXPORT CONTROLLERS (CSV, GEOJSON, KML)
+       ========================================================================= */
+    function openExportModal() {
+      if (appState.features.length === 0) {
+        showToast("Data Kosong", "Belum ada objek geospasial untuk diekspor.", "warning");
+        return;
+      }
+      document.getElementById('exportModal').classList.remove('hidden');
+    }
+
+    function closeExportModal() {
+      document.getElementById('exportModal').classList.add('hidden');
+    }
+
+    function geometryToOGCWKT(feat) {
+      if (feat.type === 'Marker') {
+        return `POINT(${feat.coordinates.lng} ${feat.coordinates.lat})`;
+      } else if (feat.type === 'Polyline') {
+        const pts = feat.coordinates.map(c => `${c[1]} ${c[0]}`).join(', ');
+        return `LINESTRING(${pts})`;
+      } else if (feat.type === 'Polygon' || feat.type === 'Rectangle') {
+        const pts = feat.coordinates.map(c => `${c[1]} ${c[0]}`).join(', ');
+        return `POLYGON((${pts}))`;
+      } else if (feat.type === 'Circle') {
+        try {
+          const centerPt = turf.point([feat.coordinates.center[1], feat.coordinates.center[0]]);
+          const poly = turf.circle(centerPt, feat.radius / 1000, { steps: 64, units: 'kilometers' });
+          const pts = poly.geometry.coordinates[0].map(c => `${c[0]} ${c[1]}`).join(', ');
+          return `POLYGON((${pts}))`;
+        } catch (e) {
+          return `POINT(${feat.coordinates.center[1]} ${feat.coordinates.center[0]})`;
+        }
+      }
+      return '';
+    }
+
+    function exportToCSV() {
+      const rows = appState.features.map(f => {
+        const row = {
+          id: f.id,
+          name: f.name,
+          type: f.type,
+          desc: f.desc || '',
+          metric: calculateFeatureMetric(f.type, f.coordinates, f.radius),
+          wkt_geometry: geometryToOGCWKT(f),
+          latitude: f.type === 'Marker' ? f.coordinates.lat : (f.type === 'Circle' ? f.coordinates.center[0] : ''),
+          longitude: f.type === 'Marker' ? f.coordinates.lng : (f.type === 'Circle' ? f.coordinates.center[1] : ''),
+          radius_meter: f.type === 'Circle' ? f.radius : '',
+          color: f.style.color || '#D6684B',
+          stroke_weight: f.style.weight || 3,
+          fill_opacity: f.style.fillOpacity !== undefined ? f.style.fillOpacity : 0.25
+        };
+
+        appState.customColumns.forEach(c => {
+          row[c] = f.properties && f.properties[c] ? f.properties[c] : '';
+        });
+
+        return row;
+      });
+
+      const csvString = Papa.unparse(rows);
+      downloadBlob(csvString, `geotag_export_${Date.now()}.csv`, 'text/csv;charset=utf-8;');
+      showToast("Ekspor Berhasil", "Berkas CSV (OGC WKT kompatibel) diunduh!", "success");
+    }
+
+    function exportToGeoJSON() {
+      const geojson = {
+        type: "FeatureCollection",
+        features: appState.features.map(f => {
+          let geometry = null;
+          if (f.type === 'Marker') {
+            geometry = { type: "Point", coordinates: [f.coordinates.lng, f.coordinates.lat] };
+          } else if (f.type === 'Polyline') {
+            geometry = { type: "LineString", coordinates: f.coordinates.map(c => [c[1], c[0]]) };
+          } else if (f.type === 'Polygon' || f.type === 'Rectangle') {
+            geometry = { type: "Polygon", coordinates: [f.coordinates.map(c => [c[1], c[0]])] };
+          } else if (f.type === 'Circle') {
+            try {
+              const centerPt = turf.point([f.coordinates.center[1], f.coordinates.center[0]]);
+              const circlePoly = turf.circle(centerPt, f.radius / 1000, { steps: 64, units: 'kilometers' });
+              geometry = circlePoly.geometry;
+            } catch (e) {
+              geometry = { type: "Point", coordinates: [f.coordinates.center[1], f.coordinates.center[0]] };
+            }
+          }
+
+          return {
+            type: "Feature",
+            id: f.id,
+            geometry: geometry,
+            properties: {
+              name: f.name,
+              type: f.type,
+              desc: f.desc,
+              radius: f.radius,
+              center: f.type === 'Circle' ? f.coordinates.center : undefined,
+              style: f.style,
+              ...f.properties
+            }
+          };
+        })
+      };
+
+      const str = JSON.stringify(geojson, null, 2);
+      downloadBlob(str, `geotag_geojson_${Date.now()}.json`, 'application/json');
+      showToast("GeoJSON Siap", "Berkas GeoJSON berhasil diekspor!", "success");
+    }
+
+    function exportToKML() {
+      let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>GeoTag Export</name>\n`;
+
+      appState.features.forEach(f => {
+        kml += `<Placemark>\n<name>${escapeHtml(f.name)}</name>\n<description>${escapeHtml(f.desc || '')}</description>\n`;
+        if (f.type === 'Marker') {
+          kml += `<Point><coordinates>${f.coordinates.lng},${f.coordinates.lat},0</coordinates></Point>\n`;
+        } else if (f.type === 'Polyline') {
+          const coords = f.coordinates.map(c => `${c[1]},${c[0]},0`).join(' ');
+          kml += `<LineString><coordinates>${coords}</coordinates></LineString>\n`;
+        } else if (f.type === 'Polygon' || f.type === 'Rectangle' || f.type === 'Circle') {
+          let coords = [];
+          if (f.type === 'Circle') {
+            const centerPt = turf.point([f.coordinates.center[1], f.coordinates.center[0]]);
+            const circlePoly = turf.circle(centerPt, f.radius / 1000, { steps: 48, units: 'kilometers' });
+            coords = circlePoly.geometry.coordinates[0].map(c => `${c[0]},${c[1]},0`).join(' ');
+          } else {
+            coords = f.coordinates.map(c => `${c[1]},${c[0]},0`).join(' ');
+          }
+          kml += `<Polygon><outerBoundaryIs><LinearRing><coordinates>${coords}</coordinates></LinearRing></outerBoundaryIs></Polygon>\n`;
+        }
+        kml += `</Placemark>\n`;
+      });
+
+      kml += `</Document>\n</kml>`;
+      downloadBlob(kml, `geotag_export_${Date.now()}.kml`, 'application/vnd.google-earth.kml+xml');
+      showToast("KML Siap", "Berkas KML berhasil diekspor!", "success");
+    }
+
+    function importFromCSV(file) {
+      Papa.parse(file, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          try {
+            let importedCount = 0;
+            const reserved = ['id', 'name', 'type', 'desc', 'metric', 'wkt_geometry', 'latitude', 'longitude', 'radius_meter', 'color', 'stroke_weight', 'fill_opacity'];
+
+            if (results.meta.fields) {
+              results.meta.fields.forEach(field => {
+                const norm = field.toLowerCase().trim();
+                if (!reserved.includes(norm) && !appState.customColumns.includes(norm)) {
+                  appState.customColumns.push(norm);
+                }
+              });
+            }
+
+            results.data.forEach(row => {
+              const name = String(row.name || `Impor CSV #${appState.features.length + 1}`).trim();
+              const desc = String(row.desc || '').trim();
+              const props = {};
+
+              appState.customColumns.forEach(c => {
+                if (row[c] !== undefined && row[c] !== null) props[c] = String(row[c]);
+              });
+
+              const style = {
+                color: row.color || appState.currentColor,
+                fillColor: row.color || appState.currentColor,
+                fillOpacity: row.fill_opacity !== undefined ? parseFloat(row.fill_opacity) : 0.25,
+                weight: row.stroke_weight ? parseInt(row.stroke_weight, 10) : 3
+              };
+
+              if (row.latitude !== undefined && row.longitude !== undefined && !isNaN(row.latitude) && !isNaN(row.longitude)) {
+                if (row.type === 'Circle' || row.radius_meter) {
+                  appState.features.push({
+                    id: `csv_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                    type: 'Circle',
+                    name: name,
+                    desc: desc,
+                    coordinates: { center: [parseFloat(row.latitude), parseFloat(row.longitude)], radius: parseFloat(row.radius_meter) || 100 },
+                    radius: parseFloat(row.radius_meter) || 100,
+                    style, properties: props, hidden: false, createdAt: new Date().toISOString()
+                  });
+                } else {
+                  appState.features.push({
+                    id: `csv_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                    type: 'Marker',
+                    name: name,
+                    desc: desc,
+                    coordinates: { lat: parseFloat(row.latitude), lng: parseFloat(row.longitude) },
+                    style, properties: props, hidden: false, createdAt: new Date().toISOString()
+                  });
+                }
+                importedCount++;
+              } else if (row.wkt_geometry) {
+                const feat = parseWKTToFeature(row.wkt_geometry, name, desc, props, style);
+                if (feat) {
+                  appState.features.push(feat);
+                  importedCount++;
+                }
+              }
+            });
+
+            rebuildMapLayers();
+            filterFeatureList();
+            renderSpreadsheetTable();
+            persistData();
+            showToast("Impor Selesai", `Memasukkan ${importedCount} data dari CSV!`, "success");
+          } catch (err) {
+            showToast("Gagal Membaca CSV", err.message, "error");
+          }
+        },
+        error: function(err) {
+          showToast("Error CSV", err.message, "error");
+        }
+      });
+    }
+
+    function parseWKTToFeature(wkt, name, desc, props, style) {
+      const cleaned = String(wkt).trim();
+      const id = `wkt_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
+      if (cleaned.toUpperCase().startsWith('POINT')) {
+        const match = cleaned.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+        if (match) {
+          return {
+            id, type: 'Marker', name, desc,
+            coordinates: { lat: parseFloat(match[2]), lng: parseFloat(match[1]) },
+            style, properties: props, hidden: false, createdAt: new Date().toISOString()
+          };
+        }
+      } else if (cleaned.toUpperCase().startsWith('LINESTRING')) {
+        const coordPart = cleaned.replace(/LINESTRING\s*\(/i, '').replace(/\)/g, '');
+        const coords = coordPart.split(',').map(pair => {
+          const [lng, lat] = pair.trim().split(/\s+/).map(parseFloat);
+          return [lat, lng];
+        });
+        return { id, type: 'Polyline', name, desc, coordinates: coords, style, properties: props, hidden: false, createdAt: new Date().toISOString() };
+      } else if (cleaned.toUpperCase().startsWith('POLYGON')) {
+        const coordPart = cleaned.replace(/POLYGON\s*\(\(/i, '').replace(/\)\)/g, '');
+        const coords = coordPart.split(',').map(pair => {
+          const [lng, lat] = pair.trim().split(/\s+/).map(parseFloat);
+          return [lat, lng];
+        });
+        return { id, type: 'Polygon', name, desc, coordinates: coords, style, properties: props, hidden: false, createdAt: new Date().toISOString() };
+      }
+      return null;
+    }
+
+    function downloadBlob(content, filename, contentType) {
+      const blob = new Blob([content], { type: contentType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    /* =========================================================================
+       11. PERSISTENCE ENGINE & DATA CLEARING
+       ========================================================================= */
+    async function persistData() {
+      const payload = {
+        features: appState.features,
+        customColumns: appState.customColumns
+      };
+      await idbSet('geoApp_pro_data', payload);
+    }
+
+    async function restoreFromStorage() {
+      try {
+        let parsed = await idbGet('geoApp_pro_data');
+        if (!parsed) {
+          const legacy = localStorage.getItem('geoApp_data') || localStorage.getItem('geoApp_pro_data');
+          if (legacy) parsed = JSON.parse(legacy);
+        }
+
+        if (parsed) {
+          appState.features = (parsed.features || []).map(f => ({
+            ...f,
+            hidden: f.hidden || false,
+            style: f.style || { color: '#D6684B', fillColor: '#D6684B', fillOpacity: 0.25, weight: 3 }
+          }));
+          appState.customColumns = parsed.customColumns || ['kategori', 'status'];
+
+          rebuildMapLayers();
+          filterFeatureList();
+          renderSpreadsheetTable();
+          if (appState.features.length > 0) {
+            showToast("Data Dipulihkan", `${appState.features.length} objek dimuat dari memori.`);
+          }
+        }
+      } catch (e) {
+        console.warn("Gagal memulihkan data geospasial:", e);
+      }
+    }
+
+    let confirmCallback = null;
+
+    function requestDeleteFeature(id) {
+      const feat = appState.features.find(f => f.id === id);
+      if (!feat) return;
+
+      document.getElementById('confirmModalTitle').innerText = `Hapus ${escapeHtml(feat.type)}?`;
+      document.getElementById('confirmModalText').innerText = `Apakah Anda yakin ingin menghapus "${escapeHtml(feat.name)}"?`;
+      
+      confirmCallback = () => {
+        appState.features = appState.features.filter(f => f.id !== id);
+        if (appState.spatialEdit && appState.spatialEdit.id === id) cancelSpatialEditing();
+        rebuildMapLayers();
+        filterFeatureList();
+        renderSpreadsheetTable();
+        persistData();
+        showToast("Objek Dihapus", `"${feat.name}" telah dihapus.`);
+      };
+
+      document.getElementById('confirmModal').classList.remove('hidden');
+    }
+
+    function promptClearAllData() {
+      if (appState.features.length === 0 && appState.rasterLayers.length === 0) return;
+
+      document.getElementById('confirmModalTitle').innerText = "Hapus Seluruh Data?";
+      document.getElementById('confirmModalText').innerText = "Tindakan ini akan mengosongkan seluruh layer dan tabel di kanvas peta.";
+
+      confirmCallback = () => {
+        appState.features = [];
+        appState.rasterLayers.forEach(r => rasterLayerGroup.removeLayer(r.layer));
+        appState.rasterLayers = [];
+        cancelSpatialEditing();
+        featureLayerGroup.clearLayers();
+        renderRasterLayersList();
+        filterFeatureList();
+        renderSpreadsheetTable();
+        persistData();
+        showToast("Semua Data Dihapus", "Kanvas peta kini bersih.", "error");
+      };
+
+      document.getElementById('confirmModal').classList.remove('hidden');
+    }
+
+    document.getElementById('btnExecuteConfirm').addEventListener('click', () => {
+      if (confirmCallback) confirmCallback();
+      closeConfirmModal();
+    });
+
+    function closeConfirmModal() {
+      document.getElementById('confirmModal').classList.add('hidden');
+      confirmCallback = null;
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('-translate-x-full');
+    }
+
+    function showToast(title, message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+
+      let icon = 'fa-info-circle text-brand-500';
+      let border = 'border-brand-200';
+      if (type === 'error') {
+        icon = 'fa-times-circle text-rose-500';
+        border = 'border-rose-300';
+      } else if (type === 'success') {
+        icon = 'fa-check-circle text-emerald-500';
+        border = 'border-emerald-300';
+      } else if (type === 'warning') {
+        icon = 'fa-exclamation-triangle text-amber-500';
+        border = 'border-amber-300';
+      }
+
+      toast.className = `glass-card ${border} px-4 py-2.5 rounded-2xl shadow-xl flex items-start space-x-2.5 transition-all duration-300 transform translate-x-4 opacity-0 pointer-events-auto`;
+      toast.innerHTML = `
+        <i class="fas ${icon} text-sm mt-0.5"></i>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-xs text-brand-900">${escapeHtml(title)}</div>
+          <div class="text-[11px] text-brand-800/70 leading-snug break-words">${escapeHtml(message)}</div>
+        </div>
+      `;
+
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.remove('translate-x-4', 'opacity-0'), 20);
+
+      setTimeout(() => {
+        toast.classList.add('translate-x-4', 'opacity-0');
+        setTimeout(() => toast.remove(), 320);
+      }, 3600);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initMapEngine();
+      if (window.innerWidth < 768) {
+        document.getElementById('sidebar').classList.add('-translate-x-full');
+      }
+    });
+  </script>
+</body>
+</html>

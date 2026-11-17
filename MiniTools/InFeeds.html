@@ -1,0 +1,2097 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InFeeds</title>
+  
+  <!-- Dependensi Eksternal -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+
+  <!-- Tipografi -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          colors: {
+            slateDark: {
+              950: '#090d16',
+              900: '#0f172a',
+              850: '#151f36',
+              800: '#1e293b',
+              700: '#334155',
+              600: '#475569'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Scrollbar minimalis fungsional */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+
+    /* Frame Mockups Simulator Browser */
+    .device-screen-mobile {
+      width: 393px;
+      height: 852px;
+      border-radius: 44px;
+      box-shadow: 0 0 0 10px #1e242e, 0 0 0 12px #334155, 0 25px 60px -15px rgba(0, 0, 0, 0.85);
+      transition: width 0.25s ease, height 0.25s ease;
+    }
+    .device-screen-mobile.landscape {
+      width: 852px;
+      height: 393px;
+      border-radius: 40px;
+    }
+    .device-screen-tablet {
+      width: 810px;
+      height: 1080px;
+      border-radius: 36px;
+      box-shadow: 0 0 0 12px #181d26, 0 0 0 14px #334155, 0 25px 60px -15px rgba(0, 0, 0, 0.85);
+      transition: width 0.25s ease, height 0.25s ease;
+    }
+    .device-screen-tablet.landscape {
+      width: 1080px;
+      height: 810px;
+    }
+    .device-screen-desktop {
+      width: 100% !important;
+      height: 100% !important;
+      flex: 1 1 0% !important;
+      min-height: 100% !important;
+      min-width: 0 !important;
+      border-radius: 0px !important;
+      border: none !important;
+      box-shadow: none !important;
+      resize: none !important;
+      transition: none;
+    }
+    .device-screen-desktop-1440 {
+      width: 1440px;
+      height: 900px;
+      border-radius: 16px;
+      box-shadow: 0 0 0 10px #1e242e, 0 0 0 12px #334155, 0 30px 60px -15px rgba(0,0,0,0.9);
+    }
+    .device-screen-desktop-1920 {
+      width: 1920px;
+      height: 1080px;
+      border-radius: 18px;
+      box-shadow: 0 0 0 12px #1e242e, 0 0 0 14px #334155, 0 35px 70px -15px rgba(0,0,0,0.9);
+    }
+    .device-screen-freeform {
+      min-width: 320px;
+      min-height: 240px;
+      border-radius: 14px;
+      box-shadow: 0 0 0 8px #1e293b, 0 0 0 10px #334155, 0 25px 50px -12px rgba(0, 0, 0, 0.75);
+      resize: both;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Notch iPhone */
+    .phone-notch {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 24px;
+      background-color: #0b111c;
+      border-radius: 18px;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      pointer-events: none;
+    }
+
+    /* Scaler Browser */
+    .viewport-scaler {
+      transform-origin: center top;
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #browser-workspace {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0%;
+      min-height: 0;
+      height: 100%;
+      width: 100%;
+      position: relative;
+    }
+    #viewport-content-holder {
+      height: 100% !important;
+      width: 100% !important;
+      flex: 1 1 0% !important;
+      min-height: 0 !important;
+    }
+    #browser-viewport {
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 100% !important;
+      flex: 1 1 0% !important;
+      display: block !important;
+      border: none;
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slateDark-950 text-slate-100 h-screen h-[100dvh] max-h-screen flex flex-col font-sans antialiased select-none overflow-hidden">
+
+  <!-- ======================================================== -->
+  <!-- HEADER UTAMA & NAVIGASI MODUL                            -->
+  <!-- ======================================================== -->
+  <header class="bg-slateDark-900 border-b border-slateDark-800 sticky top-0 z-40 px-3 py-2 flex-shrink-0">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand & Modul Navigasi -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded bg-blue-500 shadow-sm shadow-blue-500/50"></div>
+          <span class="font-bold tracking-tight text-sm text-white font-mono">InFeeds</span>
+        </div>
+
+        <div class="h-4 w-px bg-slateDark-700 hidden sm:block"></div>
+
+        <!-- 4 Navigasi Tab Modul -->
+        <nav class="flex items-center space-x-1 text-xs">
+          <button id="nav-btn-data" onclick="setModule('data')" class="px-2.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 bg-blue-600 text-white shadow">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1.5 3 3.5 3h9c2 0 3.5-1 3.5-3V7M4 7c0-2 1.5-3 3.5-3h9c2 0 3.5 1 3.5 3M4 7h16M9 11h6m-6 4h4"/></svg>
+            <span>Data API</span>
+          </button>
+
+          <button id="nav-btn-rss" onclick="setModule('rss')" class="px-2.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slateDark-800">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+            <span>RSS Reader</span>
+            <span id="badge-rss-count" class="px-1.5 py-0.2 text-[10px] rounded bg-slateDark-800 text-slate-300 font-mono">0/16</span>
+          </button>
+
+          <button id="nav-btn-live" onclick="setModule('live')" class="px-2.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slateDark-800">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <span>Live Stream</span>
+            <span id="badge-live-count" class="px-1.5 py-0.2 text-[10px] rounded bg-slateDark-800 text-slate-300 font-mono">0/16</span>
+          </button>
+
+          <button id="nav-btn-browser" onclick="setModule('browser')" class="px-2.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slateDark-800">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+            <span>Browser</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Quick Actions Global: Proxy & Muat Contoh -->
+      <div class="flex items-center gap-2 text-xs">
+        <!-- CORS Proxy Selector -->
+        <div class="flex items-center gap-1 bg-slateDark-950 border border-slateDark-800 px-2 py-1 rounded-lg">
+          <span class="text-slate-500 text-[10px] uppercase font-mono">Proxy</span>
+          <select id="global-cors-proxy" class="bg-transparent text-slate-200 text-xs outline-none cursor-pointer">
+            <option value="auto">Auto (Smart)</option>
+            <option value="allorigins">AllOrigins</option>
+            <option value="corsproxy">CORSProxy</option>
+            <option value="direct">Direct</option>
+          </select>
+        </div>
+
+        <!-- Tombol Muat Contoh Global -->
+        <div class="relative group">
+          <button class="bg-slateDark-800 hover:bg-slateDark-700 text-blue-400 border border-slateDark-700 hover:border-blue-500/50 px-2.5 py-1 rounded-lg flex items-center gap-1 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            <span class="font-medium text-[11px]">Muat Contoh</span>
+          </button>
+          
+          <!-- Dropdown pilihan muat contoh -->
+          <div class="absolute right-0 mt-1 w-48 bg-slateDark-900 border border-slateDark-700 rounded-xl shadow-2xl py-1 hidden group-hover:block z-50 text-xs">
+            <button onclick="loadSample('all')" class="w-full text-left px-3 py-1.5 hover:bg-slateDark-800 text-white font-medium">✨ Isi Seluruh Modul</button>
+            <div class="h-px bg-slateDark-800 my-1"></div>
+            <button onclick="loadSample('data')" class="w-full text-left px-3 py-1.5 hover:bg-slateDark-800 text-slate-300">📊 Contoh Data API</button>
+            <button onclick="loadSample('rss')" class="w-full text-left px-3 py-1.5 hover:bg-slateDark-800 text-slate-300">📰 Contoh RSS Feed</button>
+            <button onclick="loadSample('live')" class="w-full text-left px-3 py-1.5 hover:bg-slateDark-800 text-slate-300">📹 Contoh Live Stream</button>
+            <button onclick="loadSample('browser')" class="w-full text-left px-3 py-1.5 hover:bg-slateDark-800 text-slate-300">🌐 Contoh URL Browser</button>
+            <div class="h-px bg-slateDark-800 my-1"></div>
+            <button onclick="clearAllWorkspace()" class="w-full text-left px-3 py-1.5 hover:bg-red-950/60 text-red-400 font-medium">✕ Kosongkan Semua</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======================================================== -->
+  <!-- AREA KONTEN UTAMA                                        -->
+  <!-- ======================================================== -->
+  <main class="flex-1 flex flex-col min-h-0 w-full overflow-hidden relative">
+
+    <!-- ====================================================== -->
+    <!-- 1. MODUL: DATA REPOSITORY & PUBLIC API                 -->
+    <!-- ====================================================== -->
+    <section id="module-data" class="flex-1 p-4 max-w-7xl mx-auto w-full space-y-4 overflow-y-auto">
+      <!-- Input Controls Box -->
+      <div class="bg-slateDark-900 border border-slateDark-800 rounded-xl p-4 shadow-sm">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+          
+          <div class="lg:col-span-6 space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <label class="text-slate-400 font-medium">URL Data Publik (JSON / CSV / Direct REST):</label>
+              <div class="flex items-center gap-1.5">
+                <span class="text-[11px] text-slate-500">Preset:</span>
+                <select id="api-presets" onchange="applyApiPreset(this.value)" class="bg-transparent text-[11px] text-blue-400 underline cursor-pointer outline-none">
+                  <option value="" class="bg-slateDark-900 text-slate-200">Pilih Contoh API...</option>
+                  <option value="https://openlibrary.org/authors/OL23919A/works.json?limit=15" class="bg-slateDark-900 text-slate-200">OpenLibrary Books (JSON)</option>
+                  <option value="https://api.coincap.io/v2/assets?limit=20" class="bg-slateDark-900 text-slate-200">CoinCap Crypto Assets (JSON)</option>
+                  <option value="https://raw.githubusercontent.com/datasets/gdp/master/data/gdp.csv" class="bg-slateDark-900 text-slate-200">World GDP Records (CSV)</option>
+                  <option value="https://jsonplaceholder.typicode.com/posts" class="bg-slateDark-900 text-slate-200">JSONPlaceholder Posts</option>
+                </select>
+              </div>
+            </div>
+            <input type="url" id="data-url" placeholder="https://api.domain.com/v1/data..." class="w-full bg-slateDark-950 border border-slateDark-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 font-mono outline-none focus:border-blue-500">
+          </div>
+
+          <div class="lg:col-span-4 space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <label class="text-slate-400 font-medium">Autentikasi Header:</label>
+              <select id="auth-mode" onchange="toggleAuthFields()" class="bg-transparent text-[11px] text-slate-400 outline-none cursor-pointer">
+                <option value="none" class="bg-slateDark-900">Tanpa Kunci</option>
+                <option value="bearer" class="bg-slateDark-900">Bearer Token</option>
+                <option value="apikey" class="bg-slateDark-900">Header (x-api-key)</option>
+                <option value="custom" class="bg-slateDark-900">Custom Key:Val</option>
+              </select>
+            </div>
+            <input type="text" id="auth-val" placeholder="Tanpa otentikasi" disabled class="w-full bg-slateDark-950/50 border border-slateDark-800 rounded-lg px-3 py-2 text-xs text-slate-500 placeholder-slate-700 outline-none disabled:opacity-40 font-mono">
+          </div>
+
+          <div class="lg:col-span-2 flex gap-2">
+            <button onclick="fetchDataRepository()" id="btn-fetch-data" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95 shadow">
+              <svg id="icon-fetch" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              <span>Ambil Data</span>
+            </button>
+            <button onclick="clearDataView()" title="Kosongkan Hasil" class="bg-slateDark-800 border border-slateDark-700 hover:border-slate-500 text-slate-400 hover:text-white px-2.5 py-2 rounded-lg text-xs transition">
+              ✕
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Status & Toolbar Meta Data (Muncul setelah fetch) -->
+      <div id="data-meta-bar" class="hidden bg-slateDark-900 border border-slateDark-800 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-4">
+          <span class="flex items-center gap-1.5 text-slate-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            Status: <span id="meta-status" class="font-mono font-bold text-white">200 OK</span>
+          </span>
+          <span class="text-slate-400">Baris: <strong id="meta-rows" class="text-white font-mono">0</strong></span>
+          <span class="text-slate-400">Format: <strong id="meta-type" class="text-blue-400 font-mono">JSON</strong></span>
+          <span class="text-slate-400">Waktu: <strong id="meta-duration" class="text-slate-300 font-mono">0ms</strong></span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Nested Path Selector jika ada nested array dalam JSON -->
+          <div id="json-path-selector" class="hidden items-center gap-1.5">
+            <span class="text-slate-400 text-[11px]">Sub-kunci Array:</span>
+            <select id="array-path-select" onchange="applyJsonArrayKey(this.value)" class="bg-slateDark-950 border border-slateDark-800 rounded px-2 py-1 text-xs text-white outline-none">
+            </select>
+          </div>
+
+          <div class="h-4 w-px bg-slateDark-700"></div>
+
+          <!-- Aksi Ekspor -->
+          <button onclick="exportToCSV()" class="bg-slateDark-800 hover:bg-slateDark-700 border border-slateDark-700 text-xs px-2.5 py-1 rounded-lg text-slate-200 flex items-center gap-1.5 transition">
+            <span class="text-emerald-400">📄</span> Unduh CSV
+          </button>
+          <button onclick="exportToExcel()" class="bg-slateDark-800 hover:bg-slateDark-700 border border-slateDark-700 text-xs px-2.5 py-1 rounded-lg text-slate-200 flex items-center gap-1.5 transition">
+            <span class="text-emerald-500">📊</span> Unduh Excel
+          </button>
+          <button onclick="openRawModal()" class="bg-slateDark-800 hover:bg-slateDark-700 border border-slateDark-700 text-xs px-2 py-1 rounded-lg text-slate-400 hover:text-white font-mono" title="Lihat JSON Mentah">
+            { } Raw
+          </button>
+        </div>
+      </div>
+
+      <!-- Container Tabel Data -->
+      <div id="data-table-container" class="hidden bg-slateDark-900 border border-slateDark-800 rounded-xl flex flex-col min-h-[380px] overflow-hidden">
+        <div class="p-2.5 border-b border-slateDark-800 flex items-center justify-between gap-3 text-xs bg-slateDark-900/90">
+          <div class="relative flex-1 max-w-sm">
+            <input type="text" id="table-filter" oninput="filterDataTable(this.value)" placeholder="Cari dalam tabel..." class="w-full bg-slateDark-950 border border-slateDark-800 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500">
+          </div>
+          <span id="filtered-count" class="text-slate-400 text-[11px]">Menampilkan semua data</span>
+        </div>
+
+        <div class="overflow-x-auto flex-1 max-h-[550px]">
+          <table id="data-table" class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slateDark-850 sticky top-0 border-b border-slateDark-800 text-slate-200 font-semibold select-none">
+              <tr id="table-headers"></tr>
+            </thead>
+            <tbody id="table-body" class="divide-y divide-slateDark-800 text-slate-300 font-mono text-[11px]">
+            </tbody>
+          </table>
+        </div>
+
+        <div id="table-empty" class="hidden p-8 text-center text-slate-500 text-xs">
+          Tidak ada baris yang sesuai dengan kata kunci.
+        </div>
+      </div>
+
+      <!-- Zero-State Prompt (Kondisi Awal Kosong) -->
+      <div id="data-initial-prompt" class="p-12 border border-dashed border-slateDark-800 rounded-2xl text-center space-y-3 bg-slateDark-900/40">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-200">Repositori Data Siap Digunakan</h3>
+        <p class="text-xs text-slate-400 max-w-md mx-auto">
+          Masukkan URL REST API atau berkas CSV terbuka di atas, lalu klik <strong>Ambil Data</strong>. Anda juga dapat memilih preset yang tersedia.
+        </p>
+        <button onclick="loadSample('data')" class="px-3 py-1.5 bg-slateDark-800 hover:bg-slateDark-700 text-blue-400 border border-slateDark-700 rounded-lg text-xs font-medium transition inline-flex items-center gap-1.5">
+          <span>⚡ Muat Contoh Data (CoinCap)</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ====================================================== -->
+    <!-- 2. MODUL: RSS READER AGGREGATOR                        -->
+    <!-- ====================================================== -->
+    <section id="module-rss" class="hidden flex-1 p-4 max-w-7xl mx-auto w-full space-y-4 overflow-y-auto">
+      <!-- RSS Controller Card -->
+      <div class="bg-slateDark-900 border border-slateDark-800 rounded-xl p-4 space-y-3 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slateDark-800/80 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-300">Preset Sumber RSS:</span>
+            <div class="flex flex-wrap gap-1.5" id="rss-presets-list">
+              <!-- Preset chips diisi secara dinamis via JS -->
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <button onclick="refreshAllRss()" class="bg-slateDark-800 hover:bg-slateDark-700 border border-slateDark-700 text-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition">
+              <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Segarkan Semua</span>
+            </button>
+            <button onclick="removeAllFeeds()" class="bg-slateDark-800 hover:bg-slateDark-700 border border-slateDark-700 text-slate-400 hover:text-red-400 px-2.5 py-1.5 rounded-lg transition" title="Hapus semua feed">
+              Bersihkan
+            </button>
+          </div>
+        </div>
+
+        <!-- Tambah Input RSS Kustom -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-2">
+          <div class="md:col-span-8">
+            <input type="url" id="custom-rss-url" placeholder="Masukkan URL RSS / Atom (misal: https://feeds.bbci.co.uk/news/world/rss.xml)..." class="w-full bg-slateDark-950 border border-slateDark-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500 font-mono">
+          </div>
+          <div class="md:col-span-2">
+            <input type="text" id="custom-rss-title" placeholder="Nama Kustom (opsional)" class="w-full bg-slateDark-950 border border-slateDark-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500">
+          </div>
+          <div class="md:col-span-2">
+            <button onclick="addCustomFeed()" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95 shadow">
+              <span>+ Tambah Feed</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Saring Kata Kunci Global -->
+        <div class="pt-1 flex items-center justify-between gap-3 text-xs">
+          <div class="relative flex-1">
+            <input type="text" id="rss-global-search" oninput="filterRssCards(this.value)" placeholder="Saring kata kunci di seluruh artikel dari semua feed aktif..." class="w-full bg-slateDark-950 border border-slateDark-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500">
+          </div>
+          <span class="text-slate-500 text-[11px] whitespace-nowrap" id="rss-status-summary">0 artikel termuat</span>
+        </div>
+      </div>
+
+      <!-- Feed Grid (Maks 16 Feed) -->
+      <div id="rss-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <!-- Kartu RSS akan di-render di sini -->
+      </div>
+
+      <!-- Zero-State RSS Prompt -->
+      <div id="rss-empty" class="p-12 border border-dashed border-slateDark-800 rounded-2xl text-center space-y-3 bg-slateDark-900/40">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-200">Belum Ada Feed RSS Aktif</h3>
+        <p class="text-xs text-slate-400 max-w-md mx-auto">
+          Daftar feed Anda saat ini kosong. Anda dapat menambahkan feed kustom atau memuat paket contoh feed berita dunia.
+        </p>
+        <button onclick="loadSample('rss')" class="px-3 py-1.5 bg-slateDark-800 hover:bg-slateDark-700 text-blue-400 border border-slateDark-700 rounded-lg text-xs font-medium transition inline-flex items-center gap-1.5">
+          <span>⚡ Muat 3 Contoh Feed (BBC, Hacker News, CNN)</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ====================================================== -->
+    <!-- 3. MODUL: LIVE STREAMING (CCTV & YOUTUBE)               -->
+    <!-- ====================================================== -->
+    <section id="module-live" class="hidden flex-1 p-4 max-w-7xl mx-auto w-full space-y-4 overflow-y-auto">
+      <!-- Live Stream Controller Card -->
+      <div class="bg-slateDark-900 border border-slateDark-800 rounded-xl p-4 space-y-3 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slateDark-800/80 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-300">Preset Stream Terbuka:</span>
+            <div class="flex flex-wrap gap-1.5" id="live-presets-list">
+              <!-- Preset live diisi via JS -->
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-slate-400 hidden sm:inline text-[11px]">Layout:</span>
+            <select id="live-grid-layout" onchange="changeLiveLayout(this.value)" class="bg-slateDark-950 border border-slateDark-800 text-slate-200 rounded-lg px-2 py-1 text-xs outline-none">
+              <option value="auto">Auto Adaptive</option>
+              <option value="1">1 Layar (Fokus)</option>
+              <option value="4">2 × 2 (4 Layar)</option>
+              <option value="9">3 × 3 (9 Layar)</option>
+              <option value="16">4 × 4 (16 Layar)</option>
+            </select>
+            <button onclick="reloadAllLiveStreams()" class="bg-slateDark-800 hover:bg-slateDark-700 border border-slateDark-700 text-slate-200 px-3 py-1 rounded-lg flex items-center gap-1.5 transition">
+              <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Segarkan</span>
+            </button>
+            <button onclick="removeAllLiveStreams()" class="bg-slateDark-800 hover:bg-slateDark-700 border border-slateDark-700 text-slate-400 hover:text-red-400 px-2.5 py-1 rounded-lg transition" title="Hapus semua stream">
+              Bersihkan
+            </button>
+          </div>
+        </div>
+
+        <!-- Tambah Stream Input -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-2">
+          <div class="md:col-span-8">
+            <input type="url" id="custom-live-url" placeholder="Masukkan URL Live (contoh: https://www.youtube.com/watch?v=... atau https://domain/live.m3u8)..." class="w-full bg-slateDark-950 border border-slateDark-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500 font-mono">
+          </div>
+          <div class="md:col-span-2">
+            <input type="text" id="custom-live-title" placeholder="Nama Titik Stream (opsional)" class="w-full bg-slateDark-950 border border-slateDark-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500">
+          </div>
+          <div class="md:col-span-2">
+            <button onclick="addCustomLiveStream()" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition active:scale-95 shadow">
+              <span>+ Tambah Stream</span>
+            </button>
+          </div>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+          <span>Format: <strong>HLS / M3U8</strong> (IP Cam & CCTV), <strong>YouTube Live / Video</strong>, serta <strong>MP4 / WebM</strong> publik.</span>
+          <span id="live-active-summary" class="font-mono text-slate-300">0 stream aktif</span>
+        </div>
+      </div>
+
+      <!-- Live Video Surveillance Wall Grid -->
+      <div id="live-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <!-- Stream tiles dimuat secara dinamis -->
+      </div>
+
+      <!-- Zero-State Live Stream Prompt -->
+      <div id="live-empty" class="p-12 border border-dashed border-slateDark-800 rounded-2xl text-center space-y-3 bg-slateDark-900/40">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-200">Belum Ada Stream Aktif</h3>
+        <p class="text-xs text-slate-400 max-w-md mx-auto">
+          Dinding pemantau video saat ini kosong. Anda dapat menambahkan feed HLS (.m3u8) atau YouTube Live secara bebas hingga 16 kamera.
+        </p>
+        <button onclick="loadSample('live')" class="px-3 py-1.5 bg-slateDark-800 hover:bg-slateDark-700 text-blue-400 border border-slateDark-700 rounded-lg text-xs font-medium transition inline-flex items-center gap-1.5">
+          <span>⚡ Muat Contoh Stream (HLS Mux & Space Cam)</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ====================================================== -->
+    <!-- 4. MODUL: EMBEDDED BROWSE (BROWSEIN ENGINE)            -->
+    <!-- ====================================================== -->
+    <section id="module-browser" class="hidden flex-1 flex flex-col min-h-0 min-w-0 bg-slateDark-950 overflow-hidden">
+      
+      <!-- Sub-Header Browser: Tab Bar + Zoom Controls -->
+      <div class="bg-slateDark-900 border-b border-slateDark-800/80 flex-shrink-0 z-30">
+        <!-- Row 1: Tab Dinamis -->
+        <div class="flex items-center px-3 pt-2 gap-1 overflow-x-auto text-xs border-b border-slateDark-800/60 no-scrollbar">
+          <div id="tab-container" class="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto">
+            <!-- Tabs di-render via JS -->
+          </div>
+          
+          <button id="btn-new-tab" onclick="createNewBrowserTab('')" class="p-1.5 hover:bg-slateDark-800 rounded-md text-slate-400 hover:text-slate-200 transition flex-shrink-0" title="Tab Baru">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+          </button>
+
+          <!-- Zoom & Scaler Selector -->
+          <div class="flex items-center gap-2 pl-2 flex-shrink-0">
+            <div class="flex items-center gap-1 bg-slateDark-950 border border-slateDark-800 px-2 py-0.5 rounded-lg text-[11px]">
+              <span class="text-slate-500 text-[10px] uppercase font-mono">Zoom</span>
+              <select id="select-zoom" class="bg-transparent text-blue-400 font-mono text-[11px] outline-none cursor-pointer">
+                <option value="fit">Auto Fit</option>
+                <option value="1">100%</option>
+                <option value="0.85">85%</option>
+                <option value="0.75">75%</option>
+                <option value="0.5">50%</option>
+              </select>
+            </div>
+
+            <button onclick="toggleBrowserDrawer()" class="p-1.5 hover:bg-slateDark-800 rounded-lg text-slate-400 hover:text-slate-200 transition" title="Info Emulasi Viewport">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Row 2: Omnibox & Navigasi Frame -->
+        <div class="px-3 py-2 flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button id="btn-browser-back" disabled onclick="browserHistoryBack()" class="p-1.5 rounded-lg bg-slateDark-800 hover:bg-slateDark-750 disabled:opacity-30 text-slate-300 transition" title="Kembali">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <button id="btn-browser-forward" disabled onclick="browserHistoryForward()" class="p-1.5 rounded-lg bg-slateDark-800 hover:bg-slateDark-750 disabled:opacity-30 text-slate-300 transition" title="Maju">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+            <button id="btn-browser-reload" onclick="browserReload()" class="p-1.5 rounded-lg bg-slateDark-800 hover:bg-slateDark-750 text-slate-300 transition" title="Muat Ulang">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
+            <button id="btn-browser-home" onclick="browserGoHome()" class="p-1.5 rounded-lg bg-slateDark-800 hover:bg-slateDark-750 text-slate-300 transition" title="Beranda Simulator">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            </button>
+          </div>
+
+          <!-- Omnibox URL Form -->
+          <form id="form-omnibox" onsubmit="handleOmniboxSubmit(event)" class="flex-1 flex items-center relative min-w-[200px]">
+            <div class="absolute left-3 text-slate-400 flex items-center pointer-events-none">
+              <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
+            </div>
+            <input 
+              id="input-browser-url" 
+              type="text" 
+              spellcheck="false"
+              placeholder="Ketik URL (misal: https://id.wikipedia.org) atau kata kunci pencarian..."
+              class="w-full bg-slateDark-950 border border-slateDark-800 focus:border-blue-500 rounded-lg pl-9 pr-20 py-1.5 text-xs text-white placeholder-slate-600 outline-none font-mono transition"
+            />
+            <div class="absolute right-1.5 flex items-center gap-1">
+              <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-2.5 py-0.5 rounded text-[11px] transition shadow">
+                Buka
+              </button>
+            </div>
+          </form>
+
+          <!-- Pilihan Viewport & Rotasi -->
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <select id="select-viewport" onchange="applyViewportMode(this.value, false)" class="bg-slateDark-800 border border-slateDark-700 text-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none cursor-pointer font-medium">
+              <option value="desktop">🖥️ Layar Penuh (Fluid 100%)</option>
+              <option value="desktop-1440">💻 Laptop HD (1440 × 900)</option>
+              <option value="desktop-1920">🖥️ Desktop FHD (1920 × 1080)</option>
+              <option value="mobile">📱 iPhone 15</option>
+              <option value="tablet">💻 iPad Mini</option>
+              <option value="freeform">📐 Kustom Bebas</option>
+            </select>
+
+            <button id="btn-browser-rotate" disabled onclick="toggleBrowserRotate()" class="p-1.5 rounded-lg bg-slateDark-800 hover:bg-slateDark-750 disabled:opacity-30 text-slate-300 transition" title="Putar Orientasi">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
+
+            <button onclick="openCurrentInExternal()" class="p-1.5 rounded-lg bg-slateDark-800 hover:bg-slateDark-750 text-slate-300 hover:text-white transition" title="Buka URL di Tab Browser Eksternal">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Browser Workspace & Frame Area -->
+      <div id="browser-workspace" class="flex-1 relative bg-slateDark-950/70 p-0 flex flex-col min-h-0 min-w-0 overflow-hidden">
+        
+        <!-- Bar Pengaturan Dimensi Freeform -->
+        <div id="floating-freeform-bar" class="hidden absolute top-3 z-40 bg-slateDark-900/95 border border-slateDark-700 shadow-xl backdrop-blur rounded-xl px-3 py-1.5 items-center gap-2 text-xs">
+          <span class="text-slate-400 font-medium text-[11px]">Dimensi:</span>
+          <div class="flex items-center gap-1 font-mono">
+            <span class="text-[10px] text-slate-500">L</span>
+            <input id="input-freeform-w" type="number" min="320" max="3840" value="1024" oninput="updateFreeformValues()" class="w-16 bg-slateDark-950 border border-slateDark-800 rounded px-1 py-0.5 text-center text-blue-400 outline-none text-xs">
+            <span class="text-slate-600">×</span>
+            <span class="text-[10px] text-slate-500">T</span>
+            <input id="input-freeform-h" type="number" min="240" max="2160" value="650" oninput="updateFreeformValues()" class="w-16 bg-slateDark-950 border border-slateDark-800 rounded px-1 py-0.5 text-center text-blue-400 outline-none text-xs">
+          </div>
+        </div>
+
+        <!-- Viewport Scaler Box -->
+        <div id="viewport-scaler-box" class="viewport-scaler flex items-center justify-center w-full h-full flex-1 min-h-0 min-w-0">
+          <div id="device-wrapper" class="relative bg-slateDark-900 border-0 overflow-hidden flex flex-col flex-1 min-h-0 min-w-0 w-full h-full">
+            
+            <!-- Hardware Notch iPhone -->
+            <div id="phone-hardware-notch" class="phone-notch hidden">
+              <div class="w-2.5 h-2.5 rounded-full bg-slateDark-800 border border-slateDark-700"></div>
+              <div class="w-8 h-2 rounded-full bg-slateDark-800"></div>
+              <div class="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+            </div>
+
+            <!-- Loading Progress Bar -->
+            <div id="browser-progress-bar" class="h-0.5 bg-blue-500 w-0 transition-all duration-300 opacity-0 z-30 flex-shrink-0"></div>
+
+            <!-- Frame Konten Web -->
+            <div id="viewport-content-holder" class="relative flex-1 w-full h-full min-h-0 min-w-0 bg-white overflow-hidden flex flex-col">
+              
+              <!-- Iframe Live Viewport -->
+              <iframe 
+                id="browser-viewport" 
+                src="about:blank"
+                class="w-full h-full border-0 bg-white block flex-1 min-h-0 min-w-0"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              ></iframe>
+
+              <!-- Beranda Simulator (Speed Dial & Zero-State) -->
+              <div id="view-browser-home" class="absolute inset-0 bg-slateDark-950 text-slate-100 flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto z-10">
+                <div class="max-w-2xl w-full mx-auto py-6">
+                  <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 mb-3 shadow">
+                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
+                    </div>
+                    <h2 class="text-xl font-bold text-white tracking-tight">Embedded Browser Simulator</h2>
+                    <p class="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                      Simulator pratinjau situs berbasis multi-tab dengan preset viewport responsif dan scaling otomatis.
+                    </p>
+                  </div>
+
+                  <!-- Speed Dial Pilihan Cepat -->
+                  <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2.5">
+                      <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tautan Kompatibel Iframe (Contoh Cepat)</span>
+                      <button onclick="loadSample('browser')" class="text-[11px] text-blue-400 hover:underline">Muat Contoh Wikipedia</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      <button type="button" onclick="browseTo('https://id.wikipedia.org')" class="p-3 bg-slateDark-900 hover:bg-slateDark-850 border border-slateDark-800 hover:border-blue-500/60 rounded-xl flex items-center gap-3 text-left transition group">
+                        <div class="w-8 h-8 rounded-lg bg-slateDark-800 flex items-center justify-center font-bold text-sm text-slate-200 group-hover:bg-blue-600 group-hover:text-white transition">W</div>
+                        <div class="overflow-hidden">
+                          <p class="text-xs font-medium text-slate-200 group-hover:text-white truncate">Wikipedia ID</p>
+                          <p class="text-[10px] text-slate-500 truncate">id.wikipedia.org</p>
+                        </div>
+                      </button>
+
+                      <button type="button" onclick="browseTo('https://www.openstreetmap.org/export/embed.html')" class="p-3 bg-slateDark-900 hover:bg-slateDark-850 border border-slateDark-800 hover:border-emerald-500/60 rounded-xl flex items-center gap-3 text-left transition group">
+                        <div class="w-8 h-8 rounded-lg bg-slateDark-800 flex items-center justify-center font-bold text-sm text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition">🗺️</div>
+                        <div class="overflow-hidden">
+                          <p class="text-xs font-medium text-slate-200 group-hover:text-white truncate">OpenStreetMap</p>
+                          <p class="text-[10px] text-slate-500 truncate">openstreetmap.org</p>
+                        </div>
+                      </button>
+
+                      <button type="button" onclick="browseTo('https://archive.org')" class="p-3 bg-slateDark-900 hover:bg-slateDark-850 border border-slateDark-800 hover:border-blue-500/60 rounded-xl flex items-center gap-3 text-left transition group">
+                        <div class="w-8 h-8 rounded-lg bg-slateDark-800 flex items-center justify-center font-bold text-sm text-slate-200 group-hover:bg-blue-600 group-hover:text-white transition">🏛️</div>
+                        <div class="overflow-hidden">
+                          <p class="text-xs font-medium text-slate-200 group-hover:text-white truncate">Internet Archive</p>
+                          <p class="text-[10px] text-slate-500 truncate">archive.org</p>
+                        </div>
+                      </button>
+
+                      <button type="button" onclick="browseTo('https://www.w3schools.com/colors/colors_picker.asp')" class="p-3 bg-slateDark-900 hover:bg-slateDark-850 border border-slateDark-800 hover:border-blue-500/60 rounded-xl flex items-center gap-3 text-left transition group">
+                        <div class="w-8 h-8 rounded-lg bg-slateDark-800 flex items-center justify-center font-bold text-sm text-slate-200 group-hover:bg-blue-600 group-hover:text-white transition">🎨</div>
+                        <div class="overflow-hidden">
+                          <p class="text-xs font-medium text-slate-200 group-hover:text-white truncate">Color Picker</p>
+                          <p class="text-[10px] text-slate-500 truncate">w3schools.com</p>
+                        </div>
+                      </button>
+
+                      <button type="button" onclick="browseTo('https://example.com')" class="p-3 bg-slateDark-900 hover:bg-slateDark-850 border border-slateDark-800 hover:border-blue-500/60 rounded-xl flex items-center gap-3 text-left transition group">
+                        <div class="w-8 h-8 rounded-lg bg-slateDark-800 flex items-center justify-center font-bold text-sm text-slate-200 group-hover:bg-blue-600 group-hover:text-white transition">📄</div>
+                        <div class="overflow-hidden">
+                          <p class="text-xs font-medium text-slate-200 group-hover:text-white truncate">Example Domain</p>
+                          <p class="text-[10px] text-slate-500 truncate">example.com</p>
+                        </div>
+                      </button>
+
+                      <button type="button" onclick="browseTo('https://webrtc.github.io/samples/')" class="p-3 bg-slateDark-900 hover:bg-slateDark-850 border border-slateDark-800 hover:border-blue-500/60 rounded-xl flex items-center gap-3 text-left transition group">
+                        <div class="w-8 h-8 rounded-lg bg-slateDark-800 flex items-center justify-center font-bold text-sm text-slate-200 group-hover:bg-blue-600 group-hover:text-white transition">⚡</div>
+                        <div class="overflow-hidden">
+                          <p class="text-xs font-medium text-slate-200 group-hover:text-white truncate">WebRTC Demo</p>
+                          <p class="text-[10px] text-slate-500 truncate">webrtc.github.io</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Catatan Transparansi Header Iframe -->
+                  <div class="bg-slateDark-900/90 border border-slateDark-800 rounded-xl p-3.5 text-xs text-slate-300">
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                      Situs dengan proteksi keamanan <code class="bg-slateDark-950 px-1 py-0.5 rounded text-blue-400 font-mono text-[10px]">X-Frame-Options: SAMEORIGIN</code> (seperti Google, Facebook, dsb.) menolak dimuat dalam iframe. Gunakan tombol <strong>Buka Tab Asli ↗</strong> di bilah atas jika halaman target menolak koneksi.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Drawer Inspector Browser Info -->
+        <aside id="drawer-browser-info" class="hidden absolute right-3 top-3 bottom-3 w-72 bg-slateDark-900/95 border border-slateDark-800 rounded-xl p-4 shadow-2xl backdrop-blur flex flex-col z-50 text-xs">
+          <div class="flex items-center justify-between pb-2 border-b border-slateDark-800">
+            <span class="font-bold text-white flex items-center gap-1.5">
+              <span>🛠️</span> Parameter Viewport
+            </span>
+            <button onclick="toggleBrowserDrawer()" class="text-slate-400 hover:text-white p-1">✕</button>
+          </div>
+          <div class="flex-1 overflow-y-auto py-3 space-y-3 font-mono text-[11px]">
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-sans">URL Aktif</span>
+              <div id="inspector-url" class="p-1.5 bg-slateDark-950 border border-slateDark-800 rounded text-slate-300 break-all">about:blank</div>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-sans">Dimensi Viewport</span>
+              <div id="inspector-dimension" class="p-1.5 bg-slateDark-950 border border-slateDark-800 rounded text-blue-400 font-semibold">100% Fluid</div>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-sans">Skala Auto-Fit</span>
+              <div id="inspector-zoom" class="p-1.5 bg-slateDark-950 border border-slateDark-800 rounded text-emerald-400 font-semibold">100%</div>
+            </div>
+          </div>
+          <button onclick="copyActiveBrowserUrl()" class="w-full py-1.5 bg-slateDark-800 hover:bg-slateDark-750 text-slate-200 rounded-lg text-xs font-medium transition">
+            📋 Salin URL Aktif
+          </button>
+        </aside>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MODAL RAW JSON INSPECTOR                                 -->
+  <!-- ======================================================== -->
+  <div id="raw-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slateDark-900 border border-slateDark-800 rounded-2xl max-w-3xl w-full flex flex-col max-h-[85vh] shadow-2xl">
+      <div class="p-3 border-b border-slateDark-800 flex items-center justify-between">
+        <span class="text-xs font-semibold text-white font-mono">Payload Inspector JSON</span>
+        <button onclick="closeRawModal()" class="text-slate-400 hover:text-white text-sm">✕</button>
+      </div>
+      <div class="p-3 flex-1 overflow-auto bg-slateDark-950 font-mono text-[11px] text-slate-300">
+        <pre id="raw-json-content" class="whitespace-pre-wrap"></pre>
+      </div>
+      <div class="p-2.5 border-t border-slateDark-800 flex justify-end gap-2">
+        <button onclick="copyRawJson()" class="bg-slateDark-800 hover:bg-slateDark-700 border border-slateDark-700 text-xs px-3 py-1.5 rounded-lg text-white transition">Salin ke Clipboard</button>
+        <button onclick="closeRawModal()" class="bg-blue-600 hover:bg-blue-500 text-xs px-3 py-1.5 rounded-lg text-white font-medium transition">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- FOOTER STATUS & TOAST                                    -->
+  <!-- ======================================================== -->
+  <footer class="bg-slateDark-900 border-t border-slateDark-800 px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-400 flex-shrink-0 z-30 font-mono">
+    <div class="flex items-center gap-3">
+      <span class="flex items-center gap-1.5">
+        <span id="footer-status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+        <span id="footer-status-text">Siap</span>
+      </span>
+      <span class="text-slate-700">|</span>
+      <span id="footer-module-name" class="text-slate-300">Modul Data API</span>
+    </div>
+    <div class="flex items-center gap-2 text-slate-500 text-[10px]">
+      <span>InFeeds Dashboard</span>
+    </div>
+  </footer>
+
+  <!-- Toast Notifikasi Terpadu -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slateDark-900 border border-slateDark-700 text-white text-xs px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 pointer-events-none">
+    <span id="toast-indicator" class="w-2 h-2 rounded-full bg-blue-500"></span>
+    <span id="toast-msg">Notifikasi</span>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- JAVASCRIPT APLIKASI TERPADU                              -->
+  <!-- ======================================================== -->
+  <script>
+    /* --------------------------------------------------------
+     * 1. GLOBAL STATE & NAVIGATION MANAGER
+     * -------------------------------------------------------- */
+    const appState = {
+      activeModule: 'data', // 'data', 'rss', 'live', 'browser'
+      proxyMode: 'auto',
+      data: {
+        raw: null,
+        rows: [],
+        columns: [],
+        filteredRows: [],
+        currentUrl: '',
+        duration: 0
+      },
+      rss: {
+        feeds: [], // max 16 items
+        filterText: ''
+      },
+      live: {
+        streams: [], // max 16 items
+        layout: 'auto'
+      },
+      browser: {
+        activeTabId: null,
+        zoomMode: 'fit',
+        tabs: []
+      }
+    };
+
+    // Preset RSS Teruji
+    const RSS_PRESETS = [
+      { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+      { name: 'Hacker News', url: 'https://news.ycombinator.com/rss' },
+      { name: 'CNN Indonesia', url: 'https://www.cnnindonesia.com/nasional/rss' },
+      { name: 'Antara Terkini', url: 'https://www.antaranews.com/rss/terkini.xml' },
+      { name: 'NASA News', url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss' }
+    ];
+
+    // Preset Live Video & Stream Teruji
+    const LIVE_PRESETS = [
+      { name: 'HLS Test Feed (Mux)', url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8', title: 'Mux HLS Stream' },
+      { name: 'NASA ISS Cam (YT)', url: 'https://www.youtube.com/watch?v=21X5lGlDOfg', title: 'NASA ISS Space Live' },
+      { name: 'Tokyo Shibuya (YT)', url: 'https://www.youtube.com/watch?v=H-3c_9b6pAc', title: 'Shibuya Crossing Live' },
+      { name: 'Tears of Steel 4K', url: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8', title: 'Unified HLS Demo' }
+    ];
+
+    // Toast Alert Helper
+    let toastTimer;
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      const msg = document.getElementById('toast-msg');
+      const ind = document.getElementById('toast-indicator');
+
+      msg.textContent = message;
+      ind.className = `w-2 h-2 rounded-full ${isError ? 'bg-red-500' : 'bg-emerald-400'}`;
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    function setModule(mod) {
+      appState.activeModule = mod;
+
+      // Sembunyikan seluruh section modul
+      ['data', 'rss', 'live', 'browser'].forEach(m => {
+        document.getElementById(`module-${m}`).classList.add('hidden');
+        const btn = document.getElementById(`nav-btn-${m}`);
+        btn.className = "px-2.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slateDark-800";
+      });
+
+      // Aktifkan modul terpilih
+      document.getElementById(`module-${mod}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`nav-btn-${mod}`);
+      activeBtn.className = "px-2.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 bg-blue-600 text-white shadow";
+
+      // Perbarui footer status
+      const labels = { data: 'Data API', rss: 'RSS Reader', live: 'Live Stream', browser: 'Browser Simulator' };
+      document.getElementById('footer-module-name').textContent = `Modul ${labels[mod]}`;
+
+      // Penghemat daya & memori: Jika beralih dari live video, jeda stream
+      if (mod !== 'live') {
+        pauseAllLiveVideos();
+      }
+      
+      // Jika beralih ke browser, sinkronkan mode viewport dan hitung ulang scaling
+      if (mod === 'browser') {
+        const activeTab = getActiveBrowserTab();
+        if (activeTab) {
+          applyViewportMode(activeTab.viewportMode, activeTab.isLandscape, false);
+        }
+        setTimeout(applyZoomAndScale, 50);
+      }
+    }
+
+    function resolveProxyUrl(targetUrl) {
+      const proxyType = document.getElementById('global-cors-proxy').value;
+      if (proxyType === 'direct') return targetUrl;
+      if (proxyType === 'corsproxy') return `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+      // Default / auto / allorigins
+      return `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+    }
+
+    /* --------------------------------------------------------
+     * 2. FITUR MUAT CONTOH (LOAD SAMPLES) & RESET
+     * -------------------------------------------------------- */
+    function loadSample(target) {
+      if (target === 'data' || target === 'all') {
+        document.getElementById('data-url').value = 'https://api.coincap.io/v2/assets?limit=20';
+        fetchDataRepository();
+      }
+      if (target === 'rss' || target === 'all') {
+        if (appState.rss.feeds.length === 0) {
+          addFeedByUrl('https://feeds.bbci.co.uk/news/world/rss.xml', 'BBC World');
+          addFeedByUrl('https://news.ycombinator.com/rss', 'Hacker News');
+          addFeedByUrl('https://www.cnnindonesia.com/nasional/rss', 'CNN Indonesia');
+        }
+      }
+      if (target === 'live' || target === 'all') {
+        if (appState.live.streams.length === 0) {
+          addLiveStream('https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8', 'Mux HLS Test Feed');
+          addLiveStream('https://www.youtube.com/watch?v=21X5lGlDOfg', 'NASA Space Cam');
+        }
+      }
+      if (target === 'browser' || target === 'all') {
+        setModule('browser');
+        browseTo('https://id.wikipedia.org');
+      }
+
+      showToast(`Contoh untuk [${target.toUpperCase()}] berhasil dimuat!`);
+    }
+
+    function clearAllWorkspace() {
+      clearDataView();
+      removeAllFeeds();
+      removeAllLiveStreams();
+      browserGoHome();
+      showToast('Seluruh workspace dikembalikan ke status kosong.');
+    }
+
+    /* --------------------------------------------------------
+     * 3. MODUL DATA REPOSITORY (API & CSV)
+     * -------------------------------------------------------- */
+    function toggleAuthFields() {
+      const mode = document.getElementById('auth-mode').value;
+      const authVal = document.getElementById('auth-val');
+      if (mode === 'none') {
+        authVal.disabled = true;
+        authVal.placeholder = "Tanpa otentikasi";
+        authVal.value = '';
+      } else {
+        authVal.disabled = false;
+        if (mode === 'bearer') authVal.placeholder = "Bearer eyJhbGciOi...";
+        else if (mode === 'apikey') authVal.placeholder = "x-api-key: nilai_key";
+        else authVal.placeholder = "Header-Name: NilaiHeader";
+      }
+    }
+
+    function applyApiPreset(val) {
+      if (val) {
+        document.getElementById('data-url').value = val;
+      }
+    }
+
+    async function fetchDataRepository() {
+      const urlInput = document.getElementById('data-url');
+      const url = urlInput.value.trim();
+      if (!url) {
+        showToast('Masukkan URL API atau CSV publik terlebih dahulu.', true);
+        return;
+      }
+
+      const startTime = performance.now();
+      const btn = document.getElementById('btn-fetch-data');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin">⌛</span><span>Memuat...</span>`;
+
+      try {
+        const headers = {};
+        const authMode = document.getElementById('auth-mode').value;
+        const authVal = document.getElementById('auth-val').value.trim();
+
+        if (authMode === 'bearer' && authVal) headers['Authorization'] = authVal.startsWith('Bearer ') ? authVal : `Bearer ${authVal}`;
+        else if (authMode === 'apikey' && authVal) headers['x-api-key'] = authVal;
+        else if (authMode === 'custom' && authVal.includes(':')) {
+          const [k, v] = authVal.split(':');
+          headers[k.trim()] = v.trim();
+        }
+
+        const proxiedUrl = resolveProxyUrl(url);
+        const res = await fetch(proxiedUrl, { headers });
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+
+        const text = await res.text();
+        const duration = Math.round(performance.now() - startTime);
+
+        // Parsing JSON atau CSV
+        let parsedData = null;
+        let isJson = false;
+
+        try {
+          parsedData = JSON.parse(text);
+          isJson = true;
+        } catch (e) {
+          parsedData = parseCSVToObjects(text);
+          isJson = false;
+        }
+
+        appState.data.raw = parsedData;
+        appState.data.duration = duration;
+        appState.data.currentUrl = url;
+
+        processDataPayload(parsedData, isJson, duration);
+        showToast(`Data berhasil diambil (${duration} ms).`);
+      } catch (err) {
+        console.error('Fetch error:', err);
+        showToast(`Gagal mengambil data: ${err.message}`, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>Ambil Data</span>`;
+      }
+    }
+
+    function parseCSVToObjects(csvText) {
+      const lines = csvText.trim().split('\n').filter(l => l.trim() !== '');
+      if (lines.length < 2) return [];
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const obj = {};
+        headers.forEach((h, idx) => {
+          obj[h] = values[idx] || '';
+        });
+        rows.push(obj);
+      }
+      return rows;
+    }
+
+    function processDataPayload(payload, isJson, duration) {
+      document.getElementById('data-initial-prompt').classList.add('hidden');
+      document.getElementById('data-meta-bar').classList.remove('hidden');
+      document.getElementById('data-table-container').classList.remove('hidden');
+
+      document.getElementById('meta-duration').textContent = `${duration}ms`;
+      document.getElementById('meta-type').textContent = isJson ? 'JSON' : 'CSV';
+      document.getElementById('meta-status').textContent = '200 OK';
+
+      let rows = [];
+      const pathSelector = document.getElementById('json-path-selector');
+      const arraySelect = document.getElementById('array-path-select');
+
+      if (Array.isArray(payload)) {
+        rows = payload;
+        pathSelector.classList.add('hidden');
+      } else if (typeof payload === 'object' && payload !== null) {
+        // Deteksi sub-array dalam objek
+        const arrayKeys = Object.keys(payload).filter(k => Array.isArray(payload[k]));
+        if (arrayKeys.length > 0) {
+          pathSelector.classList.remove('hidden');
+          pathSelector.classList.add('flex');
+          arraySelect.innerHTML = arrayKeys.map(k => `<option value="${k}">${k} (${payload[k].length} item)</option>`).join('');
+          rows = payload[arrayKeys[0]];
+        } else {
+          rows = [payload];
+          pathSelector.classList.add('hidden');
+        }
+      }
+
+      appState.data.rows = rows;
+      appState.data.filteredRows = rows;
+      renderDataTable(rows);
+    }
+
+    function applyJsonArrayKey(key) {
+      if (appState.data.raw && Array.isArray(appState.data.raw[key])) {
+        appState.data.rows = appState.data.raw[key];
+        appState.data.filteredRows = appState.data.rows;
+        renderDataTable(appState.data.rows);
+      }
+    }
+
+    function renderDataTable(rows) {
+      const headersRow = document.getElementById('table-headers');
+      const tbody = document.getElementById('table-body');
+      const emptyDiv = document.getElementById('table-empty');
+      const metaRows = document.getElementById('meta-rows');
+
+      metaRows.textContent = rows.length;
+
+      if (!rows || rows.length === 0) {
+        headersRow.innerHTML = '';
+        tbody.innerHTML = '';
+        emptyDiv.classList.remove('hidden');
+        return;
+      }
+
+      emptyDiv.classList.add('hidden');
+
+      // Ambil kolom unik
+      const columns = [];
+      rows.slice(0, 15).forEach(r => {
+        if (typeof r === 'object' && r !== null) {
+          Object.keys(r).forEach(k => {
+            if (!columns.includes(k) && typeof r[k] !== 'function') columns.push(k);
+          });
+        }
+      });
+
+      appState.data.columns = columns;
+
+      // Render Header
+      headersRow.innerHTML = `
+        <th class="py-2.5 px-3 border-b border-slateDark-800 text-[10px] uppercase font-mono text-slate-400 w-12">#</th>
+        ${columns.map(c => `<th class="py-2.5 px-3 border-b border-slateDark-800 text-[10px] uppercase tracking-wider">${c}</th>`).join('')}
+      `;
+
+      // Render Isi (Limit 150 untuk performa maksimal browser)
+      const renderLimit = Math.min(rows.length, 150);
+      tbody.innerHTML = rows.slice(0, renderLimit).map((row, idx) => {
+        return `
+          <tr class="hover:bg-slateDark-850/60 transition">
+            <td class="py-2 px-3 text-slate-500 text-[10px]">${idx + 1}</td>
+            ${columns.map(c => {
+              let val = row[c];
+              if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+              return `<td class="py-2 px-3 text-slate-300 max-w-xs truncate" title="${String(val || '')}">${String(val ?? '')}</td>`;
+            }).join('')}
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterDataTable(query) {
+      const q = query.toLowerCase().trim();
+      if (!q) {
+        appState.data.filteredRows = appState.data.rows;
+        document.getElementById('filtered-count').textContent = 'Menampilkan semua data';
+      } else {
+        appState.data.filteredRows = appState.data.rows.filter(r => {
+          return Object.values(r).some(v => String(v).toLowerCase().includes(q));
+        });
+        document.getElementById('filtered-count').textContent = `Menampilkan ${appState.data.filteredRows.length} dari ${appState.data.rows.length} baris`;
+      }
+      renderDataTable(appState.data.filteredRows);
+    }
+
+    function clearDataView() {
+      appState.data.raw = null;
+      appState.data.rows = [];
+      appState.data.filteredRows = [];
+      document.getElementById('data-url').value = '';
+      document.getElementById('data-meta-bar').classList.add('hidden');
+      document.getElementById('data-table-container').classList.add('hidden');
+      document.getElementById('data-initial-prompt').classList.remove('hidden');
+    }
+
+    // Ekspor CSV & Excel
+    function exportToCSV() {
+      if (!appState.data.rows || appState.data.rows.length === 0) {
+        showToast('Tidak ada data untuk diunduh.', true);
+        return;
+      }
+      const cols = appState.data.columns;
+      const csvLines = [cols.join(',')];
+      appState.data.rows.forEach(r => {
+        const rowVals = cols.map(c => {
+          let v = r[c] ?? '';
+          if (typeof v === 'object') v = JSON.stringify(v);
+          return `"${String(v).replace(/"/g, '""')}"`;
+        });
+        csvLines.push(rowVals.join(','));
+      });
+
+      const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `data_export_${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('File CSV berhasil diunduh.');
+    }
+
+    function exportToExcel() {
+      if (!appState.data.rows || appState.data.rows.length === 0) {
+        showToast('Tidak ada data untuk diekspor.', true);
+        return;
+      }
+      try {
+        const ws = XLSX.utils.json_to_sheet(appState.data.rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Data");
+        XLSX.writeFile(wb, `data_export_${Date.now()}.xlsx`);
+        showToast('File Excel (.xlsx) berhasil diekspor.');
+      } catch (err) {
+        showToast('Gagal mengekspor Excel: ' + err.message, true);
+      }
+    }
+
+    function openRawModal() {
+      if (!appState.data.raw) return;
+      document.getElementById('raw-json-content').textContent = JSON.stringify(appState.data.raw, null, 2);
+      document.getElementById('raw-modal').classList.remove('hidden');
+    }
+
+    function closeRawModal() {
+      document.getElementById('raw-modal').classList.add('hidden');
+    }
+
+    function copyRawJson() {
+      const text = document.getElementById('raw-json-content').textContent;
+      navigator.clipboard ? navigator.clipboard.writeText(text) : document.execCommand('copy');
+      showToast('JSON mentah disalin ke papan klip!');
+    }
+
+    /* --------------------------------------------------------
+     * 4. MODUL RSS READER AGGREGATOR
+     * -------------------------------------------------------- */
+    function parseRssXml(xmlString) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlString, "application/xml");
+      let title = "RSS Feed";
+      const items = [];
+
+      const channel = xmlDoc.querySelector("channel");
+      if (channel) {
+        const chTitle = channel.querySelector("title");
+        if (chTitle) title = chTitle.textContent.trim();
+        channel.querySelectorAll("item").forEach(item => {
+          const iTitle = item.querySelector("title")?.textContent?.trim() || "Tanpa Judul";
+          const iLink = item.querySelector("link")?.textContent?.trim() || "#";
+          const iDate = item.querySelector("pubDate, date")?.textContent?.trim() || "";
+          const iDesc = item.querySelector("description, summary")?.textContent?.trim() || "";
+          items.push({
+            title: iTitle,
+            link: iLink,
+            pubDate: iDate ? new Date(iDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' }) : '',
+            snippet: iDesc.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'
+          });
+        });
+      } else {
+        const feedNode = xmlDoc.querySelector("feed");
+        if (feedNode) {
+          const fTitle = feedNode.querySelector("title");
+          if (fTitle) title = fTitle.textContent.trim();
+          feedNode.querySelectorAll("entry").forEach(entry => {
+            const iTitle = entry.querySelector("title")?.textContent?.trim() || "Tanpa Judul";
+            const linkElem = entry.querySelector("link[href]");
+            const iLink = linkElem ? linkElem.getAttribute("href") : (entry.querySelector("link")?.textContent?.trim() || "#");
+            const iDate = entry.querySelector("updated, published")?.textContent?.trim() || "";
+            const iSummary = entry.querySelector("summary, content")?.textContent?.trim() || "";
+            items.push({
+              title: iTitle,
+              link: iLink,
+              pubDate: iDate ? new Date(iDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' }) : '',
+              snippet: iSummary.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'
+            });
+          });
+        }
+      }
+      return { title, items };
+    }
+
+    async function fetchSingleFeed(feedObj) {
+      feedObj.status = 'loading';
+      renderRssGrid();
+
+      // Strategi 1: rss2json
+      try {
+        const rss2JsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedObj.url)}`;
+        const res = await fetch(rss2JsonUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'ok' && Array.isArray(data.items)) {
+            if (!feedObj.customTitleSet && data.feed?.title) feedObj.title = data.feed.title;
+            feedObj.items = data.items.map(i => ({
+              title: i.title || 'Tanpa Judul',
+              link: i.link || '#',
+              pubDate: i.pubDate ? new Date(i.pubDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' }) : '',
+              snippet: (i.description || '').replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'
+            }));
+            feedObj.status = 'ready';
+            feedObj.error = null;
+            renderRssGrid();
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Fallback rss2json -> AllOrigins');
+      }
+
+      // Strategi 2: AllOrigins JSON Proxy
+      try {
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(feedObj.url)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.contents) {
+            const parsed = parseRssXml(data.contents);
+            if (!feedObj.customTitleSet && parsed.title) feedObj.title = parsed.title;
+            feedObj.items = parsed.items;
+            feedObj.status = 'ready';
+            feedObj.error = null;
+            renderRssGrid();
+            return;
+          }
+        }
+      } catch (e2) {
+        console.warn('Fallback allorigins -> Raw Proxy');
+      }
+
+      // Strategi 3: Raw CORS Proxy
+      try {
+        const proxiedUrl = resolveProxyUrl(feedObj.url);
+        const res = await fetch(proxiedUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const xml = await res.text();
+        const parsed = parseRssXml(xml);
+        if (!feedObj.customTitleSet && parsed.title) feedObj.title = parsed.title;
+        feedObj.items = parsed.items;
+        feedObj.status = 'ready';
+        feedObj.error = null;
+      } catch (errFinal) {
+        feedObj.status = 'error';
+        feedObj.error = 'Gagal memuat feed XML. Periksa URL atau koneksi proxy.';
+      } finally {
+        renderRssGrid();
+      }
+    }
+
+    function addFeedByUrl(url, title = '') {
+      if (appState.rss.feeds.length >= 16) {
+        showToast('Maksimum 16 feed telah tercapai.', true);
+        return;
+      }
+      if (appState.rss.feeds.some(f => f.url === url)) {
+        showToast('Feed ini sudah ada di dalam daftar.', true);
+        return;
+      }
+
+      const newFeed = {
+        id: 'rss_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        url: url,
+        title: title || 'Memuat Feed...',
+        customTitleSet: Boolean(title),
+        items: [],
+        status: 'loading',
+        error: null
+      };
+
+      appState.rss.feeds.push(newFeed);
+      updateRssBadge();
+      fetchSingleFeed(newFeed);
+    }
+
+    function addCustomFeed() {
+      const urlInput = document.getElementById('custom-rss-url');
+      const titleInput = document.getElementById('custom-rss-title');
+      const url = urlInput.value.trim();
+      const title = titleInput.value.trim();
+
+      if (!url) {
+        showToast('Masukkan URL feed RSS yang sah.', true);
+        return;
+      }
+
+      addFeedByUrl(url, title);
+      urlInput.value = '';
+      titleInput.value = '';
+    }
+
+    function removeFeed(id) {
+      appState.rss.feeds = appState.rss.feeds.filter(f => f.id !== id);
+      updateRssBadge();
+      renderRssGrid();
+      showToast('Feed berhasil dihapus.');
+    }
+
+    function removeAllFeeds() {
+      appState.rss.feeds = [];
+      updateRssBadge();
+      renderRssGrid();
+    }
+
+    function refreshAllRss() {
+      if (appState.rss.feeds.length === 0) return;
+      appState.rss.feeds.forEach(f => fetchSingleFeed(f));
+      showToast('Menyegarkan semua feed RSS...');
+    }
+
+    function updateRssBadge() {
+      const count = appState.rss.feeds.length;
+      document.getElementById('badge-rss-count').textContent = `${count}/16`;
+    }
+
+    function renderRssGrid() {
+      const grid = document.getElementById('rss-grid');
+      const emptyDiv = document.getElementById('rss-empty');
+      const query = appState.rss.filterText.toLowerCase().trim();
+
+      if (appState.rss.feeds.length === 0) {
+        grid.innerHTML = '';
+        emptyDiv.classList.remove('hidden');
+        document.getElementById('rss-status-summary').textContent = '0 artikel termuat';
+        return;
+      }
+
+      emptyDiv.classList.add('hidden');
+      grid.innerHTML = '';
+      let totalArticles = 0;
+
+      appState.rss.feeds.forEach(feed => {
+        const visibleItems = query === '' 
+          ? feed.items 
+          : feed.items.filter(i => i.title.toLowerCase().includes(query) || i.snippet.toLowerCase().includes(query));
+
+        totalArticles += visibleItems.length;
+
+        const card = document.createElement('div');
+        card.className = "bg-slateDark-900 border border-slateDark-800 rounded-xl flex flex-col h-[400px] shadow-sm overflow-hidden transition";
+
+        card.innerHTML = `
+          <div class="p-3 border-b border-slateDark-800 bg-slateDark-850 flex items-center justify-between gap-2">
+            <div class="flex-1 min-w-0">
+              <h4 class="text-xs font-bold text-white truncate flex items-center gap-1.5" title="${feed.title}">
+                <span class="w-1.5 h-1.5 rounded-full ${feed.status === 'ready' ? 'bg-emerald-400' : (feed.status === 'loading' ? 'bg-amber-400 animate-ping' : 'bg-red-500')}"></span>
+                ${feed.title}
+              </h4>
+              <div class="text-[10px] text-slate-500 truncate">${feed.items.length} artikel</div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="fetchSingleFeed(appState.rss.feeds.find(f => f.id === '${feed.id}'))" class="p-1 text-slate-400 hover:text-white rounded hover:bg-slateDark-800 transition" title="Muat Ulang">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+              <button onclick="removeFeed('${feed.id}')" class="p-1 text-slate-400 hover:text-red-400 rounded hover:bg-slateDark-800 transition" title="Hapus">✕</button>
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto divide-y divide-slateDark-800/60 p-2 space-y-1">
+            ${feed.status === 'loading' && feed.items.length === 0 ? `
+              <div class="h-full flex items-center justify-center text-xs text-slate-500 gap-1.5">
+                <span class="animate-spin text-blue-400">⌛</span> Mengambil feed...
+              </div>
+            ` : feed.status === 'error' ? `
+              <div class="p-4 text-center text-xs text-red-400">${feed.error}</div>
+            ` : visibleItems.length === 0 ? `
+              <div class="h-full flex items-center justify-center text-xs text-slate-500">Tidak ada artikel yang cocok.</div>
+            ` : visibleItems.map(item => `
+              <div class="py-2 px-1 hover:bg-slateDark-800/40 rounded transition">
+                <a href="${item.link}" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-slate-200 hover:text-blue-400 line-clamp-2 leading-snug">
+                  ${item.title}
+                </a>
+                <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1 font-mono">
+                  <span>${item.pubDate}</span>
+                  <span class="text-blue-400 flex items-center gap-0.5">Buka &rarr;</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      document.getElementById('rss-status-summary').textContent = `${totalArticles} artikel ditampilkan`;
+    }
+
+    function filterRssCards(keyword) {
+      appState.rss.filterText = keyword;
+      renderRssGrid();
+    }
+
+    /* --------------------------------------------------------
+     * 5. MODUL LIVE STREAMING (HLS & YOUTUBE)
+     * -------------------------------------------------------- */
+    function detectStreamType(url) {
+      const u = url.trim();
+      const ytMatch = u.match(/(?:youtube\.com\/(?:watch\?v=|live\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      if (ytMatch && ytMatch[1]) return { type: 'youtube', id: ytMatch[1] };
+      if (u.includes('.m3u8') || u.includes('/hls/')) return { type: 'hls', id: null };
+      return { type: 'video', id: null };
+    }
+
+    function addLiveStream(url, title = '') {
+      if (appState.live.streams.length >= 16) {
+        showToast('Maksimum 16 video live telah tercapai.', true);
+        return;
+      }
+      if (appState.live.streams.some(s => s.url === url)) {
+        showToast('Stream video ini sudah ada di daftar.', true);
+        return;
+      }
+
+      const meta = detectStreamType(url);
+      const streamId = 'stream_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+      const stream = {
+        id: streamId,
+        url: url,
+        title: title || (meta.type === 'youtube' ? 'YouTube Live Cam' : 'CCTV Live Monitor'),
+        type: meta.type,
+        ytId: meta.id,
+        hlsInstance: null
+      };
+
+      appState.live.streams.push(stream);
+      updateLiveBadge();
+      renderLiveGrid();
+    }
+
+    function addCustomLiveStream() {
+      const urlInput = document.getElementById('custom-live-url');
+      const titleInput = document.getElementById('custom-live-title');
+      const url = urlInput.value.trim();
+      const title = titleInput.value.trim();
+
+      if (!url) {
+        showToast('Masukkan URL stream yang valid.', true);
+        return;
+      }
+
+      addLiveStream(url, title);
+      urlInput.value = '';
+      titleInput.value = '';
+    }
+
+    function removeLiveStream(id) {
+      const s = appState.live.streams.find(item => item.id === id);
+      if (s && s.hlsInstance) {
+        try { s.hlsInstance.destroy(); } catch (e) {}
+      }
+      appState.live.streams = appState.live.streams.filter(item => item.id !== id);
+      updateLiveBadge();
+      renderLiveGrid();
+      showToast('Stream dihapus.');
+    }
+
+    function removeAllLiveStreams() {
+      appState.live.streams.forEach(s => {
+        if (s.hlsInstance) {
+          try { s.hlsInstance.destroy(); } catch (e) {}
+        }
+      });
+      appState.live.streams = [];
+      updateLiveBadge();
+      renderLiveGrid();
+    }
+
+    function reloadAllLiveStreams() {
+      renderLiveGrid();
+      showToast('Menyegarkan dinding live stream...');
+    }
+
+    function pauseAllLiveVideos() {
+      document.querySelectorAll('#live-grid video').forEach(v => {
+        try { v.pause(); } catch (e) {}
+      });
+    }
+
+    function updateLiveBadge() {
+      const count = appState.live.streams.length;
+      document.getElementById('badge-live-count').textContent = `${count}/16`;
+      document.getElementById('live-active-summary').textContent = `${count} stream aktif`;
+    }
+
+    function changeLiveLayout(layout) {
+      appState.live.layout = layout;
+      renderLiveGrid();
+    }
+
+    function renderLiveGrid() {
+      const grid = document.getElementById('live-grid');
+      const emptyDiv = document.getElementById('live-empty');
+
+      if (appState.live.streams.length === 0) {
+        grid.innerHTML = '';
+        emptyDiv.classList.remove('hidden');
+        return;
+      }
+
+      emptyDiv.classList.add('hidden');
+      grid.innerHTML = '';
+
+      // Terapkan Layout Grid
+      grid.className = 'gap-3 grid';
+      if (appState.live.layout === '1') grid.classList.add('grid-cols-1');
+      else if (appState.live.layout === '4') grid.classList.add('grid-cols-1', 'sm:grid-cols-2');
+      else if (appState.live.layout === '9') grid.classList.add('grid-cols-1', 'sm:grid-cols-2', 'lg:grid-cols-3');
+      else if (appState.live.layout === '16') grid.classList.add('grid-cols-1', 'sm:grid-cols-2', 'lg:grid-cols-4');
+      else grid.classList.add('grid-cols-1', 'sm:grid-cols-2', 'lg:grid-cols-3', 'xl:grid-cols-4');
+
+      appState.live.streams.forEach(stream => {
+        const tile = document.createElement('div');
+        tile.className = "bg-slateDark-900 border border-slateDark-800 rounded-xl flex flex-col overflow-hidden shadow-lg";
+
+        tile.innerHTML = `
+          <div class="px-3 py-1.5 bg-slateDark-850 border-b border-slateDark-800 flex items-center justify-between text-xs select-none">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              <span class="font-medium text-white truncate max-w-[150px]">${stream.title}</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-slate-400">
+              <button onclick="toggleStreamFullscreen('${stream.id}')" class="p-1 hover:text-white hover:bg-slateDark-800 rounded transition" title="Layar Penuh">⛶</button>
+              <button onclick="removeLiveStream('${stream.id}')" class="p-1 hover:text-red-400 hover:bg-slateDark-800 rounded transition" title="Hapus">✕</button>
+            </div>
+          </div>
+          <div id="viewport-${stream.id}" class="relative bg-black w-full aspect-video flex items-center justify-center overflow-hidden">
+          </div>
+          <div class="px-2.5 py-1 bg-slateDark-900 border-t border-slateDark-800 text-[10px] text-slate-500 flex items-center justify-between font-mono">
+            <span class="truncate max-w-[200px]">${stream.url}</span>
+            <span class="uppercase text-[9px] px-1 py-0.5 rounded bg-slateDark-800 text-slate-300">${stream.type}</span>
+          </div>
+        `;
+
+        grid.appendChild(tile);
+
+        // Mount media player
+        const vp = tile.querySelector(`#viewport-${stream.id}`);
+        if (stream.type === 'youtube' && stream.ytId) {
+          const iframe = document.createElement('iframe');
+          iframe.src = `https://www.youtube-nocookie.com/embed/${stream.ytId}?autoplay=1&mute=1&playsinline=1&enablejsapi=1&rel=0`;
+          iframe.className = "w-full h-full border-0";
+          iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+          iframe.allowFullscreen = true;
+          vp.appendChild(iframe);
+        } else {
+          const video = document.createElement('video');
+          video.id = `video-${stream.id}`;
+          video.className = "w-full h-full object-cover bg-black";
+          video.autoplay = true;
+          video.muted = true;
+          video.playsInline = true;
+          video.controls = true;
+          vp.appendChild(video);
+
+          setTimeout(() => initHlsPlayback(stream, video), 50);
+        }
+      });
+    }
+
+    function initHlsPlayback(stream, videoElem) {
+      if (Hls.isSupported() && (stream.type === 'hls' || stream.url.includes('.m3u8'))) {
+        if (stream.hlsInstance) {
+          try { stream.hlsInstance.destroy(); } catch (e) {}
+        }
+        const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+        hls.loadSource(stream.url);
+        hls.attachMedia(videoElem);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          videoElem.play().catch(() => {});
+        });
+        stream.hlsInstance = hls;
+      } else if (videoElem.canPlayType('application/vnd.apple.mpegurl')) {
+        videoElem.src = stream.url;
+        videoElem.addEventListener('loadedmetadata', () => { videoElem.play().catch(() => {}); });
+      } else {
+        videoElem.src = stream.url;
+        videoElem.play().catch(() => {});
+      }
+    }
+
+    function toggleStreamFullscreen(id) {
+      const el = document.getElementById(`viewport-${id}`);
+      if (!el) return;
+      if (!document.fullscreenElement) el.requestFullscreen().catch(() => {});
+      else document.exitFullscreen().catch(() => {});
+    }
+
+    /* --------------------------------------------------------
+     * 6. MODUL EMBEDDED BROWSE (BROWSEIN ENGINE)
+     * -------------------------------------------------------- */
+    const iframe = document.getElementById('browser-viewport');
+    const viewBrowserHome = document.getElementById('view-browser-home');
+    const inputBrowserUrl = document.getElementById('input-browser-url');
+    const browserProgressBar = document.getElementById('browser-progress-bar');
+    const deviceWrapper = document.getElementById('device-wrapper');
+    const selectViewport = document.getElementById('select-viewport');
+    const selectZoom = document.getElementById('select-zoom');
+    const viewportScalerBox = document.getElementById('viewport-scaler-box');
+    const mainWorkspace = document.getElementById('browser-workspace');
+    const phoneHardwareNotch = document.getElementById('phone-hardware-notch');
+    const floatingFreeformBar = document.getElementById('floating-freeform-bar');
+    const btnBrowserRotate = document.getElementById('btn-browser-rotate');
+    const btnBrowserBack = document.getElementById('btn-browser-back');
+    const btnBrowserForward = document.getElementById('btn-browser-forward');
+
+    function createNewBrowserTab(initialUrl = '') {
+      const id = 'btab_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      const newTab = {
+        id: id,
+        title: initialUrl ? extractHostname(initialUrl) : 'Beranda',
+        url: initialUrl,
+        viewportMode: 'desktop',
+        isLandscape: false,
+        freeformW: 1024,
+        freeformH: 650,
+        history: initialUrl ? [initialUrl] : [],
+        currentIndex: initialUrl ? 0 : -1,
+        isLoading: false
+      };
+
+      appState.browser.tabs.push(newTab);
+      renderBrowserTabs();
+      switchBrowserTab(id);
+
+      if (initialUrl) {
+        browseTo(initialUrl, false);
+      }
+    }
+
+    function switchBrowserTab(tabId) {
+      const tab = appState.browser.tabs.find(t => t.id === tabId);
+      if (!tab) return;
+
+      appState.browser.activeTabId = tabId;
+      renderBrowserTabs();
+
+      inputBrowserUrl.value = tab.url;
+      selectViewport.value = tab.viewportMode;
+      applyViewportMode(tab.viewportMode, tab.isLandscape, false);
+
+      if (tab.url) {
+        viewBrowserHome.classList.add('hidden');
+        if (iframe.src !== tab.url) iframe.src = tab.url;
+      } else {
+        viewBrowserHome.classList.remove('hidden');
+        iframe.src = 'about:blank';
+      }
+
+      updateBrowserNavButtons();
+      updateInspector();
+    }
+
+    function closeBrowserTab(tabId, event) {
+      if (event) event.stopPropagation();
+      if (appState.browser.tabs.length <= 1) {
+        showToast('Tidak dapat menutup tab terakhir.');
+        return;
+      }
+      const idx = appState.browser.tabs.findIndex(t => t.id === tabId);
+      if (idx === -1) return;
+
+      appState.browser.tabs.splice(idx, 1);
+      if (appState.browser.activeTabId === tabId) {
+        const next = appState.browser.tabs[Math.max(0, idx - 1)];
+        switchBrowserTab(next.id);
+      } else {
+        renderBrowserTabs();
+      }
+    }
+
+    function renderBrowserTabs() {
+      const container = document.getElementById('tab-container');
+      container.innerHTML = '';
+      appState.browser.tabs.forEach(tab => {
+        const isActive = tab.id === appState.browser.activeTabId;
+        const tabEl = document.createElement('div');
+        tabEl.className = `flex items-center gap-2 px-3 py-1.5 rounded-t-lg font-medium text-xs max-w-[160px] cursor-pointer transition border-t-2 select-none ${
+          isActive 
+            ? 'bg-slateDark-850 text-white border-blue-500 shadow' 
+            : 'bg-slateDark-900 text-slate-400 hover:text-slate-200 border-transparent'
+        }`;
+
+        tabEl.onclick = () => switchBrowserTab(tab.id);
+
+        tabEl.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-slate-600'}"></span>
+          <span class="truncate flex-1">${tab.title || 'Tab Baru'}</span>
+          ${appState.browser.tabs.length > 1 ? `
+            <button onclick="closeBrowserTab('${tab.id}', event)" class="p-0.5 rounded hover:bg-slateDark-750 text-slate-400 hover:text-white">✕</button>
+          ` : ''}
+        `;
+        container.appendChild(tabEl);
+      });
+    }
+
+    function getActiveBrowserTab() {
+      return appState.browser.tabs.find(t => t.id === appState.browser.activeTabId) || appState.browser.tabs[0];
+    }
+
+    function extractHostname(url) {
+      try {
+        const parsed = new URL(url);
+        return parsed.hostname.replace('www.', '');
+      } catch (e) {
+        return url.slice(0, 15);
+      }
+    }
+
+    function formatTargetUrl(raw) {
+      const trimmed = raw.trim();
+      if (!trimmed) return '';
+      if (/^(https?:\/\/|about:|file:\/\/)/i.test(trimmed)) return trimmed;
+      if (/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/i.test(trimmed)) return 'https://' + trimmed;
+      return `https://duckduckgo.com/html/?q=${encodeURIComponent(trimmed)}`;
+    }
+
+    function browseTo(targetUrl, pushState = true) {
+      const activeTab = getActiveBrowserTab();
+      if (!activeTab) return;
+
+      const url = formatTargetUrl(targetUrl);
+      if (!url) return;
+
+      setBrowserLoading(true);
+      activeTab.url = url;
+      activeTab.title = extractHostname(url);
+      inputBrowserUrl.value = url;
+
+      if (pushState) {
+        if (activeTab.currentIndex < activeTab.history.length - 1) {
+          activeTab.history = activeTab.history.slice(0, activeTab.currentIndex + 1);
+        }
+        activeTab.history.push(url);
+        activeTab.currentIndex = activeTab.history.length - 1;
+      }
+
+      renderBrowserTabs();
+      updateBrowserNavButtons();
+      updateInspector();
+
+      viewBrowserHome.classList.add('hidden');
+      iframe.src = url;
+    }
+
+    function setBrowserLoading(isLoading) {
+      if (isLoading) {
+        browserProgressBar.style.width = '65%';
+        browserProgressBar.style.opacity = '1';
+      } else {
+        browserProgressBar.style.width = '100%';
+        setTimeout(() => {
+          browserProgressBar.style.opacity = '0';
+          browserProgressBar.style.width = '0';
+        }, 300);
+      }
+    }
+
+    iframe.addEventListener('load', () => setBrowserLoading(false));
+
+    function applyZoomAndScale() {
+      const activeTab = getActiveBrowserTab();
+      const mode = activeTab ? activeTab.viewportMode : 'desktop';
+      const zoom = selectZoom.value;
+
+      if (mode === 'desktop') {
+        deviceWrapper.style.width = '100%';
+        deviceWrapper.style.height = '100%';
+        if (zoom === 'fit' || zoom === '1') {
+          viewportScalerBox.style.transform = 'none';
+        } else {
+          viewportScalerBox.style.transform = `scale(${parseFloat(zoom)})`;
+        }
+        updateInspector();
+        return;
+      }
+
+      let targetW, targetH;
+      if (mode === 'mobile') {
+        targetW = activeTab.isLandscape ? 852 : 393;
+        targetH = activeTab.isLandscape ? 393 : 852;
+      } else if (mode === 'tablet') {
+        targetW = activeTab.isLandscape ? 1080 : 810;
+        targetH = activeTab.isLandscape ? 810 : 1080;
+      } else if (mode === 'desktop-1440') {
+        targetW = 1440;
+        targetH = 900;
+      } else if (mode === 'desktop-1920') {
+        targetW = 1920;
+        targetH = 1080;
+      } else if (mode === 'freeform') {
+        targetW = activeTab.freeformW;
+        targetH = activeTab.freeformH;
+      }
+
+      if (zoom === 'fit') {
+        const availW = Math.max(300, mainWorkspace.clientWidth - 32);
+        const availH = Math.max(260, mainWorkspace.clientHeight - 32);
+        const scale = Math.min(availW / targetW, availH / targetH, 1);
+        viewportScalerBox.style.transform = `scale(${scale.toFixed(3)})`;
+      } else {
+        viewportScalerBox.style.transform = `scale(${parseFloat(zoom)})`;
+      }
+      updateInspector();
+    }
+
+    selectZoom.addEventListener('change', applyZoomAndScale);
+    window.addEventListener('resize', () => {
+      applyZoomAndScale();
+    });
+
+    function applyViewportMode(mode, landscape = false, sync = true) {
+      const activeTab = getActiveBrowserTab();
+      if (sync && activeTab) {
+        activeTab.viewportMode = mode;
+        activeTab.isLandscape = landscape;
+      }
+
+      deviceWrapper.style.width = '';
+      deviceWrapper.style.height = '';
+
+      if (mode === 'desktop') {
+        mainWorkspace.className = 'flex-1 relative bg-slateDark-950/70 p-0 flex flex-col min-h-0 min-w-0 overflow-hidden w-full h-full';
+        viewportScalerBox.className = 'viewport-scaler w-full h-full flex flex-col flex-1 min-h-0 min-w-0';
+        deviceWrapper.className = 'relative device-screen-desktop bg-slateDark-900 border-0 overflow-hidden flex flex-col flex-1 min-h-0 min-w-0 w-full h-full';
+        deviceWrapper.style.width = '100%';
+        deviceWrapper.style.height = '100%';
+        phoneHardwareNotch.classList.add('hidden');
+        floatingFreeformBar.classList.add('hidden');
+        btnBrowserRotate.disabled = true;
+      } else if (mode === 'mobile') {
+        mainWorkspace.className = 'flex-1 relative bg-slateDark-950/70 p-4 sm:p-8 flex items-center justify-center overflow-auto min-h-0';
+        viewportScalerBox.className = 'viewport-scaler flex items-center justify-center';
+        deviceWrapper.className = 'relative bg-slateDark-900 border border-slateDark-800 overflow-hidden flex flex-col device-screen-mobile';
+        if (landscape) deviceWrapper.classList.add('landscape');
+        phoneHardwareNotch.classList.remove('hidden');
+        floatingFreeformBar.classList.add('hidden');
+        btnBrowserRotate.disabled = false;
+      } else if (mode === 'tablet') {
+        mainWorkspace.className = 'flex-1 relative bg-slateDark-950/70 p-4 sm:p-8 flex items-center justify-center overflow-auto min-h-0';
+        viewportScalerBox.className = 'viewport-scaler flex items-center justify-center';
+        deviceWrapper.className = 'relative bg-slateDark-900 border border-slateDark-800 overflow-hidden flex flex-col device-screen-tablet';
+        if (landscape) deviceWrapper.classList.add('landscape');
+        phoneHardwareNotch.classList.add('hidden');
+        floatingFreeformBar.classList.add('hidden');
+        btnBrowserRotate.disabled = false;
+      } else if (mode === 'freeform') {
+        mainWorkspace.className = 'flex-1 relative bg-slateDark-950/70 p-4 sm:p-8 flex items-center justify-center overflow-auto min-h-0';
+        viewportScalerBox.className = 'viewport-scaler flex items-center justify-center';
+        deviceWrapper.className = 'relative device-screen-freeform bg-slateDark-900 border border-slateDark-700 overflow-hidden flex flex-col';
+        const w = activeTab.freeformW || 1024;
+        const h = activeTab.freeformH || 650;
+        deviceWrapper.style.width = `${w}px`;
+        deviceWrapper.style.height = `${h}px`;
+        phoneHardwareNotch.classList.add('hidden');
+        floatingFreeformBar.classList.remove('hidden');
+        floatingFreeformBar.classList.add('flex');
+        btnBrowserRotate.disabled = false;
+      } else if (mode === 'desktop-1440') {
+        mainWorkspace.className = 'flex-1 relative bg-slateDark-950/70 p-4 flex items-center justify-center overflow-auto min-h-0';
+        viewportScalerBox.className = 'viewport-scaler flex items-center justify-center';
+        deviceWrapper.className = 'relative bg-slateDark-900 border border-slateDark-800 overflow-hidden flex flex-col device-screen-desktop-1440';
+        phoneHardwareNotch.classList.add('hidden');
+        floatingFreeformBar.classList.add('hidden');
+        btnBrowserRotate.disabled = true;
+      } else if (mode === 'desktop-1920') {
+        mainWorkspace.className = 'flex-1 relative bg-slateDark-950/70 p-4 flex items-center justify-center overflow-auto min-h-0';
+        viewportScalerBox.className = 'viewport-scaler flex items-center justify-center';
+        deviceWrapper.className = 'relative bg-slateDark-900 border border-slateDark-800 overflow-hidden flex flex-col device-screen-desktop-1920';
+        phoneHardwareNotch.classList.add('hidden');
+        floatingFreeformBar.classList.add('hidden');
+        btnBrowserRotate.disabled = true;
+      }
+
+      applyZoomAndScale();
+    }
+
+    function toggleBrowserRotate() {
+      const activeTab = getActiveBrowserTab();
+      if (!activeTab) return;
+      if (activeTab.viewportMode === 'freeform') {
+        const tmp = activeTab.freeformW;
+        activeTab.freeformW = activeTab.freeformH;
+        activeTab.freeformH = tmp;
+        applyViewportMode('freeform', !activeTab.isLandscape);
+      } else {
+        applyViewportMode(activeTab.viewportMode, !activeTab.isLandscape);
+      }
+    }
+
+    function updateFreeformValues() {
+      const activeTab = getActiveBrowserTab();
+      if (!activeTab) return;
+      const w = parseInt(document.getElementById('input-freeform-w').value, 10);
+      const h = parseInt(document.getElementById('input-freeform-h').value, 10);
+      if (w >= 320) activeTab.freeformW = w;
+      if (h >= 240) activeTab.freeformH = h;
+      deviceWrapper.style.width = `${activeTab.freeformW}px`;
+      deviceWrapper.style.height = `${activeTab.freeformH}px`;
+      applyZoomAndScale();
+    }
+
+    function handleOmniboxSubmit(e) {
+      e.preventDefault();
+      browseTo(inputBrowserUrl.value);
+    }
+
+    function browserHistoryBack() {
+      const tab = getActiveBrowserTab();
+      if (tab && tab.currentIndex > 0) {
+        tab.currentIndex--;
+        browseTo(tab.history[tab.currentIndex], false);
+      }
+    }
+
+    function browserHistoryForward() {
+      const tab = getActiveBrowserTab();
+      if (tab && tab.currentIndex < tab.history.length - 1) {
+        tab.currentIndex++;
+        browseTo(tab.history[tab.currentIndex], false);
+      }
+    }
+
+    function browserReload() {
+      const tab = getActiveBrowserTab();
+      if (tab && tab.url) {
+        setBrowserLoading(true);
+        iframe.src = tab.url;
+      }
+    }
+
+    function browserGoHome() {
+      const tab = getActiveBrowserTab();
+      if (!tab) return;
+      viewBrowserHome.classList.remove('hidden');
+      iframe.src = 'about:blank';
+      inputBrowserUrl.value = '';
+      tab.url = '';
+      tab.title = 'Beranda';
+      renderBrowserTabs();
+      updateInspector();
+    }
+
+    function updateBrowserNavButtons() {
+      const tab = getActiveBrowserTab();
+      if (!tab) return;
+      btnBrowserBack.disabled = tab.currentIndex <= 0;
+      btnBrowserForward.disabled = tab.currentIndex >= tab.history.length - 1;
+    }
+
+    function updateInspector() {
+      const tab = getActiveBrowserTab();
+      if (!tab) return;
+      const zoom = selectZoom.value;
+      document.getElementById('inspector-url').textContent = tab.url || 'about:blank';
+      document.getElementById('inspector-dimension').textContent = tab.viewportMode === 'desktop' ? 'Layar Penuh Desktop (100% Fluid)' : tab.viewportMode;
+      document.getElementById('inspector-zoom').textContent = zoom === 'fit' ? (tab.viewportMode === 'desktop' ? '100% (Fluid Fit)' : 'Auto Fit') : `${Math.round(parseFloat(zoom) * 100)}%`;
+    }
+
+    function toggleBrowserDrawer() {
+      document.getElementById('drawer-browser-info').classList.toggle('hidden');
+    }
+
+    function openCurrentInExternal() {
+      const tab = getActiveBrowserTab();
+      if (tab && tab.url) window.open(tab.url, '_blank', 'noopener,noreferrer');
+      else showToast('Masukkan URL terlebih dahulu.');
+    }
+
+    function copyActiveBrowserUrl() {
+      const tab = getActiveBrowserTab();
+      if (tab && tab.url) {
+        navigator.clipboard ? navigator.clipboard.writeText(tab.url) : document.execCommand('copy');
+        showToast('URL tab aktif disalin ke papan klip!');
+      }
+    }
+
+    /* --------------------------------------------------------
+     * 7. INISIALISASI APLIKASI SAAT JENDELA DIMUAT
+     * -------------------------------------------------------- */
+    window.addEventListener('DOMContentLoaded', () => {
+      // Inisialisasi chip preset RSS
+      const rssPresetContainer = document.getElementById('rss-presets-list');
+      RSS_PRESETS.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = "px-2 py-0.5 bg-slateDark-950 border border-slateDark-800 rounded text-[11px] text-slate-300 hover:text-white hover:border-blue-500 transition";
+        btn.textContent = `+ ${p.name}`;
+        btn.onclick = () => addFeedByUrl(p.url, p.name);
+        rssPresetContainer.appendChild(btn);
+      });
+
+      // Inisialisasi chip preset Live
+      const livePresetContainer = document.getElementById('live-presets-list');
+      LIVE_PRESETS.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = "px-2 py-0.5 bg-slateDark-950 border border-slateDark-800 rounded text-[11px] text-slate-300 hover:text-white hover:border-blue-500 transition";
+        btn.textContent = `+ ${p.name}`;
+        btn.onclick = () => addLiveStream(p.url, p.title);
+        livePresetContainer.appendChild(btn);
+      });
+
+      // Buka 1 tab peramban awal (dalam kondisi beranda kosong / clean slate)
+      createNewBrowserTab('');
+
+      // Status awal bersih
+      updateRssBadge();
+      updateLiveBadge();
+    });
+  </script>
+</body>
+</html>

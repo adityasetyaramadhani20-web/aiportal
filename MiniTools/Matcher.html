@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-950 text-slate-100 selection:bg-rose-500 selection:text-white">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Matcher</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fff1f2',
+              500: '#f43f5e',
+              600: '#e11d48',
+              700: '#be123c',
+            }
+          },
+          animation: {
+            'bounce-short': 'bounce 0.5s ease-in-out 1',
+            'pulse-subtle': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- SheetJS for proper Excel (.xlsx) export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <!-- Canvas Confetti for completion celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      touch-action: pan-y;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Card Drag & Physics Transitions */
+    .card-element {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      transform-origin: 50% 100%;
+      will-change: transform, opacity;
+      cursor: grab;
+      touch-action: none;
+    }
+    .card-element:active {
+      cursor: grabbing;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(71, 85, 105, 1);
+    }
+
+    /* Stamp Animations */
+    .stamp-label {
+      border-width: 4px;
+      border-radius: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.35rem 1rem;
+      pointer-events: none;
+      transform: rotate(-12deg);
+      opacity: 0;
+      transition: opacity 0.1s ease-out;
+    }
+
+    .stamp-true {
+      color: #10b981;
+      border-color: #10b981;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+      transform: rotate(-15deg);
+    }
+
+    .stamp-false {
+      color: #f43f5e;
+      border-color: #f43f5e;
+      box-shadow: 0 0 20px rgba(244, 63, 94, 0.4);
+      transform: rotate(15deg);
+    }
+  </style>
+</head>
+
+<body class="h-full flex flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 overflow-x-hidden">
+
+  <!-- Floating Toast Notifications (Safe Replacement for alert()) -->
+  <div id="toastContainer" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4"></div>
+
+  <!-- Main Container -->
+  <div class="flex-1 flex flex-col max-w-2xl mx-auto w-full h-full relative">
+
+    <!-- Top Navigation Header -->
+    <header class="py-3 px-4 flex items-center justify-between border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-600 via-pink-600 to-amber-500 flex items-center justify-center shadow-lg shadow-rose-600/20 text-white font-black text-lg">
+          <i class="fa-solid fa-fire text-base"></i>
+        </div>
+        <div>
+          <h1 class="font-black tracking-tight text-lg leading-none bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">Matcher</h1>
+          <p id="subHeaderInfo" class="text-[11px] text-slate-400 mt-0.5 truncate max-w-[180px] sm:max-w-xs font-medium">Smart File & Text Sorter</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btnHeaderHistory" onclick="app.showReviewModal()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition flex items-center gap-1.5 border border-slate-700">
+          <i class="fa-solid fa-list-check text-rose-400"></i>
+          <span>Hasil (<span id="headerReviewedCount">0</span>)</span>
+        </button>
+        <button id="btnHeaderReset" onclick="app.confirmReset()" class="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition" title="Mulai Baru / Pengaturan">
+          <i class="fa-solid fa-sliders text-sm"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- VIEW 1: Setup & Data Ingestion Form -->
+    <main id="viewSetup" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+      
+      <!-- Resume Banner if Cache Exists -->
+      <div id="cachedSessionBanner" class="hidden p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-amber-200">Sesi Sebelumnya Ditemukan!</p>
+            <p id="cachedSessionText" class="text-xs text-amber-300/70 truncate max-w-[200px] sm:max-w-xs">Memuat data...</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="app.resumeCachedSession()" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition">Lanjutkan</button>
+          <button onclick="app.discardCachedSession()" class="p-1.5 text-slate-400 hover:text-rose-400 transition" title="Hapus cache"><i class="fa-solid fa-trash-can text-xs"></i></button>
+        </div>
+      </div>
+
+      <!-- Main Form Card -->
+      <form id="setupForm" onsubmit="event.preventDefault(); app.startSession();" class="space-y-6">
+        
+        <!-- Section: Data Diri Matching -->
+        <div class="bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl backdrop-blur-sm">
+          <div class="flex items-center gap-2 text-rose-400 font-semibold text-xs tracking-wider uppercase">
+            <i class="fa-solid fa-id-card"></i>
+            <span>Identitas Matching</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <label class="text-xs font-semibold text-slate-300">Judul Matching <span class="text-rose-500">*</span></label>
+              <input type="text" id="inputTitle" required placeholder="Contoh: Seleksi Foto Produk 2026"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 text-sm text-white placeholder-slate-500 outline-none transition">
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="text-xs font-semibold text-slate-300">Tanggal Data</label>
+              <input type="date" id="inputDate"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 text-sm text-white outline-none transition">
+            </div>
+          </div>
+
+          <!-- Matching Type Select -->
+          <div class="space-y-2 pt-1">
+            <label class="text-xs font-semibold text-slate-300">Jenis Matching</label>
+            <div class="grid grid-cols-3 gap-2.5">
+              <label class="cursor-pointer">
+                <input type="radio" name="matchType" value="image" checked class="peer sr-only" onchange="app.handleTypeChange()">
+                <div class="h-full p-3 rounded-2xl border border-slate-800 bg-slate-950/40 peer-checked:border-rose-500 peer-checked:bg-rose-500/10 peer-checked:text-white text-slate-400 flex flex-col items-center justify-center gap-1.5 transition text-center hover:border-slate-700">
+                  <i class="fa-regular fa-images text-xl"></i>
+                  <span class="text-xs font-semibold">Gambar</span>
+                </div>
+              </label>
+
+              <label class="cursor-pointer">
+                <input type="radio" name="matchType" value="file" class="peer sr-only" onchange="app.handleTypeChange()">
+                <div class="h-full p-3 rounded-2xl border border-slate-800 bg-slate-950/40 peer-checked:border-rose-500 peer-checked:bg-rose-500/10 peer-checked:text-white text-slate-400 flex flex-col items-center justify-center gap-1.5 transition text-center hover:border-slate-700">
+                  <i class="fa-regular fa-folder-open text-xl"></i>
+                  <span class="text-xs font-semibold">File Dokumen</span>
+                </div>
+              </label>
+
+              <label class="cursor-pointer">
+                <input type="radio" name="matchType" value="text" class="peer sr-only" onchange="app.handleTypeChange()">
+                <div class="h-full p-3 rounded-2xl border border-slate-800 bg-slate-950/40 peer-checked:border-rose-500 peer-checked:bg-rose-500/10 peer-checked:text-white text-slate-400 flex flex-col items-center justify-center gap-1.5 transition text-center hover:border-slate-700">
+                  <i class="fa-solid fa-align-left text-xl"></i>
+                  <span class="text-xs font-semibold">Teks / CSV</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Parameter Kustom Usap -->
+        <div class="bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl backdrop-blur-sm">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-rose-400 font-semibold text-xs tracking-wider uppercase">
+              <i class="fa-solid fa-arrows-left-right"></i>
+              <span>Parameter Usapan (Swipe)</span>
+            </div>
+            <span class="text-[11px] text-slate-400">Kustomisasi arti swipe</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Left Parameter (FALSE) -->
+            <div class="p-3.5 rounded-2xl bg-rose-950/20 border border-rose-900/30 space-y-2">
+              <div class="flex items-center justify-between text-rose-400 text-xs font-bold">
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-left"></i> Usap Kiri (FALSE)</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">Tolak</span>
+              </div>
+              <input type="text" id="labelFalse" value="DITOLAK / TIDAK COCOK" placeholder="Label Kiri"
+                class="w-full px-3 py-2 rounded-xl bg-slate-950/90 border border-rose-900/40 focus:border-rose-500 text-xs font-medium text-rose-200 outline-none">
+            </div>
+
+            <!-- Right Parameter (TRUE) -->
+            <div class="p-3.5 rounded-2xl bg-emerald-950/20 border border-emerald-900/30 space-y-2">
+              <div class="flex items-center justify-between text-emerald-400 text-xs font-bold">
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-arrow-right"></i> Usap Kanan (TRUE)</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">Match!</span>
+              </div>
+              <input type="text" id="labelTrue" value="DITERIMA / MATCH" placeholder="Label Kanan"
+                class="w-full px-3 py-2 rounded-xl bg-slate-950/90 border border-emerald-900/40 focus:border-emerald-500 text-xs font-medium text-emerald-200 outline-none">
+            </div>
+          </div>
+
+          <!-- Matching Flow Setting: Note Mode -->
+          <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-4">
+            <div class="space-y-0.5">
+              <label for="toggleRequireNote" class="text-xs font-medium text-slate-200 cursor-pointer flex items-center gap-1.5">
+                <i class="fa-regular fa-comment-dots text-rose-400"></i>
+                Tampilkan Pop-up Catatan Tiap Match (TRUE)
+              </label>
+              <p class="text-[11px] text-slate-400">Beri catatan instan saat swipe kanan. Catatan tetap bisa diedit belakangan di menu Hasil.</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input type="checkbox" id="toggleRequireNote" checked class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Section: Input Data (Files / Text) -->
+        <div class="bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl backdrop-blur-sm">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-rose-400 font-semibold text-xs tracking-wider uppercase">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Sumber Data</span>
+            </div>
+            <span id="importItemCountBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-medium">0 item siap</span>
+          </div>
+
+          <!-- Dropzone Container -->
+          <div id="dropZoneContainer"
+            onclick="document.getElementById('fileInput').click()"
+            class="group border-2 border-dashed border-slate-700 hover:border-rose-500/70 rounded-2xl p-6 sm:p-8 text-center transition cursor-pointer bg-slate-950/40 hover:bg-slate-950/70 flex flex-col items-center justify-center">
+            
+            <div class="w-14 h-14 rounded-2xl bg-slate-800 group-hover:bg-rose-500/10 text-slate-400 group-hover:text-rose-400 flex items-center justify-center text-2xl transition mb-3">
+              <i id="dropZoneIcon" class="fa-regular fa-images"></i>
+            </div>
+            
+            <p id="dropZoneLabel" class="text-sm font-semibold text-slate-200">
+              Klik atau Seret File ke Sini
+            </p>
+            <p id="dropZoneSub" class="text-xs text-slate-400 mt-1">
+              Mendukung banyak gambar (JPG, PNG, WebP, GIF)
+            </p>
+
+            <input type="file" id="fileInput" multiple class="hidden" onchange="app.handleFilesSelected(this.files)">
+          </div>
+
+          <!-- Text Direct Area (Tampak jika type == 'text') -->
+          <div id="textInputAreaWrapper" class="hidden space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs text-slate-300 font-medium">Atau tempel baris teks / CSV di sini:</label>
+              <button type="button" onclick="app.pasteSampleData()" class="text-[11px] text-rose-400 hover:underline">Muat Contoh Data</button>
+            </div>
+            <textarea id="directTextArea" rows="4" placeholder="Satu baris mewakili satu item yang akan diswipe...&#10;Ide Produk A&#10;Ide Produk B&#10;Fitur C"
+              class="w-full p-3 rounded-xl bg-slate-950/80 border border-slate-800 focus:border-rose-500 text-xs font-mono text-slate-200 placeholder-slate-600 outline-none resize-none transition"
+              oninput="app.handleDirectTextChange()"></textarea>
+          </div>
+
+          <!-- File List Preview -->
+          <div id="previewListWrap" class="hidden space-y-2 pt-2 border-t border-slate-800">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Item terdeteksi:</span>
+              <button type="button" onclick="app.clearPendingItems()" class="text-rose-400 hover:underline text-[11px]">Bersihkan</button>
+            </div>
+            <div id="previewItemsList" class="max-h-36 overflow-y-auto space-y-1.5 pr-1 text-xs"></div>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="btnStartMatching" disabled
+          class="w-full py-3.5 rounded-2xl font-bold text-sm bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white shadow-xl shadow-rose-600/25 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 active:scale-[0.99]">
+          <i class="fa-solid fa-play"></i>
+          <span>Mulai Memilah (Swipe)</span>
+        </button>
+      </form>
+    </main>
+
+    <!-- VIEW 2: Active Tinder Swipe Deck Screen -->
+    <main id="viewDeck" class="hidden flex-1 flex flex-col p-4 sm:p-6 overflow-hidden select-none">
+      
+      <!-- Top Metrics & Progress Indicator -->
+      <div class="w-full mb-3 space-y-2">
+        <div class="flex items-center justify-between text-xs text-slate-300">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span id="deckCurrentTitle" class="font-bold truncate max-w-[160px] sm:max-w-xs text-white">Matching</span>
+          </div>
+          <div class="font-mono text-slate-400 font-medium">
+            <span id="deckCurrentIndex" class="text-white font-bold">1</span> / <span id="deckTotalCount">0</span>
+          </div>
+        </div>
+
+        <!-- Smooth Progress Bar -->
+        <div class="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+          <div id="deckProgressBar" class="bg-gradient-to-r from-rose-500 to-amber-400 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Card Arena (Tinder Deck) -->
+      <div class="flex-1 relative w-full flex items-center justify-center my-auto min-h-[360px] max-h-[580px]">
+        <div id="cardDeckContainer" class="relative w-full h-full max-w-sm">
+          <!-- Dynamically injected active card stack here (top active card + next card below) -->
+        </div>
+
+        <!-- Empty Deck Placeholder (When finished) -->
+        <div id="deckFinishedState" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-slate-900/60 rounded-3xl border border-slate-800 backdrop-blur-md">
+          <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center text-2xl shadow-xl shadow-emerald-500/20 mb-4 animate-bounce-short">
+            <i class="fa-solid fa-check-double"></i>
+          </div>
+          <h2 class="text-xl font-bold text-white mb-1">Semua Item Selesai Dipilah!</h2>
+          <p class="text-xs text-slate-400 max-w-xs mb-6">Kamu telah meninjau semua berkas. Buka rekap hasil untuk melihat ringkasan atau mengunduh dalam format CSV/Excel.</p>
+          <div class="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+            <button onclick="app.showReviewModal()" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold text-xs shadow-lg shadow-rose-600/20 transition">
+              <i class="fa-solid fa-file-excel mr-1.5"></i> Lihat & Ekspor
+            </button>
+            <button onclick="app.undoLastSwipe()" id="btnFinishedUndo" class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition border border-slate-700">
+              <i class="fa-solid fa-rotate-left mr-1"></i> Undo Terakhir
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Controls Bar (Tinder Action Buttons) -->
+      <div id="deckControlsBar" class="mt-4 flex items-center justify-center gap-4 sm:gap-6 py-2">
+        <!-- Undo Button -->
+        <button id="btnUndo" onclick="app.undoLastSwipe()" disabled
+          class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 hover:border-amber-500/50 text-amber-400 flex items-center justify-center text-sm shadow-md transition disabled:opacity-30 disabled:cursor-not-allowed active:scale-90"
+          title="Batalkan Pilihan Terakhir (Ctrl+Z / Backspace)">
+          <i class="fa-solid fa-rotate-left"></i>
+        </button>
+
+        <!-- Dislike / Reject / Left Button -->
+        <button onclick="app.triggerSwipeAnimation('left')"
+          class="w-16 h-16 rounded-full bg-slate-900 border-2 border-rose-600/50 hover:border-rose-500 hover:bg-rose-500/10 text-rose-500 flex items-center justify-center text-2xl shadow-xl shadow-rose-600/20 transition active:scale-90 group"
+          title="Usap Kiri (Panah Kiri)">
+          <i class="fa-solid fa-xmark transition group-hover:scale-110"></i>
+        </button>
+
+        <!-- Quick Note Button for Top Card -->
+        <button onclick="app.openNoteForCurrentCard()"
+          class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 hover:border-blue-500/50 text-blue-400 flex items-center justify-center text-sm shadow-md transition active:scale-90"
+          title="Tambahkan Catatan Manual (Spasi)">
+          <i class="fa-regular fa-comment-dots"></i>
+        </button>
+
+        <!-- Like / Match / Right Button -->
+        <button onclick="app.triggerSwipeAnimation('right')"
+          class="w-16 h-16 rounded-full bg-slate-900 border-2 border-emerald-500/50 hover:border-emerald-400 hover:bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-2xl shadow-xl shadow-emerald-500/20 transition active:scale-90 group"
+          title="Usap Kanan (Panah Kanan)">
+          <i class="fa-solid fa-heart transition group-hover:scale-110"></i>
+        </button>
+      </div>
+
+      <!-- Desktop Keyboard Guide Indicator -->
+      <div class="mt-2 text-center text-[10px] text-slate-400 font-mono hidden sm:block">
+        Shortcut: <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">←</kbd> Tolak &nbsp;|&nbsp; 
+        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">→</kbd> Match &nbsp;|&nbsp; 
+        <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">Ctrl+Z</kbd> Undo
+      </div>
+    </main>
+
+  </div>
+
+  <!-- MODAL: Note Capture Dialog (Upon Swipe Right / TRUE) -->
+  <div id="modalNote" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden transition-opacity">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl space-y-4 scale-95 transition-transform" id="modalNoteCard">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-heart"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Item Berstatus MATCH!</h3>
+            <p id="noteModalItemName" class="text-[11px] text-slate-400 truncate max-w-[240px]">Nama file</p>
+          </div>
+        </div>
+        <button onclick="app.closeNoteModal(false)" class="text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="text-xs font-semibold text-slate-300">Catatan Tambahan (Opsional):</label>
+        <textarea id="noteInput" rows="3" placeholder="Tulis alasan dipilih, kategori revisi, atau memo khusus di sini..."
+          class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-emerald-500 text-sm text-slate-100 placeholder-slate-600 outline-none resize-none transition"
+          onkeydown="if(event.key === 'Enter' && !event.shiftKey){ event.preventDefault(); app.confirmNoteAndProceed(); }"></textarea>
+        <p class="text-[10px] text-slate-400">Tekan <kbd class="px-1 py-0.5 bg-slate-800 rounded text-slate-400 font-mono">Enter</kbd> untuk simpan langsung</p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button onclick="app.confirmNoteAndProceed(true)" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">
+          Lewati Tanpa Catatan
+        </button>
+        <button onclick="app.confirmNoteAndProceed(false)" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-check"></i>
+          <span>Simpan & Lanjut</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Review & Export Table View -->
+  <div id="modalReview" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      
+      <!-- Review Header -->
+      <div class="p-5 border-b border-slate-800/80 flex items-center justify-between gap-4">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-table-list text-rose-500"></i>
+            <span>Ringkasan Hasil Sorting</span>
+          </h3>
+          <p id="reviewMetaInfo" class="text-xs text-slate-400 mt-0.5">Judul Sesi • Tanggal</p>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <button onclick="app.closeReviewModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Summary Stats Bar -->
+      <div class="px-5 py-3 bg-slate-950/50 border-b border-slate-800/50 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span class="text-slate-400"><span id="statTrueLabel">TRUE</span>:</span>
+            <span id="statTrueCount" class="font-bold text-emerald-400 font-mono">0</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            <span class="text-slate-400"><span id="statFalseLabel">FALSE</span>:</span>
+            <span id="statFalseCount" class="font-bold text-rose-400 font-mono">0</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-slate-400">
+            <span>Sisa Belum:</span>
+            <span id="statPendingCount" class="font-bold text-slate-300 font-mono">0</span>
+          </div>
+        </div>
+
+        <!-- Filter buttons -->
+        <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px]">
+          <button onclick="app.setReviewFilter('all')" id="filterBtn-all" class="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-medium transition">Semua</button>
+          <button onclick="app.setReviewFilter('true')" id="filterBtn-true" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium transition">Match Saja</button>
+          <button onclick="app.setReviewFilter('false')" id="filterBtn-false" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium transition">Ditolak Saja</button>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="flex-1 overflow-y-auto p-4">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+              <th class="py-2.5 px-3 w-12 text-center">No</th>
+              <th class="py-2.5 px-3">Item (Nama / Teks)</th>
+              <th class="py-2.5 px-3 w-28 text-center">Keputusan</th>
+              <th class="py-2.5 px-3">Catatan / Keterangan</th>
+              <th class="py-2.5 px-3 w-20 text-center">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="reviewTableBody" class="divide-y divide-slate-800/60 font-normal text-slate-300">
+            <!-- Injected dynamically -->
+          </tbody>
+        </table>
+        
+        <div id="reviewEmptyRow" class="hidden py-12 text-center text-slate-400 text-xs">
+          Belum ada data untuk filter ini.
+        </div>
+      </div>
+
+      <!-- Export Footer -->
+      <div class="p-4 bg-slate-950/90 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="text-[11px] text-slate-400">
+          Format ekspor memuat kolom: <span class="text-slate-300 font-mono">Item, Keputusan, Catatan, Tanggal</span>
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <button onclick="app.exportToCSV()" class="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-file-csv text-blue-400 text-sm"></i>
+            <span>Ekspor CSV</span>
+          </button>
+          
+          <button onclick="app.exportToExcel()" class="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-file-excel text-sm"></i>
+            <span>Ekspor Excel (.xlsx)</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: Confirm Reset Dialog -->
+  <div id="modalConfirmReset" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-4">
+      <div class="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-lg">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <div>
+        <h3 class="text-sm font-bold text-white">Mulai Sesi Baru?</h3>
+        <p class="text-xs text-slate-400 mt-1">Sesi berjalan akan disimpan di riwayat lokal browser, namun layar akan kembali ke formulir awal.</p>
+      </div>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button onclick="app.closeConfirmReset()" class="px-3.5 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition">Batal</button>
+        <button onclick="app.executeReset()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition">Ya, Buat Baru</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Sound & Haptic Synthesizer (Web Audio API)
+     * Provides instant auditory and haptic feedback without external sound files
+     */
+    class SoundController {
+      constructor() {
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      }
+      playTone(freq, type, duration, gainVal = 0.1) {
+        try {
+          this.init();
+          if (!this.ctx) return;
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+          
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {
+          // Silent fallback if audio context restricted
+        }
+      }
+      match() {
+        this.playTone(523.25, 'sine', 0.15, 0.15); // C5
+        setTimeout(() => this.playTone(659.25, 'triangle', 0.2, 0.12), 80); // E5
+      }
+      reject() {
+        this.playTone(220.0, 'sawtooth', 0.18, 0.08); // A3 low buzz
+      }
+      undo() {
+        this.playTone(440.0, 'sine', 0.1, 0.1);
+      }
+      click() {
+        this.playTone(700, 'sine', 0.04, 0.05);
+      }
+    }
+
+    /**
+     * IndexedDB Storage Engine
+     * Handles large image blobs and persistent item state beyond the 5MB localStorage limit
+     */
+    class StorageEngine {
+      constructor() {
+        this.dbName = 'MatcherAppDB';
+        this.version = 1;
+        this.db = null;
+      }
+
+      async open() {
+        if (this.db) return this.db;
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(this.dbName, this.version);
+          request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('sessions')) {
+              db.createObjectStore('sessions', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('items')) {
+              const itemStore = db.createObjectStore('items', { keyPath: 'id' });
+              itemStore.createIndex('sessionId', 'sessionId', { unique: false });
+            }
+          };
+          request.onsuccess = () => {
+            this.db = request.result;
+            resolve(this.db);
+          };
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      async saveSession(session) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('sessions', 'readwrite');
+          tx.objectStore('sessions').put(session);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+
+      async getLatestSession() {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('sessions', 'readonly');
+          const req = tx.objectStore('sessions').getAll();
+          req.onsuccess = () => {
+            const list = req.result;
+            if (!list || list.length === 0) resolve(null);
+            else {
+              // Return the most recent session
+              list.sort((a, b) => b.updatedAt - a.updatedAt);
+              resolve(list[0]);
+            }
+          };
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async saveItems(items) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('items', 'readwrite');
+          const store = tx.objectStore('items');
+          for (const it of items) {
+            store.put(it);
+          }
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+
+      async getItemsBySession(sessionId) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('items', 'readonly');
+          const index = tx.objectStore('items').index('sessionId');
+          const req = index.getAll(sessionId);
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async clearSession(sessionId) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(['sessions', 'items'], 'readwrite');
+          tx.objectStore('sessions').delete(sessionId);
+          // Delete related items
+          const itemStore = tx.objectStore('items');
+          const index = itemStore.index('sessionId');
+          const req = index.openCursor(sessionId);
+          req.onsuccess = (e) => {
+            const cursor = e.target.result;
+            if (cursor) {
+              cursor.delete();
+              cursor.continue();
+            }
+          };
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+    }
+
+    /**
+     * Main Matcher Application Logic
+     */
+    class MatcherApp {
+      constructor() {
+        this.storage = new StorageEngine();
+        this.sound = new SoundController();
+        
+        // Active Session State
+        this.session = {
+          id: null,
+          title: '',
+          date: '',
+          type: 'image', // 'image' | 'file' | 'text'
+          labelFalse: 'DITOLAK / TIDAK COCOK',
+          labelTrue: 'DITERIMA / MATCH',
+          requireNoteOnMatch: true,
+          updatedAt: Date.now()
+        };
+
+        // Items queue and history
+        this.items = []; // array of item objects
+        this.currentIndex = 0; // index of item currently on top
+        this.historyStack = []; // IDs of swiped items in chronological order
+        this.pendingNoteItem = null; // Item waiting for user note modal
+        
+        // Touch & Drag Tracking variables
+        this.dragState = {
+          isDragging: false,
+          startX: 0,
+          startY: 0,
+          currentX: 0,
+          currentY: 0,
+          cardElement: null
+        };
+
+        // Review table active filter
+        this.reviewFilter = 'all';
+
+        // Staged files for initial upload form
+        this.stagedItems = [];
+      }
+
+      // Initialize UI on page ready
+      async init() {
+        // Set default date input to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('inputDate').value = today;
+
+        // Set drag-and-drop event listeners on drop zone
+        this.setupDropZone();
+
+        // Check IndexedDB for existing cached session
+        await this.checkExistingCache();
+
+        // Global keyboard shortcut navigation
+        window.addEventListener('keydown', (e) => this.handleKeyboard(e));
+      }
+
+      // Show Custom Toast (replaces alert)
+      toast(msg, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const el = document.createElement('div');
+        
+        const colors = {
+          info: 'bg-slate-900 border-slate-700 text-slate-200',
+          success: 'bg-emerald-950/90 border-emerald-700 text-emerald-200',
+          warning: 'bg-amber-950/90 border-amber-700 text-amber-200',
+          error: 'bg-rose-950/90 border-rose-700 text-rose-200'
+        };
+
+        const icons = {
+          info: 'fa-circle-info text-blue-400',
+          success: 'fa-circle-check text-emerald-400',
+          warning: 'fa-triangle-exclamation text-amber-400',
+          error: 'fa-circle-exclamation text-rose-400'
+        };
+
+        el.className = `p-3 px-4 rounded-2xl border ${colors[type] || colors.info} shadow-xl text-xs flex items-center gap-2.5 transform transition-all duration-300 translate-y-[-10px] opacity-0 pointer-events-auto backdrop-blur-md`;
+        el.innerHTML = `
+          <i class="fa-solid ${icons[type] || icons.info}"></i>
+          <span class="flex-1">${msg}</span>
+        `;
+
+        container.appendChild(el);
+        requestAnimationFrame(() => {
+          el.classList.remove('translate-y-[-10px]', 'opacity-0');
+        });
+
+        setTimeout(() => {
+          el.classList.add('opacity-0', 'translate-y-[-5px]');
+          setTimeout(() => el.remove(), 300);
+        }, 3200);
+      }
+
+      setupDropZone() {
+        const dropZone = document.getElementById('dropZoneContainer');
+        
+        ['dragenter', 'dragover'].forEach(name => {
+          dropZone.addEventListener(name, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('border-rose-500', 'bg-rose-500/10');
+          });
+        });
+
+        ['dragleave', 'drop'].forEach(name => {
+          dropZone.addEventListener(name, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('border-rose-500', 'bg-rose-500/10');
+          });
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+          if (e.dataTransfer && e.dataTransfer.files) {
+            this.handleFilesSelected(e.dataTransfer.files);
+          }
+        });
+      }
+
+      handleTypeChange() {
+        const type = document.querySelector('input[name="matchType"]:checked').value;
+        const icon = document.getElementById('dropZoneIcon');
+        const label = document.getElementById('dropZoneLabel');
+        const sub = document.getElementById('dropZoneSub');
+        const textWrapper = document.getElementById('textInputAreaWrapper');
+        const fileInput = document.getElementById('fileInput');
+
+        if (type === 'image') {
+          icon.className = 'fa-regular fa-images';
+          label.textContent = 'Klik atau Seret Berkas Gambar';
+          sub.textContent = 'Mendukung JPG, PNG, WebP, GIF, SVG';
+          textWrapper.classList.add('hidden');
+          fileInput.accept = 'image/*';
+        } else if (type === 'file') {
+          icon.className = 'fa-regular fa-folder-open';
+          label.textContent = 'Klik atau Seret Berkas Apapun';
+          sub.textContent = 'PDF, Dokumen Word, Spreadsheet, Arsip ZIP, dll.';
+          textWrapper.classList.add('hidden');
+          fileInput.removeAttribute('accept');
+        } else {
+          icon.className = 'fa-solid fa-file-csv';
+          label.textContent = 'Impor Berkas CSV atau TXT';
+          sub.textContent = 'Atau langsung tempelkan baris teks pada kotak di bawah';
+          textWrapper.classList.remove('hidden');
+          fileInput.accept = '.csv,.txt';
+        }
+
+        this.clearPendingItems();
+      }
+
+      async handleFilesSelected(fileList) {
+        if (!fileList || fileList.length === 0) return;
+        const type = document.querySelector('input[name="matchType"]:checked').value;
+
+        for (let i = 0; i < fileList.length; i++) {
+          const file = fileList[i];
+
+          // If in text/csv mode and user uploads a text file
+          if (type === 'text') {
+            const textContent = await file.text();
+            this.parseTextLines(textContent);
+            continue;
+          }
+
+          // Otherwise add as physical file or image
+          const item = {
+            id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            name: file.name,
+            size: file.size,
+            mimeType: file.type,
+            fileRef: file, // Keep File blob reference
+            dataUrl: null, // Will generate on demand for images
+            text: null,
+            status: 'pending', // 'pending' | 'true' | 'false'
+            note: '',
+            timestamp: null
+          };
+
+          this.stagedItems.push(item);
+        }
+
+        this.renderPreviewList();
+      }
+
+      handleDirectTextChange() {
+        const area = document.getElementById('directTextArea');
+        const raw = area.value.trim();
+        if (!raw) return;
+        this.parseTextLines(raw);
+        area.value = ''; // clear after ingestion
+      }
+
+      parseTextLines(rawText) {
+        // Split text by lines
+        const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+        
+        for (const line of lines) {
+          // Avoid duplicate simple entries in same batch
+          this.stagedItems.push({
+            id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            name: line,
+            size: line.length,
+            mimeType: 'text/plain',
+            fileRef: null,
+            dataUrl: null,
+            text: line,
+            status: 'pending',
+            note: '',
+            timestamp: null
+          });
+        }
+        this.renderPreviewList();
+      }
+
+      pasteSampleData() {
+        const samples = [
+          "Ide Fitur A: Mode Gelap Otomatis",
+          "Ide Fitur B: Integrasi AI Summary",
+          "Ide Fitur C: Ekspor Langsung ke Google Drive",
+          "Ide Fitur D: Notifikasi Email Mingguan",
+          "Ide Fitur E: Widget Layar Kunci Ponsel"
+        ].join('\n');
+        this.parseTextLines(samples);
+        this.toast("Contoh 5 data teks berhasil ditambahkan!", "info");
+      }
+
+      clearPendingItems() {
+        this.stagedItems = [];
+        this.renderPreviewList();
+      }
+
+      renderPreviewList() {
+        const badge = document.getElementById('importItemCountBadge');
+        const wrap = document.getElementById('previewListWrap');
+        const listEl = document.getElementById('previewItemsList');
+        const btnStart = document.getElementById('btnStartMatching');
+
+        badge.textContent = `${this.stagedItems.length} item siap`;
+
+        if (this.stagedItems.length === 0) {
+          wrap.classList.add('hidden');
+          btnStart.disabled = true;
+          return;
+        }
+
+        wrap.classList.remove('hidden');
+        btnStart.disabled = false;
+
+        // Render first 10 items preview
+        const firstFew = this.stagedItems.slice(0, 10);
+        listEl.innerHTML = firstFew.map((item, idx) => `
+          <div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-950/70 border border-slate-800/80 text-slate-300">
+            <span class="truncate max-w-[280px] font-mono">${idx + 1}. ${item.name}</span>
+            <span class="text-[10px] text-slate-400 shrink-0 font-sans">${this.formatSize(item.size)}</span>
+          </div>
+        `).join('');
+
+        if (this.stagedItems.length > 10) {
+          listEl.innerHTML += `
+            <div class="text-center text-[10px] text-slate-400 italic py-1">
+              ...dan ${this.stagedItems.length - 10} item lainnya
+            </div>
+          `;
+        }
+      }
+
+      formatSize(bytes) {
+        if (!bytes) return '';
+        if (typeof bytes === 'number') {
+          if (bytes < 1024) return bytes + ' B';
+          if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+          return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        return '';
+      }
+
+      async checkExistingCache() {
+        try {
+          const cachedSession = await this.storage.getLatestSession();
+          if (cachedSession) {
+            const cachedItems = await this.storage.getItemsBySession(cachedSession.id);
+            if (cachedItems && cachedItems.length > 0) {
+              const banner = document.getElementById('cachedSessionBanner');
+              const text = document.getElementById('cachedSessionText');
+              const pendingCount = cachedItems.filter(i => i.status === 'pending').length;
+              
+              text.textContent = `"${cachedSession.title}" • ${cachedItems.length} item (${pendingCount} tersisa)`;
+              banner.classList.remove('hidden');
+              this.cachedSessionData = { session: cachedSession, items: cachedItems };
+            }
+          }
+        } catch (err) {
+          console.warn('Gagal membaca cache IndexedDB:', err);
+        }
+      }
+
+      resumeCachedSession() {
+        if (!this.cachedSessionData) return;
+        this.session = this.cachedSessionData.session;
+        this.items = this.cachedSessionData.items;
+        
+        // Find index of first pending item
+        const firstPending = this.items.findIndex(i => i.status === 'pending');
+        this.currentIndex = firstPending !== -1 ? firstPending : this.items.length;
+
+        // Reconstruct history stack from swiped items
+        this.historyStack = this.items
+          .filter(i => i.status !== 'pending' && i.timestamp)
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .map(i => i.id);
+
+        this.sound.click();
+        this.openDeckView();
+        this.toast(`Sesi "${this.session.title}" berhasil dimuat kembali!`, 'success');
+      }
+
+      async discardCachedSession() {
+        if (this.cachedSessionData) {
+          await this.storage.clearSession(this.cachedSessionData.session.id);
+          this.cachedSessionData = null;
+        }
+        document.getElementById('cachedSessionBanner').classList.add('hidden');
+        this.toast('Cache sesi lama telah dihapus.', 'info');
+      }
+
+      async startSession() {
+        const titleInput = document.getElementById('inputTitle');
+        const title = titleInput.value.trim();
+        if (!title) {
+          this.toast('Harap masukkan Judul Matching terlebih dahulu.', 'warning');
+          titleInput.focus();
+          return;
+        }
+
+        if (this.stagedItems.length === 0) {
+          this.toast('Belum ada item/file yang dipilih untuk disortir.', 'warning');
+          return;
+        }
+
+        const date = document.getElementById('inputDate').value || new Date().toISOString().split('T')[0];
+        const matchType = document.querySelector('input[name="matchType"]:checked').value;
+        const labelFalse = document.getElementById('labelFalse').value.trim() || 'FALSE';
+        const labelTrue = document.getElementById('labelTrue').value.trim() || 'TRUE';
+        const requireNote = document.getElementById('toggleRequireNote').checked;
+
+        const sessionId = 'session_' + Date.now();
+        this.session = {
+          id: sessionId,
+          title,
+          date,
+          type: matchType,
+          labelFalse,
+          labelTrue,
+          requireNoteOnMatch: requireNote,
+          updatedAt: Date.now()
+        };
+
+        // Assign sessionId to staged items
+        this.items = this.stagedItems.map((item, idx) => ({
+          ...item,
+          sessionId: sessionId,
+          orderIndex: idx
+        }));
+
+        this.currentIndex = 0;
+        this.historyStack = [];
+
+        // Persist to IndexedDB
+        await this.storage.saveSession(this.session);
+        await this.storage.saveItems(this.items);
+
+        this.sound.click();
+        this.openDeckView();
+      }
+
+      openDeckView() {
+        document.getElementById('viewSetup').classList.add('hidden');
+        document.getElementById('viewDeck').classList.remove('hidden');
+        document.getElementById('btnHeaderHistory').classList.remove('hidden');
+        
+        // Update top bar text
+        document.getElementById('subHeaderInfo').textContent = `${this.session.title} (${this.session.date})`;
+        document.getElementById('deckCurrentTitle').textContent = this.session.title;
+        document.getElementById('deckTotalCount').textContent = this.items.length;
+        
+        this.updateHeaderBadge();
+        this.renderDeckCards();
+      }
+
+      updateHeaderBadge() {
+        const reviewedCount = this.items.filter(i => i.status !== 'pending').length;
+        document.getElementById('headerReviewedCount').textContent = reviewedCount;
+      }
+
+      renderDeckCards() {
+        const container = document.getElementById('cardDeckContainer');
+        const finishedView = document.getElementById('deckFinishedState');
+        const controlsBar = document.getElementById('deckControlsBar');
+        const progressBar = document.getElementById('deckProgressBar');
+        const currentIndexEl = document.getElementById('deckCurrentIndex');
+        const btnUndo = document.getElementById('btnUndo');
+
+        // Update undo button
+        btnUndo.disabled = this.historyStack.length === 0;
+
+        // Calculate progress
+        const total = this.items.length;
+        const reviewed = this.items.filter(i => i.status !== 'pending').length;
+        const progressPercent = total > 0 ? (reviewed / total) * 100 : 0;
+        progressBar.style.width = `${progressPercent}%`;
+
+        // Check if all items are processed
+        if (this.currentIndex >= total) {
+          container.innerHTML = '';
+          finishedView.classList.remove('hidden');
+          controlsBar.classList.add('opacity-40', 'pointer-events-none');
+          currentIndexEl.textContent = total;
+          
+          // Trigger victory confetti
+          if (typeof confetti === 'function') {
+            confetti({
+              particleCount: 80,
+              spread: 60,
+              origin: { y: 0.7 }
+            });
+          }
+          return;
+        }
+
+        finishedView.classList.add('hidden');
+        controlsBar.classList.remove('opacity-40', 'pointer-events-none');
+        currentIndexEl.textContent = this.currentIndex + 1;
+
+        // Virtualized card stack: render top card and 1 card behind it
+        container.innerHTML = '';
+
+        const topItem = this.items[this.currentIndex];
+        const nextItem = this.currentIndex + 1 < total ? this.items[this.currentIndex + 1] : null;
+
+        // 1. Render Next Card (Background Card with slight scale down)
+        if (nextItem) {
+          const nextCard = this.createCardDOM(nextItem, false);
+          nextCard.style.transform = 'scale(0.94) translateY(16px)';
+          nextCard.style.opacity = '0.55';
+          nextCard.style.zIndex = '1';
+          container.appendChild(nextCard);
+        }
+
+        // 2. Render Active Top Card
+        if (topItem) {
+          const topCard = this.createCardDOM(topItem, true);
+          topCard.style.transform = 'scale(1) translateY(0px)';
+          topCard.style.zIndex = '10';
+          container.appendChild(topCard);
+
+          // Attach Drag/Swipe listeners
+          this.attachPointerListeners(topCard, topItem);
+        }
+      }
+
+      createCardDOM(item, isActive) {
+        const card = document.createElement('div');
+        card.className = 'card-element bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-transform select-none';
+        card.id = `card_${item.id}`;
+
+        let mediaContent = '';
+
+        if (this.session.type === 'image') {
+          // If image has file reference, create or reuse object URL
+          if (!item.dataUrl && item.fileRef) {
+            item.dataUrl = URL.createObjectURL(item.fileRef);
+          }
+          const src = item.dataUrl || 'https://placehold.co/600x600/1e293b/94a3b8?text=No+Image';
+
+          mediaContent = `
+            <div class="flex-1 w-full relative bg-slate-950 flex items-center justify-center overflow-hidden">
+              <img src="${src}" alt="${item.name}" class="w-full h-full object-contain pointer-events-none" onerror="this.src='https://placehold.co/600x600/1e293b/94a3b8?text=Image+Load+Error'">
+            </div>
+          `;
+        } else if (this.session.type === 'file') {
+          mediaContent = `
+            <div class="flex-1 w-full bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 flex flex-col items-center justify-center p-6 text-center">
+              <div class="w-20 h-20 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center text-4xl mb-4 shadow-lg shadow-rose-500/10">
+                <i class="fa-regular fa-file-lines"></i>
+              </div>
+              <h4 class="text-sm font-bold text-white max-w-xs break-all px-2">${item.name}</h4>
+              <p class="text-xs text-slate-400 mt-1 font-mono">${this.formatSize(item.size)}</p>
+            </div>
+          `;
+        } else {
+          // Text / CSV mode
+          mediaContent = `
+            <div class="flex-1 w-full bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center p-6 sm:p-8 text-center">
+              <span class="text-xs uppercase tracking-widest text-slate-400 font-mono mb-4">
+                Item #${item.orderIndex + 1}
+              </span>
+              <p class="text-lg sm:text-xl font-bold text-white leading-relaxed max-w-xs sm:max-w-md">
+                "${item.text || item.name}"
+              </p>
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <!-- Visual Stamps (Tinder Stamp Overlay) -->
+          <div class="stamp-label stamp-true absolute top-6 left-6 z-30 pointer-events-none">
+            ${this.session.labelTrue}
+          </div>
+          <div class="stamp-label stamp-false absolute top-6 right-6 z-30 pointer-events-none">
+            ${this.session.labelFalse}
+          </div>
+
+          <!-- Card Body / Media Preview -->
+          ${mediaContent}
+
+          <!-- Card Bottom Info Banner -->
+          <div class="p-4 bg-slate-950/90 border-t border-slate-800/80 flex items-center justify-between gap-3">
+            <div class="truncate flex-1">
+              <p class="text-xs font-bold text-slate-200 truncate">${item.name}</p>
+              <p class="text-[11px] text-slate-400 truncate mt-0.5">
+                ${item.note ? `<span class="text-emerald-400"><i class="fa-regular fa-comment"></i> ${item.note}</span>` : 'Geser kanan (True) atau kiri (False)'}
+              </p>
+            </div>
+            <div class="shrink-0 text-slate-400 text-xs">
+              <i class="fa-solid fa-hand-pointer text-rose-400 text-xs"></i>
+            </div>
+          </div>
+        `;
+
+        return card;
+      }
+
+      attachPointerListeners(cardEl, item) {
+        const state = this.dragState;
+
+        const onPointerDown = (e) => {
+          // Prevent gesture when interacting with buttons inside card
+          if (e.target.closest('button')) return;
+          
+          state.isDragging = true;
+          state.startX = e.clientX;
+          state.startY = e.clientY;
+          state.currentX = e.clientX;
+          state.currentY = e.clientY;
+          state.cardElement = cardEl;
+
+          cardEl.style.transition = 'none';
+          cardEl.setPointerCapture(e.pointerId);
+        };
+
+        const onPointerMove = (e) => {
+          if (!state.isDragging || state.cardElement !== cardEl) return;
+          state.currentX = e.clientX;
+          state.currentY = e.clientY;
+
+          const deltaX = state.currentX - state.startX;
+          const deltaY = state.currentY - state.startY;
+          const rotation = deltaX * 0.07; // subtle rotation based on drag
+
+          cardEl.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) rotate(${rotation}deg)`;
+
+          // Adjust Stamp opacities
+          const trueStamp = cardEl.querySelector('.stamp-true');
+          const falseStamp = cardEl.querySelector('.stamp-false');
+          const threshold = 70;
+
+          if (deltaX > 0) {
+            const opacity = Math.min(1, deltaX / threshold);
+            trueStamp.style.opacity = opacity;
+            falseStamp.style.opacity = 0;
+          } else {
+            const opacity = Math.min(1, Math.abs(deltaX) / threshold);
+            falseStamp.style.opacity = opacity;
+            trueStamp.style.opacity = 0;
+          }
+        };
+
+        const onPointerUp = (e) => {
+          if (!state.isDragging || state.cardElement !== cardEl) return;
+          state.isDragging = false;
+          
+          try {
+            cardEl.releasePointerCapture(e.pointerId);
+          } catch (err) {}
+
+          const deltaX = state.currentX - state.startX;
+          const swipeThreshold = 100;
+
+          if (deltaX > swipeThreshold) {
+            // Swiped Right -> TRUE
+            this.handleCardSwiped(cardEl, item, 'right');
+          } else if (deltaX < -swipeThreshold) {
+            // Swiped Left -> FALSE
+            this.handleCardSwiped(cardEl, item, 'left');
+          } else {
+            // Snap back smoothly
+            cardEl.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            cardEl.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+            
+            const trueStamp = cardEl.querySelector('.stamp-true');
+            const falseStamp = cardEl.querySelector('.stamp-false');
+            if (trueStamp) trueStamp.style.opacity = 0;
+            if (falseStamp) falseStamp.style.opacity = 0;
+          }
+        };
+
+        cardEl.addEventListener('pointerdown', onPointerDown);
+        cardEl.addEventListener('pointermove', onPointerMove);
+        cardEl.addEventListener('pointerup', onPointerUp);
+        cardEl.addEventListener('pointercancel', onPointerUp);
+      }
+
+      async handleCardSwiped(cardEl, item, direction) {
+        const flyX = direction === 'right' ? window.innerWidth * 1.2 : -window.innerWidth * 1.2;
+        const rotate = direction === 'right' ? 30 : -30;
+
+        cardEl.style.transition = 'transform 0.35s ease-out, opacity 0.3s ease-out';
+        cardEl.style.transform = `translate3d(${flyX}px, 0, 0) rotate(${rotate}deg)`;
+        cardEl.style.opacity = '0';
+
+        // Play feedback sounds
+        if (direction === 'right') {
+          this.sound.match();
+        } else {
+          this.sound.reject();
+        }
+
+        setTimeout(() => {
+          this.processItemDecision(item, direction === 'right' ? 'true' : 'false');
+        }, 220);
+      }
+
+      triggerSwipeAnimation(direction) {
+        const topItem = this.items[this.currentIndex];
+        if (!topItem) return;
+        const cardEl = document.getElementById(`card_${topItem.id}`);
+        if (!cardEl) return;
+
+        // Show corresponding stamp first
+        const stamp = cardEl.querySelector(direction === 'right' ? '.stamp-true' : '.stamp-false');
+        if (stamp) stamp.style.opacity = 1;
+
+        this.handleCardSwiped(cardEl, topItem, direction);
+      }
+
+      async processItemDecision(item, status) {
+        item.status = status;
+        item.timestamp = Date.now();
+        this.historyStack.push(item.id);
+
+        // Check if user enabled "Prompt note on TRUE match"
+        if (status === 'true' && this.session.requireNoteOnMatch) {
+          this.pendingNoteItem = item;
+          this.showNoteModal(item);
+        } else {
+          // Immediately save and proceed to next card
+          await this.saveCurrentItemState(item);
+          this.advanceNextCard();
+        }
+      }
+
+      showNoteModal(item) {
+        const modal = document.getElementById('modalNote');
+        const itemName = document.getElementById('noteModalItemName');
+        const input = document.getElementById('noteInput');
+
+        itemName.textContent = item.name;
+        input.value = item.note || '';
+        modal.classList.remove('hidden');
+
+        setTimeout(() => {
+          input.focus();
+        }, 100);
+      }
+
+      async confirmNoteAndProceed(skip = false) {
+        const modal = document.getElementById('modalNote');
+        const input = document.getElementById('noteInput');
+
+        if (this.pendingNoteItem) {
+          this.pendingNoteItem.note = skip ? '' : input.value.trim();
+          await this.saveCurrentItemState(this.pendingNoteItem);
+          this.pendingNoteItem = null;
+        }
+
+        modal.classList.add('hidden');
+        input.value = '';
+        this.advanceNextCard();
+      }
+
+      closeNoteModal(save) {
+        if (save) {
+          this.confirmNoteAndProceed(false);
+        } else {
+          this.confirmNoteAndProceed(true);
+        }
+      }
+
+      openNoteForCurrentCard() {
+        const topItem = this.items[this.currentIndex];
+        if (!topItem) return;
+        this.pendingNoteItem = topItem;
+        this.showNoteModal(topItem);
+      }
+
+      async saveCurrentItemState(item) {
+        this.session.updatedAt = Date.now();
+        await this.storage.saveSession(this.session);
+        await this.storage.saveItems([item]);
+        this.updateHeaderBadge();
+      }
+
+      advanceNextCard() {
+        this.currentIndex++;
+        this.renderDeckCards();
+      }
+
+      async undoLastSwipe() {
+        if (this.historyStack.length === 0) return;
+
+        const lastId = this.historyStack.pop();
+        const lastItem = this.items.find(i => i.id === lastId);
+        if (!lastItem) return;
+
+        lastItem.status = 'pending';
+        lastItem.timestamp = null;
+
+        // If we were on finished screen or any index, step back
+        if (this.currentIndex > 0) {
+          this.currentIndex--;
+        }
+
+        await this.saveCurrentItemState(lastItem);
+        this.sound.undo();
+        this.toast(`Undo: "${lastItem.name}" dikembalikan ke antrean`, 'info');
+        this.renderDeckCards();
+      }
+
+      handleKeyboard(e) {
+        // If typing in input or textarea, don't trigger shortcuts
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+          return;
+        }
+
+        // Only handle shortcuts when on swipe deck view
+        const deckView = document.getElementById('viewDeck');
+        if (deckView.classList.contains('hidden')) return;
+
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          this.triggerSwipeAnimation('left');
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          this.triggerSwipeAnimation('right');
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          this.undoLastSwipe();
+        } else if (e.key === 'Backspace') {
+          e.preventDefault();
+          this.undoLastSwipe();
+        } else if (e.key === ' ') {
+          e.preventDefault();
+          this.openNoteForCurrentCard();
+        }
+      }
+
+      showReviewModal() {
+        const modal = document.getElementById('modalReview');
+        document.getElementById('reviewMetaInfo').textContent = `${this.session.title} • Tanggal: ${this.session.date || '-'}`;
+        
+        document.getElementById('statTrueLabel').textContent = this.session.labelTrue;
+        document.getElementById('statFalseLabel').textContent = this.session.labelFalse;
+
+        this.setReviewFilter(this.reviewFilter);
+        modal.classList.remove('hidden');
+      }
+
+      closeReviewModal() {
+        document.getElementById('modalReview').classList.add('hidden');
+      }
+
+      setReviewFilter(filter) {
+        this.reviewFilter = filter;
+        
+        // Update filter button tabs
+        ['all', 'true', 'false'].forEach(f => {
+          const btn = document.getElementById(`filterBtn-${f}`);
+          if (f === filter) {
+            btn.className = 'px-2.5 py-1 rounded-lg bg-rose-600 text-white font-medium transition';
+          } else {
+            btn.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium transition';
+          }
+        });
+
+        this.renderReviewTable();
+      }
+
+      renderReviewTable() {
+        const tbody = document.getElementById('reviewTableBody');
+        const emptyRow = document.getElementById('reviewEmptyRow');
+
+        const trueItems = this.items.filter(i => i.status === 'true');
+        const falseItems = this.items.filter(i => i.status === 'false');
+        const pendingItems = this.items.filter(i => i.status === 'pending');
+
+        document.getElementById('statTrueCount').textContent = trueItems.length;
+        document.getElementById('statFalseCount').textContent = falseItems.length;
+        document.getElementById('statPendingCount').textContent = pendingItems.length;
+
+        let filtered = this.items;
+        if (this.reviewFilter === 'true') filtered = trueItems;
+        else if (this.reviewFilter === 'false') filtered = falseItems;
+
+        if (filtered.length === 0) {
+          tbody.innerHTML = '';
+          emptyRow.classList.remove('hidden');
+          return;
+        }
+
+        emptyRow.classList.add('hidden');
+        tbody.innerHTML = filtered.map((item, idx) => {
+          const isTrue = item.status === 'true';
+          const isFalse = item.status === 'false';
+
+          const badge = isTrue
+            ? `<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold text-[10px]">${this.session.labelTrue}</span>`
+            : isFalse
+            ? `<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold text-[10px]">${this.session.labelFalse}</span>`
+            : `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px]">Pending</span>`;
+
+          return `
+            <tr class="hover:bg-slate-850/60 transition">
+              <td class="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">${idx + 1}</td>
+              <td class="py-2.5 px-3">
+                <div class="font-medium text-slate-200 truncate max-w-[200px] sm:max-w-xs" title="${item.name}">${item.name}</div>
+                <div class="text-[10px] text-slate-400">${this.formatSize(item.size)}</div>
+              </td>
+              <td class="py-2.5 px-3 text-center">${badge}</td>
+              <td class="py-2.5 px-3">
+                <input type="text" value="${item.note || ''}" placeholder="Tambah catatan..."
+                  class="w-full px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 focus:border-rose-500 text-xs text-slate-200 outline-none"
+                  onchange="app.updateItemNote('${item.id}', this.value)">
+              </td>
+              <td class="py-2.5 px-3 text-center">
+                <button onclick="app.toggleItemDecision('${item.id}')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Ubah Status">
+                  <i class="fa-solid fa-arrows-rotate text-[11px]"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      async updateItemNote(itemId, noteText) {
+        const item = this.items.find(i => i.id === itemId);
+        if (!item) return;
+        item.note = noteText.trim();
+        await this.saveCurrentItemState(item);
+        this.toast('Catatan berhasil diperbarui.', 'info');
+      }
+
+      async toggleItemDecision(itemId) {
+        const item = this.items.find(i => i.id === itemId);
+        if (!item) return;
+
+        // Cycle through: true -> false -> pending -> true
+        if (item.status === 'true') item.status = 'false';
+        else if (item.status === 'false') item.status = 'true';
+        else item.status = 'true';
+
+        item.timestamp = Date.now();
+        await this.saveCurrentItemState(item);
+        this.renderReviewTable();
+        this.renderDeckCards();
+        this.toast(`Status "${item.name}" diubah ke ${item.status === 'true' ? this.session.labelTrue : this.session.labelFalse}`, 'info');
+      }
+
+      exportToCSV() {
+        if (this.items.length === 0) {
+          this.toast('Tidak ada data untuk diekspor.', 'warning');
+          return;
+        }
+
+        const headers = ['No', 'Item', 'Keputusan', 'Parameter Kustom', 'Catatan / Keterangan', 'Tanggal Keputusan'];
+        const rows = this.items.map((it, idx) => {
+          const decisionText = it.status === 'true' ? 'TRUE' : it.status === 'false' ? 'FALSE' : 'PENDING';
+          const paramLabel = it.status === 'true' ? this.session.labelTrue : it.status === 'false' ? this.session.labelFalse : '-';
+          const dateStr = it.timestamp ? new Date(it.timestamp).toLocaleString('id-ID') : '-';
+
+          return [
+            idx + 1,
+            `"${(it.name || '').replace(/"/g, '""')}"`,
+            decisionText,
+            `"${paramLabel.replace(/"/g, '""')}"`,
+            `"${(it.note || '').replace(/"/g, '""')}"`,
+            `"${dateStr}"`
+          ];
+        });
+
+        const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        
+        const cleanTitle = (this.session.title || 'Matcher_Export').replace(/[^a-z0-9_-]/gi, '_');
+        a.href = url;
+        a.download = `${cleanTitle}_${this.session.date || 'Hasil'}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.toast('File CSV berhasil diunduh!', 'success');
+      }
+
+      exportToExcel() {
+        if (this.items.length === 0) {
+          this.toast('Tidak ada data untuk diekspor.', 'warning');
+          return;
+        }
+
+        if (typeof XLSX === 'undefined') {
+          this.toast('Library Excel belum siap, mengekspor sebagai CSV sebagai gantinya...', 'warning');
+          this.exportToCSV();
+          return;
+        }
+
+        // Prepare data objects for SheetJS
+        const excelData = this.items.map((it, idx) => ({
+          'No': idx + 1,
+          'Item (Nama File / Teks)': it.name || '',
+          'Status': it.status === 'true' ? 'TRUE' : it.status === 'false' ? 'FALSE' : 'PENDING',
+          'Hasil Klasifikasi': it.status === 'true' ? this.session.labelTrue : it.status === 'false' ? this.session.labelFalse : 'Belum Ditentukan',
+          'Catatan / Keterangan': it.note || '',
+          'Tanggal Matching': it.timestamp ? new Date(it.timestamp).toLocaleString('id-ID') : '-'
+        }));
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(excelData);
+
+        // Set column widths for readability
+        ws['!cols'] = [
+          { wch: 6 },  // No
+          { wch: 35 }, // Item
+          { wch: 10 }, // Status
+          { wch: 25 }, // Hasil
+          { wch: 35 }, // Catatan
+          { wch: 22 }  // Tanggal
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Hasil Sorting');
+        
+        const cleanTitle = (this.session.title || 'Matcher_Export').replace(/[^a-z0-9_-]/gi, '_');
+        XLSX.writeFile(wb, `${cleanTitle}_${this.session.date || 'Hasil'}.xlsx`);
+
+        this.toast('File Excel (.xlsx) berhasil diunduh!', 'success');
+      }
+
+      confirmReset() {
+        document.getElementById('modalConfirmReset').classList.remove('hidden');
+      }
+
+      closeConfirmReset() {
+        document.getElementById('modalConfirmReset').classList.add('hidden');
+      }
+
+      executeReset() {
+        this.closeConfirmReset();
+        this.closeReviewModal();
+
+        // Release any allocated object URLs
+        this.items.forEach(it => {
+          if (it.dataUrl) URL.revokeObjectURL(it.dataUrl);
+        });
+
+        this.items = [];
+        this.stagedItems = [];
+        this.historyStack = [];
+        this.currentIndex = 0;
+
+        document.getElementById('viewDeck').classList.add('hidden');
+        document.getElementById('viewSetup').classList.remove('hidden');
+        document.getElementById('btnHeaderHistory').classList.add('hidden');
+        document.getElementById('subHeaderInfo').textContent = 'Smart File & Text Sorter';
+        document.getElementById('inputTitle').value = '';
+        document.getElementById('directTextArea').value = '';
+        
+        this.renderPreviewList();
+        this.checkExistingCache();
+        this.toast('Kembali ke formulir awal. Sesi siap dibuat.', 'info');
+      }
+    }
+
+    // Initialize application instance on DOM load
+    let app;
+    window.addEventListener('DOMContentLoaded', () => {
+      app = new MatcherApp();
+      app.init();
+    });
+  </script>
+</body>
+</html>

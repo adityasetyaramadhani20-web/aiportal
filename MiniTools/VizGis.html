@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VizGis</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Leaflet Map Engine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Turf.js for Spatial Calculations & Interpolations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+  
+  <!-- html2canvas for Travel Summary Card Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  
+  <!-- Google Fonts: Plus Jakarta Sans & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"Space Grotesk"', 'monospace'],
+          },
+          colors: {
+            cream: {
+              50: '#FDFBF7',
+              100: '#FBF8F1',
+              200: '#F5EFE3',
+              300: '#EBDDC6',
+              400: '#DEC6A3',
+              500: '#CEAC7F',
+            },
+            sand: {
+              100: '#FAF6F0',
+              200: '#EFE8DE',
+              300: '#E0D5C3',
+              800: '#3D352E',
+              900: '#231F1B',
+            },
+            terracotta: {
+              400: '#E07A5F',
+              500: '#D6684B',
+              600: '#B85338',
+            },
+            accent: '#D97706',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #F8F5EE;
+      color: #2D2721;
+      overflow: hidden;
+    }
+    
+    /* Custom Minimalist Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F2ECE1;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #D9CEBE;
+      border-radius: 9999px;
+    }
+
+    /* Soft Frosted Glass Panel */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(230, 220, 205, 0.88);
+    }
+
+    /* Aspect Ratio Frames for Social Media Export */
+    .ratio-frame-9-16 {
+      width: 100%;
+      max-width: min(390px, 92vw);
+      aspect-ratio: 9 / 16;
+      height: auto;
+      max-height: calc(100vh - 100px);
+      border-radius: 32px;
+      box-shadow: 0 25px 60px -15px rgba(45, 39, 33, 0.35), 0 0 0 6px #FFFFFF, 0 0 0 8px #D9CEBE;
+      overflow: hidden;
+      margin: auto;
+    }
+
+    .ratio-frame-1-1 {
+      width: 100%;
+      max-width: min(540px, 88vw, calc(100vh - 110px));
+      aspect-ratio: 1 / 1;
+      height: auto;
+      max-height: calc(100vh - 110px);
+      border-radius: 26px;
+      box-shadow: 0 25px 60px -15px rgba(45, 39, 33, 0.3), 0 0 0 6px #FFFFFF, 0 0 0 8px #D9CEBE;
+      overflow: hidden;
+      margin: auto;
+    }
+
+    /* Perspective Cam Effect */
+    .perspective-map .leaflet-map-pane {
+      transform: perspective(700px) rotateX(24deg) scale(1.08);
+      transform-origin: center bottom;
+      transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    /* Custom Pulsing Marker */
+    .vehicle-pulse-marker {
+      width: 22px;
+      height: 22px;
+      background: #D6684B;
+      border-radius: 50%;
+      border: 3px solid #FFFFFF;
+      box-shadow: 0 0 16px rgba(214, 104, 75, 0.9);
+      position: relative;
+    }
+    .vehicle-pulse-marker::after {
+      content: '';
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      right: -8px;
+      bottom: -8px;
+      border: 2px solid #D6684B;
+      border-radius: 50%;
+      animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.4); opacity: 1; }
+      100% { transform: scale(2.4); opacity: 0; }
+    }
+
+    /* Route Planner Markers */
+    .planner-wpt-pin {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #231F1B;
+      color: #FDFBF7;
+      font-weight: 700;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2.5px solid #FFFFFF;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    }
+    .planner-wpt-pin.start {
+      background: #15803D;
+    }
+    .planner-wpt-pin.end {
+      background: #B91C1C;
+    }
+
+    /* Label POI Pin */
+    .label-poi-pin {
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: #FFFFFF;
+      color: #231F1B;
+      font-weight: 600;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      border: 1.5px solid #D6684B;
+      box-shadow: 0 3px 10px rgba(45,39,33,0.18);
+      white-space: nowrap;
+      cursor: pointer;
+      transform: translate(-50%, -100%);
+      transition: transform 0.15s ease;
+    }
+    .label-poi-pin:hover {
+      transform: translate(-50%, -110%) scale(1.05);
+      border-color: #231F1B;
+    }
+
+    /* Freeform Drawing Cursor */
+    .cursor-draw {
+      cursor: crosshair !important;
+    }
+    .cursor-label {
+      cursor: cell !important;
+    }
+
+    /* Range slider custom styling */
+    input[type=range] {
+      accent-color: #D6684B;
+    }
+
+    .leaflet-control-attribution {
+      font-size: 9px !important;
+      background: rgba(255, 255, 255, 0.75) !important;
+      border-radius: 4px;
+      padding: 0 4px !important;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex flex-col font-sans select-none bg-[#F7F4EC] text-sand-900">
+
+  <!-- Header -->
+  <header class="w-full h-16 bg-cream-50/95 border-b border-cream-300/80 px-3 sm:px-6 flex items-center justify-between z-30 shrink-0 shadow-sm backdrop-blur-md">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-terracotta-500 to-amber-500 flex items-center justify-center text-white shadow-md shadow-terracotta-500/20">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="font-bold text-base tracking-tight text-sand-900">VizGis</h1>
+        <p class="text-[11px] text-sand-800/70 hidden sm:block">Pembuat Rute & Visualisasi Perjalanan</p>
+      </div>
+    </div>
+
+    <!-- Mode Selector & Action Buttons -->
+    <div class="flex items-center space-x-1.5 sm:space-x-2">
+      <!-- Mode Toggle: Visualizer vs Route Planner -->
+      <div class="flex items-center bg-cream-200/90 p-0.5 rounded-xl border border-cream-300">
+        <button id="tabVisualizer" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-sand-900 shadow-sm transition">
+          Visualisasi
+        </button>
+        <button id="tabPlanner" class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-sand-800 hover:text-sand-900 transition flex items-center space-x-1">
+          <span>✨ Rencanakan Rute</span>
+        </button>
+      </div>
+
+      <!-- Demo Data Loader -->
+      <button id="btnLoadDemo" class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-cream-200 hover:bg-cream-300 text-sand-800 font-medium text-xs transition flex items-center space-x-1 border border-cream-300 shadow-sm active:scale-95" title="Muat contoh trip siap pakai">
+        <svg class="w-3.5 h-3.5 text-terracotta-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span class="hidden md:inline">Contoh Trip</span>
+      </button>
+
+      <!-- Upload File Button -->
+      <label class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-white hover:bg-cream-100 text-sand-900 font-medium text-xs transition flex items-center space-x-1 border border-cream-300 shadow-sm cursor-pointer active:scale-95">
+        <svg class="w-3.5 h-3.5 text-terracotta-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        <span class="hidden lg:inline">Upload JSON / GPX</span>
+        <span class="lg:hidden">Upload</span>
+        <input type="file" id="fileInput" accept=".json,.gpx" class="hidden" />
+      </label>
+
+      <!-- Stats / Wrapped Modal -->
+      <button id="btnOpenStats" class="p-2 rounded-lg bg-white hover:bg-cream-100 text-sand-800 border border-cream-300 shadow-sm transition" title="Rangkuman Trip">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      </button>
+
+      <!-- Privacy Mask Modal -->
+      <button id="btnOpenPrivacy" class="p-2 rounded-lg bg-white hover:bg-cream-100 text-sand-800 border border-cream-300 shadow-sm transition" title="Sensor Privasi">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      </button>
+
+      <!-- Record Animation Video -->
+      <button id="btnRecord" class="px-3 py-1.5 rounded-lg bg-sand-900 hover:bg-sand-800 text-cream-50 font-medium text-xs transition flex items-center space-x-1.5 shadow-md active:scale-95">
+        <span id="recDot" class="w-2 h-2 rounded-full bg-red-400"></span>
+        <span id="recText">Rekam</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Canvas Container -->
+  <main class="flex-1 relative flex items-center justify-center overflow-hidden p-0 sm:p-4 bg-[#F2EDE4]">
+    
+    <div id="mapWrapper" class="w-full h-full relative transition-all duration-500 ease-in-out shadow-sm overflow-hidden sm:rounded-2xl">
+      <!-- Leaflet Map Container -->
+      <div id="map" class="w-full h-full bg-[#E8E2D5] z-0"></div>
+      
+      <!-- Top Left HUD Widget -->
+      <div class="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex flex-col space-y-2 pointer-events-none">
+        <div class="glass-panel p-2.5 sm:p-4 rounded-2xl shadow-lg border border-cream-300/80 min-w-[200px] sm:min-w-[240px] max-w-[230px] sm:max-w-xs pointer-events-auto">
+          <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-cream-200">
+            <div class="flex items-center space-x-1.5">
+              <span id="hudActivityIcon" class="text-sm sm:text-base">🚗</span>
+              <span id="hudActivityText" class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-sand-800">Berkendara</span>
+            </div>
+            <div id="hudDateBadge" class="text-[9px] sm:text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-md bg-cream-200 text-terracotta-600">
+              12 Agu 2026
+            </div>
+          </div>
+          
+          <div class="space-y-0.5">
+            <div class="text-lg sm:text-2xl font-mono font-bold tracking-tight text-sand-900" id="hudTime">
+              08:30:00 <span class="text-[10px] sm:text-xs font-sans font-normal text-sand-800/60">WIB</span>
+            </div>
+            <div class="text-[11px] sm:text-xs text-sand-800/80 truncate font-medium flex items-center space-x-1" id="hudLocationWrapper">
+              <span id="hudLocationName">Memulai rute...</span>
+            </div>
+          </div>
+
+          <!-- Active Label POI Callout -->
+          <div id="hudPoiBadge" class="hidden mt-1.5 py-1 px-2 rounded-lg bg-terracotta-500/10 border border-terracotta-500/30 text-terracotta-600 text-[10px] font-medium flex items-center space-x-1 truncate">
+            <span id="hudPoiIcon">📍</span>
+            <span id="hudPoiName" class="truncate">Mendekati: Rest Area KM 45</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-1.5 pt-2 mt-1.5 border-t border-cream-200 text-[10px] sm:text-[11px]">
+            <div>
+              <span class="text-sand-800/60 block text-[9px]">Jarak Tempuh</span>
+              <span class="font-mono font-bold text-sand-900 text-[11px] sm:text-xs" id="hudDistance">0.0 km</span>
+            </div>
+            <div>
+              <span class="text-sand-800/60 block text-[9px]">Kecepatan Est.</span>
+              <span class="font-mono font-bold text-sand-900 text-[11px] sm:text-xs" id="hudSpeed">0 km/jam</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notification Toast -->
+        <div id="toast" class="opacity-0 translate-y-2 transition-all duration-300 glass-panel px-3.5 py-2 rounded-xl text-xs font-medium text-sand-900 flex items-center space-x-2 shadow-md max-w-sm pointer-events-auto">
+          <span id="toastIcon">💡</span>
+          <span id="toastMessage">Siap merencanakan rute!</span>
+        </div>
+      </div>
+
+      <!-- ROUTE PLANNER DOCK PANEL (Floating on the left) -->
+      <aside id="plannerDock" class="hidden absolute top-3 sm:top-4 left-3 sm:left-4 z-20 w-[92vw] sm:w-80 max-h-[calc(100vh-140px)] flex flex-col glass-panel rounded-2xl shadow-2xl border border-cream-300 overflow-hidden">
+        <!-- Dock Header -->
+        <div class="px-4 py-3 bg-cream-100/90 border-b border-cream-200 flex items-center justify-between shrink-0">
+          <div class="flex items-center space-x-2">
+            <span class="w-2 h-2 rounded-full bg-terracotta-500 animate-pulse"></span>
+            <h2 class="font-bold text-xs uppercase tracking-wider text-sand-900">Rencanakan Rute</h2>
+          </div>
+          <button id="btnClosePlanner" class="p-1 rounded-lg hover:bg-cream-200 text-sand-800" title="Tutup panel">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Dock Content Scrollable -->
+        <div class="p-3.5 space-y-3.5 overflow-y-auto text-xs">
+          
+          <!-- 1. Activity Profile -->
+          <div>
+            <label class="block font-semibold text-sand-800 mb-1.5 text-[11px]">Aktivitas Rute</label>
+            <div class="grid grid-cols-4 gap-1">
+              <button class="activity-btn active p-1.5 rounded-xl border border-cream-300 bg-white text-sand-900 font-medium flex flex-col items-center justify-center space-y-1 transition text-center" data-activity="driving">
+                <span class="text-base">🚗</span>
+                <span class="text-[10px]">Berkendara</span>
+              </button>
+              <button class="activity-btn p-1.5 rounded-xl border border-cream-300 bg-cream-50 text-sand-800 font-medium flex flex-col items-center justify-center space-y-1 transition text-center" data-activity="traveling">
+                <span class="text-base">🧳</span>
+                <span class="text-[10px]">Traveling</span>
+              </button>
+              <button class="activity-btn p-1.5 rounded-xl border border-cream-300 bg-cream-50 text-sand-800 font-medium flex flex-col items-center justify-center space-y-1 transition text-center" data-activity="sports">
+                <span class="text-base">🚴</span>
+                <span class="text-[10px]">Olahraga</span>
+              </button>
+              <button class="activity-btn p-1.5 rounded-xl border border-cream-300 bg-cream-50 text-sand-800 font-medium flex flex-col items-center justify-center space-y-1 transition text-center" data-activity="hiking">
+                <span class="text-base">🥾</span>
+                <span class="text-[10px]">Pendakian</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Draw Mode -->
+          <div>
+            <label class="block font-semibold text-sand-800 mb-1.5 text-[11px]">Metode Pembuatan</label>
+            <div class="grid grid-cols-3 gap-1">
+              <button id="btnDrawModePoint" class="draw-mode-btn active px-2 py-1.5 rounded-xl border border-cream-300 bg-white font-medium text-[11px] text-terracotta-600 shadow-sm flex items-center justify-center space-x-1">
+                <span>📍 Titik Jalan</span>
+              </button>
+              <button id="btnDrawModeFree" class="draw-mode-btn px-2 py-1.5 rounded-xl border border-cream-300 bg-cream-50 font-medium text-[11px] text-sand-800 hover:bg-cream-100 flex items-center justify-center space-x-1">
+                <span>✏️ Tarik Bebas</span>
+              </button>
+              <button id="btnDrawModeLabel" class="draw-mode-btn px-2 py-1.5 rounded-xl border border-cream-300 bg-cream-50 font-medium text-[11px] text-sand-800 hover:bg-cream-100 flex items-center justify-center space-x-1">
+                <span>🏷️ Titik Label</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. Label/POI Settings (shown when Label Mode is active or anytime) -->
+          <div id="labelSettingsSection" class="p-2.5 rounded-xl bg-cream-100/90 border border-cream-300 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-[11px] text-sand-900">Preset Label Titik Singgah</span>
+              <span class="text-[9px] text-sand-800/60">Klik peta untuk menaruh</span>
+            </div>
+            
+            <div class="grid grid-cols-4 gap-1">
+              <button class="label-preset-btn active p-1 rounded-lg bg-white border border-cream-300 text-[10px] text-center" data-label-type="transit" data-label-name="Transit" data-icon="🚏">
+                🚏 Transit
+              </button>
+              <button class="label-preset-btn p-1 rounded-lg bg-cream-50 border border-cream-300 text-[10px] text-center" data-label-type="rest_area" data-label-name="Rest Area" data-icon="☕">
+                ☕ Rest Area
+              </button>
+              <button class="label-preset-btn p-1 rounded-lg bg-cream-50 border border-cream-300 text-[10px] text-center" data-label-type="water_station" data-label-name="Water Station" data-icon="💧">
+                💧 Water
+              </button>
+              <button class="label-preset-btn p-1 rounded-lg bg-cream-50 border border-cream-300 text-[10px] text-center" data-label-type="medis" data-label-name="Pos Medis" data-icon="🩺">
+                🩺 Medis
+              </button>
+              <button class="label-preset-btn p-1 rounded-lg bg-cream-50 border border-cream-300 text-[10px] text-center" data-label-type="rs" data-label-name="Rumah Sakit" data-icon="🏥">
+                🏥 RS
+              </button>
+              <button class="label-preset-btn p-1 rounded-lg bg-cream-50 border border-cream-300 text-[10px] text-center" data-label-type="ibadah" data-label-name="Tempat Ibadah" data-icon="🕌">
+                🕌 Ibadah
+              </button>
+              <button class="label-preset-btn p-1 rounded-lg bg-cream-50 border border-cream-300 text-[10px] text-center" data-label-type="warning" data-label-name="Hati-hati" data-icon="⚠️">
+                ⚠️ Bahaya
+              </button>
+              <button class="label-preset-btn p-1 rounded-lg bg-cream-50 border border-cream-300 text-[10px] text-center" data-label-type="roadblock" data-label-name="Penutupan Jalan" data-icon="⛔">
+                ⛔ Tutup
+              </button>
+            </div>
+
+            <!-- Custom label text input -->
+            <div class="flex items-center space-x-1 pt-1">
+              <input type="text" id="customLabelInput" placeholder="Kustom teks (opsional)..." class="w-full bg-white border border-cream-300 rounded-lg px-2 py-1 text-xs text-sand-900 focus:outline-none focus:ring-1 focus:ring-terracotta-500">
+            </div>
+
+            <!-- Existing Labels Pill List -->
+            <div id="labelsListContainer" class="pt-1 flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+              <!-- Label badges inserted via JS -->
+            </div>
+          </div>
+
+          <!-- 4. Loop Configuration -->
+          <div>
+            <label class="block font-semibold text-sand-800 mb-1.5 text-[11px]">Konfigurasi Jalur (Loop)</label>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button class="loop-btn active px-2.5 py-1.5 rounded-xl border border-cream-300 bg-white font-medium text-xs text-sand-900 flex items-center justify-between" data-loop="one-way">
+                <span>➡️ Satu Arah</span>
+                <span class="text-[9px] text-sand-800/60">A → B</span>
+              </button>
+              <button class="loop-btn px-2.5 py-1.5 rounded-xl border border-cream-300 bg-cream-50 font-medium text-xs text-sand-800 hover:bg-cream-100 flex items-center justify-between" data-loop="reversed">
+                <span>⬅️ Arah Kembali</span>
+                <span class="text-[9px] text-sand-800/60">B → A</span>
+              </button>
+              <button class="loop-btn px-2.5 py-1.5 rounded-xl border border-cream-300 bg-cream-50 font-medium text-xs text-sand-800 hover:bg-cream-100 flex items-center justify-between" data-loop="out-and-back">
+                <span>🔁 Pergi-Pulang</span>
+                <span class="text-[9px] text-sand-800/60">A ⇄ B</span>
+              </button>
+              <button class="loop-btn px-2.5 py-1.5 rounded-xl border border-cream-300 bg-cream-50 font-medium text-xs text-sand-800 hover:bg-cream-100 flex items-center justify-between" data-loop="circular">
+                <span>🔄 Melingkar</span>
+                <span class="text-[9px] text-sand-800/60">Tutup Loop</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Route Stats Snippet -->
+          <div class="bg-cream-200/70 p-2.5 rounded-xl border border-cream-300 flex justify-between items-center text-[11px]">
+            <div>
+              <span class="text-sand-800/60 block text-[9px]">Total Titik Jalur</span>
+              <span id="plannerPointsCount" class="font-mono font-bold text-sand-900">0 titik</span>
+            </div>
+            <div>
+              <span class="text-sand-800/60 block text-[9px]">Estimasi Jarak</span>
+              <span id="plannerDistEstimate" class="font-mono font-bold text-sand-900">0.0 km</span>
+            </div>
+            <div>
+              <span class="text-sand-800/60 block text-[9px]">Label Tersimpan</span>
+              <span id="plannerLabelsCount" class="font-mono font-bold text-sand-900">0 POI</span>
+            </div>
+          </div>
+
+          <!-- Action Buttons: Undo, Clear, Preview in VizGis -->
+          <div class="grid grid-cols-2 gap-1.5">
+            <button id="btnPlannerUndo" class="px-2 py-1.5 rounded-xl bg-cream-100 hover:bg-cream-200 border border-cream-300 text-sand-800 font-medium text-xs flex items-center justify-center space-x-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M3 10h10a5 5 0 015 5v2m0 0l-4-4m4 4l4-4M3 10l4-4m-4 4l4 4"/></svg>
+              <span>Undo Titik</span>
+            </button>
+            <button id="btnPlannerClear" class="px-2 py-1.5 rounded-xl bg-cream-100 hover:bg-cream-200 border border-cream-300 text-terracotta-600 font-medium text-xs flex items-center justify-center space-x-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              <span>Bersihkan</span>
+            </button>
+          </div>
+
+          <!-- Main Preview Button -->
+          <button id="btnPlannerPreview" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-terracotta-500 to-amber-600 hover:from-terracotta-600 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-terracotta-500/30 transition active:scale-95">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <span>Terapkan & Putar di VizGis</span>
+          </button>
+
+          <!-- Export & Google Maps Links -->
+          <div class="pt-2 border-t border-cream-200 space-y-1.5">
+            <span class="block font-semibold text-[10px] text-sand-800/70 uppercase tracking-wider">Ekspor & Bagikan Rute</span>
+            <div class="grid grid-cols-3 gap-1">
+              <button id="btnExportGPX" class="px-2 py-1.5 rounded-lg bg-white hover:bg-cream-100 border border-cream-300 text-sand-900 font-medium text-[11px] shadow-sm flex items-center justify-center space-x-1" title="Unduh format standar GPS">
+                <span>📁 GPX</span>
+              </button>
+              <button id="btnExportJSON" class="px-2 py-1.5 rounded-lg bg-white hover:bg-cream-100 border border-cream-300 text-sand-900 font-medium text-[11px] shadow-sm flex items-center justify-center space-x-1" title="Unduh JSON VizGis">
+                <span>📄 JSON</span>
+              </button>
+              <button id="btnOpenGMaps" class="px-2 py-1.5 rounded-lg bg-white hover:bg-cream-100 border border-cream-300 text-sand-900 font-medium text-[11px] shadow-sm flex items-center justify-center space-x-1" title="Buka navigasi di Google Maps">
+                <span>🗺️ G-Maps</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- Right Side Controls (Aspect Ratio & Camera) -->
+      <div class="absolute top-4 right-4 z-10 flex flex-col space-y-2">
+        <!-- Aspect Ratio Controls -->
+        <div class="glass-panel p-1.5 rounded-xl shadow-md border border-cream-300/80 flex flex-col space-y-1">
+          <button class="ratio-btn active p-2 rounded-lg text-xs font-medium text-sand-800 hover:bg-cream-200 transition" data-ratio="full" title="Tampilan Penuh">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+          </button>
+          <button class="ratio-btn p-2 rounded-lg text-xs font-medium text-sand-800 hover:bg-cream-200 transition" data-ratio="9-16" title="Format TikTok / Reels (9:16)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3" stroke-width="2"/></svg>
+          </button>
+          <button class="ratio-btn p-2 rounded-lg text-xs font-medium text-sand-800 hover:bg-cream-200 transition" data-ratio="1-1" title="Format Persegi Instagram (1:1)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke-width="2"/></svg>
+          </button>
+        </div>
+
+        <!-- Camera Tracking Preset Controls -->
+        <div class="glass-panel p-1.5 rounded-xl shadow-md border border-cream-300/80 flex flex-col space-y-1">
+          <button id="btnCamFollow" class="cam-btn active p-2 rounded-lg text-xs font-medium text-sand-800 bg-cream-200 text-terracotta-500 transition" title="Follow Cam (Mengikuti Titik Aktif)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+          <button id="btnCam2D" class="cam-btn p-2 rounded-lg text-xs font-medium text-sand-800 hover:bg-cream-200 transition" title="Overview 2D (Tampak Atas)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+          </button>
+          <button id="btnCamReset" class="p-2 rounded-lg text-xs font-medium text-sand-800 hover:bg-cream-200 transition" title="Fit Seluruh Jalur">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Playback Scrubber & Toolbar Bottom Floating Dock -->
+      <div class="absolute bottom-5 inset-x-0 mx-auto max-w-2xl px-3 sm:px-4 z-10">
+        <div class="glass-panel p-3 sm:p-4 rounded-2xl shadow-xl border border-cream-300/90 flex flex-col space-y-2 sm:space-y-3">
+          
+          <!-- Scrubber Timeline Slider -->
+          <div class="flex items-center space-x-3">
+            <span id="timeStartLabel" class="text-[11px] font-mono font-medium text-sand-800/70 w-10 sm:w-12 text-left">0%</span>
+            <input id="timelineSlider" type="range" min="0" max="1000" value="0" class="w-full h-1.5 bg-cream-200 rounded-lg cursor-pointer appearance-none">
+            <span id="timeEndLabel" class="text-[11px] font-mono font-medium text-sand-800/70 w-10 sm:w-12 text-right">100%</span>
+          </div>
+
+          <!-- Controls: Play, Step, Speed, Map Theme -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-1.5 sm:space-x-2">
+              <button id="btnPrevPoint" class="p-2 rounded-xl bg-cream-100 hover:bg-cream-200 text-sand-900 border border-cream-300 transition" title="Mundur 5%">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/></svg>
+              </button>
+
+              <button id="btnPlayPause" class="px-4 sm:px-5 py-2 rounded-xl bg-terracotta-500 hover:bg-terracotta-600 text-white font-medium text-xs sm:text-sm flex items-center space-x-1.5 sm:space-x-2 shadow-md shadow-terracotta-500/25 transition active:scale-95">
+                <svg id="playIcon" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="pauseIcon" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                <span id="playLabel">Putar</span>
+              </button>
+
+              <button id="btnNextPoint" class="p-2 rounded-xl bg-cream-100 hover:bg-cream-200 text-sand-900 border border-cream-300 transition" title="Maju 5%">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M11.934 12.8a1 1 0 000-1.6l-5.334-4A1 1 0 005 8v8a1 1 0 001.6.8l5.334-4zM19.934 12.8a1 1 0 000-1.6l-5.334-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.334-4z"/></svg>
+              </button>
+            </div>
+
+            <!-- Speed Selector -->
+            <div class="flex items-center space-x-0.5 sm:space-x-1 bg-cream-200 p-1 rounded-xl border border-cream-300 text-xs font-mono font-medium">
+              <button class="speed-btn px-2 py-1 rounded-lg transition text-sand-800" data-speed="1">1x</button>
+              <button class="speed-btn px-2 py-1 rounded-lg transition text-sand-800" data-speed="5">5x</button>
+              <button class="speed-btn active px-2 py-1 rounded-lg transition bg-white text-terracotta-600 shadow-sm font-bold" data-speed="20">20x</button>
+              <button class="speed-btn px-2 py-1 rounded-lg transition text-sand-800" data-speed="60">60x</button>
+            </div>
+
+            <!-- Map Theme Selector -->
+            <div class="flex items-center space-x-1.5 text-xs">
+              <select id="mapStyleSelect" class="bg-cream-100 border border-cream-300 text-sand-900 rounded-lg px-2 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-terracotta-500 cursor-pointer shadow-sm">
+                <option value="osm_hot" selected>OSM Humanitarian (Vibrant)</option>
+                <option value="voyager">Carto Voyager</option>
+                <option value="osm">OpenStreetMap</option>
+                <option value="positron">Carto Light</option>
+                <option value="dark">Carto Dark</option>
+              </select>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Privacy Filter Modal -->
+  <div id="privacyModal" class="fixed inset-0 bg-sand-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md p-6 rounded-3xl shadow-2xl border border-cream-300 space-y-5">
+      <div class="flex items-center justify-between pb-3 border-b border-cream-200">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-lg bg-terracotta-500/10 text-terracotta-500 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          </div>
+          <h3 class="font-bold text-sand-900 text-base">Sensor Zona Privasi</h3>
+        </div>
+        <button id="btnClosePrivacy" class="p-1 rounded-lg hover:bg-cream-200 text-sand-800">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <p class="text-xs text-sand-800/80 leading-relaxed">
+        Lindungi privasi rumah atau area pribadi. Koordinat di dalam radius zona ini akan otomatis disembunyikan dari rute playback.
+      </p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-sand-900 mb-1">Status Sensor</label>
+          <div class="flex items-center space-x-3">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="privacyToggle" class="sr-only peer" checked>
+              <div class="w-11 h-6 bg-cream-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-cream-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-terracotta-500"></div>
+            </label>
+            <span id="privacyStatusText" class="text-xs font-medium text-terracotta-600">Aktif (Radius Awal Disamarkan)</span>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs font-medium text-sand-900 mb-1">
+            <span>Radius Masking</span>
+            <span id="privacyRadiusLabel" class="font-mono text-terracotta-600 font-bold">800 meter</span>
+          </div>
+          <input type="range" id="privacyRadiusInput" min="200" max="3000" step="100" value="800" class="w-full h-1.5 bg-cream-200 rounded-lg cursor-pointer">
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-cream-200 flex justify-end space-x-2">
+        <button id="btnApplyPrivacy" class="px-4 py-2 rounded-xl bg-terracotta-500 hover:bg-terracotta-600 text-white font-medium text-xs transition">
+          Terapkan Filter
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Travel Summary Card Modal -->
+  <div id="statsModal" class="fixed inset-0 bg-sand-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-lg p-6 rounded-3xl shadow-2xl border border-cream-300 space-y-5">
+      <div class="flex items-center justify-between pb-3 border-b border-cream-200">
+        <div class="flex items-center space-x-2">
+          <span class="text-xl">✨</span>
+          <h3 class="font-bold text-sand-900 text-base">Travel Summary Card</h3>
+        </div>
+        <button id="btnCloseStats" class="p-1 rounded-lg hover:bg-cream-200 text-sand-800">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Exportable Travel Card -->
+      <div id="travelCard" class="bg-gradient-to-br from-cream-50 via-cream-100 to-cream-200 p-6 rounded-2xl border border-cream-300/80 shadow-inner space-y-4">
+        <div class="flex justify-between items-start">
+          <div>
+            <span class="text-[10px] font-mono tracking-widest uppercase font-bold text-terracotta-600">VizGis Route Recap</span>
+            <h4 id="cardTripTitle" class="text-lg font-bold text-sand-900">Perjalanan Lintas Jawa - Bali</h4>
+            <p id="cardDateRange" class="text-xs text-sand-800/70">12 Agu 2026 – 16 Agu 2026</p>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-terracotta-500 flex items-center justify-center text-white text-lg font-bold shadow-md">
+            🗺️
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <div class="bg-white/85 p-3 rounded-xl border border-cream-300">
+            <span class="text-[11px] text-sand-800/60 block">Total Jarak</span>
+            <span id="cardTotalDist" class="text-xl font-mono font-bold text-sand-900">1,180.4 km</span>
+          </div>
+          <div class="bg-white/85 p-3 rounded-xl border border-cream-300">
+            <span class="text-[11px] text-sand-800/60 block">Total Titik GPS</span>
+            <span id="cardTotalPoints" class="text-xl font-mono font-bold text-sand-900">428 pts</span>
+          </div>
+          <div class="bg-white/85 p-3 rounded-xl border border-cream-300">
+            <span class="text-[11px] text-sand-800/60 block">Mode Aktivitas</span>
+            <span id="cardTotalDuration" class="text-xl font-mono font-bold text-sand-900">Berkendara</span>
+          </div>
+          <div class="bg-white/85 p-3 rounded-xl border border-cream-300">
+            <span class="text-[11px] text-sand-800/60 block">Label / POI</span>
+            <span id="cardTotalLabels" class="text-xl font-mono font-bold text-sand-900">0 POI</span>
+          </div>
+        </div>
+
+        <div class="p-3 bg-white/70 rounded-xl border border-cream-200 text-xs text-sand-800/80 flex items-center space-x-2">
+          <span>🌿</span>
+          <span id="cardFunFact">Rute siap dibagikan untuk media sosial atau navigasi lapangan.</span>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center pt-2">
+        <span class="text-xs text-sand-800/60">Simpan kartu ringkasan visual</span>
+        <button id="btnDownloadCard" class="px-4 py-2 rounded-xl bg-sand-900 hover:bg-sand-800 text-white font-medium text-xs flex items-center space-x-1.5 shadow-md">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span>Unduh Gambar PNG</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global Application State
+    const state = {
+      // Playback & Visualization
+      rawPoints: [],
+      filteredPoints: [],
+      currentIndex: 0,
+      isPlaying: false,
+      speed: 20,
+      cameraMode: 'follow', // 'follow', '2d'
+      totalDistanceKm: 0,
+      privacyEnabled: true,
+      privacyRadiusMeters: 800,
+      isRecording: false,
+
+      // Route Planner State
+      plannerActive: false,
+      activity: 'driving', // 'driving', 'traveling', 'sports', 'hiking'
+      drawMode: 'point', // 'point', 'freeform', 'label'
+      loopMode: 'one-way', // 'one-way', 'reversed', 'out-and-back', 'circular'
+      waypoints: [], // { lat, lng }
+      plannerRouteCoords: [], // [{ lat, lng }]
+      labels: [], // { id, lat, lng, type, name, icon }
+      isDrawingFreeform: false,
+      currentFreeformCoords: [],
+
+      // Active Label Preset
+      selectedLabelPreset: {
+        type: 'transit',
+        name: 'Transit',
+        icon: '🚏'
+      }
+    };
+
+    let map = null;
+    let tileLayer = null;
+    let fullRouteLine = null;
+    let trailGlowLine = null;
+    let trailCoreLine = null;
+    let privacyCircle = null;
+    let pulseMarker = null;
+    let animFrameId = null;
+
+    // Route Planner Layers
+    let plannerDraftLine = null;
+    let plannerWptLayer = null;
+    let plannerLabelLayer = null;
+
+    // Demo Coordinates (Jakarta to Bali Roadtrip)
+    const DEMO_COORDINATES = [
+      { lat: -6.1754, lng: 106.8272, time: "2026-08-12T07:00:00Z", name: "Monas, Jakarta", mode: "START" },
+      { lat: -6.2146, lng: 106.8451, time: "2026-08-12T07:30:00Z", name: "Tol Jakarta - Cikampek", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -6.3707, lng: 107.3308, time: "2026-08-12T08:45:00Z", name: "Karawang Timur", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -6.8906, lng: 107.6100, time: "2026-08-12T11:15:00Z", name: "Bandung, Jawa Barat", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -6.7063, lng: 108.5570, time: "2026-08-12T15:30:00Z", name: "Cirebon Heritage", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -6.8728, lng: 109.1256, time: "2026-08-12T17:40:00Z", name: "Tol Pejagan - Brebes", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -6.9932, lng: 110.4203, time: "2026-08-13T09:00:00Z", name: "Simpang Lima Semarang", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -7.7956, lng: 110.3695, time: "2026-08-13T14:30:00Z", name: "Malioboro, Yogyakarta", mode: "WALKING" },
+      { lat: -7.5755, lng: 110.8243, time: "2026-08-14T08:00:00Z", name: "Surakarta / Solo", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -7.5361, lng: 112.2384, time: "2026-08-14T12:00:00Z", name: "Jombang - Mojokerto", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -7.2575, lng: 112.7521, time: "2026-08-14T16:00:00Z", name: "Surabaya Gubeng", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -7.7569, lng: 113.2115, time: "2026-08-15T09:30:00Z", name: "Probolinggo Pesisir", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -8.1331, lng: 114.3986, time: "2026-08-15T15:00:00Z", name: "Pelabuhan Ketapang Banyuwangi", mode: "IN_FERRY" },
+      { lat: -8.1722, lng: 114.4372, time: "2026-08-15T16:45:00Z", name: "Pelabuhan Gilimanuk Bali", mode: "IN_FERRY" },
+      { lat: -8.3588, lng: 114.9856, time: "2026-08-16T10:00:00Z", name: "Jalan Raya Denpasar - Gilimanuk", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -8.6500, lng: 115.2167, time: "2026-08-16T14:30:00Z", name: "Denpasar, Bali", mode: "IN_PASSENGER_VEHICLE" },
+      { lat: -8.7959, lng: 115.1689, time: "2026-08-16T17:30:00Z", name: "Pantai Jimbaran Sunset, Bali", mode: "FINISH" }
+    ];
+
+    const TILE_STYLES = {
+      osm_hot: {
+        url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenStreetMap contributors, Tiles courtesy of Humanitarian OSM',
+        subdomains: 'abc'
+      },
+      osm: {
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenStreetMap contributors',
+        subdomains: ''
+      },
+      voyager: {
+        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; CARTO &copy; OSM',
+        subdomains: 'abcd'
+      },
+      positron: {
+        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; CARTO &copy; OSM',
+        subdomains: 'abcd'
+      },
+      dark: {
+        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; CARTO &copy; OSM',
+        subdomains: 'abcd'
+      }
+    };
+
+    function setTileLayer(styleKey) {
+      const config = TILE_STYLES[styleKey] || TILE_STYLES.osm_hot;
+      if (tileLayer && map) map.removeLayer(tileLayer);
+      tileLayer = L.tileLayer(config.url, {
+        attribution: config.attribution,
+        subdomains: config.subdomains || 'abc',
+        maxZoom: 19
+      }).addTo(map);
+
+      // Keep lines and pulse markers above tiles
+      if (fullRouteLine) fullRouteLine.bringToFront();
+      if (plannerDraftLine) plannerDraftLine.bringToFront();
+      if (trailGlowLine) trailGlowLine.bringToFront();
+      if (trailCoreLine) trailCoreLine.bringToFront();
+    }
+
+    function initMap() {
+      map = L.map('map', {
+        zoomControl: false,
+        attributionControl: true
+      }).setView([-7.7956, 110.3695], 7);
+
+      setTileLayer('osm_hot');
+
+      // Layer for planner waypoints & labels
+      plannerWptLayer = L.layerGroup().addTo(map);
+      plannerLabelLayer = L.layerGroup().addTo(map);
+
+      // Full planned route background line
+      fullRouteLine = L.polyline([], {
+        color: '#DEC6A3',
+        weight: 3.5,
+        opacity: 0.7,
+        dashArray: '6, 6',
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
+
+      // Active draft line for Route Planner
+      plannerDraftLine = L.polyline([], {
+        color: '#D97706',
+        weight: 4,
+        opacity: 0.85,
+        dashArray: '4, 6',
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
+
+      // Active glowing trail underlay
+      trailGlowLine = L.polyline([], {
+        color: '#E07A5F',
+        weight: 8,
+        opacity: 0.35,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
+
+      // Active vibrant trail core
+      trailCoreLine = L.polyline([], {
+        color: '#D6684B',
+        weight: 4,
+        opacity: 1.0,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
+
+      // Pulse vehicle icon
+      const customIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: '<div class="vehicle-pulse-marker"></div>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+
+      pulseMarker = L.marker([-6.1754, 106.8272], { icon: customIcon }).addTo(map);
+
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      // Attach Map Event Listeners for Planner
+      setupPlannerMapEvents();
+
+      // Auto-load Demo Trip on launch
+      loadDemoJourney();
+    }
+
+    // ==========================================
+    // ROUTE PLANNER ENGINE & OSRM INTEGRATION
+    // ==========================================
+
+    function setupPlannerMapEvents() {
+      // Point-to-Point Click or Label Placement Click
+      map.on('click', (e) => {
+        if (!state.plannerActive) return;
+
+        if (state.drawMode === 'point') {
+          addPlannerWaypoint(e.latlng);
+        } else if (state.drawMode === 'label') {
+          addPlannerLabel(e.latlng);
+        }
+      });
+
+      // Freeform Drag Drawing Events
+      const mapContainer = map.getContainer();
+
+      mapContainer.addEventListener('mousedown', (e) => {
+        if (!state.plannerActive || state.drawMode !== 'freeform') return;
+        state.isDrawingFreeform = true;
+        state.currentFreeformCoords = [];
+        map.dragging.disable();
+        const pt = map.mouseEventToLatLng(e);
+        state.currentFreeformCoords.push([pt.lng, pt.lat]);
+      });
+
+      mapContainer.addEventListener('mousemove', (e) => {
+        if (!state.isDrawingFreeform || !state.plannerActive || state.drawMode !== 'freeform') return;
+        const pt = map.mouseEventToLatLng(e);
+        const last = state.currentFreeformCoords[state.currentFreeformCoords.length - 1];
+        
+        // Add coordinate if distance moved is sufficient
+        if (!last || Math.hypot(last[0] - pt.lng, last[1] - pt.lat) > 0.0005) {
+          state.currentFreeformCoords.push([pt.lng, pt.lat]);
+          const latLngs = state.currentFreeformCoords.map(c => [c[1], c[0]]);
+          plannerDraftLine.setLatLngs(latLngs);
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (state.isDrawingFreeform) {
+          state.isDrawingFreeform = false;
+          map.dragging.enable();
+          finalizeFreeformPath();
+        }
+      });
+    }
+
+    function addPlannerWaypoint(latlng) {
+      state.waypoints.push({ lat: latlng.lat, lng: latlng.lng });
+      renderPlannerWaypoints();
+      recalculatePlannerRoute();
+    }
+
+    function renderPlannerWaypoints() {
+      plannerWptLayer.clearLayers();
+
+      state.waypoints.forEach((wpt, idx) => {
+        const isStart = idx === 0;
+        const isEnd = idx === state.waypoints.length - 1 && state.waypoints.length > 1;
+        
+        let markerClass = 'planner-wpt-pin';
+        let labelText = (idx + 1).toString();
+        if (isStart) {
+          markerClass += ' start';
+          labelText = 'A';
+        } else if (isEnd) {
+          markerClass += ' end';
+          labelText = 'B';
+        }
+
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="${markerClass}">${labelText}</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+
+        const marker = L.marker([wpt.lat, wpt.lng], { icon }).addTo(plannerWptLayer);
+        marker.bindTooltip(`Titik ${idx + 1}: ${wpt.lat.toFixed(4)}, ${wpt.lng.toFixed(4)}`, { direction: 'top', offset: [0, -12] });
+      });
+    }
+
+    async function recalculatePlannerRoute() {
+      if (state.waypoints.length === 0) {
+        state.plannerRouteCoords = [];
+        plannerDraftLine.setLatLngs([]);
+        updatePlannerStats();
+        return;
+      }
+
+      if (state.waypoints.length === 1) {
+        state.plannerRouteCoords = [{ lat: state.waypoints[0].lat, lng: state.waypoints[0].lng }];
+        plannerDraftLine.setLatLngs([]);
+        updatePlannerStats();
+        return;
+      }
+
+      // Route through OSRM public engine
+      showToast('⏳ Menghitung jalur rute...');
+      
+      const osrmProfile = (state.activity === 'sports') ? 'bike' : (state.activity === 'hiking' ? 'foot' : 'car');
+      const coordsQuery = state.waypoints.map(w => `${w.lng.toFixed(6)},${w.lat.toFixed(6)}`).join(';');
+      const url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${coordsQuery}?overview=full&geometries=geojson`;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error('OSRM status not OK');
+        const data = await response.json();
+
+        if (data.routes && data.routes.length > 0) {
+          const geoCoords = data.routes[0].geometry.coordinates;
+          state.plannerRouteCoords = geoCoords.map(c => ({ lng: c[0], lat: c[1] }));
+        } else {
+          fallbackInterpolateWaypoints();
+        }
+      } catch (err) {
+        // Fallback to straight-line interpolation if offline or OSRM unavailable
+        fallbackInterpolateWaypoints();
+      }
+
+      applyLoopToPlannerCoords();
+      updatePlannerStats();
+      showToast('✅ Rute berhasil diperbarui!');
+    }
+
+    function fallbackInterpolateWaypoints() {
+      const generated = [];
+      for (let i = 0; i < state.waypoints.length - 1; i++) {
+        const p1 = state.waypoints[i];
+        const p2 = state.waypoints[i + 1];
+        const line = turf.lineString([[p1.lng, p1.lat], [p2.lng, p2.lat]]);
+        const dist = turf.length(line, { units: 'kilometers' });
+        const steps = Math.max(4, Math.floor(dist * 8));
+
+        for (let s = 0; s < steps; s++) {
+          const pt = turf.along(line, dist * (s / steps), { units: 'kilometers' });
+          generated.push({ lng: pt.geometry.coordinates[0], lat: pt.geometry.coordinates[1] });
+        }
+      }
+      generated.push({ lng: state.waypoints[state.waypoints.length - 1].lng, lat: state.waypoints[state.waypoints.length - 1].lat });
+      state.plannerRouteCoords = generated;
+    }
+
+    function finalizeFreeformPath() {
+      if (state.currentFreeformCoords.length < 2) return;
+
+      // Simplify freeform path using Turf.js to reduce jitter
+      const line = turf.lineString(state.currentFreeformCoords);
+      const simplified = turf.simplify(line, { tolerance: 0.00015, highQuality: true });
+      
+      const newCoords = simplified.geometry.coordinates.map(c => ({ lng: c[0], lat: c[1] }));
+      state.plannerRouteCoords = state.plannerRouteCoords.concat(newCoords);
+
+      // Register start and end as waypoints for visual markers
+      if (newCoords.length > 0) {
+        state.waypoints.push({ lat: newCoords[0].lat, lng: newCoords[0].lng });
+        state.waypoints.push({ lat: newCoords[newCoords.length - 1].lat, lng: newCoords[newCoords.length - 1].lng });
+      }
+
+      renderPlannerWaypoints();
+      applyLoopToPlannerCoords();
+      updatePlannerStats();
+      showToast('✏️ Rute gambar bebas disimpan!');
+    }
+
+    function applyLoopToPlannerCoords() {
+      if (state.plannerRouteCoords.length < 2) {
+        plannerDraftLine.setLatLngs([]);
+        return;
+      }
+
+      let finalCoords = [...state.plannerRouteCoords];
+
+      if (state.loopMode === 'reversed') {
+        finalCoords.reverse();
+      } else if (state.loopMode === 'out-and-back') {
+        const back = [...state.plannerRouteCoords].reverse().slice(1);
+        finalCoords = finalCoords.concat(back);
+      } else if (state.loopMode === 'circular') {
+        const first = finalCoords[0];
+        const last = finalCoords[finalCoords.length - 1];
+        if (Math.hypot(first.lng - last.lng, first.lat - last.lat) > 0.0005) {
+          finalCoords.push({ lat: first.lat, lng: first.lng });
+        }
+      }
+
+      const latLngs = finalCoords.map(c => [c.lat, c.lng]);
+      plannerDraftLine.setLatLngs(latLngs);
+    }
+
+    function updatePlannerStats() {
+      const count = state.plannerRouteCoords.length;
+      document.getElementById('plannerPointsCount').innerText = `${count} titik`;
+
+      if (count < 2) {
+        document.getElementById('plannerDistEstimate').innerText = '0.0 km';
+        return;
+      }
+
+      const coords = state.plannerRouteCoords.map(c => [c.lng, c.lat]);
+      let multiplier = 1;
+      if (state.loopMode === 'out-and-back') multiplier = 2;
+      
+      const line = turf.lineString(coords);
+      const dist = (turf.length(line, { units: 'kilometers' }) * (state.loopMode === 'out-and-back' ? 2 : 1)).toFixed(1);
+      document.getElementById('plannerDistEstimate').innerText = `${dist} km`;
+    }
+
+    // ==========================================
+    // LABEL & POI ANNOTATION SYSTEM
+    // ==========================================
+
+    function addPlannerLabel(latlng) {
+      const customText = document.getElementById('customLabelInput').value.trim();
+      const preset = state.selectedLabelPreset;
+      const labelName = customText || preset.name;
+
+      const newLabel = {
+        id: 'lbl_' + Date.now(),
+        lat: latlng.lat,
+        lng: latlng.lng,
+        type: preset.type,
+        name: labelName,
+        icon: preset.icon
+      };
+
+      state.labels.push(newLabel);
+      renderPlannerLabels();
+      renderLabelBadgesList();
+      showToast(`🏷️ Label "${labelName}" ditambahkan!`);
+    }
+
+    function renderPlannerLabels() {
+      plannerLabelLayer.clearLayers();
+
+      state.labels.forEach(lbl => {
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="label-poi-pin" data-id="${lbl.id}"><span>${lbl.icon}</span><span>${lbl.name}</span></div>`,
+          iconSize: [100, 26],
+          iconAnchor: [50, 26]
+        });
+
+        const marker = L.marker([lbl.lat, lbl.lng], { icon }).addTo(plannerLabelLayer);
+        marker.bindPopup(`
+          <div class="text-xs space-y-1">
+            <div class="font-bold text-sand-900">${lbl.icon} ${lbl.name}</div>
+            <div class="text-[10px] text-sand-800/70">Koordinat: ${lbl.lat.toFixed(4)}, ${lbl.lng.toFixed(4)}</div>
+            <button onclick="removePlannerLabel('${lbl.id}')" class="mt-1 text-red-600 font-semibold hover:underline block text-[10px]">Hapus Label Ini</button>
+          </div>
+        `);
+      });
+
+      document.getElementById('plannerLabelsCount').innerText = `${state.labels.length} POI`;
+      document.getElementById('cardTotalLabels').innerText = `${state.labels.length} POI`;
+    }
+
+    window.removePlannerLabel = function(id) {
+      state.labels = state.labels.filter(l => l.id !== id);
+      renderPlannerLabels();
+      renderLabelBadgesList();
+      showToast('🗑️ Label dihapus');
+    };
+
+    function renderLabelBadgesList() {
+      const container = document.getElementById('labelsListContainer');
+      container.innerHTML = '';
+
+      state.labels.forEach(lbl => {
+        const pill = document.createElement('div');
+        pill.className = 'px-2 py-0.5 rounded-md bg-white border border-cream-300 text-[10px] font-medium text-sand-900 flex items-center space-x-1 shadow-xs';
+        pill.innerHTML = `
+          <span>${lbl.icon}</span>
+          <span class="truncate max-w-[80px]">${lbl.name}</span>
+          <button class="text-red-500 hover:text-red-700 font-bold ml-1" onclick="removePlannerLabel('${lbl.id}')">&times;</button>
+        `;
+        container.appendChild(pill);
+      });
+    }
+
+    // ==========================================
+    // PREVIEW & INJECTION TO VIZGIS ANIMATOR
+    // ==========================================
+
+    function applyPlannedRouteToVizGis() {
+      if (state.plannerRouteCoords.length < 2) {
+        showToast('⚠️ Buat rute minimal 2 titik terlebih dahulu!');
+        return;
+      }
+
+      pauseAnimation();
+
+      // Determine active transformed points according to loop settings
+      let baseCoords = [...state.plannerRouteCoords];
+      if (state.loopMode === 'reversed') {
+        baseCoords.reverse();
+      } else if (state.loopMode === 'out-and-back') {
+        baseCoords = baseCoords.concat([...state.plannerRouteCoords].reverse().slice(1));
+      } else if (state.loopMode === 'circular') {
+        const first = baseCoords[0];
+        const last = baseCoords[baseCoords.length - 1];
+        if (Math.hypot(first.lng - last.lng, first.lat - last.lat) > 0.0005) {
+          baseCoords.push({ lat: first.lat, lng: first.lng });
+        }
+      }
+
+      // Synthesize realistic timestamps based on chosen activity profile
+      let speedKmH = 60;
+      let modeStr = 'IN_PASSENGER_VEHICLE';
+      if (state.activity === 'traveling') {
+        speedKmH = 40;
+        modeStr = 'IN_PASSENGER_VEHICLE';
+      } else if (state.activity === 'sports') {
+        speedKmH = 18;
+        modeStr = 'ON_BICYCLE';
+      } else if (state.activity === 'hiking') {
+        speedKmH = 4.5;
+        modeStr = 'WALKING';
+      }
+
+      const startTime = new Date().getTime();
+      let accumulatedHours = 0;
+      const formattedPoints = [];
+
+      for (let i = 0; i < baseCoords.length; i++) {
+        if (i > 0) {
+          const ptA = turf.point([baseCoords[i - 1].lng, baseCoords[i - 1].lat]);
+          const ptB = turf.point([baseCoords[i].lng, baseCoords[i].lat]);
+          const segDistKm = turf.distance(ptA, ptB, { units: 'kilometers' });
+          accumulatedHours += (segDistKm / speedKmH);
+        }
+
+        const pointTime = new Date(startTime + (accumulatedHours * 3600 * 1000)).toISOString();
+        
+        let pointName = (i === 0) ? 'Titik Awal' : (i === baseCoords.length - 1 ? 'Titik Selesai' : `Rute Km ${(accumulatedHours * speedKmH).toFixed(1)}`);
+        
+        formattedPoints.push({
+          lat: baseCoords[i].lat,
+          lng: baseCoords[i].lng,
+          time: pointTime,
+          name: pointName,
+          mode: modeStr
+        });
+      }
+
+      const smoothed = generateSmoothPath(formattedPoints, 12);
+      state.rawPoints = smoothed;
+      state.filteredPoints = applyPrivacyMask(smoothed);
+      state.currentIndex = 0;
+
+      // Update Card Modal Info
+      document.getElementById('cardTripTitle').innerText = `Rute Rencana: ${state.activity.toUpperCase()}`;
+      document.getElementById('cardTotalDuration').innerText = `${state.activity}`;
+
+      calculateTotalDistance();
+      updateFullRouteLayer();
+      fitRouteBounds();
+      renderFrame(0);
+
+      // Switch to visualizer mode view
+      switchToVisualizerMode();
+      showToast('🚀 Rute berhasil diinjeksikan! Memulai visualisasi...', '✨');
+      setTimeout(() => startAnimation(), 400);
+    }
+
+    // ==========================================
+    // EXPORT TO GPX, JSON, & GOOGLE MAPS
+    // ==========================================
+
+    function exportToGPX() {
+      if (state.plannerRouteCoords.length < 2) {
+        showToast('⚠️ Belum ada rute untuk diekspor!');
+        return;
+      }
+
+      let gpxXml = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="VizGis" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Rencana Rute VizGis - ${state.activity}</name>
+    <time>${new Date().toISOString()}</time>
+  </metadata>
+`;
+
+      // 1. Export Waypoints (Labels & POIs)
+      state.labels.forEach(lbl => {
+        gpxXml += `  <wpt lat="${lbl.lat.toFixed(6)}" lon="${lbl.lng.toFixed(6)}">
+    <name><![CDATA[${lbl.name}]]></name>
+    <type>${lbl.type}</type>
+  </wpt>
+`;
+      });
+
+      // 2. Export Track Coordinates
+      gpxXml += `  <trk>
+    <name>Jalur Perjalanan (${state.loopMode})</name>
+    <trkseg>
+`;
+      const coordsToExport = (state.filteredPoints.length > 0) ? state.filteredPoints : state.plannerRouteCoords;
+      coordsToExport.forEach(c => {
+        const timeTag = c.time ? `\n        <time>${c.time}</time>` : '';
+        gpxXml += `      <trkpt lat="${c.lat.toFixed(6)}" lon="${c.lng.toFixed(6)}">${timeTag}
+      </trkpt>
+`;
+      });
+
+      gpxXml += `    </trkseg>
+  </trk>
+</gpx>`;
+
+      const blob = new Blob([gpxXml], { type: 'application/gpx+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vizgis_route_${state.activity}_${Date.now()}.gpx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('📥 Berkas GPX berhasil diunduh!');
+    }
+
+    function exportToJSON() {
+      if (state.plannerRouteCoords.length < 2 && state.filteredPoints.length < 2) {
+        showToast('⚠️ Belum ada rute untuk disimpan!');
+        return;
+      }
+
+      const dataToSave = {
+        app: "VizGis",
+        version: "2.0",
+        createdAt: new Date().toISOString(),
+        activity: state.activity,
+        loopMode: state.loopMode,
+        waypoints: state.waypoints,
+        labels: state.labels,
+        totalDistanceKm: state.totalDistanceKm,
+        routeCoordinates: state.plannerRouteCoords,
+        timelinePoints: state.filteredPoints
+      };
+
+      const jsonStr = JSON.stringify(dataToSave, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vizgis_route_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('📥 Berkas JSON berhasil disimpan!');
+    }
+
+    function openInGoogleMaps() {
+      if (state.waypoints.length < 2 && state.plannerRouteCoords.length < 2) {
+        showToast('⚠️ Rute memerlukan minimal titik awal dan akhir!');
+        return;
+      }
+
+      const pts = (state.waypoints.length >= 2) ? state.waypoints : [state.plannerRouteCoords[0], state.plannerRouteCoords[state.plannerRouteCoords.length - 1]];
+      const origin = `${pts[0].lat.toFixed(6)},${pts[0].lng.toFixed(6)}`;
+      const destination = `${pts[pts.length - 1].lat.toFixed(6)},${pts[pts.length - 1].lng.toFixed(6)}`;
+
+      let gmapsMode = 'driving';
+      if (state.activity === 'sports') gmapsMode = 'bicycling';
+      if (state.activity === 'hiking') gmapsMode = 'walking';
+
+      // Downsample interior waypoints to fit Google Maps URL limits (max 8 intermediate)
+      let waypointsParam = '';
+      if (pts.length > 2) {
+        const intermediate = pts.slice(1, pts.length - 1);
+        const sampled = intermediate.length > 8 ? intermediate.filter((_, i) => i % Math.ceil(intermediate.length / 8) === 0).slice(0, 8) : intermediate;
+        waypointsParam = '&waypoints=' + sampled.map(w => `${w.lat.toFixed(6)},${w.lng.toFixed(6)}`).join('|');
+      }
+
+      const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=${gmapsMode}`;
+      window.open(gmapsUrl, '_blank');
+      showToast('🗺️ Membuka navigasi rute di Google Maps...');
+    }
+
+    // ==========================================
+    // VIZGIS CORE VISUALIZER ENGINE
+    // ==========================================
+
+    function generateSmoothPath(rawPoints, densityMultiplier = 14) {
+      if (rawPoints.length < 2) return rawPoints;
+      
+      const smooth = [];
+      for (let i = 0; i < rawPoints.length - 1; i++) {
+        const p1 = rawPoints[i];
+        const p2 = rawPoints[i + 1];
+        
+        const line = turf.lineString([[p1.lng, p1.lat], [p2.lng, p2.lat]]);
+        const distance = turf.length(line, { units: 'kilometers' });
+        const steps = Math.max(5, Math.floor(distance * densityMultiplier));
+        
+        const t1 = new Date(p1.time).getTime();
+        const t2 = new Date(p2.time).getTime();
+        
+        for (let s = 0; s < steps; s++) {
+          const fraction = s / steps;
+          const interpolated = turf.along(line, distance * fraction, { units: 'kilometers' });
+          const interpolatedTime = new Date(t1 + (t2 - t1) * fraction).toISOString();
+          
+          smooth.push({
+            lng: interpolated.geometry.coordinates[0],
+            lat: interpolated.geometry.coordinates[1],
+            time: interpolatedTime,
+            name: fraction < 0.5 ? p1.name : p2.name,
+            mode: p1.mode || 'IN_PASSENGER_VEHICLE'
+          });
+        }
+      }
+      smooth.push(rawPoints[rawPoints.length - 1]);
+      return smooth;
+    }
+
+    function applyPrivacyMask(points) {
+      if (!state.privacyEnabled || points.length < 5) {
+        if (privacyCircle && map) map.removeLayer(privacyCircle);
+        return [...points];
+      }
+
+      const startPt = turf.point([points[0].lng, points[0].lat]);
+      const radiusKm = state.privacyRadiusMeters / 1000;
+
+      if (map) {
+        if (privacyCircle) map.removeLayer(privacyCircle);
+        privacyCircle = L.circle([points[0].lat, points[0].lng], {
+          radius: state.privacyRadiusMeters,
+          color: '#D6684B',
+          weight: 1,
+          fillColor: '#D6684B',
+          fillOpacity: 0.15,
+          dashArray: '4, 4'
+        }).addTo(map);
+      }
+
+      const masked = points.filter((p, idx) => {
+        const currentPt = turf.point([p.lng, p.lat]);
+        const distFromStart = turf.distance(startPt, currentPt, { units: 'kilometers' });
+        if (idx < points.length * 0.15 && distFromStart < radiusKm) {
+          return false;
+        }
+        return true;
+      });
+
+      return masked.length > 5 ? masked : points;
+    }
+
+    function calculateTotalDistance() {
+      if (state.filteredPoints.length < 2) {
+        state.totalDistanceKm = 0;
+        return;
+      }
+      const coords = state.filteredPoints.map(p => [p.lng, p.lat]);
+      const line = turf.lineString(coords);
+      state.totalDistanceKm = turf.length(line, { units: 'kilometers' });
+      document.getElementById('cardTotalDist').innerText = state.totalDistanceKm.toFixed(1) + ' km';
+      document.getElementById('cardTotalPoints').innerText = state.filteredPoints.length + ' pts';
+    }
+
+    function updateFullRouteLayer() {
+      const latLngs = state.filteredPoints.map(p => [p.lat, p.lng]);
+      if (fullRouteLine) fullRouteLine.setLatLngs(latLngs);
+    }
+
+    function fitRouteBounds() {
+      if (!map || state.filteredPoints.length < 2) return;
+      const latLngs = state.filteredPoints.map(p => [p.lat, p.lng]);
+      map.fitBounds(latLngs, { padding: [50, 50], maxZoom: 15, animate: true, duration: 1.2 });
+    }
+
+    function renderFrame(index) {
+      if (!state.filteredPoints || state.filteredPoints.length === 0) return;
+      
+      const safeIndex = Math.min(Math.max(0, Math.floor(index)), state.filteredPoints.length - 1);
+      const currentPt = state.filteredPoints[safeIndex];
+
+      // 1. Marker Position
+      if (pulseMarker) pulseMarker.setLatLng([currentPt.lat, currentPt.lng]);
+
+      // 2. Active Trail Lines
+      const trailLatLngs = state.filteredPoints.slice(0, safeIndex + 1).map(p => [p.lat, p.lng]);
+      if (trailGlowLine && trailCoreLine) {
+        trailGlowLine.setLatLngs(trailLatLngs);
+        trailCoreLine.setLatLngs(trailLatLngs);
+      }
+
+      // 3. Camera Follow
+      if (state.cameraMode === 'follow' && map) {
+        map.panTo([currentPt.lat, currentPt.lng], { animate: false });
+      }
+
+      // 4. Update HUD Widget & Check Nearby Labels
+      updateHUD(currentPt, safeIndex);
+
+      // 5. Timeline Scrubber Slider
+      const progressRatio = safeIndex / (state.filteredPoints.length - 1);
+      document.getElementById('timelineSlider').value = Math.floor(progressRatio * 1000);
+      document.getElementById('timeStartLabel').innerText = Math.round(progressRatio * 100) + '%';
+    }
+
+    function updateHUD(point, index) {
+      const dateObj = new Date(point.time);
+      
+      const hours = String(dateObj.getHours()).padStart(2, '0');
+      const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+      const seconds = String(dateObj.getSeconds()).padStart(2, '0');
+      document.getElementById('hudTime').innerHTML = `${hours}:${minutes}:${seconds} <span class="text-xs font-sans font-normal text-sand-800/60">WIB</span>`;
+
+      const options = { day: 'numeric', month: 'short', year: 'numeric' };
+      document.getElementById('hudDateBadge').innerText = dateObj.toLocaleDateString('id-ID', options);
+      document.getElementById('hudLocationName').innerText = point.name || `Koordinat: ${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`;
+
+      const progress = index / (state.filteredPoints.length - 1);
+      const coveredKm = (state.totalDistanceKm * progress).toFixed(1);
+      document.getElementById('hudDistance').innerText = `${coveredKm} km`;
+
+      let speedVal = 60;
+      let icon = '🚗';
+      let modeText = 'Berkendara';
+      
+      if (point.mode === 'WALKING') {
+        speedVal = 4;
+        icon = '🥾';
+        modeText = 'Pendakian';
+      } else if (point.mode === 'ON_BICYCLE') {
+        speedVal = 18;
+        icon = '🚴';
+        modeText = 'Olahraga';
+      } else if (point.mode === 'IN_FERRY') {
+        speedVal = 25;
+        icon = '⛴️';
+        modeText = 'Kapal Feri';
+      } else {
+        speedVal = 55 + Math.floor(Math.sin(index * 0.1) * 15);
+      }
+
+      document.getElementById('hudSpeed').innerText = `${speedVal} km/jam`;
+      document.getElementById('hudActivityIcon').innerText = icon;
+      document.getElementById('hudActivityText').innerText = modeText;
+
+      // Check proximity to any placed Labels/POIs (< 150 meters)
+      checkNearbyLabelPOI(point);
+    }
+
+    function checkNearbyLabelPOI(point) {
+      const poiBadge = document.getElementById('hudPoiBadge');
+      if (state.labels.length === 0) {
+        poiBadge.classList.add('hidden');
+        return;
+      }
+
+      const currPt = turf.point([point.lng, point.lat]);
+      let nearestLabel = null;
+      let minDistanceKm = Infinity;
+
+      for (const lbl of state.labels) {
+        const lblPt = turf.point([lbl.lng, lbl.lat]);
+        const distKm = turf.distance(currPt, lblPt, { units: 'kilometers' });
+        if (distKm < minDistanceKm) {
+          minDistanceKm = distKm;
+          nearestLabel = lbl;
+        }
+      }
+
+      // If within 200 meters, show in HUD
+      if (nearestLabel && minDistanceKm < 0.2) {
+        poiBadge.classList.remove('hidden');
+        document.getElementById('hudPoiIcon').innerText = nearestLabel.icon;
+        document.getElementById('hudPoiName').innerText = `${nearestLabel.name} (${Math.round(minDistanceKm * 1000)}m)`;
+      } else {
+        poiBadge.classList.add('hidden');
+      }
+    }
+
+    function loadDemoJourney() {
+      const smoothed = generateSmoothPath(DEMO_COORDINATES, 18);
+      state.rawPoints = smoothed;
+      state.filteredPoints = applyPrivacyMask(smoothed);
+      state.currentIndex = 0;
+
+      // Add a couple of demo labels
+      state.labels = [
+        { id: 'lbl_d1', lat: -6.7063, lng: 108.5570, type: 'rest_area', name: 'Rest Area Cirebon', icon: '☕' },
+        { id: 'lbl_d2', lat: -7.7956, lng: 110.3695, type: 'transit', name: 'Transit Malioboro', icon: '🚏' },
+        { id: 'lbl_d3', lat: -8.1331, lng: 114.3986, type: 'warning', name: 'Antrean Dermaga Feri', icon: '⚠️' }
+      ];
+      renderPlannerLabels();
+      renderLabelBadgesList();
+      
+      calculateTotalDistance();
+      updateFullRouteLayer();
+      fitRouteBounds();
+      renderFrame(0);
+      showToast('✨ Memuat Trip Demo: Jakarta ke Bali (1,180 km)');
+    }
+
+    function animationLoop() {
+      if (!state.isPlaying) return;
+
+      state.currentIndex += (state.speed * 0.12);
+      
+      if (state.currentIndex >= state.filteredPoints.length - 1) {
+        state.currentIndex = state.filteredPoints.length - 1;
+        renderFrame(state.currentIndex);
+        pauseAnimation();
+        showToast('🏁 Perjalanan selesai!');
+        if (state.isRecording) stopRecording();
+        return;
+      }
+
+      renderFrame(state.currentIndex);
+      animFrameId = requestAnimationFrame(animationLoop);
+    }
+
+    function startAnimation() {
+      if (state.currentIndex >= state.filteredPoints.length - 1) {
+        state.currentIndex = 0;
+      }
+      state.isPlaying = true;
+      document.getElementById('playIcon').classList.add('hidden');
+      document.getElementById('pauseIcon').classList.remove('hidden');
+      document.getElementById('playLabel').innerText = 'Jeda';
+      animFrameId = requestAnimationFrame(animationLoop);
+    }
+
+    function pauseAnimation() {
+      state.isPlaying = false;
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      document.getElementById('playIcon').classList.remove('hidden');
+      document.getElementById('pauseIcon').classList.add('hidden');
+      document.getElementById('playLabel').innerText = 'Putar';
+    }
+
+    // GPX & JSON File Parser
+    function parseUploadedFile(fileContent, fileName) {
+      try {
+        if (fileName.endsWith('.gpx') || fileContent.trim().startsWith('<?xml') || fileContent.includes('<gpx')) {
+          parseGPXContent(fileContent);
+        } else {
+          parseTimelineJSON(JSON.parse(fileContent));
+        }
+      } catch (err) {
+        showToast('⚠️ Gagal membaca berkas: ' + err.message);
+      }
+    }
+
+    function parseGPXContent(xmlText) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+      const trkpts = xmlDoc.getElementsByTagName('trkpt');
+      const extracted = [];
+
+      for (let i = 0; i < trkpts.length; i++) {
+        const pt = trkpts[i];
+        const lat = parseFloat(pt.getAttribute('lat'));
+        const lng = parseFloat(pt.getAttribute('lon'));
+        const timeNode = pt.getElementsByTagName('time')[0];
+        const time = timeNode ? timeNode.textContent : new Date().toISOString();
+        if (!isNaN(lat) && !isNaN(lng)) {
+          extracted.push({ lat, lng, time, name: `Titik GPX ${i + 1}`, mode: 'IN_PASSENGER_VEHICLE' });
+        }
+      }
+
+      // Parse Waypoints as Labels
+      const wpts = xmlDoc.getElementsByTagName('wpt');
+      const parsedLabels = [];
+      for (let i = 0; i < wpts.length; i++) {
+        const w = wpts[i];
+        const lat = parseFloat(w.getAttribute('lat'));
+        const lng = parseFloat(w.getAttribute('lon'));
+        const nameNode = w.getElementsByTagName('name')[0];
+        const name = nameNode ? nameNode.textContent : `Waypoint ${i + 1}`;
+        parsedLabels.push({
+          id: 'gpx_lbl_' + i,
+          lat,
+          lng,
+          type: 'transit',
+          name,
+          icon: '📍'
+        });
+      }
+
+      if (extracted.length < 2) throw new Error('Titik koordinat GPX tidak mencukupi.');
+
+      state.labels = parsedLabels;
+      renderPlannerLabels();
+      renderLabelBadgesList();
+
+      const smoothed = generateSmoothPath(extracted, 12);
+      state.rawPoints = smoothed;
+      state.filteredPoints = applyPrivacyMask(smoothed);
+      state.currentIndex = 0;
+
+      calculateTotalDistance();
+      updateFullRouteLayer();
+      fitRouteBounds();
+      renderFrame(0);
+      showToast(`🎉 Sukses memuat GPX: ${extracted.length} titik & ${parsedLabels.length} POI!`);
+    }
+
+    function parseTimelineJSON(jsonContent) {
+      let extractedPoints = [];
+
+      // Check if file is exported from VizGis
+      if (jsonContent.app === 'VizGis' && jsonContent.routeCoordinates) {
+        state.plannerRouteCoords = jsonContent.routeCoordinates || [];
+        state.waypoints = jsonContent.waypoints || [];
+        state.labels = jsonContent.labels || [];
+        state.activity = jsonContent.activity || 'driving';
+        state.loopMode = jsonContent.loopMode || 'one-way';
+
+        renderPlannerWaypoints();
+        renderPlannerLabels();
+        renderLabelBadgesList();
+        applyLoopToPlannerCoords();
+        updatePlannerStats();
+        applyPlannedRouteToVizGis();
+        return;
+      }
+
+      // Schema 1: Google Semantic Location Timeline
+      if (jsonContent.timelineObjects && Array.isArray(jsonContent.timelineObjects)) {
+        for (const item of jsonContent.timelineObjects) {
+          if (item.placeVisit && item.placeVisit.location) {
+            const loc = item.placeVisit.location;
+            const lat = loc.latitudeE7 ? loc.latitudeE7 / 1e7 : loc.latitude;
+            const lng = loc.longitudeE7 ? loc.longitudeE7 / 1e7 : loc.longitude;
+            const time = item.placeVisit.duration?.startTimestamp || new Date().toISOString();
+            if (lat && lng) extractedPoints.push({ lat, lng, time, name: loc.name || 'Tempat', mode: 'WALKING' });
+          }
+          if (item.activitySegment) {
+            const seg = item.activitySegment;
+            const mode = seg.activityType || 'IN_PASSENGER_VEHICLE';
+            if (seg.simplifiedRawPath && Array.isArray(seg.simplifiedRawPath.points)) {
+              for (const p of seg.simplifiedRawPath.points) {
+                const lat = p.latE7 ? p.latE7 / 1e7 : p.latitudeE7 / 1e7;
+                const lng = p.lngE7 ? p.lngE7 / 1e7 : p.longitudeE7 / 1e7;
+                const time = p.timestamp || seg.duration?.startTimestamp || new Date().toISOString();
+                if (lat && lng) extractedPoints.push({ lat, lng, time, name: 'Perjalanan', mode });
+              }
+            }
+          }
+        }
+      } 
+      // Schema 2: Raw Google Takeout Records
+      else if (jsonContent.locations && Array.isArray(jsonContent.locations)) {
+        for (const loc of jsonContent.locations) {
+          const lat = loc.latitudeE7 ? loc.latitudeE7 / 1e7 : loc.latitude;
+          const lng = loc.longitudeE7 ? loc.longitudeE7 / 1e7 : loc.longitude;
+          const time = loc.timestamp || new Date().toISOString();
+          if (lat && lng) extractedPoints.push({ lat, lng, time, name: 'GPS Record', mode: 'IN_PASSENGER_VEHICLE' });
+        }
+        extractedPoints.sort((a, b) => new Date(a.time) - new Date(b.time));
+      }
+
+      if (extractedPoints.length < 2) throw new Error('Tidak ditemukan titik rute yang valid di JSON.');
+
+      if (extractedPoints.length > 1200) {
+        const step = Math.ceil(extractedPoints.length / 1200);
+        extractedPoints = extractedPoints.filter((_, i) => i % step === 0);
+      }
+
+      const smoothed = generateSmoothPath(extractedPoints, 12);
+      state.rawPoints = smoothed;
+      state.filteredPoints = applyPrivacyMask(smoothed);
+      state.currentIndex = 0;
+
+      calculateTotalDistance();
+      updateFullRouteLayer();
+      fitRouteBounds();
+      renderFrame(0);
+      showToast(`🎉 Sukses memuat ${state.filteredPoints.length} titik riwayat!`);
+    }
+
+    function switchToPlannerMode() {
+      state.plannerActive = true;
+      document.getElementById('tabPlanner').classList.add('bg-white', 'text-sand-900', 'shadow-sm');
+      document.getElementById('tabPlanner').classList.remove('text-sand-800');
+      document.getElementById('tabVisualizer').classList.remove('bg-white', 'text-sand-900', 'shadow-sm');
+      document.getElementById('tabVisualizer').classList.add('text-sand-800');
+
+      document.getElementById('plannerDock').classList.remove('hidden');
+      updateCursorMode();
+      showToast('🗺️ Mode Pembuat Rute aktif! Klik di peta untuk membuat jalur.');
+    }
+
+    function switchToVisualizerMode() {
+      state.plannerActive = false;
+      document.getElementById('tabVisualizer').classList.add('bg-white', 'text-sand-900', 'shadow-sm');
+      document.getElementById('tabVisualizer').classList.remove('text-sand-800');
+      document.getElementById('tabPlanner').classList.remove('bg-white', 'text-sand-900', 'shadow-sm');
+      document.getElementById('tabPlanner').classList.add('text-sand-800');
+
+      document.getElementById('plannerDock').classList.add('hidden');
+      document.getElementById('map').classList.remove('cursor-draw', 'cursor-label');
+    }
+
+    function updateCursorMode() {
+      const mapElem = document.getElementById('map');
+      mapElem.classList.remove('cursor-draw', 'cursor-label');
+
+      if (!state.plannerActive) return;
+      if (state.drawMode === 'point' || state.drawMode === 'freeform') {
+        mapElem.classList.add('cursor-draw');
+      } else if (state.drawMode === 'label') {
+        mapElem.classList.add('cursor-label');
+      }
+    }
+
+    function startRecording() {
+      showToast('🔴 Menyiapkan rekaman...');
+      state.isRecording = true;
+      document.getElementById('recDot').classList.add('animate-ping');
+      document.getElementById('recText').innerText = 'Merekam...';
+      state.currentIndex = 0;
+      startAnimation();
+    }
+
+    function stopRecording() {
+      state.isRecording = false;
+      document.getElementById('recDot').classList.remove('animate-ping');
+      document.getElementById('recText').innerText = 'Rekam';
+      showToast('🎬 Animasi selesai direkam!');
+    }
+
+    function showToast(msg, icon = '💡') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').innerText = msg;
+      document.getElementById('toastIcon').innerText = icon;
+      toast.classList.remove('opacity-0', 'translate-y-2');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-2');
+      }, 3500);
+    }
+
+    // ==========================================
+    // INITIALIZATION & DOM EVENT BINDINGS
+    // ==========================================
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+
+      // Top Tab Navigation Switches
+      document.getElementById('tabVisualizer').addEventListener('click', switchToVisualizerMode);
+      document.getElementById('tabPlanner').addEventListener('click', switchToPlannerMode);
+      document.getElementById('btnClosePlanner').addEventListener('click', switchToVisualizerMode);
+
+      // Playback Controls
+      document.getElementById('btnPlayPause').addEventListener('click', () => {
+        if (state.isPlaying) pauseAnimation();
+        else startAnimation();
+      });
+
+      document.getElementById('timelineSlider').addEventListener('input', (e) => {
+        pauseAnimation();
+        const ratio = e.target.value / 1000;
+        state.currentIndex = ratio * (state.filteredPoints.length - 1);
+        renderFrame(state.currentIndex);
+      });
+
+      document.getElementById('btnPrevPoint').addEventListener('click', () => {
+        pauseAnimation();
+        state.currentIndex = Math.max(0, state.currentIndex - (state.filteredPoints.length * 0.05));
+        renderFrame(state.currentIndex);
+      });
+
+      document.getElementById('btnNextPoint').addEventListener('click', () => {
+        pauseAnimation();
+        state.currentIndex = Math.min(state.filteredPoints.length - 1, state.currentIndex + (state.filteredPoints.length * 0.05));
+        renderFrame(state.currentIndex);
+      });
+
+      // Speed Buttons
+      document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.speed-btn').forEach(b => {
+            b.classList.remove('active', 'bg-white', 'text-terracotta-600', 'shadow-sm', 'font-bold');
+            b.classList.add('text-sand-800');
+          });
+          btn.classList.add('active', 'bg-white', 'text-terracotta-600', 'shadow-sm', 'font-bold');
+          btn.classList.remove('text-sand-800');
+          state.speed = parseInt(btn.dataset.speed);
+        });
+      });
+
+      // Camera Presets
+      document.getElementById('btnCamFollow').addEventListener('click', function() {
+        state.cameraMode = 'follow';
+        document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('bg-cream-200', 'text-terracotta-500'));
+        this.classList.add('bg-cream-200', 'text-terracotta-500');
+        document.getElementById('map').classList.add('perspective-map');
+        if (state.filteredPoints.length > 0) {
+          const pt = state.filteredPoints[Math.floor(state.currentIndex)] || state.filteredPoints[0];
+          map.setView([pt.lat, pt.lng], 14, { animate: true });
+        }
+      });
+
+      document.getElementById('btnCam2D').addEventListener('click', function() {
+        state.cameraMode = '2d';
+        document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('bg-cream-200', 'text-terracotta-500'));
+        this.classList.add('bg-cream-200', 'text-terracotta-500');
+        document.getElementById('map').classList.remove('perspective-map');
+      });
+
+      document.getElementById('btnCamReset').addEventListener('click', () => fitRouteBounds());
+
+      // Aspect Ratio Controls
+      document.querySelectorAll('.ratio-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('bg-cream-200', 'active'));
+          btn.classList.add('bg-cream-200', 'active');
+          
+          const ratio = btn.dataset.ratio;
+          const wrapper = document.getElementById('mapWrapper');
+          wrapper.className = 'relative transition-all duration-300 ease-in-out overflow-hidden';
+
+          if (ratio === '9-16') wrapper.classList.add('ratio-frame-9-16');
+          else if (ratio === '1-1') wrapper.classList.add('ratio-frame-1-1');
+          else wrapper.classList.add('w-full', 'h-full', 'sm:rounded-2xl');
+
+          [50, 150, 320, 500].forEach(delay => {
+            setTimeout(() => {
+              if (map) {
+                map.invalidateSize({ animate: false });
+                if (state.filteredPoints.length > 0) {
+                  const pt = state.filteredPoints[Math.floor(state.currentIndex)] || state.filteredPoints[0];
+                  if (state.cameraMode === 'follow') map.panTo([pt.lat, pt.lng], { animate: false });
+                }
+              }
+            }, delay);
+          });
+        });
+      });
+
+      // Planner Activity Selection
+      document.querySelectorAll('.activity-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.activity-btn').forEach(b => {
+            b.classList.remove('active', 'bg-white', 'text-sand-900');
+            b.classList.add('bg-cream-50', 'text-sand-800');
+          });
+          btn.classList.add('active', 'bg-white', 'text-sand-900');
+          btn.classList.remove('bg-cream-50', 'text-sand-800');
+          state.activity = btn.dataset.activity;
+          recalculatePlannerRoute();
+        });
+      });
+
+      // Planner Draw Mode Selection
+      document.getElementById('btnDrawModePoint').addEventListener('click', () => {
+        setDrawMode('point');
+      });
+      document.getElementById('btnDrawModeFree').addEventListener('click', () => {
+        setDrawMode('freeform');
+      });
+      document.getElementById('btnDrawModeLabel').addEventListener('click', () => {
+        setDrawMode('label');
+      });
+
+      function setDrawMode(mode) {
+        state.drawMode = mode;
+        document.querySelectorAll('.draw-mode-btn').forEach(b => {
+          b.classList.remove('active', 'bg-white', 'text-terracotta-600', 'shadow-sm');
+          b.classList.add('bg-cream-50', 'text-sand-800');
+        });
+        
+        let targetBtn = document.getElementById('btnDrawModePoint');
+        if (mode === 'freeform') targetBtn = document.getElementById('btnDrawModeFree');
+        if (mode === 'label') targetBtn = document.getElementById('btnDrawModeLabel');
+        
+        targetBtn.classList.add('active', 'bg-white', 'text-terracotta-600', 'shadow-sm');
+        targetBtn.classList.remove('bg-cream-50', 'text-sand-800');
+        updateCursorMode();
+
+        if (mode === 'freeform') {
+          showToast('✏️ Tahan & seret kursor pada peta untuk menggambar garis!');
+        } else if (mode === 'point') {
+          showToast('📍 Klik peta untuk meletakkan titik jalan');
+        } else if (mode === 'label') {
+          showToast('🏷️ Klik lokasi di peta untuk menaruh label POI');
+        }
+      }
+
+      // Label Preset Selection
+      document.querySelectorAll('.label-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.label-preset-btn').forEach(b => {
+            b.classList.remove('active', 'bg-white', 'font-bold');
+            b.classList.add('bg-cream-50');
+          });
+          btn.classList.add('active', 'bg-white', 'font-bold');
+          btn.classList.remove('bg-cream-50');
+
+          state.selectedLabelPreset = {
+            type: btn.dataset.labelType,
+            name: btn.dataset.labelName,
+            icon: btn.dataset.icon
+          };
+          setDrawMode('label');
+        });
+      });
+
+      // Loop Configuration
+      document.querySelectorAll('.loop-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.loop-btn').forEach(b => {
+            b.classList.remove('active', 'bg-white', 'text-sand-900', 'shadow-sm');
+            b.classList.add('bg-cream-50', 'text-sand-800');
+          });
+          btn.classList.add('active', 'bg-white', 'text-sand-900', 'shadow-sm');
+          btn.classList.remove('bg-cream-50', 'text-sand-800');
+          state.loopMode = btn.dataset.loop;
+          applyLoopToPlannerCoords();
+          updatePlannerStats();
+          showToast(`🔁 Loop diatur: ${btn.querySelector('span').innerText}`);
+        });
+      });
+
+      // Planner Actions: Undo & Clear
+      document.getElementById('btnPlannerUndo').addEventListener('click', () => {
+        if (state.waypoints.length > 0) {
+          state.waypoints.pop();
+          renderPlannerWaypoints();
+          recalculatePlannerRoute();
+          showToast('↩️ Titik terakhir dibatalkan');
+        }
+      });
+
+      document.getElementById('btnPlannerClear').addEventListener('click', () => {
+        state.waypoints = [];
+        state.plannerRouteCoords = [];
+        plannerDraftLine.setLatLngs([]);
+        plannerWptLayer.clearLayers();
+        updatePlannerStats();
+        showToast('🧹 Rute dibersihkan');
+      });
+
+      // Apply & Preview in VizGis
+      document.getElementById('btnPlannerPreview').addEventListener('click', applyPlannedRouteToVizGis);
+
+      // Export Buttons
+      document.getElementById('btnExportGPX').addEventListener('click', exportToGPX);
+      document.getElementById('btnExportJSON').addEventListener('click', exportToJSON);
+      document.getElementById('btnOpenGMaps').addEventListener('click', openInGoogleMaps);
+
+      // Upload GPX or JSON File
+      document.getElementById('fileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        pauseAnimation();
+        const reader = new FileReader();
+        reader.onload = (event) => parseUploadedFile(event.target.result, file.name.toLowerCase());
+        reader.readAsText(file);
+      });
+
+      // Load Demo Button
+      document.getElementById('btnLoadDemo').addEventListener('click', () => {
+        pauseAnimation();
+        loadDemoJourney();
+      });
+
+      // Record Button
+      document.getElementById('btnRecord').addEventListener('click', () => {
+        if (state.isRecording) stopRecording();
+        else startRecording();
+      });
+
+      // Map Style Selector
+      document.getElementById('mapStyleSelect').addEventListener('change', (e) => {
+        setTileLayer(e.target.value);
+        showToast(`🗺️ Tema peta: ${e.target.options[e.target.selectedIndex].text}`);
+      });
+
+      // Privacy Modal
+      document.getElementById('btnOpenPrivacy').addEventListener('click', () => {
+        document.getElementById('privacyModal').classList.remove('hidden');
+      });
+      document.getElementById('btnClosePrivacy').addEventListener('click', () => {
+        document.getElementById('privacyModal').classList.add('hidden');
+      });
+      document.getElementById('privacyRadiusInput').addEventListener('input', (e) => {
+        document.getElementById('privacyRadiusLabel').innerText = `${e.target.value} meter`;
+        state.privacyRadiusMeters = parseInt(e.target.value);
+      });
+      document.getElementById('privacyToggle').addEventListener('change', (e) => {
+        state.privacyEnabled = e.target.checked;
+        document.getElementById('privacyStatusText').innerText = e.target.checked ? 'Aktif (Radius Awal Disamarkan)' : 'Nonaktif';
+      });
+      document.getElementById('btnApplyPrivacy').addEventListener('click', () => {
+        state.filteredPoints = applyPrivacyMask(state.rawPoints);
+        calculateTotalDistance();
+        updateFullRouteLayer();
+        renderFrame(0);
+        document.getElementById('privacyModal').classList.add('hidden');
+        showToast('🛡️ Zona privasi diperbarui!');
+      });
+
+      // Stats Modal & Card PNG Download
+      document.getElementById('btnOpenStats').addEventListener('click', () => {
+        document.getElementById('statsModal').classList.remove('hidden');
+      });
+      document.getElementById('btnCloseStats').addEventListener('click', () => {
+        document.getElementById('statsModal').classList.add('hidden');
+      });
+      document.getElementById('btnDownloadCard').addEventListener('click', () => {
+        const cardElem = document.getElementById('travelCard');
+        html2canvas(cardElem, { scale: 2 }).then(canvas => {
+          const imgUrl = canvas.toDataURL('image/png');
+          const a = document.createElement('a');
+          a.href = imgUrl;
+          a.download = `vizgis_summary_${Date.now()}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          showToast('🖼️ Kartu ringkasan disimpan!');
+        });
+      });
+    });
+  </script>
+</body>
+</html>

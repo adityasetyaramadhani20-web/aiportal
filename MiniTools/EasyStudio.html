@@ -1,0 +1,1942 @@
+<!DOCTYPE html>
+<html lang="id">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>EasyStudio</title>
+		
+		<!-- Tailwind CSS -->
+		<script src="https://cdn.tailwindcss.com"></script>
+		
+		<!-- Phosphor Icons -->
+		<script src="https://unpkg.com/@phosphor-icons/web"></script>
+		
+		<!-- html2canvas for capturing DOM -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+		
+		<!-- QRious for generating QR Codes -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+		
+		<!-- Prism.js for Code Highlighting -->
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-html.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+		
+		<style>
+			/* Custom Styles */
+			.checkered-bg {
+            background-color: #f0f0f0;
+            background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), 
+			linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+			linear-gradient(45deg, transparent 75%, #ccc 75%), 
+			linear-gradient(-45deg, transparent 75%, #ccc 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+			}
+			
+            .tool-section { display: none; }
+            .tool-section.active { 
+                display: flex; 
+                flex-direction: column; 
+                height: 100%; 
+                overflow-y: auto; 
+            }
+			
+			/* Smooth transitions */
+			.tab-btn { transition: all 0.2s ease; }
+			.tab-btn.active {
+            background-color: #EFF6FF; /* blue-50 */
+            color: #2563EB; /* blue-600 */
+            border-right: 4px solid #2563EB;
+			}
+			
+			/* Hide scrollbar for canvas containers */
+			.hide-scroll::-webkit-scrollbar { display: none; }
+			.hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+			
+			/* Glassmorphism for Info Card */
+			.glass-card {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+			}
+			/* TICKET PERFORATION EFFECT */
+			.ticket-divider {
+            position: relative;
+			}
+			.ticket-divider::before, .ticket-divider::after {
+            content: '';
+            position: absolute;
+            left: -10px;
+            width: 20px;
+            height: 20px;
+            background-color: #f9fafb; /* match gray-50 of main bg */
+            border-radius: 50%;
+            z-index: 10;
+			}
+			.ticket-divider::before { top: -10px; }
+			.ticket-divider::after { bottom: -10px; }
+			
+			/* TIER LIST STYLES */
+			.tier-row {
+            display: flex;
+            align-items: stretch;
+            min-height: 80px;
+            border-bottom: 1px solid #374151; /* gray-700 */
+            background-color: #1f2937; /* gray-800 */
+			}
+			.tier-row:last-child { border-bottom: none; }
+			
+			.tier-label {
+			width: 100px;
+			min-width: 100px;
+			max-width: 100px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 10px;
+			text-align: center;
+			font-weight: bold;
+			color: #000;
+			word-break: break-all;
+			cursor: pointer;
+			outline: none;
+			overflow: hidden;
+			}
+			
+			.tier-dropzone {
+            flex-grow: 1;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: center;
+            padding: 8px;
+            gap: 8px;
+            background-color: #111827; /* gray-900 */
+			}
+			
+			.tier-item {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            cursor: grab;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            background-color: #fff;
+			}
+			.tier-item:active { cursor: grabbing; }
+			
+			#item-bank {
+            min-height: 120px;
+            background-color: #374151;
+            border: 2px dashed #6b7280;
+			}
+
+            /* Utilities for Low Image & Text effects (Mockup purposes) */
+            .pixelated { image-rendering: pixelated; }
+		</style>
+	</head>
+	<body class="bg-gray-100 text-gray-800 font-sans h-screen flex overflow-hidden">
+		
+		<!-- Sidebar -->
+		<aside class="w-64 bg-white border-r border-gray-200 flex flex-col z-20 shadow-sm shrink-0 overflow-y-auto">
+			<div class="p-6">
+				<h1 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+					<i class="ph-fill ph-palette text-blue-600 text-2xl"></i>
+					EasyStudio
+				</h1>
+			</div>
+			
+			<nav class="flex-1 mt-2">
+				<ul class="space-y-1">
+					<li><button onclick="switchTab('card')" id="tab-card" class="tab-btn active w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-envelope-simple text-xl"></i> Kartu Ucapan</button></li>
+					<li><button onclick="switchTab('infocard')" id="tab-infocard" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-credit-card text-xl"></i> Kartu Info</button></li>
+					<li><button onclick="switchTab('idcard')" id="tab-idcard" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-identification-badge text-xl"></i> Kartu Pegawai</button></li>
+					<li><button onclick="switchTab('icon')" id="tab-icon" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-app-window text-xl"></i> Generator Ikon</button></li>
+					<li><button onclick="switchTab('twibbon')" id="tab-twibbon" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-bounding-box text-xl"></i> Twibbon</button></li>
+					<li><button onclick="switchTab('watermark')" id="tab-watermark" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-drop text-xl"></i> Watermark</button></li>
+					<li><button onclick="switchTab('code')" id="tab-code" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-code text-xl"></i> Code Snippet</button></li>
+					<li><button onclick="switchTab('mockup')" id="tab-mockup" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-device-mobile text-xl"></i> Mockup Perangkat</button></li>
+					<li><button onclick="switchTab('ticket')" id="tab-ticket" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-ticket text-xl"></i> Tiket Event</button></li>
+					<li><button onclick="switchTab('ornament')" id="tab-ornament" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-shapes text-xl"></i> Ornamen Geometris</button></li>
+					<li><button onclick="switchTab('gradient')" id="tab-gradient" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-swatches text-xl"></i> Gradien Kustom</button></li>
+					<li><button onclick="switchTab('tierlist')" id="tab-tierlist" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-list-numbers text-xl"></i> Tier List Maker</button></li>
+                    
+                    <!-- NEW FEATURES -->
+                    <li><button onclick="switchTab('lowimage')" id="tab-lowimage" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-image-broken text-xl"></i> Low Image</button></li>
+                    <li><button onclick="switchTab('lowtext')" id="tab-lowtext" class="tab-btn w-full flex items-center gap-3 px-6 py-3 text-left font-medium text-gray-600 hover:bg-gray-50"><i class="ph ph-text-align-justify text-xl"></i> Low Text</button></li>
+				</ul>
+			</nav>
+			
+			<div class="p-4 border-t border-gray-200 text-center text-xs text-gray-400">
+				Dibuat untuk kebutuhan desain cepat Anda.
+			</div>
+		</aside>
+		
+		<!-- Main Content -->
+		<main class="flex-1 h-full overflow-hidden bg-gray-50">
+			
+			<!-- ==================== 1. TOOL: KARTU UCAPAN ==================== -->
+			<section id="view-card" class="tool-section active p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Desain Kartu Ucapan</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+						<div class="space-y-4">
+							<div>
+								<label class="block text-sm font-medium mb-1">Judul Kartu</label>
+								<input type="text" id="card-title" value="Kutipan Hari Ini" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateCard()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Isi Pesan</label>
+								<textarea id="card-desc" rows="4" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateCard()">Belajarlah seolah-olah kamu akan hidup selamanya, hiduplah seolah-olah kamu akan mati besok. - Mahatma Gandhi</textarea>
+							</div>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<label class="block text-sm font-medium mb-1">Warna Latar</label>
+									<input type="color" id="card-bg" value="#ffffff" class="w-full h-10 rounded cursor-pointer" oninput="updateCard()">
+								</div>
+								<div>
+									<label class="block text-sm font-medium mb-1">Warna Teks</label>
+									<input type="color" id="card-color" value="#1f2937" class="w-full h-10 rounded cursor-pointer" oninput="updateCard()">
+								</div>
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Sudut Melengkung (Border Radius)</label>
+								<input type="range" id="card-radius" min="0" max="64" value="16" class="w-full" oninput="updateCard()">
+							</div>
+							<button onclick="downloadElement('card-preview-container', 'kartu-ucapan.png')" class="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+								<i class="ph ph-download-simple text-lg"></i> Unduh Kartu (PNG)
+							</button>
+						</div>
+					</div>
+					
+					<div class="w-full lg:w-2/3 flex items-center justify-center checkered-bg rounded-xl border border-gray-200 p-8">
+						<div id="card-preview-container" class="shadow-2xl overflow-hidden flex flex-col justify-center p-8 transition-all duration-300 w-full max-w-md aspect-[4/5]" style="background-color: #ffffff; border-radius: 16px;">
+							<h1 id="card-preview-title" class="text-3xl font-bold mb-4" style="color: #1f2937;">Kutipan Hari Ini</h1>
+							<p id="card-preview-desc" class="text-lg leading-relaxed whitespace-pre-wrap" style="color: #1f2937;">Belajarlah seolah-olah kamu akan hidup selamanya, hiduplah seolah-olah kamu akan mati besok. - Mahatma Gandhi</p>
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 2. TOOL: KARTU INFO ==================== -->
+			<section id="view-infocard" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Desain Kartu Info (Member/Akses)</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<!-- Kontrol -->
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+						<div class="space-y-4">
+							<div>
+								<label class="block text-sm font-medium mb-1">Nama Brand / Institusi</label>
+								<input type="text" id="info-brand" value="PERPUSTAKAAN NASIONAL" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateInfoCard()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Nomor Kartu</label>
+								<input type="text" id="info-number" value="1234 5678 9012 3456" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono" oninput="updateInfoCard()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Nama Pemilik</label>
+								<input type="text" id="info-name" value="BUDI SANTOSO" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateInfoCard()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Data QR Code</label>
+								<input type="text" id="info-qrdata" value="ID:1234567890123456" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateInfoCard()">
+							</div>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<label class="block text-sm font-medium mb-1">Warna Latar</label>
+									<input type="color" id="info-bg-color" value="#1e3a8a" class="w-full h-10 rounded cursor-pointer" oninput="updateInfoCard()">
+								</div>
+								<div>
+									<label class="block text-sm font-medium mb-1">Warna Teks</label>
+									<input type="color" id="info-text-color" value="#ffffff" class="w-full h-10 rounded cursor-pointer" oninput="updateInfoCard()">
+								</div>
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Unggah Gambar Latar (Opsional)</label>
+								<input type="file" id="info-bg-image" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+							</div>
+							<button onclick="downloadElement('infocard-preview', 'kartu-info.png')" class="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+								<i class="ph ph-download-simple text-lg"></i> Unduh Kartu Info
+							</button>
+						</div>
+					</div>
+					
+					<!-- Preview -->
+					<div class="w-full lg:w-2/3 flex items-center justify-center checkered-bg rounded-xl border border-gray-200 p-8">
+						<!-- Ukuran proporsional kartu (85.6mm x 53.98mm) disimulasikan -->
+						<div id="infocard-preview" class="relative shadow-2xl rounded-2xl overflow-hidden flex flex-col justify-between p-6 transition-all duration-300 w-full max-w-lg aspect-[1.58/1] bg-blue-900 bg-cover bg-center" style="background-color: #1e3a8a;">
+							<!-- Overlay untuk keterbacaan jika pakai gambar -->
+							<div class="absolute inset-0 bg-black/10 z-0"></div>
+							
+							<!-- Header -->
+							<div class="relative z-10 flex justify-between items-start text-white" id="info-header-color">
+								<h3 id="info-preview-brand" class="font-bold text-lg tracking-widest uppercase">PERPUSTAKAAN NASIONAL</h3>
+								<i class="ph ph-identification-card text-3xl opacity-80"></i>
+							</div>
+							
+							<!-- Content -->
+							<div class="relative z-10 flex justify-between items-end text-white" id="info-body-color">
+								<div class="space-y-4">
+									<p id="info-preview-number" class="font-mono text-2xl tracking-[0.2em] shadow-sm">1234 5678 9012 3456</p>
+									<div>
+										<p class="text-xs opacity-80 uppercase tracking-wider mb-1">Cardholder Name</p>
+										<p id="info-preview-name" class="font-bold text-lg tracking-wider uppercase">BUDI SANTOSO</p>
+									</div>
+								</div>
+								
+								<!-- QR Code Container -->
+								<div class="bg-white p-1.5 rounded-lg shadow-lg">
+									<canvas id="infocard-qr" width="80" height="80"></canvas>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 3. TOOL: KARTU PEGAWAI ==================== -->
+			<section id="view-idcard" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Desain Kartu Pegawai (ID Card)</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<!-- Kontrol -->
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+						<div class="space-y-4">
+							<div>
+								<label class="block text-sm font-medium mb-1">Nama Perusahaan</label>
+								<input type="text" id="id-company" value="PT MAJU MUNDUR" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateIdCard()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Foto Pegawai (Sisi Depan)</label>
+								<input type="file" id="id-photo-input" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Nama Pegawai</label>
+								<input type="text" id="id-name" value="Ahmad Wijaya" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateIdCard()">
+							</div>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<label class="block text-sm font-medium mb-1">Jabatan</label>
+									<input type="text" id="id-role" value="Software Engineer" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateIdCard()">
+								</div>
+								<div>
+									<label class="block text-sm font-medium mb-1">NIP / ID</label>
+									<input type="text" id="id-nip" value="EMP-2026-001" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateIdCard()">
+								</div>
+							</div>
+							
+							<hr class="border-gray-200 my-2">
+							<h3 class="text-sm font-bold text-gray-700">Informasi Sisi Belakang</h3>
+							
+							<div>
+								<label class="block text-sm font-medium mb-1">Data QR Code</label>
+								<input type="text" id="id-qrdata" value="vcard:Ahmad Wijaya;EMP-2026-001" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateIdCard()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Telepon / Kontak Darurat</label>
+								<input type="text" id="id-phone" value="+62 812 3456 7890" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="updateIdCard()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Alamat / Teks Tambahan</label>
+								<textarea id="id-address" rows="2" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-xs" oninput="updateIdCard()">Kantor Pusat: Jl. Sudirman No. 123, Jakarta. Jika menemukan kartu ini harap kembalikan ke alamat tersebut.</textarea>
+							</div>
+							
+							<hr class="border-gray-200 my-2">
+							
+							<div>
+								<label class="block text-sm font-medium mb-1">Warna Tema</label>
+								<input type="color" id="id-theme" value="#047857" class="w-full h-10 rounded cursor-pointer" oninput="updateIdCard()">
+							</div>
+							
+							<div class="flex gap-2 mt-4">
+								<button onclick="downloadElement('idcard-preview-front', 'id-card-depan.png')" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium text-sm">
+									<i class="ph ph-download-simple text-lg"></i> Unduh Depan
+								</button>
+								<button onclick="downloadElement('idcard-preview-back', 'id-card-belakang.png')" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 font-medium text-sm">
+									<i class="ph ph-download-simple text-lg"></i> Unduh Belakang
+								</button>
+							</div>
+						</div>
+					</div>
+					
+					<!-- Preview -->
+					<div class="w-full lg:w-2/3 flex flex-col items-center justify-center checkered-bg rounded-xl border border-gray-200 p-8">
+						
+						<!-- Toggle Switch -->
+						<div class="flex bg-white rounded-lg p-1 shadow-sm mb-6 border border-gray-200">
+							<button id="btn-show-front" onclick="toggleIdCardSide('front')" class="px-4 py-1.5 rounded-md bg-blue-50 text-blue-600 font-medium text-sm transition-colors">Sisi Depan</button>
+							<button id="btn-show-back" onclick="toggleIdCardSide('back')" class="px-4 py-1.5 rounded-md text-gray-500 hover:text-gray-700 font-medium text-sm transition-colors">Sisi Belakang</button>
+						</div>
+						
+						<!-- Ukuran Portrait CR80 (280px x 442px) -->
+						<div class="relative w-full max-w-[280px] aspect-[1/1.58]">
+							
+							<!-- SISI DEPAN -->
+							<div id="idcard-preview-front" class="absolute inset-0 shadow-2xl rounded-xl overflow-hidden flex flex-col items-center p-0 bg-white border border-gray-100 transition-opacity duration-300">
+								<!-- Lanyard Hole Simulation -->
+								<div class="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-3 rounded-full bg-gray-200 shadow-inner z-20"></div>
+								
+								<!-- Header Area -->
+								<div id="id-preview-header-front" class="w-full pt-12 pb-20 px-4 text-center rounded-b-[40px] text-white z-10" style="background-color: #047857;">
+									<h2 id="id-preview-company-front" class="font-bold text-lg uppercase tracking-widest leading-tight">PT MAJU MUNDUR</h2>
+								</div>
+								
+								<!-- Photo Area -->
+								<div class="relative -mt-16 z-20 mb-4 p-1 bg-white rounded-full shadow-lg">
+									<div class="w-32 h-32 rounded-full overflow-hidden bg-gray-200 border-4 border-white flex items-center justify-center text-gray-400 bg-white">
+										<img id="id-preview-photo" src="" class="w-full h-full object-cover hidden" alt="Foto">
+										<i id="id-photo-icon" class="ph ph-user text-5xl"></i>
+									</div>
+								</div>
+								
+								<!-- Employee Details -->
+								<div class="text-center px-6 w-full flex-1 flex flex-col justify-center pb-8">
+									<h3 id="id-preview-name" class="font-bold text-xl text-gray-800 leading-tight">Ahmad Wijaya</h3>
+									<p id="id-preview-role" class="text-sm font-medium text-blue-600 mt-1 uppercase tracking-wide">Software Engineer</p>
+									<div class="mt-6 border-t border-gray-100 pt-4">
+										<p class="text-xs text-gray-400 uppercase tracking-wider mb-1">ID Pegawai</p>
+										<p id="id-preview-nip" class="font-mono font-bold text-gray-700 tracking-widest">EMP-2026-001</p>
+									</div>
+								</div>
+							</div>
+							
+							<!-- SISI BELAKANG -->
+							<div id="idcard-preview-back" class="absolute inset-0 shadow-2xl rounded-xl overflow-hidden flex flex-col items-center p-0 bg-white border border-gray-100 transition-opacity duration-300 opacity-0 pointer-events-none">
+								<!-- Lanyard Hole Simulation -->
+								<div class="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-3 rounded-full bg-gray-200 shadow-inner z-20"></div>
+								
+								<!-- Header Area Belakang -->
+								<div id="id-preview-header-back" class="w-full pt-12 pb-4 px-4 text-center text-white z-10" style="background-color: #047857;">
+									<h2 class="font-bold text-sm uppercase tracking-widest">INFORMASI KARTU</h2>
+								</div>
+								
+								<!-- Content Belakang -->
+								<div class="flex-1 w-full px-6 py-6 flex flex-col items-center justify-center text-center">
+									<!-- QR Code -->
+									<div class="bg-white p-2.5 rounded-xl shadow-md border border-gray-100 mb-2">
+										<canvas id="idcard-qr" width="120" height="120"></canvas>
+									</div>
+									<p class="text-[10px] text-gray-400 uppercase tracking-wider mb-6">Scan for Verification</p>
+									
+									<!-- Extra Info -->
+									<div class="w-full space-y-4">
+										<div>
+											<p class="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Emergency Contact</p>
+											<p id="id-preview-phone" class="font-bold text-gray-700 text-sm font-mono">+62 812 3456 7890</p>
+										</div>
+										<div class="border-t border-gray-100 pt-4">
+											<p id="id-preview-address" class="text-xs text-gray-500 leading-relaxed">Kantor Pusat: Jl. Sudirman No. 123, Jakarta. Jika menemukan kartu ini harap kembalikan ke alamat tersebut.</p>
+										</div>
+									</div>
+								</div>
+								
+								<!-- Footer Belakang -->
+								<div id="id-preview-footer-back" class="w-full py-3 text-center text-white text-xs font-bold tracking-widest" style="background-color: #047857;">
+									<span id="id-preview-company-back">PT MAJU MUNDUR</span>
+								</div>
+							</div>
+							
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 4. TOOL: GENERATOR IKON ==================== -->
+			<section id="view-icon" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Generator Ikon Aplikasi (.ico & .png)</h2>
+				<!-- Content omitted for brevity in chunk but included in reality -->
+                <div class="flex flex-col lg:flex-row gap-8 h-full">
+					<!-- Kontrol -->
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+						<div class="space-y-4">
+							<div class="p-4 bg-blue-50 text-blue-800 text-sm rounded-lg flex gap-3">
+								<i class="ph ph-info text-xl shrink-0"></i>
+								<p>Unggah gambar resolusi tinggi (disarankan rasio 1:1 persegi) untuk diubah menjadi format ikon standar (.ico) dan ukuran (.png).</p>
+							</div>
+							
+							<div>
+								<label class="block text-sm font-medium mb-1">Unggah Gambar Ikon</label>
+								<input type="file" id="icon-input" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+							</div>
+							
+							<div>
+								<label class="block text-sm font-medium mb-1 flex justify-between">
+									Margin Gambar 
+									<span id="icon-padding-val" class="text-gray-500">10%</span>
+								</label>
+								<input type="range" id="icon-padding" min="0" max="40" value="10" class="w-full" oninput="drawIconPreview()">
+							</div>
+							
+							<div>
+								<label class="block text-sm font-medium mb-1">Warna Latar</label>
+								<div class="flex items-center gap-3">
+									<input type="color" id="icon-bg" value="#ffffff" class="h-10 w-16 rounded cursor-pointer" oninput="drawIconPreview()">
+									<label class="flex items-center gap-2 text-sm">
+										<input type="checkbox" id="icon-transparent" class="w-4 h-4 text-blue-600 rounded" onchange="drawIconPreview()">
+										Latar Transparan
+									</label>
+								</div>
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Gaya Bingkai</label>
+								<select id="icon-radius" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" onchange="drawIconPreview()">
+									<option value="0">Persegi Kaku</option>
+									<option value="0.2">Persegi Lengkung (iOS Style)</option>
+									<option value="0.5">Lingkaran Penuh</option>
+								</select>
+							</div>
+							
+							<div class="border-t pt-4 space-y-2">
+								<p class="text-sm font-medium text-gray-700 mb-2">Pilih Format Unduhan:</p>
+								<button onclick="exportIcon('ico', 32)" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 font-medium">
+									<i class="ph ph-download-simple text-lg"></i> Unduh Favicon (.ico) 32x32
+								</button>
+								<button onclick="exportIcon('png', 512)" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+									<i class="ph ph-download-simple text-lg"></i> Unduh App Icon (.png) 512x512
+								</button>
+								<button onclick="exportIcon('png', 192)" class="w-full bg-blue-100 text-blue-700 py-2 rounded-lg hover:bg-blue-200 flex items-center justify-center gap-2 font-medium text-sm">
+									<i class="ph ph-download-simple text-lg"></i> Unduh Web Icon (.png) 192x192
+								</button>
+							</div>
+						</div>
+					</div>
+					
+					<!-- Preview Canvas -->
+					<div class="w-full lg:w-2/3 flex flex-col items-center justify-center checkered-bg rounded-xl border border-gray-200 p-8">
+						<p class="text-sm text-gray-500 font-medium mb-4">Pratinjau Resolusi Tinggi</p>
+						<div class="relative shadow-lg rounded-xl overflow-hidden max-w-[256px] w-full aspect-square bg-white flex items-center justify-center">
+							<canvas id="icon-preview-canvas" width="512" height="512" class="w-full h-full"></canvas>
+							<div id="icon-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-white border border-gray-200 pointer-events-none">
+								<i class="ph ph-image text-4xl mb-2"></i>
+								<p class="text-xs">Unggah Gambar</p>
+							</div>
+						</div>
+						
+						<p class="text-sm text-gray-500 font-medium mt-8 mb-2">Pratinjau Favicon (32x32)</p>
+						<div class="shadow-sm border border-gray-300 w-8 h-8 flex items-center justify-center bg-white checkered-bg">
+							<canvas id="icon-small-preview" width="32" height="32" class="w-full h-full"></canvas>
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 5. TOOL: TWIBBON ==================== -->
+			<section id="view-twibbon" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Generator Twibbon</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+						<div class="space-y-4">
+							<div>
+								<label class="block text-sm font-medium mb-1">1. Unggah Bingkai Twibbon (PNG Transparan)</label>
+								<input type="file" id="twibbon-frame-input" accept="image/png" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">2. Unggah Foto Anda</label>
+								<input type="file" id="twibbon-photo-input" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+							</div>
+							
+							<div class="pt-4 border-t">
+								<label class="block text-sm font-medium mb-1">Perbesar/Perkecil Foto</label>
+								<input type="range" id="twibbon-scale" min="0.1" max="3" step="0.05" value="1" class="w-full" oninput="drawTwibbon()">
+							</div>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<label class="block text-sm font-medium mb-1">Geser Kiri/Kanan</label>
+									<input type="range" id="twibbon-x" min="-1000" max="1000" value="0" class="w-full" oninput="drawTwibbon()">
+								</div>
+								<div>
+									<label class="block text-sm font-medium mb-1">Geser Atas/Bawah</label>
+									<input type="range" id="twibbon-y" min="-1000" max="1000" value="0" class="w-full" oninput="drawTwibbon()">
+								</div>
+							</div>
+							
+							<button onclick="downloadCanvas('twibbon-canvas', 'twibbon-saya.png')" class="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+								<i class="ph ph-download-simple text-lg"></i> Unduh Twibbon
+							</button>
+						</div>
+					</div>
+					
+					<div class="w-full lg:w-2/3 flex items-center justify-center checkered-bg rounded-xl border border-gray-200 p-4">
+						<div class="relative shadow-2xl rounded overflow-hidden max-w-[500px] w-full aspect-square bg-white flex items-center justify-center">
+							<canvas id="twibbon-canvas" width="1080" height="1080" class="w-full h-full object-contain"></canvas>
+							<div id="twibbon-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 pointer-events-none">
+								<i class="ph ph-image text-6xl mb-2"></i>
+								<p>Unggah Bingkai & Foto untuk melihat pratinjau</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 6. TOOL: WATERMARK ==================== -->
+			<section id="view-watermark" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Penambah Watermark Gambar</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+						<div class="space-y-4">
+							<div>
+								<label class="block text-sm font-medium mb-1">Unggah Gambar Utama</label>
+								<input type="file" id="wm-image-input" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Teks Watermark</label>
+								<input type="text" id="wm-text" value="© Hak Cipta 2026" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" oninput="drawWatermark()">
+							</div>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<label class="block text-sm font-medium mb-1">Warna Teks</label>
+									<input type="color" id="wm-color" value="#ffffff" class="w-full h-10 rounded cursor-pointer" oninput="drawWatermark()">
+								</div>
+								<div>
+									<label class="block text-sm font-medium mb-1">Transparansi</label>
+									<input type="range" id="wm-opacity" min="0" max="1" step="0.1" value="0.5" class="w-full mt-2" oninput="drawWatermark()">
+								</div>
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Posisi</label>
+								<select id="wm-position" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" onchange="drawWatermark()">
+									<option value="bottom-right">Kanan Bawah</option>
+									<option value="bottom-left">Kiri Bawah</option>
+									<option value="top-right">Kanan Atas</option>
+									<option value="top-left">Kiri Atas</option>
+									<option value="center">Tengah</option>
+									<option value="pattern">Pola Berulang (Pattern)</option>
+								</select>
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Ukuran Font</label>
+								<input type="range" id="wm-size" min="10" max="150" value="48" class="w-full" oninput="drawWatermark()">
+							</div>
+							
+							<button onclick="downloadCanvas('wm-canvas', 'watermark.png')" class="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+								<i class="ph ph-download-simple text-lg"></i> Unduh Gambar
+							</button>
+						</div>
+					</div>
+					
+					<div class="w-full lg:w-2/3 flex items-center justify-center checkered-bg rounded-xl border border-gray-200 p-4 overflow-hidden">
+						<div class="shadow-xl rounded overflow-hidden max-w-full max-h-[70vh] flex items-center justify-center relative bg-white">
+							<canvas id="wm-canvas" class="max-w-full max-h-[70vh] object-contain"></canvas>
+							<div id="wm-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-white pointer-events-none">
+								<i class="ph ph-images text-6xl mb-2"></i>
+								<p>Unggah gambar untuk mulai</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 7. TOOL: CODE SNIPPET ==================== -->
+			<section id="view-code" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Cantikkan Potongan Kode</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+						<div class="space-y-4">
+							<div>
+								<label class="block text-sm font-medium mb-1">Bahasa Pemrograman</label>
+								<select id="code-lang" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" onchange="updateCode()">
+									<option value="javascript">JavaScript</option>
+									<option value="python">Python</option>
+									<option value="html">HTML</option>
+									<option value="css">CSS</option>
+								</select>
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Masukkan Kode Anda</label>
+								<textarea id="code-input" rows="8" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm" oninput="updateCode()">
+									function sapaDunia(nama) {
+									const pesan = `Halo, ${nama}!`;
+									console.log(pesan);
+									return pesan;
+									}
+									
+								sapaDunia('Programmer');</textarea>
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Latar Belakang (Gradient)</label>
+								<select id="code-bg" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" onchange="updateCodeBg()">
+									<option value="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">Senja Ungu (Purple Sunset)</option>
+									<option value="bg-gradient-to-r from-cyan-500 to-blue-500">Lautan Biru (Ocean Blue)</option>
+									<option value="bg-gradient-to-r from-emerald-500 to-teal-400">Zamrud (Emerald)</option>
+									<option value="bg-gradient-to-tr from-gray-900 to-gray-600">Gelap (Dark Mode)</option>
+									<option value="bg-white">Putih Bersih (Solid White)</option>
+								</select>
+							</div>
+							<button onclick="downloadElement('code-preview-container', 'kode-cantik.png')" class="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+								<i class="ph ph-download-simple text-lg"></i> Unduh Snippet
+							</button>
+						</div>
+					</div>
+					
+					<div class="w-full lg:w-2/3 flex items-center justify-center checkered-bg rounded-xl border border-gray-200 p-4 sm:p-8">
+						<div id="code-preview-container" class="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-8 sm:p-12 w-full max-w-3xl rounded-xl shadow-2xl flex items-center justify-center transition-all duration-300">
+							<div class="bg-[#1e1e1e] rounded-xl shadow-2xl w-full overflow-hidden border border-gray-700/50">
+								<div class="flex items-center px-4 py-3 bg-[#2d2d2d] border-b border-gray-800">
+									<div class="flex space-x-2">
+										<div class="w-3 h-3 rounded-full bg-red-500"></div>
+										<div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+										<div class="w-3 h-3 rounded-full bg-green-500"></div>
+									</div>
+									<div class="mx-auto text-xs text-gray-400 font-mono tracking-wider" id="code-filename">script.js</div>
+									<div class="w-12"></div>
+								</div>
+								<div class="p-4 sm:p-6 overflow-auto">
+									<pre><code id="code-display" class="language-javascript text-sm sm:text-base font-mono leading-relaxed"></code></pre>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 8. MOCKUP PERANGKAT ==================== -->
+			<section id="view-mockup" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Mockup Perangkat</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit space-y-4">
+						<div>
+							<label class="block text-sm font-medium mb-1">Unggah Screenshot</label>
+							<input type="file" id="mockup-img-input" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:bg-blue-50 file:text-blue-700">
+						</div>
+						<div>
+							<label class="block text-sm font-medium mb-1">Tipe Perangkat</label>
+							<select id="mockup-type" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500" onchange="updateMockupLayout()">
+								<option value="phone">Smartphone</option>
+								<option value="laptop">Laptop / Desktop</option>
+							</select>
+						</div>
+						<div>
+							<label class="block text-sm font-medium mb-1">Warna Latar Belakang</label>
+							<select id="mockup-bg" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500" onchange="updateMockupLayout()">
+								<option value="bg-gradient-to-br from-blue-100 to-blue-300">Biru Gradasi</option>
+								<option value="bg-gradient-to-br from-pink-200 to-purple-400">Ungu Gradasi</option>
+								<option value="bg-transparent">Transparan</option>
+								<option value="bg-gray-100">Abu-abu</option>
+							</select>
+						</div>
+						<button onclick="downloadElement('mockup-export-area', 'mockup.png')" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">
+							<i class="ph ph-download-simple text-lg"></i> Unduh Mockup
+						</button>
+					</div>
+					
+					<div class="w-full lg:w-2/3 flex items-center justify-center checkered-bg rounded-xl border border-gray-200 p-4">
+						<div id="mockup-export-area" class="w-full max-w-2xl p-10 flex justify-center items-center rounded-xl bg-gradient-to-br from-blue-100 to-blue-300 transition-all duration-300">
+							<!-- Phone Frame (Default) -->
+							<div id="mockup-frame" class="relative bg-gray-900 rounded-[2.5rem] border-[12px] border-gray-900 shadow-2xl overflow-hidden aspect-[9/19] w-[260px] flex items-center justify-center transition-all duration-500">
+								<!-- Notch/Camera -->
+								<div id="mockup-notch" class="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-6 bg-gray-900 rounded-b-xl z-10 flex justify-center items-center">
+									<div class="w-2 h-2 rounded-full bg-gray-700"></div>
+								</div>
+								<div class="w-full h-full bg-white flex items-center justify-center">
+									<img id="mockup-image" src="" class="w-full h-full object-cover hidden" alt="Screenshot">
+									<span id="mockup-placeholder" class="text-gray-400 text-sm">Upload Image</span>
+								</div>
+								<!-- Laptop Base (Hidden by default) -->
+								<div id="mockup-laptop-base" class="absolute -bottom-6 -left-12 -right-12 h-6 bg-gray-300 rounded-b-xl shadow-lg hidden">
+									<div class="w-24 h-2 mx-auto bg-gray-400 rounded-b-md"></div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 9. TIKET EVENT ==================== -->
+			<section id="view-ticket" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Generator Tiket Acara</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit space-y-4">
+						<div>
+							<label class="block text-sm font-medium mb-1">Nama Acara</label>
+							<input type="text" id="ticket-title" value="MUSIC FESTIVAL 2026" class="w-full p-2 border rounded uppercase font-bold" oninput="updateTicket()">
+						</div>
+						<div class="grid grid-cols-2 gap-4">
+							<div>
+								<label class="block text-sm font-medium mb-1">Tanggal</label>
+								<input type="text" id="ticket-date" value="25 DES 2026" class="w-full p-2 border rounded" oninput="updateTicket()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Waktu</label>
+								<input type="text" id="ticket-time" value="19:00 WIB" class="w-full p-2 border rounded" oninput="updateTicket()">
+							</div>
+						</div>
+						<div>
+							<label class="block text-sm font-medium mb-1">Lokasi</label>
+							<input type="text" id="ticket-location" value="Stadion Utama, Jakarta" class="w-full p-2 border rounded" oninput="updateTicket()">
+						</div>
+						<div>
+							<label class="block text-sm font-medium mb-1">Data QR / ID Tiket</label>
+							<input type="text" id="ticket-id" value="TICKET-998877" class="w-full p-2 border rounded font-mono" oninput="updateTicket()">
+						</div>
+						<div>
+							<label class="block text-sm font-medium mb-1">Warna Tema</label>
+							<input type="color" id="ticket-color" value="#0f172a" class="w-full h-10 rounded cursor-pointer" oninput="updateTicket()">
+						</div>
+						<button onclick="downloadElement('ticket-preview-wrapper', 'tiket.png')" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">
+							<i class="ph ph-download-simple text-lg"></i> Unduh Tiket
+						</button>
+					</div>
+					
+					<div class="w-full lg:w-2/3 flex items-center justify-center checkered-bg rounded-xl border p-4">
+						<!-- Wrapper for saving with pseudo elements -->
+						<div id="ticket-preview-wrapper" class="p-4 bg-transparent">
+							<div class="flex shadow-2xl rounded-xl overflow-hidden max-w-2xl w-full aspect-[2.5/1] bg-white relative">
+								<!-- Left: Event Info -->
+								<div id="ticket-left" class="w-[70%] p-8 flex flex-col justify-between text-white" style="background-color: #0f172a;">
+									<div>
+										<p class="text-xs uppercase tracking-widest opacity-80 mb-1">Admit One</p>
+										<h3 id="preview-ticket-title" class="font-black text-3xl md:text-4xl leading-tight uppercase">MUSIC FESTIVAL 2026</h3>
+									</div>
+									<div class="mt-6 flex justify-between items-end border-t border-white/20 pt-4">
+										<div>
+											<p class="text-xs opacity-70 uppercase mb-1">Date & Time</p>
+											<p class="font-bold text-lg"><span id="preview-ticket-date">25 DES 2026</span> • <span id="preview-ticket-time">19:00 WIB</span></p>
+											<p class="text-sm mt-1" id="preview-ticket-location">Stadion Utama, Jakarta</p>
+										</div>
+									</div>
+								</div>
+								
+								<!-- Divider (Perforation) -->
+								<div class="w-0 border-l-[3px] border-dashed border-gray-300 ticket-divider bg-white"></div>
+								
+								<!-- Right: QR Code -->
+								<div class="w-[30%] bg-white p-4 flex flex-col items-center justify-center text-center">
+									<p class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Scan Here</p>
+									<canvas id="ticket-qr" width="100" height="100" class="mb-2"></canvas>
+									<p id="preview-ticket-id" class="text-xs font-mono font-bold text-gray-800 tracking-widest mt-2">TICKET-998877</p>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 10. GENERATOR ORNAMEN ==================== -->
+			<section id="view-ornament" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Generator Ornamen Geometris</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit space-y-4">
+						<div>
+							<label class="block text-sm font-medium mb-1">Jenis Ornamen</label>
+							<select id="ornament-type" class="w-full p-2 border rounded" onchange="generateOrnament()">
+								<option value="memphis">Memphis Acak</option>
+								<option value="lowpoly">Geometri Low-Poly</option>
+								<option value="wave">Gelombang (Wave)</option>
+								<option value="zigzag">Garis Zigzag</option>
+								<option value="paper">Robekan Kertas</option>
+							</select>
+						</div>
+						<div class="grid grid-cols-2 gap-4">
+							<div>
+								<label class="block text-sm font-medium mb-1">Warna Utama</label>
+								<input type="color" id="orn-color1" value="#4f46e5" class="w-full h-10 rounded cursor-pointer" oninput="generateOrnament()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Warna Aksen</label>
+								<input type="color" id="orn-color2" value="#ec4899" class="w-full h-10 rounded cursor-pointer" oninput="generateOrnament()">
+							</div>
+						</div>
+						<div>
+							<label class="block text-sm font-medium mb-1">Kompleksitas / Jumlah</label>
+							<input type="range" id="orn-complexity" min="5" max="50" value="20" class="w-full" oninput="generateOrnament()">
+						</div>
+						<button onclick="generateOrnament()" class="w-full bg-gray-100 text-gray-700 py-2 rounded-lg border border-gray-300 hover:bg-gray-200 font-medium">Acak Ulang (Regenerate)</button>
+						<button onclick="downloadCanvas('ornament-canvas', 'ornamen.png')" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">
+							<i class="ph ph-download-simple text-lg"></i> Unduh Transparan (PNG)
+						</button>
+					</div>
+					
+					<div class="w-full lg:w-2/3 flex items-center justify-center checkered-bg rounded-xl border p-4">
+						<div class="shadow-md bg-transparent rounded-lg overflow-hidden border border-dashed border-gray-400">
+							<canvas id="ornament-canvas" width="800" height="400" class="w-full max-w-2xl bg-transparent"></canvas>
+						</div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 11. GENERATOR GRADIEN ==================== -->
+			<section id="view-gradient" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Generator Gradien CSS</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit space-y-4">
+						<div class="grid grid-cols-2 gap-4">
+							<div>
+								<label class="block text-sm font-medium mb-1">Warna 1</label>
+								<input type="color" id="grad-color1" value="#ff7e5f" class="w-full h-10 rounded cursor-pointer" oninput="updateGradient()">
+							</div>
+							<div>
+								<label class="block text-sm font-medium mb-1">Warna 2</label>
+								<input type="color" id="grad-color2" value="#feb47b" class="w-full h-10 rounded cursor-pointer" oninput="updateGradient()">
+							</div>
+						</div>
+						<div>
+							<label class="block text-sm font-medium mb-1">Tipe Gradien</label>
+							<select id="grad-type" class="w-full p-2 border rounded" onchange="updateGradient()">
+								<option value="linear">Linear</option>
+								<option value="radial">Radial</option>
+							</select>
+						</div>
+						<div>
+							<label class="block text-sm font-medium mb-1">Sudut (Linear)</label>
+							<input type="range" id="grad-angle" min="0" max="360" value="45" class="w-full" oninput="updateGradient()">
+						</div>
+						
+						<div class="pt-4 border-t">
+							<label class="block text-sm font-medium mb-1">Kode CSS</label>
+							<textarea id="grad-css-output" rows="2" class="w-full p-2 border rounded font-mono text-xs bg-gray-50 outline-none" readonly></textarea>
+						</div>
+						
+						<button onclick="downloadElement('gradient-preview', 'gradien.png')" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">
+							<i class="ph ph-download-simple text-lg"></i> Unduh Gambar
+						</button>
+					</div>
+					
+					<div class="w-full lg:w-2/3 flex items-center justify-center checkered-bg rounded-xl border p-4">
+						<div id="gradient-preview" class="w-full aspect-video max-w-3xl rounded-xl shadow-lg border border-gray-100" style="background: linear-gradient(45deg, #ff7e5f, #feb47b);"></div>
+					</div>
+				</div>
+			</section>
+			
+			<!-- ==================== 12. TIER LIST MAKER ==================== -->
+			<section id="view-tierlist" class="tool-section p-8">
+				<h2 class="text-2xl font-bold mb-4">Tier List Maker Kustom</h2>
+				
+				<div class="flex gap-4 mb-6">
+					<label for="tier-image-input" class="bg-emerald-600 text-white px-4 py-2 rounded-lg cursor-pointer hover:bg-emerald-700 font-medium flex items-center gap-2">
+						<i class="ph ph-upload-simple"></i> Impor Gambar
+					</label>
+					<input type="file" id="tier-image-input" accept="image/*" multiple class="hidden">
+					
+					<button onclick="addTierRow()" class="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 font-medium flex items-center gap-2">
+						<i class="ph ph-plus"></i> Tambah Tier
+					</button>
+					<button onclick="exportTierList()" class="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 font-medium flex items-center gap-2 ml-auto">
+						<i class="ph ph-image"></i> Ekspor PNG
+					</button>
+				</div>
+				
+				<div class="flex-1 min-h-0 overflow-y-auto space-y-6 pr-2">
+					<!-- Main Tier Container -->
+					<div id="tier-list-container" class="w-full max-w-5xl rounded-lg shadow-xl overflow-hidden bg-gray-900">
+						<div class="tier-row">
+							<div class="tier-label" contenteditable="true" style="background-color: #ff7f7f;">S</div>
+							<div class="tier-dropzone" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
+							<div class="tier-actions flex flex-col justify-center gap-2 p-2 bg-gray-800">
+								<input type="color" value="#ff7f7f" class="w-8 h-8 rounded cursor-pointer border-0 p-0" oninput="changeTierColor(this)">
+								<button class="bg-red-600 hover:bg-red-700 text-white p-1.5 rounded text-xs" onclick="deleteRow(this)"><i class="ph ph-x"></i></button>
+							</div>
+						</div>
+						<div class="tier-row">
+							<div class="tier-label" contenteditable="true" style="background-color: #ffbf7f;">A</div>
+							<div class="tier-dropzone" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
+							<div class="tier-actions flex flex-col justify-center gap-2 p-2 bg-gray-800">
+								<input type="color" value="#ffbf7f" class="w-8 h-8 rounded cursor-pointer border-0 p-0" oninput="changeTierColor(this)">
+								<button class="bg-red-600 hover:bg-red-700 text-white p-1.5 rounded text-xs" onclick="deleteRow(this)"><i class="ph ph-x"></i></button>
+							</div>
+						</div>
+						<div class="tier-row">
+							<div class="tier-label" contenteditable="true" style="background-color: #ffdf7f;">B</div>
+							<div class="tier-dropzone" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
+							<div class="tier-actions flex flex-col justify-center gap-2 p-2 bg-gray-800">
+								<input type="color" value="#ffdf7f" class="w-8 h-8 rounded cursor-pointer border-0 p-0" oninput="changeTierColor(this)">
+								<button class="bg-red-600 hover:bg-red-700 text-white p-1.5 rounded text-xs" onclick="deleteRow(this)"><i class="ph ph-x"></i></button>
+							</div>
+						</div>
+					</div>
+					
+					<!-- Bank Foto -->
+					<div>
+						<h3 class="font-bold text-gray-700 mb-2">Bank Foto (Tarik foto ke atas)</h3>
+						<div id="item-bank" class="w-full max-w-5xl rounded-lg p-3 flex flex-wrap gap-2 content-start" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
+					</div>
+				</div>
+			</section>
+			
+            <!-- ==================== NEW: LOW IMAGE ==================== -->
+            <section id="view-lowimage" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Penurun Kualitas Gambar (Low Image)</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<!-- Kontrol -->
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+						<div class="space-y-4">
+							<div class="p-4 bg-yellow-50 text-yellow-800 text-sm rounded-lg flex gap-3">
+								<i class="ph ph-warning-circle text-xl shrink-0"></i>
+								<p>Turunkan resolusi dan kualitas ketajaman gambar Anda menjadi buram/pecah.</p>
+							</div>
+							
+							<div>
+								<label class="block text-sm font-medium mb-1">Unggah Gambar Anda</label>
+								<input type="file" id="lowimage-input" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+							</div>
+							
+							<div>
+								<label class="block text-sm font-medium mb-1 flex justify-between">
+									Skala Turun (Scale Down)
+									<span id="lowimage-scale-val" class="text-gray-500">20%</span>
+								</label>
+								<input type="range" id="lowimage-scale" min="1" max="100" value="20" class="w-full" oninput="updateLowImage()">
+							</div>
+
+                            <div>
+								<label class="block text-sm font-medium mb-1 flex justify-between">
+									Buram (Blur) / Pengurangan Ketajaman
+									<span id="lowimage-blur-val" class="text-gray-500">2px</span>
+								</label>
+								<input type="range" id="lowimage-blur" min="0" max="20" value="2" class="w-full" oninput="updateLowImage()">
+							</div>
+
+                            <div>
+								<label class="block text-sm font-medium mb-1">Format Unduhan</label>
+								<select id="lowimage-format" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+									<option value="image/jpeg">JPEG (Rekomendasi untuk hasil jelek)</option>
+									<option value="image/png">PNG</option>
+								</select>
+							</div>
+							
+							<div class="border-t pt-4">
+								<button onclick="downloadLowImage()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+									<i class="ph ph-download-simple text-lg"></i> Unduh Gambar Rusak
+								</button>
+							</div>
+						</div>
+					</div>
+					
+					<!-- Preview Canvas -->
+					<div class="w-full lg:w-2/3 flex flex-col items-center justify-center checkered-bg rounded-xl border border-gray-200 p-8">
+						<div class="relative shadow-lg overflow-hidden max-w-full max-h-[70vh] flex items-center justify-center bg-white">
+							<canvas id="lowimage-canvas" class="max-w-full max-h-[70vh] object-contain pixelated"></canvas>
+							<div id="lowimage-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-white border border-gray-200 pointer-events-none">
+								<i class="ph ph-image-broken text-4xl mb-2"></i>
+								<p class="text-xs">Unggah gambar untuk merusaknya</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+            <!-- ==================== NEW: LOW TEXT ==================== -->
+            <section id="view-lowtext" class="tool-section p-8 h-full">
+				<h2 class="text-2xl font-bold mb-6">Pembuat Teks Kualitas Rendah (Low Text)</h2>
+				<div class="flex flex-col lg:flex-row gap-8 h-full">
+					<!-- Kontrol -->
+					<div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-sm border border-gray-200 h-fit">
+						<div class="space-y-4">
+							
+							<div>
+								<label class="block text-sm font-medium mb-1">Teks (Justified)</label>
+								<textarea id="lowtext-input" rows="5" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm" oninput="updateLowText()">Silakan isi dengan teks kutipan atau tulisan apa pun. Teks ini akan ditata secara Justified (rata kanan kiri) dan di-render menjadi gambar dengan kualitas yang sengaja diturunkan layaknya meme hasil screenshot berkali-kali.</textarea>
+							</div>
+							
+                            <div class="grid grid-cols-2 gap-4">
+								<div>
+									<label class="block text-sm font-medium mb-1">Warna Background</label>
+									<input type="color" id="lowtext-bg" value="#ffffff" class="w-full h-10 rounded cursor-pointer" oninput="updateLowText()">
+								</div>
+								<div>
+									<label class="block text-sm font-medium mb-1">Warna Teks</label>
+									<input type="color" id="lowtext-color" value="#000000" class="w-full h-10 rounded cursor-pointer" oninput="updateLowText()">
+								</div>
+							</div>
+							
+							<div>
+								<label class="block text-sm font-medium mb-1 flex justify-between">
+									Tingkat Kerusakan Teks (Degradation)
+									<span id="lowtext-deg-val" class="text-gray-500">Medium</span>
+								</label>
+								<input type="range" id="lowtext-degradation" min="1" max="3" step="1" value="2" class="w-full" oninput="updateLowText()">
+                                <p class="text-xs text-gray-400 mt-1">Mengatur seberapa buram/pecah gambar ini ketika diunduh.</p>
+							</div>
+                            
+                            <div>
+								<label class="block text-sm font-medium mb-1">Format Unduhan</label>
+								<select id="lowtext-format" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+									<option value="image/jpeg">JPEG</option>
+									<option value="image/png">PNG</option>
+								</select>
+							</div>
+							
+							<div class="border-t pt-4">
+								<button onclick="downloadLowText()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium">
+									<i class="ph ph-download-simple text-lg"></i> Unduh Teks Rusak
+								</button>
+							</div>
+						</div>
+					</div>
+					
+					<!-- Preview -->
+					<div class="w-full lg:w-2/3 flex flex-col items-center justify-center checkered-bg rounded-xl border border-gray-200 p-8">
+                        <p class="text-sm text-gray-500 font-medium mb-4">Pratinjau (Tampilan Asli Sebelum diunduh)</p>
+						<div class="shadow-lg overflow-hidden flex items-center justify-center">
+                            <!-- Container yang akan dirender -->
+							<div id="lowtext-preview-container" class="p-6 max-w-sm w-full font-serif" style="background-color: #ffffff; color: #000000;">
+                                <p id="lowtext-preview-p" class="text-base leading-relaxed text-justify" style="text-align: justify; text-justify: inter-word;">
+                                    Silakan isi dengan teks kutipan atau tulisan apa pun. Teks ini akan ditata secara Justified (rata kanan kiri) dan di-render menjadi gambar dengan kualitas yang sengaja diturunkan layaknya meme hasil screenshot berkali-kali.
+                                </p>
+                            </div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+
+		</main>
+		
+		<!-- Script Utama -->
+		<script>
+			// ==========================================
+			// 0. INIT & NAVIGATION LOGIC
+			// ==========================================
+			let qrInfoInstance, qrIdInstance;
+			
+			window.addEventListener('DOMContentLoaded', () => {
+				// Init QR Codes
+				qrInfoInstance = new QRious({
+					element: document.getElementById('infocard-qr'),
+					size: 150,
+					value: 'ID:1234567890123456',
+					background: 'white',
+					foreground: 'black'
+				});
+				
+				qrIdInstance = new QRious({
+					element: document.getElementById('idcard-qr'),
+					size: 150,
+					value: 'vcard:Ahmad Wijaya;EMP-2026-001',
+					background: 'white',
+					foreground: 'black'
+				});
+				
+				updateCode();
+				updateInfoCard();
+				updateIdCard();
+			});
+			
+			function switchTab(tabId) {
+				document.querySelectorAll('.tool-section').forEach(el => el.classList.remove('active'));
+				document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+				document.getElementById(`view-${tabId}`).classList.add('active');
+				document.getElementById(`tab-${tabId}`).classList.add('active');
+			}
+			
+			// Helper to load image from file input
+			function loadImage(event, callback) {
+				const file = event.target.files[0];
+				if (!file) return;
+				const reader = new FileReader();
+				reader.onload = function(e) {
+					const img = new Image();
+					img.onload = () => callback(img, e.target.result);
+					img.src = e.target.result;
+				};
+				reader.readAsDataURL(file);
+			}
+			
+			// ==========================================
+			// 1. KARTU UCAPAN
+			// ==========================================
+			function updateCard() {
+				const title = document.getElementById('card-title').value;
+				const desc = document.getElementById('card-desc').value;
+				const bgColor = document.getElementById('card-bg').value;
+				const color = document.getElementById('card-color').value;
+				const radius = document.getElementById('card-radius').value;
+				
+				document.getElementById('card-preview-title').textContent = title;
+				document.getElementById('card-preview-desc').textContent = desc;
+				document.getElementById('card-preview-container').style.backgroundColor = bgColor;
+				document.getElementById('card-preview-container').style.borderRadius = `${radius}px`;
+				document.getElementById('card-preview-title').style.color = color;
+				document.getElementById('card-preview-desc').style.color = color;
+			}
+			
+			// ==========================================
+			// 2. KARTU INFO (MEMBER CARD)
+			// ==========================================
+			function updateInfoCard() {
+				document.getElementById('info-preview-brand').textContent = document.getElementById('info-brand').value;
+				document.getElementById('info-preview-number').textContent = document.getElementById('info-number').value;
+				document.getElementById('info-preview-name').textContent = document.getElementById('info-name').value;
+				
+				// Update Colors
+				const bgColor = document.getElementById('info-bg-color').value;
+				const textColor = document.getElementById('info-text-color').value;
+				document.getElementById('infocard-preview').style.backgroundColor = bgColor;
+				document.getElementById('info-header-color').style.color = textColor;
+				document.getElementById('info-body-color').style.color = textColor;
+				
+				// Update QR
+				qrInfoInstance.value = document.getElementById('info-qrdata').value;
+			}
+			
+			document.getElementById('info-bg-image').addEventListener('change', function(e) {
+				loadImage(e, (img, dataUrl) => {
+					document.getElementById('infocard-preview').style.backgroundImage = `url(${dataUrl})`;
+				});
+			});
+			
+			// ==========================================
+			// 3. KARTU PEGAWAI (ID CARD)
+			// ==========================================
+			function updateIdCard() {
+				const companyName = document.getElementById('id-company').value;
+				// Terapkan nama perusahaan ke sisi depan dan belakang
+				document.getElementById('id-preview-company-front').textContent = companyName;
+				document.getElementById('id-preview-company-back').textContent = companyName;
+				
+				document.getElementById('id-preview-name').textContent = document.getElementById('id-name').value;
+				document.getElementById('id-preview-role').textContent = document.getElementById('id-role').value;
+				document.getElementById('id-preview-nip').textContent = document.getElementById('id-nip').value;
+				
+				// Info Belakang
+				document.getElementById('id-preview-phone').textContent = document.getElementById('id-phone').value;
+				document.getElementById('id-preview-address').textContent = document.getElementById('id-address').value;
+				
+				// Update Theme di berbagai elemen
+				const themeColor = document.getElementById('id-theme').value;
+				document.getElementById('id-preview-header-front').style.backgroundColor = themeColor;
+				document.getElementById('id-preview-header-back').style.backgroundColor = themeColor;
+				document.getElementById('id-preview-footer-back').style.backgroundColor = themeColor;
+				
+				// Update QR (Di sisi belakang)
+				qrIdInstance.value = document.getElementById('id-qrdata').value;
+			}
+			
+			// Logic toggle Sisi Depan / Belakang
+			function toggleIdCardSide(side) {
+				const front = document.getElementById('idcard-preview-front');
+				const back = document.getElementById('idcard-preview-back');
+				const btnFront = document.getElementById('btn-show-front');
+				const btnBack = document.getElementById('btn-show-back');
+				
+				if (side === 'front') {
+					front.classList.remove('opacity-0', 'pointer-events-none');
+					back.classList.add('opacity-0', 'pointer-events-none');
+					
+					btnFront.classList.add('bg-blue-50', 'text-blue-600');
+					btnFront.classList.remove('text-gray-500', 'hover:text-gray-700');
+					
+					btnBack.classList.remove('bg-blue-50', 'text-blue-600');
+					btnBack.classList.add('text-gray-500', 'hover:text-gray-700');
+					} else {
+					back.classList.remove('opacity-0', 'pointer-events-none');
+					front.classList.add('opacity-0', 'pointer-events-none');
+					
+					btnBack.classList.add('bg-blue-50', 'text-blue-600');
+					btnBack.classList.remove('text-gray-500', 'hover:text-gray-700');
+					
+					btnFront.classList.remove('bg-blue-50', 'text-blue-600');
+					btnFront.classList.add('text-gray-500', 'hover:text-gray-700');
+				}
+			}
+			
+			document.getElementById('id-photo-input').addEventListener('change', function(e) {
+				loadImage(e, (img, dataUrl) => {
+					const photoEl = document.getElementById('id-preview-photo');
+					photoEl.src = dataUrl;
+					photoEl.classList.remove('hidden');
+					document.getElementById('id-photo-icon').classList.add('hidden');
+				});
+			});
+			
+			// ==========================================
+			// 4. GENERATOR IKON
+			// ==========================================
+			let iconImg = null;
+			
+			document.getElementById('icon-input').addEventListener('change', function(e) {
+				loadImage(e, img => {
+					iconImg = img;
+					document.getElementById('icon-placeholder').style.display = 'none';
+					drawIconPreview();
+				});
+			});
+			
+			function drawIconPreview() {
+				const canvas = document.getElementById('icon-preview-canvas');
+				const canvasSmall = document.getElementById('icon-small-preview');
+				
+				_renderIconToCanvas(canvas, 512);
+				_renderIconToCanvas(canvasSmall, 32);
+			}
+			
+			function _renderIconToCanvas(canvas, size) {
+				const ctx = canvas.getContext('2d');
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				
+				const isTransparent = document.getElementById('icon-transparent').checked;
+				const bgColor = document.getElementById('icon-bg').value;
+				const paddingPercent = document.getElementById('icon-padding').value;
+				const borderRadiusRatio = parseFloat(document.getElementById('icon-radius').value);
+				
+				document.getElementById('icon-padding-val').textContent = paddingPercent + '%';
+				
+				// Draw Background shape
+				if (!isTransparent) {
+					ctx.fillStyle = bgColor;
+					const radius = (size / 2) * borderRadiusRatio * 2; // scale radius based on ratio
+					
+					if (radius > 0) {
+						ctx.beginPath();
+						ctx.moveTo(radius, 0);
+						ctx.lineTo(size - radius, 0);
+						ctx.quadraticCurveTo(size, 0, size, radius);
+						ctx.lineTo(size, size - radius);
+						ctx.quadraticCurveTo(size, size, size - radius, size);
+						ctx.lineTo(radius, size);
+						ctx.quadraticCurveTo(0, size, 0, size - radius);
+						ctx.lineTo(0, radius);
+						ctx.quadraticCurveTo(0, 0, radius, 0);
+						ctx.closePath();
+						ctx.fill();
+						} else {
+						ctx.fillRect(0, 0, size, size);
+					}
+				}
+				
+				// Draw Image with padding
+				if (iconImg) {
+					const paddingPx = (size * paddingPercent) / 100;
+					const availableSize = size - (paddingPx * 2);
+					
+					// Keep aspect ratio
+					const scale = Math.min(availableSize / iconImg.width, availableSize / iconImg.height);
+					const drawW = iconImg.width * scale;
+					const drawH = iconImg.height * scale;
+					const drawX = (size - drawW) / 2;
+					const drawY = (size - drawH) / 2;
+					
+					ctx.drawImage(iconImg, drawX, drawY, drawW, drawH);
+				}
+			}
+			
+			// Logic export format ICO/PNG
+			async function exportIcon(format, size) {
+				if (!iconImg) {
+					alert("Silakan unggah gambar terlebih dahulu.");
+					return;
+				}
+				
+				// Buat canvas sementara (hidden) sesuai ukuran
+				const tempCanvas = document.createElement('canvas');
+				tempCanvas.width = size;
+				tempCanvas.height = size;
+				_renderIconToCanvas(tempCanvas, size);
+				
+				if (format === 'ico') {
+					// Konversi biner spesifik untuk .ico (mengandung PNG Header)
+					try {
+						const blobUrl = await generateIcoBlob(tempCanvas);
+						const link = document.createElement('a');
+						link.download = `favicon.ico`;
+						link.href = blobUrl;
+						link.click();
+						URL.revokeObjectURL(blobUrl);
+						} catch (e) {
+						console.error(e);
+						alert("Gagal membuat file ICO.");
+					}
+					} else {
+					// Format standar PNG
+					const link = document.createElement('a');
+					link.download = `icon-${size}x${size}.png`;
+					link.href = tempCanvas.toDataURL('image/png');
+					link.click();
+				}
+			}
+			
+			// Helper untuk membungkus gambar PNG ke dalam struktur file biner (.ico)
+			function generateIcoBlob(canvas) {
+				return new Promise((resolve, reject) => {
+					canvas.toBlob((blob) => {
+						if(!blob) return reject();
+						const reader = new FileReader();
+						reader.onload = () => {
+							const pngData = new Uint8Array(reader.result);
+							// Struktur Header ICO (22 byte)
+							const icoData = new Uint8Array(22 + pngData.length);
+							icoData.set([0, 0, 1, 0, 1, 0], 0); // ICONDIR
+							icoData[6] = canvas.width >= 256 ? 0 : canvas.width; // Width
+							icoData[7] = canvas.height >= 256 ? 0 : canvas.height; // Height
+							icoData[8] = 0; // Color palette
+							icoData[9] = 0; // Reserved
+							icoData[10] = 1; // Color planes
+							icoData[11] = 0; //
+							icoData[12] = 32; // Bits per pixel
+							icoData[13] = 0;
+							// Ukuran data gambar
+							const size = pngData.length;
+							icoData[14] = size & 0xff;
+							icoData[15] = (size >> 8) & 0xff;
+							icoData[16] = (size >> 16) & 0xff;
+							icoData[17] = (size >> 24) & 0xff;
+							// Offset (selalu 22 byte setelah header)
+							icoData[18] = 22;
+							icoData[19] = 0;
+							icoData[20] = 0;
+							icoData[21] = 0;
+							
+							icoData.set(pngData, 22); // Masukkan data PNG
+							
+							const icoBlob = new Blob([icoData], { type: "image/x-icon" });
+							resolve(URL.createObjectURL(icoBlob));
+						};
+						reader.readAsArrayBuffer(blob);
+					}, 'image/png');
+				});
+			}
+			
+			
+			// ==========================================
+			// 5. TWIBBON
+			// ==========================================
+			const twibbonCanvas = document.getElementById('twibbon-canvas');
+			const ctxTwibbon = twibbonCanvas.getContext('2d');
+			let frameImg = null; let photoImg = null;
+			
+			document.getElementById('twibbon-frame-input').addEventListener('change', function(e) {
+				loadImage(e, img => {
+					frameImg = img;
+					twibbonCanvas.width = img.width || 1080;
+					twibbonCanvas.height = img.height || 1080;
+					document.getElementById('twibbon-placeholder').style.display = 'none';
+					drawTwibbon();
+				});
+			});
+			
+			document.getElementById('twibbon-photo-input').addEventListener('change', function(e) {
+				loadImage(e, img => {
+					photoImg = img;
+					document.getElementById('twibbon-placeholder').style.display = 'none';
+					document.getElementById('twibbon-scale').value = 1;
+					document.getElementById('twibbon-x').value = 0;
+					document.getElementById('twibbon-y').value = 0;
+					drawTwibbon();
+				});
+			});
+			
+			function drawTwibbon() {
+				if (!frameImg && !photoImg) return;
+				const w = twibbonCanvas.width; const h = twibbonCanvas.height;
+				ctxTwibbon.clearRect(0, 0, w, h);
+				
+				if (photoImg) {
+					const scale = parseFloat(document.getElementById('twibbon-scale').value);
+					const dx = parseFloat(document.getElementById('twibbon-x').value);
+					const dy = parseFloat(document.getElementById('twibbon-y').value);
+					const baseScale = Math.max(w / photoImg.width, h / photoImg.height);
+					const finalScale = baseScale * scale;
+					const imgW = photoImg.width * finalScale;
+					const imgH = photoImg.height * finalScale;
+					const x = (w - imgW) / 2 + dx;
+					const y = (h - imgH) / 2 + dy;
+					ctxTwibbon.drawImage(photoImg, x, y, imgW, imgH);
+				}
+				if (frameImg) ctxTwibbon.drawImage(frameImg, 0, 0, w, h);
+			}
+			
+			// ==========================================
+			// 6. WATERMARK
+			// ==========================================
+			const wmCanvas = document.getElementById('wm-canvas');
+			const ctxWm = wmCanvas.getContext('2d');
+			let wmMainImg = null;
+			
+			document.getElementById('wm-image-input').addEventListener('change', function(e) {
+				loadImage(e, img => {
+					wmMainImg = img;
+					wmCanvas.width = img.width; wmCanvas.height = img.height;
+					document.getElementById('wm-placeholder').style.display = 'none';
+					drawWatermark();
+				});
+			});
+			
+			function drawWatermark() {
+				if (!wmMainImg) return;
+				const w = wmCanvas.width; const h = wmCanvas.height;
+				
+				ctxWm.clearRect(0, 0, w, h);
+				ctxWm.globalAlpha = 1.0;
+				ctxWm.drawImage(wmMainImg, 0, 0, w, h);
+				
+				const text = document.getElementById('wm-text').value;
+				if (!text.trim()) return;
+				
+				const color = document.getElementById('wm-color').value;
+				const opacity = parseFloat(document.getElementById('wm-opacity').value);
+				const position = document.getElementById('wm-position').value;
+				const fontSize = parseInt(document.getElementById('wm-size').value);
+				
+				ctxWm.fillStyle = color;
+				ctxWm.globalAlpha = opacity;
+				ctxWm.font = `bold ${fontSize}px Arial, sans-serif`;
+				ctxWm.textBaseline = 'middle';
+				
+				const metrics = ctxWm.measureText(text);
+				const textWidth = metrics.width;
+				const margin = fontSize;
+				
+				if (position === 'pattern') {
+					const stepX = textWidth + margin * 2;
+					const stepY = fontSize * 3;
+					ctxWm.save();
+					ctxWm.translate(w/2, h/2);
+					ctxWm.rotate(-Math.PI / 6);
+					ctxWm.translate(-w, -h);
+					for (let x = 0; x < w * 2; x += stepX) {
+						for (let y = 0; y < h * 2; y += stepY) {
+							ctxWm.fillText(text, x, y);
+						}
+					}
+					ctxWm.restore();
+					} else {
+					let x, y;
+					ctxWm.textAlign = 'left';
+					if (position.includes('bottom')) y = h - margin - (fontSize/2);
+					else if (position.includes('top')) y = margin + (fontSize/2);
+					else y = h / 2;
+					
+					if (position.includes('right')) { ctxWm.textAlign = 'right'; x = w - margin; } 
+					else if (position.includes('left')) { x = margin; } 
+					else { ctxWm.textAlign = 'center'; x = w / 2; }
+					
+					ctxWm.fillText(text, x, y);
+				}
+			}
+			
+			// ==========================================
+			// 7. CODE SNIPPET
+			// ==========================================
+			function updateCode() {
+				const codeInput = document.getElementById('code-input').value;
+				const lang = document.getElementById('code-lang').value;
+				const displayCode = document.getElementById('code-display');
+				const exts = { javascript: 'script.js', python: 'main.py', html: 'index.html', css: 'style.css' };
+				
+				document.getElementById('code-filename').textContent = exts[lang];
+				displayCode.className = `language-${lang}`;
+				displayCode.innerHTML = codeInput.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+				
+				if (window.Prism) Prism.highlightElement(displayCode);
+			}
+			
+			function updateCodeBg() {
+				const container = document.getElementById('code-preview-container');
+				const bgClass = document.getElementById('code-bg').value;
+				container.className = `p-8 sm:p-12 w-full max-w-3xl rounded-xl shadow-2xl flex items-center justify-center transition-all duration-300 ${bgClass}`;
+			}
+			
+			
+			// ==========================================
+			// 8 - 12. FITUR BARU
+			// ==========================================		
+			let qrTicketInstance;
+			
+			window.addEventListener('DOMContentLoaded', () => {
+				// Setup Ticket QR
+				qrTicketInstance = new QRious({
+					element: document.getElementById('ticket-qr'),
+					size: 100,
+					value: 'TICKET-998877',
+					background: 'white',
+					foreground: 'black'
+				});
+				
+				// Initial calls
+				generateOrnament();
+				updateGradient();
+				updateTicket();
+			});
+			
+			// --- Mockup Perangkat ---
+			document.getElementById('mockup-img-input').addEventListener('change', function(e) {
+				loadImage(e, (img, url) => {
+					const el = document.getElementById('mockup-image');
+					el.src = url;
+					el.classList.remove('hidden');
+					document.getElementById('mockup-placeholder').classList.add('hidden');
+				});
+			});
+			
+			function updateMockupLayout() {
+				const type = document.getElementById('mockup-type').value;
+				const bgClass = document.getElementById('mockup-bg').value;
+				const frame = document.getElementById('mockup-frame');
+				const laptopBase = document.getElementById('mockup-laptop-base');
+				const exportArea = document.getElementById('mockup-export-area');
+				const notch = document.getElementById('mockup-notch');
+				
+				// Update Background
+				exportArea.className = `w-full max-w-2xl p-10 flex justify-center items-center rounded-xl transition-all duration-300 ${bgClass}`;
+				
+				// Update Device Shape
+				if (type === 'phone') {
+					frame.className = "relative bg-gray-900 rounded-[2.5rem] border-[12px] border-gray-900 shadow-2xl overflow-hidden aspect-[9/19] w-[260px] flex items-center justify-center transition-all duration-500";
+					laptopBase.classList.add('hidden');
+					notch.classList.remove('hidden');
+					} else {
+					frame.className = "relative bg-gray-900 rounded-t-xl border-[16px] border-gray-900 shadow-2xl overflow-hidden aspect-[16/9] w-[450px] flex items-center justify-center transition-all duration-500";
+					laptopBase.classList.remove('hidden');
+					notch.classList.add('hidden');
+				}
+			}
+			
+			// --- Tiket Event ---
+			function updateTicket() {
+				document.getElementById('preview-ticket-title').textContent = document.getElementById('ticket-title').value;
+				document.getElementById('preview-ticket-date').textContent = document.getElementById('ticket-date').value;
+				document.getElementById('preview-ticket-time').textContent = document.getElementById('ticket-time').value;
+				document.getElementById('preview-ticket-location').textContent = document.getElementById('ticket-location').value;
+				
+				const tid = document.getElementById('ticket-id').value;
+				document.getElementById('preview-ticket-id').textContent = tid;
+				qrTicketInstance.value = tid;
+				
+				document.getElementById('ticket-left').style.backgroundColor = document.getElementById('ticket-color').value;
+			}
+			
+			// --- Generator Ornamen ---
+			function generateOrnament() {
+				const canvas = document.getElementById('ornament-canvas');
+				const ctx = canvas.getContext('2d');
+				const type = document.getElementById('ornament-type').value;
+				const color1 = document.getElementById('orn-color1').value;
+				const color2 = document.getElementById('orn-color2').value;
+				const count = parseInt(document.getElementById('orn-complexity').value);
+				const w = canvas.width; const h = canvas.height;
+				
+				ctx.clearRect(0, 0, w, h);
+				
+				const rand = (min, max) => Math.random() * (max - min) + min;
+				
+				if (type === 'memphis') {
+					for (let i = 0; i < count; i++) {
+						ctx.fillStyle = Math.random() > 0.5 ? color1 : color2;
+						ctx.beginPath();
+						const shape = Math.floor(rand(0, 3));
+						const x = rand(0, w); const y = rand(0, h);
+						const size = rand(10, 40);
+						
+						if (shape === 0) { // Circle
+							ctx.arc(x, y, size, 0, Math.PI*2);
+							ctx.fill();
+							} else if (shape === 1) { // Triangle
+							ctx.moveTo(x, y - size);
+							ctx.lineTo(x + size, y + size);
+							ctx.lineTo(x - size, y + size);
+							ctx.fill();
+							} else { // Lines/Squiggles
+							ctx.strokeStyle = ctx.fillStyle;
+							ctx.lineWidth = 5;
+							ctx.moveTo(x, y);
+							ctx.lineTo(x + size, y + size*2);
+							ctx.stroke();
+						}
+					}
+					} else if (type === 'wave') {
+					ctx.fillStyle = color1;
+					ctx.beginPath();
+					ctx.moveTo(0, h);
+					let waveH = h/2;
+					for (let i = 0; i <= w; i += 10) {
+						ctx.lineTo(i, waveH + Math.sin(i * (count * 0.002)) * 50);
+					}
+					ctx.lineTo(w, h);
+					ctx.fill();
+					} else if (type === 'zigzag') {
+					ctx.strokeStyle = color1;
+					ctx.lineWidth = 10;
+					ctx.beginPath();
+					let y = h/2; let step = w/count;
+					for (let i = 0; i <= count; i++) {
+						ctx.lineTo(i * step, i % 2 === 0 ? y - 50 : y + 50);
+					}
+					ctx.stroke();
+					} else if (type === 'paper') {
+					ctx.fillStyle = color2;
+					ctx.beginPath();
+					ctx.moveTo(0, 0);
+					ctx.lineTo(w, 0);
+					ctx.lineTo(w, h/2);
+					let step = w / count;
+					for(let i = w; i >= 0; i -= step) {
+						ctx.lineTo(i, (h/2) + rand(-20, 20));
+					}
+					ctx.lineTo(0, h/2);
+					ctx.fill();
+					} else if (type === 'lowpoly') {
+					const cols = Math.floor(count / 2); const rows = 4;
+					const cw = w/cols; const ch = h/rows;
+					const points = [];
+					for(let y=0; y<=rows; y++){
+						points[y] = [];
+						for(let x=0; x<=cols; x++){
+							points[y][x] = {
+								x: (x*cw) + (x>0 && x<cols ? rand(-15,15) : 0),
+								y: (y*ch) + (y>0 && y<rows ? rand(-15,15) : 0)
+							};
+						}
+					}
+					for(let y=0; y<rows; y++){
+						for(let x=0; x<cols; x++){
+							ctx.fillStyle = Math.random() > 0.5 ? color1 : color2;
+							ctx.globalAlpha = rand(0.5, 1);
+							ctx.beginPath();
+							ctx.moveTo(points[y][x].x, points[y][x].y);
+							ctx.lineTo(points[y][x+1].x, points[y][x+1].y);
+							ctx.lineTo(points[y+1][x].x, points[y+1][x].y);
+							ctx.fill();
+							
+							ctx.beginPath();
+							ctx.moveTo(points[y+1][x+1].x, points[y+1][x+1].y);
+							ctx.lineTo(points[y][x+1].x, points[y][x+1].y);
+							ctx.lineTo(points[y+1][x].x, points[y+1][x].y);
+							ctx.fill();
+						}
+					}
+					ctx.globalAlpha = 1.0;
+				}
+			}
+			
+			// --- Generator Gradien ---
+			function updateGradient() {
+				const c1 = document.getElementById('grad-color1').value;
+				const c2 = document.getElementById('grad-color2').value;
+				const type = document.getElementById('grad-type').value;
+				const angle = document.getElementById('grad-angle').value;
+				
+				let css = "";
+				if(type === 'linear') {
+					css = `linear-gradient(${angle}deg, ${c1}, ${c2})`;
+					} else {
+					css = `radial-gradient(circle, ${c1}, ${c2})`;
+				}
+				
+				document.getElementById('gradient-preview').style.background = css;
+				document.getElementById('grad-css-output').value = `background: ${css};`;
+			}
+			
+			// --- Tier List Maker ---
+			let dragCounter = 0;
+			
+			function allowDrop(ev) { ev.preventDefault(); }
+			function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+			function drop(ev) {
+				ev.preventDefault();
+				const data = ev.dataTransfer.getData("text");
+				const draggedElement = document.getElementById(data);
+				
+				let target = ev.target;
+				while (target && !target.classList.contains('tier-dropzone') && target.id !== 'item-bank') {
+					target = target.parentNode;
+				}
+				
+				if (target && draggedElement) target.appendChild(draggedElement);
+			}
+			
+			document.getElementById('tier-image-input').addEventListener('change', function(e) {
+				const files = e.target.files;
+				const bank = document.getElementById('item-bank');
+				for (let i = 0; i < files.length; i++) {
+					if (!files[i].type.match('image.*')) continue;
+					const reader = new FileReader();
+					reader.onload = function(event) {
+						dragCounter++;
+						const img = document.createElement('img');
+						img.src = event.target.result;
+						img.className = 'tier-item';
+						img.id = 'tier-item-' + dragCounter;
+						img.draggable = true;
+						img.addEventListener('dragstart', drag);
+						bank.appendChild(img);
+					};
+					reader.readAsDataURL(files[i]);
+				}
+				this.value = '';
+			});
+			
+			function addTierRow() {
+				const container = document.getElementById('tier-list-container');
+				const newRow = document.createElement('div');
+				newRow.className = 'tier-row';
+				const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+				
+				newRow.innerHTML = `
+                <div class="tier-label" contenteditable="true" style="background-color: ${randomColor};">NEW</div>
+                <div class="tier-dropzone" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
+                <div class="tier-actions flex flex-col justify-center gap-2 p-2 bg-gray-800">
+				<input type="color" value="${randomColor}" class="w-8 h-8 rounded cursor-pointer border-0 p-0" oninput="changeTierColor(this)">
+				<button class="bg-red-600 hover:bg-red-700 text-white p-1.5 rounded text-xs" onclick="deleteRow(this)"><i class="ph ph-x"></i></button>
+                </div>
+				`;
+				container.appendChild(newRow);
+			}
+			
+			function deleteRow(button) {
+				const row = button.closest('.tier-row');
+				const dropzone = row.querySelector('.tier-dropzone');
+				const bank = document.getElementById('item-bank');
+				while (dropzone.firstChild) { bank.appendChild(dropzone.firstChild); }
+				row.remove();
+			}
+			
+			function changeTierColor(input) {
+				input.closest('.tier-row').querySelector('.tier-label').style.backgroundColor = input.value;
+			}
+			
+			function exportTierList() {
+				const container = document.getElementById('tier-list-container');
+				const actions = document.querySelectorAll('.tier-actions');
+				actions.forEach(act => act.style.display = 'none'); 
+				
+				html2canvas(container, { 
+					backgroundColor: '#111827', 
+					logging: false, 
+					useCORS: true,
+					height: container.scrollHeight,
+					windowHeight: container.scrollHeight
+					}).then(canvas => {
+					actions.forEach(act => act.style.display = 'flex');
+					const link = document.createElement('a');
+					link.download = 'tier-list.png';
+					link.href = canvas.toDataURL('image/png');
+					link.click();
+					}).catch(err => {
+					actions.forEach(act => act.style.display = 'flex');
+					alert("Terjadi kesalahan.");
+				});
+			}
+
+            // ==========================================
+			// 13. FITUR BARU: LOW IMAGE
+			// ==========================================
+            let lowMainImg = null;
+            const lowCanvas = document.getElementById('lowimage-canvas');
+            const lowCtx = lowCanvas.getContext('2d');
+
+            document.getElementById('lowimage-input').addEventListener('change', function(e) {
+				loadImage(e, img => {
+					lowMainImg = img;
+					document.getElementById('lowimage-placeholder').style.display = 'none';
+					updateLowImage();
+				});
+			});
+
+            function updateLowImage() {
+                if(!lowMainImg) return;
+                
+                const scale = parseInt(document.getElementById('lowimage-scale').value) / 100;
+                const blur = document.getElementById('lowimage-blur').value;
+                document.getElementById('lowimage-scale-val').textContent = (scale * 100) + '%';
+                document.getElementById('lowimage-blur-val').textContent = blur + 'px';
+
+                // Setup the base canvas dimensions before scaling
+                const targetW = lowMainImg.width * scale;
+                const targetH = lowMainImg.height * scale;
+
+                lowCanvas.width = targetW;
+                lowCanvas.height = targetH;
+                
+                // MOCKUP KERANGKA: Anda dapat mengisi logika spesifik di dalam sini (e.g. manipulasi pixel)
+                // Ini merupakan demo visual CSS filter blur & render resolusi kecil 
+                lowCtx.filter = `blur(${blur}px)`;
+                lowCtx.drawImage(lowMainImg, 0, 0, targetW, targetH);
+                
+                // Mengatur tampilan di browser agar terlihat "pecah" (berkat CSS .pixelated)
+                // karena width/height elementnya kita manipulasi dengan rasio kecil
+            }
+
+            function downloadLowImage() {
+                if(!lowMainImg) { alert("Unggah gambar dulu!"); return; }
+                const format = document.getElementById('lowimage-format').value;
+                // Kualitas spesifik (0.1 jika JPEG = 10% quality agar terkompresi rusak)
+                const quality = format === 'image/jpeg' ? 0.1 : 1.0; 
+                
+                const link = document.createElement('a');
+				link.download = `low-image-result.${format === 'image/jpeg' ? 'jpg' : 'png'}`;
+				link.href = lowCanvas.toDataURL(format, quality);
+				link.click();
+            }
+
+            // ==========================================
+			// 14. FITUR BARU: LOW TEXT
+			// ==========================================
+            function updateLowText() {
+                const text = document.getElementById('lowtext-input').value;
+                const bg = document.getElementById('lowtext-bg').value;
+                const color = document.getElementById('lowtext-color').value;
+                const degradation = document.getElementById('lowtext-degradation').value;
+
+                const levels = ["Rendah (Sedikit Pecah)", "Medium (Pecah Standar)", "Tinggi (Sangat Rusak)"];
+                document.getElementById('lowtext-deg-val').textContent = levels[degradation - 1];
+
+                const pContainer = document.getElementById('lowtext-preview-container');
+                const pText = document.getElementById('lowtext-preview-p');
+
+                pText.textContent = text;
+                pContainer.style.backgroundColor = bg;
+                pContainer.style.color = color;
+            }
+
+            function downloadLowText() {
+                const element = document.getElementById('lowtext-preview-container');
+                const format = document.getElementById('lowtext-format').value;
+                const degradation = parseInt(document.getElementById('lowtext-degradation').value);
+                
+                // Set parameter rendering berdasarkan tingkat kerusakan (Mockup/Demo)
+                // Semakin tinggi level kerusakan, semakin kecil scale dari html2canvas
+                let renderScale = 1; 
+                let imgQuality = 1.0;
+
+                if(degradation === 1) { renderScale = 1; imgQuality = 0.5; }
+                else if(degradation === 2) { renderScale = 0.5; imgQuality = 0.2; }
+                else if(degradation === 3) { renderScale = 0.3; imgQuality = 0.05; }
+                
+                html2canvas(element, { scale: renderScale, backgroundColor: null, logging: false })
+				.then(canvas => {
+					const link = document.createElement('a');
+					link.download = `low-text-result.${format === 'image/jpeg' ? 'jpg' : 'png'}`;
+                    // Jika PNG, tidak memakai parameter kompresi. Tapi karena ditarik scale kecil, sudah pecah.
+					link.href = canvas.toDataURL(format, imgQuality); 
+					link.click();
+				}).catch(err => {
+					console.error("Gagal buat gambar:", err);
+					alert("Terjadi kesalahan.");
+				});
+            }
+
+			// ==========================================
+			// UTILITY DOWNLOADERS
+			// ==========================================
+			function downloadCanvas(canvasId, filename) {
+				const canvas = document.getElementById(canvasId);
+				const ctx = canvas.getContext('2d');
+				const pixelBuffer = new Uint32Array(ctx.getImageData(0, 0, canvas.width, canvas.height).data.buffer);
+				if(!pixelBuffer.some(color => color !== 0)) {
+					alert("Area kerja kosong!"); return;
+				}
+				const link = document.createElement('a');
+				link.download = filename;
+				link.href = canvas.toDataURL('image/png');
+				link.click();
+			}
+			
+			function downloadElement(elementId, filename) {
+				const element = document.getElementById(elementId);
+				html2canvas(element, { scale: 3, backgroundColor: null, logging: false, useCORS: true })
+				.then(canvas => {
+					const link = document.createElement('a');
+					link.download = filename;
+					link.href = canvas.toDataURL('image/png');
+					link.click();
+					}).catch(err => {
+					console.error("Gagal buat gambar:", err);
+					alert("Terjadi kesalahan.");
+				});
+			}
+			
+		</script>
+	</body>
+</html>

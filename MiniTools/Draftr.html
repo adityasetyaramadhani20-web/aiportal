@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Draftr</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Core Mail Merge Libraries -->
+  <!-- SheetJS for XLSX/CSV processing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- PizZip for handling docx zip containers -->
+  <script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.4/dist/pizzip.min.js"></script>
+  <!-- Docxtemplater for merging placeholders -->
+  <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.42.0/build/docxtemplater.js"></script>
+  <!-- JSZip loaded before docx-preview to resolve window.JSZip dependency for loadAsync -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <!-- docx-preview for in-browser visual DOM rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js"></script>
+  <!-- FileSaver for programmatic client-side downloads -->
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              200: '#fed7aa',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Standard Paper Dimensions for Container Preview */
+    .paper-a4 { width: 210mm; min-height: 297mm; }
+    .paper-a5 { width: 148mm; min-height: 210mm; }
+    .paper-legal { width: 216mm; min-height: 356mm; }
+    .paper-letter { width: 216mm; min-height: 279mm; }
+    .paper-a3 { width: 297mm; min-height: 420mm; }
+
+    /* Manual Editor & Preview Page Break Marker */
+    .page-break {
+      page-break-after: always;
+      border-top: 2px dashed #94a3b8;
+      margin: 20px 0;
+      padding: 6px 12px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      background-color: #f8fafc;
+      border-radius: 4px;
+      user-select: none;
+    }
+
+    /* Custom docx-preview container override */
+    .docx-render-container .docx-wrapper {
+      background: transparent !important;
+      padding: 0 !important;
+    }
+    .docx-render-container .docx {
+      box-shadow: none !important;
+      margin-bottom: 2rem !important;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col antialiased select-none">
+
+  <!-- Header Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Brand & Title -->
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+          D
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-slate-900 tracking-tight leading-none">Draftr</h1>
+          <p class="text-xs text-slate-500 font-medium mt-0.5">Generator Dokumen & Mail Merge</p>
+        </div>
+      </div>
+
+      <!-- Center Status Summary -->
+      <div class="hidden md:flex items-center space-x-6 text-xs text-slate-600">
+        <div class="flex items-center space-x-1.5">
+          <span id="status-template-dot" class="w-2 h-2 rounded-full bg-slate-300"></span>
+          <span>Template: <strong id="status-template-name" class="font-semibold text-slate-800">Kosong</strong></span>
+        </div>
+        <div class="h-3 w-px bg-slate-200"></div>
+        <div class="flex items-center space-x-1.5">
+          <span id="status-data-dot" class="w-2 h-2 rounded-full bg-slate-300"></span>
+          <span>Data: <strong id="status-data-count" class="font-semibold text-slate-800">0 Baris</strong></span>
+        </div>
+        <div class="h-3 w-px bg-slate-200"></div>
+        <div class="flex items-center space-x-1.5">
+          <span id="status-mapping-dot" class="w-2 h-2 rounded-full bg-slate-300"></span>
+          <span>Pemetaan: <strong id="status-mapping-count" class="font-semibold text-slate-800">0 Terhubung</strong></span>
+        </div>
+      </div>
+
+      <!-- Action Utilities -->
+      <div class="flex items-center space-x-2">
+        <!-- Paper Size Selector -->
+        <div class="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200 text-xs">
+          <label for="paper-size-select" class="px-2 font-medium text-slate-600">Kertas:</label>
+          <select id="paper-size-select" class="bg-white border-none rounded py-1 px-2 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer">
+            <option value="a4" selected>A4 (210 × 297 mm)</option>
+            <option value="a5">A5 (148 × 210 mm)</option>
+            <option value="letter">Letter (8.5 × 11 in)</option>
+            <option value="legal">Legal (8.5 × 14 in)</option>
+            <option value="a3">A3 (297 × 420 mm)</option>
+          </select>
+        </div>
+
+        <!-- JSON Config Export / Import -->
+        <button id="btn-export-config" title="Simpan Konfigurasi Sesi (JSON)" class="p-2 rounded-lg text-slate-600 hover:text-brand-600 hover:bg-slate-100 border border-slate-200 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        </button>
+        <button id="btn-import-config-trigger" title="Muat Konfigurasi Sesi (JSON)" class="p-2 rounded-lg text-slate-600 hover:text-brand-600 hover:bg-slate-100 border border-slate-200 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        </button>
+        <input type="file" id="input-config-file" accept=".json" class="hidden">
+      </div>
+    </div>
+  </header>
+
+  <!-- Step Navigation Tabs -->
+  <nav class="bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex space-x-8 -mb-px">
+        <button id="tab-btn-template" onclick="switchTab('template')" class="tab-button border-b-2 border-brand-600 py-3 px-1 text-sm font-semibold text-brand-600 flex items-center space-x-2">
+          <span class="w-5 h-5 rounded-full bg-brand-100 text-brand-700 text-xs flex items-center justify-center font-bold">1</span>
+          <span>Template Dokumen</span>
+        </button>
+
+        <button id="tab-btn-data" onclick="switchTab('data')" class="tab-button border-b-2 border-transparent py-3 px-1 text-sm font-semibold text-slate-500 hover:text-slate-800 hover:border-slate-300 flex items-center space-x-2">
+          <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-xs flex items-center justify-center font-bold">2</span>
+          <span>Data & Pemetaan Kolom</span>
+        </button>
+
+        <button id="tab-btn-preview" onclick="switchTab('preview')" class="tab-button border-b-2 border-transparent py-3 px-1 text-sm font-semibold text-slate-500 hover:text-slate-800 hover:border-slate-300 flex items-center space-x-2">
+          <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-xs flex items-center justify-center font-bold">3</span>
+          <span>Pratinjau & Ekspor</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+    <!-- ========================================== -->
+    <!-- TAB 1: TEMPLATE DOKUMEN                    -->
+    <!-- ========================================== -->
+    <section id="tab-content-template" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: Upload & Input Panel -->
+        <div class="lg:col-span-2 space-y-6">
+          <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Sumber Template</h2>
+                <p class="text-xs text-slate-500">Mendukung file Microsoft Word (.docx) atau ketik teks format langsung</p>
+              </div>
+              <!-- Template Type Switcher -->
+              <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
+                <button id="btn-mode-docx" onclick="setTemplateMode('docx')" class="px-3 py-1.5 rounded-md font-semibold text-brand-600 bg-white shadow-sm transition">File Word (.docx)</button>
+                <button id="btn-mode-manual" onclick="setTemplateMode('manual')" class="px-3 py-1.5 rounded-md font-semibold text-slate-600 hover:text-slate-900 transition">Editor Manual</button>
+              </div>
+            </div>
+
+            <!-- Mode A: Word Document Upload -->
+            <div id="panel-template-docx" class="space-y-4">
+              <div id="dropzone-docx" class="border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-8 text-center cursor-pointer transition bg-slate-50 hover:bg-brand-50/20">
+                <input type="file" id="input-docx-file" accept=".docx" class="hidden">
+                <div class="mx-auto w-12 h-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mb-3">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                </div>
+                <p class="text-sm font-medium text-slate-800">Klik untuk memilih file .docx atau seret file ke sini</p>
+                <p class="text-xs text-slate-400 mt-1">Format tag didukung: <code class="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-700 font-mono text-[11px]">${nama_variabel}</code> atau <code class="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-700 font-mono text-[11px]">«nama_variabel»</code></p>
+              </div>
+
+              <!-- Active Template Info Bar -->
+              <div id="active-template-bar" class="hidden flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs">
+                <div class="flex items-center space-x-2">
+                  <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  <div>
+                    <span id="loaded-template-filename" class="font-bold text-slate-800">template.docx</span>
+                    <span id="loaded-template-size" class="text-slate-400 ml-2">-- KB</span>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button id="btn-download-raw-template" class="px-2.5 py-1 text-slate-600 hover:text-slate-900 border border-slate-200 rounded bg-white font-medium hover:bg-slate-50 transition">Unduh Template Asli</button>
+                  <button id="btn-remove-template" class="px-2.5 py-1 text-red-600 hover:text-red-700 border border-red-200 rounded bg-white font-medium hover:bg-red-50 transition">Hapus</button>
+                </div>
+              </div>
+
+              <!-- Sample Preset Loader -->
+              <div class="flex items-center justify-between pt-2">
+                <span class="text-xs text-slate-500">Belum punya template Word?</span>
+                <button onclick="loadSampleTemplate()" class="text-xs text-brand-600 hover:text-brand-700 font-semibold underline underline-offset-2">Gunakan Surat Contoh Bawaan</button>
+              </div>
+            </div>
+
+            <!-- Mode B: Manual RTF/Rich Text Editor -->
+            <div id="panel-template-manual" class="hidden space-y-3">
+              <!-- Toolbar -->
+              <div class="flex flex-wrap items-center gap-1.5 p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs">
+                <button type="button" onclick="formatDoc('bold')" class="p-1.5 rounded hover:bg-white text-slate-700 font-bold border border-transparent hover:border-slate-200">B</button>
+                <button type="button" onclick="formatDoc('italic')" class="p-1.5 rounded hover:bg-white text-slate-700 italic border border-transparent hover:border-slate-200">I</button>
+                <button type="button" onclick="formatDoc('underline')" class="p-1.5 rounded hover:bg-white text-slate-700 underline border border-transparent hover:border-slate-200">U</button>
+                <span class="h-4 w-px bg-slate-300 mx-1"></span>
+                <button type="button" onclick="formatDoc('justifyLeft')" class="p-1.5 rounded hover:bg-white text-slate-700 border border-transparent hover:border-slate-200">Rata Kiri</button>
+                <button type="button" onclick="formatDoc('justifyCenter')" class="p-1.5 rounded hover:bg-white text-slate-700 border border-transparent hover:border-slate-200">Tengah</button>
+                <button type="button" onclick="formatDoc('justifyRight')" class="p-1.5 rounded hover:bg-white text-slate-700 border border-transparent hover:border-slate-200">Rata Kanan</button>
+                <span class="h-4 w-px bg-slate-300 mx-1"></span>
+                <button type="button" onclick="insertPageBreak()" class="px-2 py-1 rounded bg-white hover:bg-slate-50 text-slate-700 font-medium border border-slate-200 flex items-center space-x-1" title="Sisipkan pemisah halaman baru">
+                  <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 13H5m14 0l-4-4m4 4l-4 4M5 7h14M5 19h14"/></svg>
+                  <span>Batas Halaman</span>
+                </button>
+                <button type="button" onclick="insertPlaceholderPrompt()" class="px-2 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded font-semibold border border-brand-200">
+                  + Sisipkan Tag «...»
+                </button>
+              </div>
+
+              <!-- Editable Canvas Area -->
+              <div id="manual-editor" contenteditable="true"
+                <br>
+                <p>Kepada Yth,</p>
+                <p><strong>${nama_penerima}</strong></p>
+                <p>di ${alamat_penerima}</p>
+                <br>
+                <p>Dengan hormat,</p>
+                <p>Bersama surat ini kami mengundang Saudara/i untuk hadir pada kegiatan evaluasi berkala yang akan diselenggarakan pada tanggal <strong>${tanggal_acara}</strong> bertempat di ${lokasi_acara}.</p>
+                <br>
+                <p>Demikian surat ini kami sampaikan, atas perhatian dan kerja samanya kami ucapkan terima kasih.</p>
+                <br>
+                <p>Hormat kami,</p>
+                <p><strong>${penandatangan}</strong><br>${jabatan_penandatangan}</p>
+              </div>
+              <p class="text-[11px] text-slate-400">Ketik tanda format seperti <code class="font-mono text-slate-600">${nama_kolom}</code> atau <code class="font-mono text-slate-600">«nama_kolom»</code> langsung pada editor.</p>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right: Detected Variables Sidebar -->
+        <div class="space-y-6">
+          <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-slate-900">Variabel / Placeholder</h3>
+              <span id="detected-tags-badge" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">0 tag</span>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">Tag yang berhasil dideteksi dari template saat ini. Kolom data Excel nantinya akan dicocokkan ke tag ini.</p>
+            
+            <div id="detected-tags-container" class="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+              <div class="text-center py-8 text-xs text-slate-400 italic">
+                Belum ada template yang dimuat
+              </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
+              <button onclick="rescanPlaceholders()" class="text-xs text-slate-600 hover:text-brand-600 font-semibold flex items-center space-x-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Pindai Ulang Tag</span>
+              </button>
+              <button onclick="switchTab('data')" class="text-xs px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-semibold transition">
+                Lanjut ke Data →
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: DATA & PEMETAAN KOLOM               -->
+    <!-- ========================================== -->
+    <section id="tab-content-data" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Top / Left: File Upload & Spreadsheet Preview (8 cols) -->
+        <div class="lg:col-span-8 space-y-6">
+          <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Data Sumber</h2>
+                <p class="text-xs text-slate-500">Unggah file spreadsheet Excel (.xlsx, .xls) atau CSV</p>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button onclick="loadSampleData()" class="px-3 py-1.5 text-xs font-semibold text-brand-600 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition">
+                  Gunakan Data Contoh
+                </button>
+                <button id="btn-export-current-data" onclick="exportDataToExcel()" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition flex items-center space-x-1.5">
+                  <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  <span>Simpan Data (.xlsx)</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Upload Area -->
+            <div id="dropzone-data" class="border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-6 text-center cursor-pointer transition bg-slate-50 hover:bg-brand-50/20 mb-4">
+              <input type="file" id="input-data-file" accept=".xlsx, .xls, .csv" class="hidden">
+              <div class="mx-auto w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mb-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
+              <p class="text-xs font-semibold text-slate-800">Pilih file spreadsheet (.xlsx / .csv)</p>
+              <p class="text-[11px] text-slate-400 mt-0.5">Baris pertama harus berisi judul kolom (header)</p>
+            </div>
+
+            <!-- Spreadsheet Table Container -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-slate-700">Tabel Data Aktif</span>
+                <span id="data-table-records-label" class="text-xs text-slate-400">0 baris data</span>
+              </div>
+              <div class="border border-slate-200 rounded-lg overflow-x-auto max-h-[360px] bg-slate-50">
+                <table id="data-preview-table" class="min-w-full divide-y divide-slate-200 text-xs text-left">
+                  <thead class="bg-slate-100 text-slate-600 font-semibold sticky top-0 shadow-sm z-10" id="data-preview-thead">
+                    <tr><th class="p-3 text-center text-slate-400">Belum ada data</th></tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-200 bg-white" id="data-preview-tbody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Right: Field Mapping Interface (4 cols) -->
+        <div class="lg:col-span-4 space-y-6">
+          <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-base font-bold text-slate-900">Pencocokan Kolom</h3>
+              <button onclick="autoMatchColumns(true)" title="Jalankan pencocokan otomatis cerdas" class="text-xs text-brand-600 hover:text-brand-700 font-semibold">
+                Auto-Match
+              </button>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">Hubungkan tag placeholder pada dokumen dengan kolom dari tabel data.</p>
+
+            <div id="mapping-list-container" class="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+              <div class="text-center py-8 text-xs text-slate-400 italic">
+                Muat template dan data terlebih dahulu
+              </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+              <span id="mapping-progress-text" class="text-[11px] font-medium text-slate-500">0 dari 0 tag terpetakan</span>
+              <button onclick="switchTab('preview')" class="text-xs px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-semibold transition">
+                Buka Pratinjau →
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: PRATINJAU & EKSPOR                  -->
+    <!-- ========================================== -->
+    <section id="tab-content-preview" class="hidden space-y-6">
+      
+      <!-- Top Control Bar -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        
+        <!-- Record Navigation -->
+        <div class="flex items-center space-x-2">
+          <button id="nav-btn-first" onclick="goToRecord(0)" class="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" title="Baris Pertama">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+          </button>
+          <button id="nav-btn-prev" onclick="prevRecord()" class="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" title="Sebelumnya">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          
+          <div class="flex items-center space-x-1.5 text-xs font-semibold px-2">
+            <span>Baris:</span>
+            <input type="number" id="nav-record-input" min="1" value="1" onchange="onRecordInputChanged(this.value)" class="w-14 text-center py-1 border border-slate-200 rounded font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            <span class="text-slate-400">/ <span id="nav-total-records">0</span></span>
+          </div>
+
+          <button id="nav-btn-next" onclick="nextRecord()" class="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" title="Berikutnya">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button id="nav-btn-last" onclick="goToRecord(totalRecords - 1)" class="p-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" title="Baris Terakhir">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <!-- Export Actions Toolbar -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Export Single Word -->
+          <button onclick="exportSingleWord()" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
+            <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span>Ekspor Word (.docx) Ini</span>
+          </button>
+
+          <!-- Export Batch ZIP (All Records) -->
+          <button onclick="exportBatchZip()" class="px-3.5 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+            <span>Ekspor Batch (.zip Semua Baris)</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Document Visual Preview Canvas -->
+      <div class="flex justify-center bg-slate-200/70 p-4 sm:p-8 rounded-xl border border-slate-300 min-h-[600px] overflow-auto">
+        <div id="preview-paper" class="paper-a4 bg-white shadow-xl rounded-sm p-12 transition-all duration-150 relative">
+          
+          <!-- Loading Overlay -->
+          <div id="preview-loading" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
+            <div class="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-xs font-semibold text-slate-600 mt-3">Menghasilkan dokumen...</p>
+          </div>
+
+          <!-- Live Render Mount -->
+          <div id="preview-content-mount" class="docx-render-container w-full h-full text-slate-800 leading-relaxed">
+            <div class="text-center py-20 text-slate-400">
+              <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+              <p class="text-sm font-medium text-slate-500">Pratinjau Belum Tersedia</p>
+              <p class="text-xs text-slate-400 mt-1">Lengkapi template pada langkah 1 dan data pada langkah 2</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Custom Alert / Confirm Modal (Strict zero-native alert implementation) -->
+  <div id="app-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transition transform scale-95" id="app-modal-box">
+      <h3 id="modal-title" class="text-base font-bold text-slate-900 mb-2">Pemberitahuan</h3>
+      <p id="modal-message" class="text-xs text-slate-600 mb-6 leading-relaxed">Pesan modal ditampilkan di sini.</p>
+      <div id="modal-actions" class="flex justify-end space-x-2">
+        <button id="modal-btn-cancel" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Batal</button>
+        <button id="modal-btn-confirm" class="px-4 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Non-intrusive Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs px-4 py-3 rounded-lg shadow-lg flex items-center space-x-2 transition-all transform translate-y-12 opacity-0 pointer-events-none">
+    <span id="toast-message">Notifikasi</span>
+  </div>
+
+  <script>
+    /* =========================================================================
+       DRAFTR - CLIENT-SIDE MAIL MERGE ENGINE
+       Core State, Caching, Event Listeners, and File Handlers
+       ========================================================================= */
+
+    // Application Master State
+    const state = {
+      templateMode: 'docx', // 'docx' or 'manual'
+      rawDocxArrayBuffer: null,
+      templateFileName: '',
+      manualContentHtml: '',
+      detectedPlaceholders: [],
+      dataHeaders: [],
+      dataRows: [], // Array of objects
+      mappings: {}, // { placeholder_key: excel_header_key }
+      currentIndex: 0,
+      paperSize: 'a4',
+      isDirty: false
+    };
+
+    // DOM Elements Cache
+    const el = {
+      // Tabs
+      tabTemplate: document.getElementById('tab-content-template'),
+      tabData: document.getElementById('tab-content-data'),
+      tabPreview: document.getElementById('tab-content-preview'),
+      btnTabTemplate: document.getElementById('tab-btn-template'),
+      btnTabData: document.getElementById('tab-btn-data'),
+      btnTabPreview: document.getElementById('tab-btn-preview'),
+
+      // Header Status
+      statusTemplateDot: document.getElementById('status-template-dot'),
+      statusTemplateName: document.getElementById('status-template-name'),
+      statusDataDot: document.getElementById('status-data-dot'),
+      statusDataCount: document.getElementById('status-data-count'),
+      statusMappingDot: document.getElementById('status-mapping-dot'),
+      statusMappingCount: document.getElementById('status-mapping-count'),
+      paperSelect: document.getElementById('paper-size-select'),
+
+      // Template Elements
+      btnModeDocx: document.getElementById('btn-mode-docx'),
+      btnModeManual: document.getElementById('btn-mode-manual'),
+      panelDocx: document.getElementById('panel-template-docx'),
+      panelManual: document.getElementById('panel-template-manual'),
+      dropzoneDocx: document.getElementById('dropzone-docx'),
+      inputDocxFile: document.getElementById('input-docx-file'),
+      activeTemplateBar: document.getElementById('active-template-bar'),
+      loadedTemplateFilename: document.getElementById('loaded-template-filename'),
+      loadedTemplateSize: document.getElementById('loaded-template-size'),
+      btnDownloadRawTemplate: document.getElementById('btn-download-raw-template'),
+      btnRemoveTemplate: document.getElementById('btn-remove-template'),
+      manualEditor: document.getElementById('manual-editor'),
+      detectedTagsContainer: document.getElementById('detected-tags-container'),
+      detectedTagsBadge: document.getElementById('detected-tags-badge'),
+
+      // Data Elements
+      dropzoneData: document.getElementById('dropzone-data'),
+      inputDataFile: document.getElementById('input-data-file'),
+      dataPreviewThead: document.getElementById('data-preview-thead'),
+      dataPreviewTbody: document.getElementById('data-preview-tbody'),
+      dataTableRecordsLabel: document.getElementById('data-table-records-label'),
+      mappingListContainer: document.getElementById('mapping-list-container'),
+      mappingProgressText: document.getElementById('mapping-progress-text'),
+
+      // Preview Elements
+      previewPaper: document.getElementById('preview-paper'),
+      previewLoading: document.getElementById('preview-loading'),
+      previewMount: document.getElementById('preview-content-mount'),
+      navRecordInput: document.getElementById('nav-record-input'),
+      navTotalRecords: document.getElementById('nav-total-records'),
+      navBtnFirst: document.getElementById('nav-btn-first'),
+      navBtnPrev: document.getElementById('nav-btn-prev'),
+      navBtnNext: document.getElementById('nav-btn-next'),
+      navBtnLast: document.getElementById('nav-btn-last'),
+
+      // Config Elements
+      btnExportConfig: document.getElementById('btn-export-config'),
+      btnImportConfigTrigger: document.getElementById('btn-import-config-trigger'),
+      inputConfigFile: document.getElementById('input-config-file'),
+
+      // Modal & Toast
+      appModal: document.getElementById('app-modal'),
+      appModalBox: document.getElementById('app-modal-box'),
+      modalTitle: document.getElementById('modal-title'),
+      modalMessage: document.getElementById('modal-message'),
+      modalBtnCancel: document.getElementById('modal-btn-cancel'),
+      modalBtnConfirm: document.getElementById('modal-btn-confirm'),
+      toast: document.getElementById('toast'),
+      toastMessage: document.getElementById('toast-message'),
+    };
+
+    // Custom Non-blocking Toast Helper
+    function showToast(msg, duration = 3000) {
+      el.toastMessage.textContent = msg;
+      el.toast.classList.remove('translate-y-12', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        el.toast.classList.add('translate-y-12', 'opacity-0', 'pointer-events-none');
+      }, duration);
+    }
+
+    // Custom Modal System (Zero native alert/confirm)
+    function showCustomModal({ title, message, showCancel = false, confirmText = 'OK', cancelText = 'Batal', onConfirm = null }) {
+      el.modalTitle.textContent = title || 'Informasi';
+      el.modalMessage.textContent = message || '';
+      el.modalBtnConfirm.textContent = confirmText;
+      el.modalBtnCancel.textContent = cancelText;
+
+      el.modalBtnCancel.style.display = showCancel ? 'inline-block' : 'none';
+
+      el.appModal.classList.remove('hidden');
+      setTimeout(() => el.appModalBox.classList.remove('scale-95'), 10);
+
+      const cleanup = () => {
+        el.appModalBox.classList.add('scale-95');
+        setTimeout(() => el.appModal.classList.add('hidden'), 150);
+        el.modalBtnConfirm.onclick = null;
+        el.modalBtnCancel.onclick = null;
+      };
+
+      el.modalBtnConfirm.onclick = () => {
+        cleanup();
+        if (onConfirm) onConfirm();
+      };
+
+      el.modalBtnCancel.onclick = () => {
+        cleanup();
+      };
+    }
+
+    // Protection against accidental tab/browser close
+    window.addEventListener('beforeunload', (e) => {
+      if (state.isDirty || state.dataRows.length > 0 || state.rawDocxArrayBuffer) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    // Paper Size Change Handler
+    el.paperSelect.addEventListener('change', (e) => {
+      setPaperSize(e.target.value);
+    });
+
+    function setPaperSize(sizeKey) {
+      state.paperSize = sizeKey;
+      el.previewPaper.className = `paper-${sizeKey} bg-white shadow-xl rounded-sm p-12 transition-all duration-150 relative`;
+      showToast(`Ukuran kertas diatur ke ${sizeKey.toUpperCase()}`);
+      saveToIndexedDB();
+    }
+
+    function switchTab(tabId) {
+      // Update UI classes
+      const tabs = ['template', 'data', 'preview'];
+      tabs.forEach(t => {
+        const content = document.getElementById(`tab-content-${t}`);
+        const btn = document.getElementById(`tab-btn-${t}`);
+        if (t === tabId) {
+          content.classList.remove('hidden');
+          btn.classList.add('border-brand-600', 'text-brand-600');
+          btn.classList.remove('border-transparent', 'text-slate-500');
+          btn.querySelector('span:first-child').classList.add('bg-brand-100', 'text-brand-700');
+          btn.querySelector('span:first-child').classList.remove('bg-slate-100', 'text-slate-600');
+        } else {
+          content.classList.add('hidden');
+          btn.classList.remove('border-brand-600', 'text-brand-600');
+          btn.classList.add('border-transparent', 'text-slate-500');
+          btn.querySelector('span:first-child').classList.remove('bg-brand-100', 'text-brand-700');
+          btn.querySelector('span:first-child').classList.add('bg-slate-100', 'text-slate-600');
+        }
+      });
+
+      // Actions upon entering preview
+      if (tabId === 'preview') {
+        renderCurrentPreview();
+      }
+    }
+
+    function setTemplateMode(mode) {
+      state.templateMode = mode;
+      state.isDirty = true;
+      if (mode === 'docx') {
+        el.panelDocx.classList.remove('hidden');
+        el.panelManual.classList.add('hidden');
+        el.btnModeDocx.classList.add('text-brand-600', 'bg-white', 'shadow-sm');
+        el.btnModeDocx.classList.remove('text-slate-600');
+        el.btnModeManual.classList.remove('text-brand-600', 'bg-white', 'shadow-sm');
+        el.btnModeManual.classList.add('text-slate-600');
+        rescanPlaceholders();
+      } else {
+        el.panelDocx.classList.add('hidden');
+        el.panelManual.classList.remove('hidden');
+        el.btnModeManual.classList.add('text-brand-600', 'bg-white', 'shadow-sm');
+        el.btnModeManual.classList.remove('text-slate-600');
+        el.btnModeDocx.classList.remove('text-brand-600', 'bg-white', 'shadow-sm');
+        el.btnModeDocx.classList.add('text-slate-600');
+        rescanPlaceholders();
+      }
+      updateStatusBadges();
+      saveToIndexedDB();
+    }
+
+    // Helper to sanitize placeholder strings
+    function sanitizeTag(raw) {
+      return raw.replace(/^[«\$\{]+|[»\}]+$/g, '').trim();
+    }
+
+    // Scan placeholders from Word or Manual Editor
+    function rescanPlaceholders() {
+      const foundTags = new Set();
+
+      if (state.templateMode === 'docx') {
+        if (!state.rawDocxArrayBuffer) {
+          state.detectedPlaceholders = [];
+          renderDetectedTags();
+          return;
+        }
+
+        try {
+          const zip = new PizZip(state.rawDocxArrayBuffer);
+          const xmlContent = zip.files['word/document.xml'] ? zip.files['word/document.xml'].asText() : '';
+          
+          // Regex matching: ${varName} or «varName» or {varName}
+          const regexAll = /(?:«([^»]+)»|\$\{([^}]+)\}|\{([a-zA-Z0-9_\-]+)\})/g;
+          let match;
+          while ((match = regexAll.exec(xmlContent)) !== null) {
+            const tag = (match[1] || match[2] || match[3] || '').trim();
+            if (tag && !tag.startsWith('#') && !tag.startsWith('/') && !tag.startsWith('^')) {
+              foundTags.add(tag);
+            }
+          }
+        } catch (err) {
+          console.error("Gagal mengekstrak placeholder dari XML DOCX:", err);
+        }
+
+      } else {
+        // Manual mode
+        const text = el.manualEditor.innerText || '';
+        const regexAll = /(?:«([^»]+)»|\$\{([^}]+)\})/g;
+        let match;
+        while ((match = regexAll.exec(text)) !== null) {
+          const tag = (match[1] || match[2] || '').trim();
+          if (tag) foundTags.add(tag);
+        }
+      }
+
+      state.detectedPlaceholders = Array.from(foundTags);
+      renderDetectedTags();
+      renderMappingInterface();
+      updateStatusBadges();
+      saveToIndexedDB();
+    }
+
+    function renderDetectedTags() {
+      el.detectedTagsBadge.textContent = `${state.detectedPlaceholders.length} tag`;
+      el.detectedTagsContainer.innerHTML = '';
+
+      if (state.detectedPlaceholders.length === 0) {
+        el.detectedTagsContainer.innerHTML = `
+          <div class="text-center py-8 text-xs text-slate-400 italic">
+            ${state.templateMode === 'docx' && !state.rawDocxArrayBuffer ? 'Silakan unggah file Word terlebih dahulu' : 'Tidak ada tag terdeteksi (${tag} atau «tag»)'}
+          </div>
+        `;
+        return;
+      }
+
+      state.detectedPlaceholders.forEach(tag => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs';
+        item.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-brand-500"></span>
+            <span class="font-mono text-slate-800 font-medium">${tag}</span>
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono">«${tag}»</span>
+        `;
+        el.detectedTagsContainer.appendChild(item);
+      });
+    }
+
+    // Docx Dropzone Event Listeners
+    el.dropzoneDocx.addEventListener('click', () => el.inputDocxFile.click());
+    el.dropzoneDocx.addEventListener('dragover', (e) => { e.preventDefault(); el.dropzoneDocx.classList.add('border-brand-500', 'bg-brand-50/20'); });
+    el.dropzoneDocx.addEventListener('dragleave', () => { el.dropzoneDocx.classList.remove('border-brand-500', 'bg-brand-50/20'); });
+    el.dropzoneDocx.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.dropzoneDocx.classList.remove('border-brand-500', 'bg-brand-50/20');
+      if (e.dataTransfer.files.length) handleDocxFile(e.dataTransfer.files[0]);
+    });
+    el.inputDocxFile.addEventListener('change', (e) => {
+      if (e.target.files.length) handleDocxFile(e.target.files[0]);
+    });
+
+    function handleDocxFile(file) {
+      if (!file.name.toLowerCase().endsWith('.docx')) {
+        showCustomModal({ title: 'Format Tidak Sesuai', message: 'Harap unggah file Microsoft Word dengan ekstensi .docx' });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        state.rawDocxArrayBuffer = e.target.result;
+        state.templateFileName = file.name;
+        state.isDirty = true;
+
+        el.loadedTemplateFilename.textContent = file.name;
+        el.loadedTemplateSize.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+        el.activeTemplateBar.classList.remove('hidden');
+
+        rescanPlaceholders();
+        showToast('Template Word berhasil dimuat');
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    el.btnRemoveTemplate.addEventListener('click', () => {
+      showCustomModal({
+        title: 'Hapus Template',
+        message: 'Apakah Anda yakin ingin menghapus template Word aktif?',
+        showCancel: true,
+        confirmText: 'Hapus',
+        onConfirm: () => {
+          state.rawDocxArrayBuffer = null;
+          state.templateFileName = '';
+          el.inputDocxFile.value = '';
+          el.activeTemplateBar.classList.add('hidden');
+          rescanPlaceholders();
+          showToast('Template Word dihapus');
+        }
+      });
+    });
+
+    el.btnDownloadRawTemplate.addEventListener('click', () => {
+      if (!state.rawDocxArrayBuffer) return;
+      const blob = new Blob([state.rawDocxArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      saveAs(blob, state.templateFileName || 'Template_Draftr.docx');
+    });
+
+    // Manual Editor Tools
+    function formatDoc(command) {
+      document.execCommand(command, false, null);
+      el.manualEditor.focus();
+      rescanPlaceholders();
+    }
+
+    function insertPageBreak() {
+      const pageBreakHtml = '<div class="page-break" contenteditable="false">--- BATAS HALAMAN (PAGE BREAK) ---</div><p><br></p>';
+      document.execCommand('insertHTML', false, pageBreakHtml);
+      el.manualEditor.focus();
+      state.isDirty = true;
+      rescanPlaceholders();
+    }
+
+    function insertPlaceholderPrompt() {
+      const tag = prompt("Masukkan nama tag placeholder (tanpa kurung/simbol):");
+      if (tag && tag.trim()) {
+        const clean = tag.trim().replace(/\s+/g, '_');
+        document.execCommand('insertText', false, `\${${clean}}`);
+        rescanPlaceholders();
+      }
+    }
+
+    el.manualEditor.addEventListener('input', () => {
+      state.isDirty = true;
+      rescanPlaceholders();
+    });
+
+    // Helper to generate a pre-made sample DOCX on the fly
+    function loadSampleTemplate() {
+      setTemplateMode('docx');
+      
+      // Minimal OpenXML structure for sample certificate / letter
+      const zip = new PizZip();
+      zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+          <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+          <Default Extension="xml" ContentType="application/xml"/>
+          <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+        </Types>`);
+
+      zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+        </Relationships>`);
+
+      zip.folder("word").file("document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="36"/></w:rPr><w:t>SURAT KETERANGAN RESMI</w:t></w:r></w:p>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:color w:val="666666"/></w:rPr><w:t>Nomor: {nomor_surat}</w:t></w:r></w:p>
+            <w:p><w:r><w:t></w:t></w:r></w:p>
+            <w:p><w:r><w:t>Yang bertanda tangan di bawah ini menerangkan bahwa:</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Nama Lengkap : {nama_lengkap}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Instansi / Unit : {instansi}</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Jabatan : {jabatan}</w:t></w:r></w:p>
+            <w:p><w:r><w:t></w:t></w:r></w:p>
+            <w:p><w:r><w:t>Telah menyelesaikan seluruh rangkaian kegiatan evaluasi dengan predikat: {status_kelulusan}.</w:t></w:r></w:p>
+            <w:p><w:r><w:t>Demikian surat keterangan ini diterbitkan di {kota_terbit} pada tanggal {tanggal_terbit} untuk dipergunakan sebagaimana mestinya.</w:t></w:r></w:p>
+            <w:p><w:r><w:t></w:t></w:r></w:p>
+            <w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>{penandatangan}</w:t></w:r></w:p>
+          </w:body>
+        </w:document>`);
+
+      const outBuffer = zip.generate({ type: "arraybuffer" });
+      state.rawDocxArrayBuffer = outBuffer;
+      state.templateFileName = "Template_Contoh_Resmi.docx";
+      state.isDirty = true;
+
+      el.loadedTemplateFilename.textContent = state.templateFileName;
+      el.loadedTemplateSize.textContent = `${(outBuffer.byteLength / 1024).toFixed(1)} KB`;
+      el.activeTemplateBar.classList.remove('hidden');
+
+      rescanPlaceholders();
+      showToast('Template contoh berhasil dimuat');
+    }
+
+    // Data File Dropzone
+    el.dropzoneData.addEventListener('click', () => el.inputDataFile.click());
+    el.dropzoneData.addEventListener('dragover', (e) => { e.preventDefault(); el.dropzoneData.classList.add('border-brand-500', 'bg-brand-50/20'); });
+    el.dropzoneData.addEventListener('dragleave', () => { el.dropzoneData.classList.remove('border-brand-500', 'bg-brand-50/20'); });
+    el.dropzoneData.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.dropzoneData.classList.remove('border-brand-500', 'bg-brand-50/20');
+      if (e.dataTransfer.files.length) handleDataFile(e.dataTransfer.files[0]);
+    });
+    el.inputDataFile.addEventListener('change', (e) => {
+      if (e.target.files.length) handleDataFile(e.target.files[0]);
+    });
+
+    function handleDataFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+          if (!jsonData || jsonData.length === 0) {
+            showCustomModal({ title: 'File Kosong', message: 'Tabel spreadsheet tidak memiliki baris data.' });
+            return;
+          }
+
+          // Extract Headers
+          state.dataHeaders = Object.keys(jsonData[0]);
+          state.dataRows = jsonData;
+          state.currentIndex = 0;
+          state.isDirty = true;
+
+          renderDataTable();
+          autoMatchColumns(false);
+          updateStatusBadges();
+          saveToIndexedDB();
+          showToast(`Berhasil memuat ${state.dataRows.length} baris data`);
+        } catch (err) {
+          console.error("Gagal membaca file data:", err);
+          showCustomModal({ title: 'Kesalahan Berkas', message: 'Format data Excel/CSV tidak valid atau rusak.' });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function renderDataTable() {
+      el.dataPreviewThead.innerHTML = '';
+      el.dataPreviewTbody.innerHTML = '';
+      el.dataTableRecordsLabel.textContent = `${state.dataRows.length} baris data`;
+
+      if (state.dataHeaders.length === 0) {
+        el.dataPreviewThead.innerHTML = '<tr><th class="p-3 text-center text-slate-400">Belum ada data</th></tr>';
+        return;
+      }
+
+      // Render Header Row
+      const trHead = document.createElement('tr');
+      const thNum = document.createElement('th');
+      thNum.className = 'p-2.5 font-bold text-slate-700 text-center w-12 border-b border-slate-200';
+      thNum.textContent = '#';
+      trHead.appendChild(thNum);
+
+      state.dataHeaders.forEach(header => {
+        const th = document.createElement('th');
+        th.className = 'p-2.5 font-bold text-slate-700 border-b border-slate-200 whitespace-nowrap';
+        th.textContent = header;
+        trHead.appendChild(th);
+      });
+      el.dataPreviewThead.appendChild(trHead);
+
+      // Render First 50 rows for fast preview
+      const previewRows = state.dataRows.slice(0, 50);
+      previewRows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition font-mono text-[11px]';
+
+        const tdNum = document.createElement('td');
+        tdNum.className = 'p-2 text-center text-slate-400 font-sans';
+        tdNum.textContent = idx + 1;
+        tr.appendChild(tdNum);
+
+        state.dataHeaders.forEach(header => {
+          const td = document.createElement('td');
+          td.className = 'p-2 text-slate-700 truncate max-w-[200px]';
+          td.textContent = row[header] !== undefined ? String(row[header]) : '';
+          tr.appendChild(td);
+        });
+
+        el.dataPreviewTbody.appendChild(tr);
+      });
+    }
+
+    // Normalization helper for smart matching
+    function normalizeString(str) {
+      return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function autoMatchColumns(notifyUser = true) {
+      if (state.detectedPlaceholders.length === 0 || state.dataHeaders.length === 0) return;
+
+      let matchCount = 0;
+      state.detectedPlaceholders.forEach(tag => {
+        const normTag = normalizeString(tag);
+
+        // 1. Exact or normalized match
+        let bestMatch = state.dataHeaders.find(h => normalizeString(h) === normTag);
+
+        // 2. Substring match fallback
+        if (!bestMatch) {
+          bestMatch = state.dataHeaders.find(h => {
+            const normH = normalizeString(h);
+            return normH.includes(normTag) || normTag.includes(normH);
+          });
+        }
+
+        if (bestMatch) {
+          state.mappings[tag] = bestMatch;
+          matchCount++;
+        }
+      });
+
+      renderMappingInterface();
+      updateStatusBadges();
+      saveToIndexedDB();
+
+      if (notifyUser) {
+        showToast(`Auto-match selesai: ${matchCount} tag berhasil dipasangkan`);
+      }
+    }
+
+    function renderMappingInterface() {
+      el.mappingListContainer.innerHTML = '';
+
+      if (state.detectedPlaceholders.length === 0) {
+        el.mappingListContainer.innerHTML = `
+          <div class="text-center py-8 text-xs text-slate-400 italic">
+            Belum ada placeholder terdeteksi pada template
+          </div>
+        `;
+        el.mappingProgressText.textContent = '0 dari 0 tag terpetakan';
+        return;
+      }
+
+      let mappedCount = 0;
+
+      state.detectedPlaceholders.forEach(tag => {
+        const currentMappedCol = state.mappings[tag] || '';
+        if (currentMappedCol) mappedCount++;
+
+        const row = document.createElement('div');
+        row.className = 'p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex flex-col space-y-1.5';
+
+        const labelRow = document.createElement('div');
+        labelRow.className = 'flex items-center justify-between';
+        labelRow.innerHTML = `
+          <span class="font-mono text-xs font-bold text-slate-800">${tag}</span>
+          <span class="text-[10px] text-slate-400">Tag Template</span>
+        `;
+
+        const select = document.createElement('select');
+        select.className = 'w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500';
+        
+        // Option default: Not mapped
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = '-- Pilih Kolom Excel --';
+        select.appendChild(defaultOpt);
+
+        state.dataHeaders.forEach(header => {
+          const opt = document.createElement('option');
+          opt.value = header;
+          opt.textContent = header;
+          if (header === currentMappedCol) opt.selected = true;
+          select.appendChild(opt);
+        });
+
+        select.addEventListener('change', (e) => {
+          if (e.target.value) {
+            state.mappings[tag] = e.target.value;
+          } else {
+            delete state.mappings[tag];
+          }
+          state.isDirty = true;
+          updateStatusBadges();
+          renderMappingInterface();
+          saveToIndexedDB();
+        });
+
+        row.appendChild(labelRow);
+        row.appendChild(select);
+        el.mappingListContainer.appendChild(row);
+      });
+
+      el.mappingProgressText.textContent = `${mappedCount} dari ${state.detectedPlaceholders.length} tag terpetakan`;
+    }
+
+    // Export current data table to Excel
+    function exportDataToExcel() {
+      if (state.dataRows.length === 0) {
+        showCustomModal({ title: 'Data Kosong', message: 'Tidak ada data untuk diekspor.' });
+        return;
+      }
+      const ws = XLSX.utils.json_to_sheet(state.dataRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Data_Draftr");
+      XLSX.writeFile(wb, "Data_Draftr.xlsx");
+      showToast('File Data_Draftr.xlsx berhasil diunduh');
+    }
+
+    // Built-in sample data set loader
+    function loadSampleData() {
+      const sample = [
+        {
+          "nomor_surat": "001/HRD/EXT/IX/2026",
+          "nama_lengkap": "Ahmad Subagio",
+          "instansi": "Kementerian Pendidikan dan Kebudayaan",
+          "jabatan": "Analis Data Kebijakan",
+          "status_kelulusan": "Sangat Memuaskan",
+          "kota_terbit": "Jakarta Pusat",
+          "tanggal_terbit": "28 September 2026",
+          "penandatangan": "Dr. Hendra Gunawan, M.Sc.",
+          "nama_penerima": "Ahmad Subagio",
+          "alamat_penerima": "Jl. Sudirman No. 45, Jakarta",
+          "tanggal_acara": "5 Oktober 2026",
+          "lokasi_acara": "Ruang Rapat Utama Lt. 3",
+          "jabatan_penandatangan": "Kepala Pusat Standarisasi"
+        },
+        {
+          "nomor_surat": "002/HRD/EXT/IX/2026",
+          "nama_lengkap": "Siti Nurhaliza Putri",
+          "instansi": "Universitas Indonesia",
+          "jabatan": "Dosen Madya",
+          "status_kelulusan": "Dengan Pujian (Cum Laude)",
+          "kota_terbit": "Depok",
+          "tanggal_terbit": "28 September 2026",
+          "penandatangan": "Dr. Hendra Gunawan, M.Sc.",
+          "nama_penerima": "Siti Nurhaliza Putri",
+          "alamat_penerima": "Kampus UI Depok",
+          "tanggal_acara": "5 Oktober 2026",
+          "lokasi_acara": "Ruang Rapat Utama Lt. 3",
+          "jabatan_penandatangan": "Kepala Pusat Standarisasi"
+        },
+        {
+          "nomor_surat": "003/HRD/EXT/IX/2026",
+          "nama_lengkap": "Bambang Pamungkas",
+          "instansi": "Dinas Pemuda dan Olahraga",
+          "jabatan": "Koordinator Wilayah",
+          "status_kelulusan": "Memuaskan",
+          "kota_terbit": "Bandung",
+          "tanggal_terbit": "28 September 2026",
+          "penandatangan": "Dr. Hendra Gunawan, M.Sc.",
+          "nama_penerima": "Bambang Pamungkas",
+          "alamat_penerima": "Jl. Diponegoro No. 12, Bandung",
+          "tanggal_acara": "5 Oktober 2026",
+          "lokasi_acara": "Ruang Rapat Utama Lt. 3",
+          "jabatan_penandatangan": "Kepala Pusat Standarisasi"
+        }
+      ];
+
+      state.dataHeaders = Object.keys(sample[0]);
+      state.dataRows = sample;
+      state.currentIndex = 0;
+      state.isDirty = true;
+
+      renderDataTable();
+      autoMatchColumns(true);
+      updateStatusBadges();
+      saveToIndexedDB();
+    }
+
+    function getMergedRecordData(rowIndex) {
+      if (!state.dataRows || state.dataRows.length === 0) return {};
+      const row = state.dataRows[rowIndex] || {};
+      const mergedObj = {};
+
+      state.detectedPlaceholders.forEach(tag => {
+        const mappedCol = state.mappings[tag];
+        if (mappedCol && row[mappedCol] !== undefined) {
+          mergedObj[tag] = String(row[mappedCol]);
+        } else {
+          // Keep blank or original tag if unmapped
+          mergedObj[tag] = '';
+        }
+      });
+
+      return mergedObj;
+    }
+
+    // Paper dimensions in dxa (1 inch = 1440 dxa, 1 mm ~ 56.7 dxa)
+    const PAPER_SPECS = {
+      a4: { w: 11906, h: 16838 },
+      a5: { w: 8390, h: 11906 },
+      letter: { w: 12240, h: 15840 },
+      legal: { w: 12240, h: 20160 },
+      a3: { w: 16838, h: 23811 }
+    };
+
+    function escapeXml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+
+    // Converts Manual Editor DOM content to valid Word OpenXML paragraphs
+    function htmlToDocxXml(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
+      const root = doc.body.firstElementChild || doc.body;
+      let bodyXml = '';
+
+      function getAlignment(node) {
+        const align = node.style?.textAlign || node.getAttribute?.('align') || '';
+        if (align === 'center') return 'center';
+        if (align === 'right') return 'right';
+        if (align === 'justify') return 'both';
+        return '';
+      }
+
+      function collectRuns(element, activeStyle = { bold: false, italic: false, underline: false }) {
+        let runsXml = '';
+        for (const child of element.childNodes) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            const text = child.textContent;
+            if (!text) continue;
+            let rPr = '';
+            if (activeStyle.bold) rPr += '<w:b/>';
+            if (activeStyle.italic) rPr += '<w:i/>';
+            if (activeStyle.underline) rPr += '<w:u w:val="single"/>';
+            runsXml += `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ''}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const tag = child.tagName.toLowerCase();
+            if (tag === 'br') {
+              runsXml += '<w:r><w:br/></w:r>';
+            } else if (child.classList?.contains('page-break')) {
+              runsXml += '<w:r><w:br w:type="page"/></w:r>';
+            } else {
+              const nextStyle = {
+                bold: activeStyle.bold || tag === 'strong' || tag === 'b' || child.style.fontWeight === 'bold' || parseInt(child.style.fontWeight, 10) >= 600,
+                italic: activeStyle.italic || tag === 'em' || tag === 'i' || child.style.fontStyle === 'italic',
+                underline: activeStyle.underline || tag === 'u' || child.style.textDecoration?.includes('underline')
+              };
+              runsXml += collectRuns(child, nextStyle);
+            }
+          }
+        }
+        return runsXml;
+      }
+
+      for (const child of root.childNodes) {
+        if (child.nodeType === Node.ELEMENT_NODE) {
+          const tag = child.tagName.toLowerCase();
+          if (child.classList?.contains('page-break') || tag === 'hr') {
+            bodyXml += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+            continue;
+          }
+          const align = getAlignment(child);
+          const alignXml = align ? `<w:pPr><w:jc w:val="${align}"/></w:pPr>` : '';
+          const runs = collectRuns(child);
+          bodyXml += `<w:p>${alignXml}${runs || '<w:r><w:t></w:t></w:r>'}</w:p>`;
+        } else if (child.nodeType === Node.TEXT_NODE) {
+          const text = child.textContent.trim();
+          if (text) {
+            bodyXml += `<w:p><w:r><w:t xml:space="preserve">${escapeXml(child.textContent)}</w:t></w:r></w:p>`;
+          }
+        }
+      }
+
+      return bodyXml || '<w:p><w:r><w:t></w:t></w:r></w:p>';
+    }
+
+    // Synthesizes a valid .docx container from manual editor HTML content
+    function generateDocxBufferFromManualEditor() {
+      const zip = new PizZip();
+      const paper = PAPER_SPECS[state.paperSize] || PAPER_SPECS.a4;
+      const paragraphsXml = htmlToDocxXml(el.manualEditor.innerHTML);
+
+      zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+          <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+          <Default Extension="xml" ContentType="application/xml"/>
+          <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+        </Types>`);
+
+      zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+          <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+        </Relationships>`);
+
+      zip.folder("word").file("document.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body>
+            ${paragraphsXml}
+            <w:sectPr>
+              <w:pgSz w:w="${paper.w}" w:h="${paper.h}"/>
+              <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+            </w:sectPr>
+          </w:body>
+        </w:document>`);
+
+      return zip.generate({ type: "arraybuffer" });
+    }
+
+    // Gets template ArrayBuffer regardless of Word upload or Manual mode
+    function getEffectiveTemplateBuffer() {
+      if (state.templateMode === 'docx') {
+        return state.rawDocxArrayBuffer;
+      }
+      return generateDocxBufferFromManualEditor();
+    }
+
+    // Compiles a DOCX ArrayBuffer using Docxtemplater with robust binary output
+    function compileDocx(arrayBuffer, dataObj) {
+      const zip = new PizZip(arrayBuffer);
+
+      // Support {var}, ${var}, and «var»
+      let docXml = zip.files['word/document.xml'] ? zip.files['word/document.xml'].asText() : '';
+      if (docXml) {
+        docXml = docXml.replace(/«([^»]+)»/g, '{$1}');
+        docXml = docXml.replace(/\$\{([^}]+)\}/g, '{$1}');
+        zip.file('word/document.xml', docXml);
+      }
+
+      const docReady = new docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+
+      docReady.render(dataObj);
+      const u8Array = docReady.getZip().generate({ type: 'uint8array' });
+      return new Blob([u8Array], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+    }
+
+    async function renderCurrentPreview() {
+      const total = state.dataRows.length;
+      el.navTotalRecords.textContent = total;
+      el.navRecordInput.value = total > 0 ? state.currentIndex + 1 : 0;
+      el.navRecordInput.max = total;
+
+      el.navBtnFirst.disabled = state.currentIndex <= 0 || total === 0;
+      el.navBtnPrev.disabled = state.currentIndex <= 0 || total === 0;
+      el.navBtnNext.disabled = state.currentIndex >= total - 1 || total === 0;
+      el.navBtnLast.disabled = state.currentIndex >= total - 1 || total === 0;
+
+      if (total === 0) {
+        el.previewMount.innerHTML = `
+          <div class="text-center py-20 text-slate-400">
+            <svg class="w-10 h-10 mx-auto text-slate-300 mb-2" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+            <p class="text-sm font-semibold text-slate-600">Tidak ada data untuk ditampilkan</p>
+            <p class="text-xs text-slate-400 mt-1">Impor data spreadsheet pada Tab 2 terlebih dahulu</p>
+          </div>
+        `;
+        return;
+      }
+
+      el.previewLoading.classList.remove('hidden');
+
+      try {
+        const currentData = getMergedRecordData(state.currentIndex);
+
+        if (state.templateMode === 'docx') {
+          if (!state.rawDocxArrayBuffer) {
+            el.previewMount.innerHTML = `
+              <div class="text-center py-20 text-slate-400">
+                <p class="text-sm font-semibold text-slate-600">Template Word Belum Dimuat</p>
+                <p class="text-xs text-slate-400 mt-1">Unggah file .docx pada Tab 1</p>
+              </div>
+            `;
+            el.previewLoading.classList.add('hidden');
+            return;
+          }
+
+          // Compile DOCX Blob
+          const compiledBlob = compileDocx(state.rawDocxArrayBuffer, currentData);
+          el.previewMount.innerHTML = '';
+          
+          // Render to visual DOM via docx-preview
+          await docx.renderAsync(compiledBlob, el.previewMount, null, {
+            className: 'docx-page',
+            inWrapper: false,
+            ignoreWidth: false,
+            ignoreHeight: false
+          });
+
+        } else {
+          // Manual HTML Mode
+          let html = el.manualEditor.innerHTML;
+          state.detectedPlaceholders.forEach(tag => {
+            const val = currentData[tag] || '';
+            const regex1 = new RegExp(`\\$\\{${tag}\\}`, 'g');
+            const regex2 = new RegExp(`«${tag}»`, 'g');
+            html = html.replace(regex1, val).replace(regex2, val);
+          });
+          el.previewMount.innerHTML = `<div class="prose max-w-none text-slate-800">${html}</div>`;
+        }
+      } catch (err) {
+        console.error("Gagal merender pratinjau:", err);
+        el.previewMount.innerHTML = `
+          <div class="p-6 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
+            <strong class="font-bold">Gagal Mengompilasi Dokumen:</strong>
+            <p class="mt-1 font-mono">${err.message}</p>
+          </div>
+        `;
+      } finally {
+        el.previewLoading.classList.add('hidden');
+      }
+    }
+
+    function goToRecord(idx) {
+      if (idx < 0 || idx >= state.dataRows.length) return;
+      state.currentIndex = idx;
+      renderCurrentPreview();
+    }
+
+    function prevRecord() {
+      if (state.currentIndex > 0) {
+        state.currentIndex--;
+        renderCurrentPreview();
+      }
+    }
+
+    function nextRecord() {
+      if (state.currentIndex < state.dataRows.length - 1) {
+        state.currentIndex++;
+        renderCurrentPreview();
+      }
+    }
+
+    function onRecordInputChanged(val) {
+      const target = parseInt(val, 10) - 1;
+      if (!isNaN(target) && target >= 0 && target < state.dataRows.length) {
+        state.currentIndex = target;
+        renderCurrentPreview();
+      } else {
+        el.navRecordInput.value = state.currentIndex + 1;
+      }
+    }
+
+    // 1. Export Single DOCX (Supports both DOCX mode and Manual Editor mode)
+    function exportSingleWord() {
+      if (state.dataRows.length === 0) {
+        showCustomModal({ title: 'Data Kosong', message: 'Tidak ada baris data untuk diekspor.' });
+        return;
+      }
+
+      const templateBuffer = getEffectiveTemplateBuffer();
+      if (!templateBuffer) {
+        showCustomModal({ title: 'Template Kosong', message: 'Silakan siapkan template pada Langkah 1 terlebih dahulu.' });
+        return;
+      }
+
+      try {
+        const currentData = getMergedRecordData(state.currentIndex);
+        const compiledBlob = compileDocx(templateBuffer, currentData);
+        const filename = `Draftr_Dokumen_Baris_${state.currentIndex + 1}.docx`;
+        saveAs(compiledBlob, filename);
+        showToast(`Berhasil mengunduh ${filename}`);
+      } catch (err) {
+        console.error("Gagal ekspor word tunggal:", err);
+        showCustomModal({ title: 'Gagal Ekspor', message: err.message });
+      }
+    }
+
+    // 2. Batch ZIP Export (Supports both DOCX mode and Manual Editor mode)
+    async function exportBatchZip() {
+      const total = state.dataRows.length;
+      if (total === 0) {
+        showCustomModal({ title: 'Data Kosong', message: 'Tidak ada data untuk diproses dalam batch.' });
+        return;
+      }
+
+      const templateBuffer = getEffectiveTemplateBuffer();
+      if (!templateBuffer) {
+        showCustomModal({ title: 'Template Kosong', message: 'Silakan siapkan template pada Langkah 1 terlebih dahulu.' });
+        return;
+      }
+
+      showCustomModal({
+        title: 'Konfirmasi Ekspor Batch',
+        message: `Sistem akan memproses ${total} dokumen Word (.docx) dan mengemasnya ke dalam satu file ZIP. Lanjutkan?`,
+        showCancel: true,
+        confirmText: 'Mulai Ekspor',
+        onConfirm: async () => {
+          el.previewLoading.classList.remove('hidden');
+          showToast(`Sedang memproses dokumen...`, 10000);
+
+          try {
+            const zipArchive = new JSZip();
+
+            for (let i = 0; i < total; i++) {
+              const recordData = getMergedRecordData(i);
+              const docBlob = compileDocx(templateBuffer, recordData);
+              const paddedIdx = String(i + 1).padStart(3, '0');
+              const entryName = `Dokumen_${paddedIdx}.docx`;
+              zipArchive.file(entryName, docBlob);
+            }
+
+            const zipBlob = await zipArchive.generateAsync({ type: 'blob' });
+            saveAs(zipBlob, `Draftr_Batch_${total}_Dokumen.zip`);
+            showToast('Arsip ZIP berhasil dibuat dan diunduh');
+          } catch (err) {
+            console.error("Gagal membuat batch ZIP:", err);
+            showCustomModal({ title: 'Kesalahan Batch ZIP', message: err.message });
+          } finally {
+            el.previewLoading.classList.add('hidden');
+          }
+        }
+      });
+    }
+
+    el.btnExportConfig.addEventListener('click', () => {
+      const config = {
+        app: "Draftr",
+        timestamp: new Date().toISOString(),
+        paperSize: state.paperSize,
+        templateMode: state.templateMode,
+        templateFileName: state.templateFileName,
+        detectedPlaceholders: state.detectedPlaceholders,
+        mappings: state.mappings,
+        manualContentHtml: el.manualEditor.innerHTML
+      };
+
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+      saveAs(blob, `Draftr_Konfigurasi_${new Date().toISOString().slice(0,10)}.json`);
+      showToast('Konfigurasi sesi berhasil diekspor');
+    });
+
+    el.btnImportConfigTrigger.addEventListener('click', () => el.inputConfigFile.click());
+    el.inputConfigFile.addEventListener('change', (e) => {
+      if (!e.target.files.length) return;
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const cfg = JSON.parse(evt.target.result);
+          if (cfg.app !== 'Draftr') {
+            showCustomModal({ title: 'Format Tidak Valid', message: 'File JSON ini bukan konfigurasi resmi Draftr.' });
+            return;
+          }
+
+          if (cfg.paperSize) {
+            el.paperSelect.value = cfg.paperSize;
+            setPaperSize(cfg.paperSize);
+          }
+          if (cfg.mappings) state.mappings = cfg.mappings;
+          if (cfg.manualContentHtml) el.manualEditor.innerHTML = cfg.manualContentHtml;
+          if (cfg.templateMode) setTemplateMode(cfg.templateMode);
+
+          renderMappingInterface();
+          updateStatusBadges();
+          showToast('Konfigurasi sesi berhasil dimuat');
+        } catch (err) {
+          showCustomModal({ title: 'Kesalahan Impor', message: 'Gagal mengurai file JSON: ' + err.message });
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    function updateStatusBadges() {
+      // Template status
+      if (state.templateMode === 'docx') {
+        if (state.rawDocxArrayBuffer) {
+          el.statusTemplateDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+          el.statusTemplateName.textContent = state.templateFileName || 'Word Aktif';
+        } else {
+          el.statusTemplateDot.className = 'w-2 h-2 rounded-full bg-slate-300';
+          el.statusTemplateName.textContent = 'Kosong';
+        }
+      } else {
+        el.statusTemplateDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        el.statusTemplateName.textContent = 'Editor Manual';
+      }
+
+      // Data status
+      const totalRows = state.dataRows.length;
+      if (totalRows > 0) {
+        el.statusDataDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        el.statusDataCount.textContent = `${totalRows} Baris`;
+      } else {
+        el.statusDataDot.className = 'w-2 h-2 rounded-full bg-slate-300';
+        el.statusDataCount.textContent = '0 Baris';
+      }
+
+      // Mapping status
+      const mappedCount = Object.keys(state.mappings).length;
+      if (mappedCount > 0 && mappedCount >= state.detectedPlaceholders.length) {
+        el.statusMappingDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+      } else if (mappedCount > 0) {
+        el.statusMappingDot.className = 'w-2 h-2 rounded-full bg-amber-500';
+      } else {
+        el.statusMappingDot.className = 'w-2 h-2 rounded-full bg-slate-300';
+      }
+      el.statusMappingCount.textContent = `${mappedCount} Terhubung`;
+    }
+
+    // Local Persistence via IndexedDB
+    const DB_NAME = 'Draftr_DB';
+    const DB_STORE = 'app_session';
+
+    function initDB() {
+      return new Promise((resolve) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(DB_STORE)) {
+            db.createObjectStore(DB_STORE);
+          }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = () => resolve(null);
+      });
+    }
+
+    async function saveToIndexedDB() {
+      try {
+        const db = await initDB();
+        if (!db) return;
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        const store = tx.objectStore(DB_STORE);
+
+        const cacheObj = {
+          templateMode: state.templateMode,
+          templateFileName: state.templateFileName,
+          rawDocxArrayBuffer: state.rawDocxArrayBuffer,
+          manualContentHtml: el.manualEditor.innerHTML,
+          dataHeaders: state.dataHeaders,
+          dataRows: state.dataRows,
+          mappings: state.mappings,
+          paperSize: state.paperSize,
+          currentIndex: state.currentIndex
+        };
+
+        store.put(cacheObj, 'last_state');
+      } catch (e) {
+        console.warn("Gagal menyimpan ke IndexedDB:", e);
+      }
+    }
+
+    async function restoreFromIndexedDB() {
+      try {
+        const db = await initDB();
+        if (!db) return;
+        const tx = db.transaction(DB_STORE, 'readonly');
+        const store = tx.objectStore(DB_STORE);
+        const req = store.get('last_state');
+
+        req.onsuccess = (e) => {
+          const cached = e.target.result;
+          if (!cached) return;
+
+          if (cached.paperSize) {
+            state.paperSize = cached.paperSize;
+            el.paperSelect.value = cached.paperSize;
+            setPaperSize(cached.paperSize);
+          }
+
+          if (cached.rawDocxArrayBuffer) {
+            state.rawDocxArrayBuffer = cached.rawDocxArrayBuffer;
+            state.templateFileName = cached.templateFileName || 'Restored.docx';
+            el.loadedTemplateFilename.textContent = state.templateFileName;
+            el.loadedTemplateSize.textContent = `${(state.rawDocxArrayBuffer.byteLength / 1024).toFixed(1)} KB`;
+            el.activeTemplateBar.classList.remove('hidden');
+          }
+
+          if (cached.manualContentHtml) {
+            el.manualEditor.innerHTML = cached.manualContentHtml;
+          }
+
+          if (cached.dataRows && cached.dataRows.length > 0) {
+            state.dataHeaders = cached.dataHeaders || [];
+            state.dataRows = cached.dataRows;
+            renderDataTable();
+          }
+
+          if (cached.mappings) {
+            state.mappings = cached.mappings;
+          }
+
+          if (cached.templateMode) {
+            setTemplateMode(cached.templateMode);
+          } else {
+            rescanPlaceholders();
+          }
+
+          updateStatusBadges();
+        };
+      } catch (e) {
+        console.warn("Gagal memulihkan dari IndexedDB:", e);
+      }
+    }
+
+    // App Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      restoreFromIndexedDB();
+      rescanPlaceholders();
+      updateStatusBadges();
+    });
+  </script>
+</body>
+</html>

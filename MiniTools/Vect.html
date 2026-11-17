@@ -1,0 +1,2874 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vect</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip for Multi Vector ZIP Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- UTIF.js for TIFF Image Decoding -->
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
+    <!-- ImageTracerJS for High-Quality Vector Tracing -->
+    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
+
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .bg-checker-light {
+            background-color: #f8fafc;
+            background-image: 
+                linear-gradient(45deg, #e2e8f0 25%, transparent 25%), 
+                linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #e2e8f0 75%), 
+                linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .bg-checker-dark {
+            background-color: #0b0f19;
+            background-image: 
+                linear-gradient(45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1e293b 75%), 
+                linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .comparison-slider {
+            user-select: none;
+            touch-action: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Node Editor handles */
+        .node-handle {
+            cursor: pointer;
+            transition: r 0.15s ease, fill 0.15s ease;
+        }
+        .node-handle:hover {
+            r: 7px;
+            fill: #38bdf8;
+        }
+        .node-handle.active {
+            r: 8px;
+            fill: #f43f5e;
+            stroke: #ffffff;
+            stroke-width: 2px;
+        }
+
+        /* SVG Vector Path selection highlight */
+        .vector-path-selectable {
+            cursor: pointer;
+            transition: stroke 0.15s ease;
+        }
+        .vector-path-selectable:hover {
+            stroke: #6366f1 !important;
+            stroke-width: 1.5px !important;
+            stroke-dasharray: 4 2;
+        }
+        .vector-path-selected {
+            stroke: #f43f5e !important;
+            stroke-width: 2px !important;
+            stroke-dasharray: 4 2;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-slate-800 bg-slate-950/90 backdrop-blur sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            
+            <!-- Logo & Title -->
+            <div class="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-start">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-gradient-to-tr from-indigo-500 via-brand-600 to-purple-600 rounded-xl shadow-lg shadow-indigo-500/25">
+                        <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent flex items-center gap-2">
+                            Vect
+                        </h1>
+                        <p class="text-xs text-slate-400">Editor Gambar dan Vektor</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Switcher Navigation -->
+            <nav class="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-inner w-full sm:w-auto overflow-x-auto">
+                <button type="button" id="tab-btn-backmove" onclick="switchTab('backmove')" class="tab-btn flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all bg-indigo-600 text-white shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    1. BackMove
+                </button>
+                <button type="button" id="tab-btn-upscaler" onclick="switchTab('upscaler')" class="tab-btn flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all text-slate-400 hover:text-slate-200">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+                    </svg>
+                    2. Upscaler
+                </button>
+                <button type="button" id="tab-btn-vectorer" onclick="switchTab('vectorer')" class="tab-btn flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all text-slate-400 hover:text-slate-200">
+                    <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5"/>
+                    </svg>
+                    3. Vectorer
+                </button>
+            </nav>
+
+        </div>
+    </header>
+
+    <!-- Modal Dialog System -->
+    <div id="custom-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3">
+                <div id="modal-icon" class="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <h3 id="modal-title" class="text-base font-bold text-slate-100">Pemberitahuan</h3>
+            </div>
+            <p id="modal-message" class="text-sm text-slate-300 leading-relaxed"></p>
+            <div id="modal-actions" class="flex justify-end gap-2 pt-2">
+                <button type="button" id="modal-btn-ok" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Global Toast Notifications -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- MAIN APP CONTENT AREA -->
+    <div class="flex-1 flex flex-col">
+
+        <!-- ======================================================== -->
+        <!-- TAB 1: BACKMOVE (Editor Penghapus Latar Belakang)         -->
+        <!-- ======================================================== -->
+        <div id="tab-backmove" class="tab-pane max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+            
+            <!-- Left Control Panel -->
+            <section class="lg:col-span-4 space-y-5 flex flex-col">
+                
+                <!-- Upload Box -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-sm">
+                    <label class="block text-sm font-semibold text-slate-200 mb-2">1. Pilih Gambar</label>
+                    <div id="bm-dropZone" class="border-2 border-dashed border-slate-700 hover:border-indigo-400 transition-colors rounded-xl p-5 text-center cursor-pointer bg-slate-950/60 hover:bg-slate-900 group">
+                        <input type="file" id="bm-fileInput" accept="image/*" class="hidden">
+                        <div class="flex flex-col items-center justify-center space-y-2">
+                            <div class="p-3 bg-slate-800 group-hover:bg-indigo-500/20 group-hover:text-indigo-400 rounded-full transition-colors text-slate-400">
+                                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                            </div>
+                            <p class="text-sm font-medium text-slate-300">Klik atau Drag & Drop gambar</p>
+                            <p class="text-xs text-slate-500">Format: PNG, JPG, WEBP (Bisa juga Paste)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls Box -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-5 flex-1">
+                    <h2 class="text-sm font-semibold text-slate-200 border-b border-slate-800 pb-2">2. Pengaturan Transparansi</h2>
+
+                    <!-- Color Selection Info -->
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-medium text-slate-300">Warna Target Dihapus:</label>
+                            <button id="bm-btnAutoPick" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                Deteksi Latar Otomatis
+                            </button>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                            <div id="bm-targetColorSwatch" class="w-10 h-10 rounded-lg border border-white/20 shadow-inner flex-shrink-0 bg-white"></div>
+                            <div class="flex-1 min-w-0">
+                                <p id="bm-targetColorHex" class="text-sm font-mono font-bold text-slate-200">#FFFFFF</p>
+                                <p class="text-xs text-slate-400 truncate">Klik gambar untuk mengambil sampel warna</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tolerance Slider -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <label for="bm-toleranceSlider" class="font-medium text-slate-300">Toleransi Warna (Sensitivity)</label>
+                            <span id="bm-toleranceVal" class="font-mono text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">30%</span>
+                        </div>
+                        <input type="range" id="bm-toleranceSlider" min="0" max="100" value="30" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        <p class="text-[11px] text-slate-500">Makin tinggi angka, spektrum warna serupa di sekitarnya ikut terhapus.</p>
+                    </div>
+
+                    <!-- Feather Slider -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center text-xs">
+                            <label for="bm-featherSlider" class="font-medium text-slate-300">Kelembutan Tepi (Feathering)</label>
+                            <span id="bm-featherVal" class="font-mono text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">15%</span>
+                        </div>
+                        <input type="range" id="bm-featherSlider" min="0" max="50" value="15" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        <p class="text-[11px] text-slate-500">Menghaluskan tepi potongan objek agar tidak bergerigi.</p>
+                    </div>
+
+                    <!-- Background Preview Style -->
+                    <div class="space-y-2 pt-2 border-t border-slate-800">
+                        <label class="text-xs font-medium text-slate-300">Tampilan Latar Preview:</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button data-bg="bg-checker-light" class="bm-btn-bg-preview p-2 rounded-lg border border-indigo-500 bg-slate-800 text-xs text-center transition-all">
+                                🏁 Terang
+                            </button>
+                            <button data-bg="bg-checker-dark" class="bm-btn-bg-preview p-2 rounded-lg border border-slate-700 bg-slate-800 text-xs text-center transition-all">
+                                🏁 Gelap
+                            </button>
+                            <button data-bg="bg-black" class="bm-btn-bg-preview p-2 rounded-lg border border-slate-700 bg-slate-800 text-xs text-center transition-all">
+                                ⬛ Hitam
+                            </button>
+                            <button data-bg="bg-white" class="bm-btn-bg-preview p-2 rounded-lg border border-slate-700 bg-slate-800 text-xs text-center transition-all">
+                                ⬜ Putih
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="pt-2 space-y-2">
+                        <div class="flex gap-2">
+                            <button id="bm-btnReset" class="flex-1 py-2.5 px-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium text-xs transition-colors flex items-center justify-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                Reset
+                            </button>
+                            
+                            <button id="bm-btnDownload" disabled class="flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-xs transition-all shadow-md flex items-center justify-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                Unduh PNG
+                            </button>
+                        </div>
+
+                        <!-- Inter-Tab Transfer Pipeline Buttons -->
+                        <div class="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2">
+                            <button id="bm-btnSendToUpscaler" disabled class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5 border border-slate-700">
+                                ➔ Ke Upscaler
+                            </button>
+                            <button id="bm-btnSendToVectorer" disabled class="py-2 px-3 rounded-xl bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-semibold flex items-center justify-center gap-1.5 border border-brand-500/30">
+                                ➔ Ke Vectorer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Canvas Workspace -->
+            <section class="lg:col-span-8 flex flex-col">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-sm flex-1 flex flex-col min-h-[460px]">
+                    
+                    <div class="flex items-center justify-between mb-3 px-1">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">BackMove Viewport</span>
+                            <span id="bm-imgDimensions" class="text-xs font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">0 x 0 px</span>
+                        </div>
+                        <div id="bm-statusMessage" class="text-xs text-indigo-400 font-medium">
+                            Pilih gambar untuk memulai
+                        </div>
+                    </div>
+
+                    <!-- Canvas Wrapper -->
+                    <div id="bm-canvasContainer" class="flex-1 w-full bg-checker-light rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center min-h-[380px]">
+                        
+                        <!-- Empty Placeholder -->
+                        <div id="bm-emptyState" class="text-center p-8 space-y-3">
+                            <div class="w-16 h-16 mx-auto bg-slate-800/80 rounded-2xl flex items-center justify-center text-slate-500 border border-slate-700">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <p class="text-sm font-medium text-slate-400">Belum ada gambar yang dimuat</p>
+                            <p class="text-xs text-slate-500">Pilih berkas dari sebelah kiri atau tekan Ctrl+V</p>
+                        </div>
+
+                        <!-- Main Canvas -->
+                        <canvas id="bm-mainCanvas" class="hidden cursor-crosshair shadow-2xl transition-all max-w-full max-h-[500px] object-contain"></canvas>
+
+                        <!-- Indicator Overlay -->
+                        <div id="bm-colorIndicator" class="hidden absolute w-8 h-8 pointer-events-none rounded-full border-2 border-white shadow-lg transform -translate-x-1/2 -translate-y-1/2">
+                            <div class="w-full h-full rounded-full border border-black/40"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 flex items-center justify-between text-xs text-slate-500 px-1">
+                        <p>💡 Gunakan <b>Toleransi</b> jika warna latar belakang memiliki gradasi halus.</p>
+                        <p id="bm-processTime" class="font-mono text-[11px]"></p>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- TAB 2: UPSCALER (Peningkat Kualitas Gambar)                -->
+        <!-- ======================================================== -->
+        <div id="tab-upscaler" class="tab-pane hidden max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+            
+            <!-- Left Controls & Configuration Panel -->
+            <aside class="lg:col-span-4 space-y-5">
+                
+                <!-- Engine Settings Card -->
+                <div class="bg-slate-900/80 rounded-2xl p-5 border border-slate-800 shadow-xl space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h2 class="font-bold text-slate-200 text-xs tracking-wider uppercase flex items-center gap-2">
+                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            Pengaturan Skala & Pemrosesan
+                        </h2>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700">
+                            CPU Canvas 2D
+                        </span>
+                    </div>
+
+                    <!-- Scaling Factor Selector -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2">Faktor Pembesaran (Scale Factor)</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" id="up-scale-2x" data-scale="2" class="up-scale-btn active-scale py-2 px-3 rounded-xl border border-brand-500 bg-brand-500/10 text-brand-300 font-bold text-xs flex items-center justify-center gap-1 transition">
+                                <span class="text-[10px] font-normal">Perbesar</span> 2x
+                            </button>
+                            <button type="button" id="up-scale-4x" data-scale="4" class="up-scale-btn py-2 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 font-bold text-xs flex items-center justify-center gap-1 hover:border-slate-700 transition">
+                                <span class="text-[10px] font-normal">Perbesar</span> 4x
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tile Size Selector -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label for="up-tile-size" class="text-xs font-semibold text-slate-400">Ukuran Pemrosesan Ubin (Tiling)</label>
+                            <span id="up-tile-size-val" class="text-xs font-mono font-bold text-indigo-400">256 px</span>
+                        </div>
+                        <select id="up-tile-size" class="w-full text-xs bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 outline-none focus:border-brand-500">
+                            <option value="256" selected>256 x 256 px (Optimal & Stabil)</option>
+                            <option value="512">512 x 512 px (Cepat untuk Gambar Besar)</option>
+                            <option value="0">Tanpa Tiling (Hanya Gambar Mini)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Post-Processing Filters Card -->
+                <div class="bg-slate-900/80 rounded-2xl p-5 border border-slate-800 shadow-xl space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h2 class="font-bold text-slate-200 text-xs tracking-wider uppercase flex items-center gap-2">
+                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                            </svg>
+                            Penyempurnaan Detail
+                        </h2>
+                        <button id="up-btn-reset-filters" class="text-xs text-slate-500 hover:text-slate-300">Reset</button>
+                    </div>
+
+                    <!-- Sharpness -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">Ketajaman Tepi (Unsharp Mask)</span>
+                            <span id="up-val-sharpness" class="text-brand-400 font-mono">15%</span>
+                        </div>
+                        <input type="range" id="up-slider-sharpness" min="0" max="100" value="15" class="w-full accent-brand-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
+                    </div>
+
+                    <!-- Denoise -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">Pengurang Bintik (Denoise)</span>
+                            <span id="up-val-denoise" class="text-brand-400 font-mono">10%</span>
+                        </div>
+                        <input type="range" id="up-slider-denoise" min="0" max="100" value="10" class="w-full accent-brand-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
+                    </div>
+
+                    <!-- Contrast -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">Penyesuaian Kontras</span>
+                            <span id="up-val-contrast" class="text-brand-400 font-mono">0</span>
+                        </div>
+                        <input type="range" id="up-slider-contrast" min="-30" max="30" value="0" class="w-full accent-brand-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Action Execute Button -->
+                <div class="space-y-3">
+                    <button id="up-btn-start" disabled class="w-full py-3.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold text-xs shadow-lg shadow-brand-600/20 disabled:shadow-none flex items-center justify-center gap-2 transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        <span id="up-btn-start-text">Jalankan Upscaling</span>
+                    </button>
+                </div>
+
+            </aside>
+
+            <!-- Right Main Preview Workspace & Queue -->
+            <section class="lg:col-span-8 flex flex-col gap-6">
+
+                <!-- Main Comparison Preview Area -->
+                <div class="bg-slate-900/80 rounded-2xl border border-slate-800 shadow-xl p-4 flex flex-col min-h-[460px] relative overflow-hidden">
+                    
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
+                            <h3 id="up-viewport-title" class="font-bold text-slate-200 text-xs">Viewport Gambar</h3>
+                        </div>
+                        <div id="up-preview-meta" class="hidden text-xs text-slate-400 font-mono flex items-center gap-3">
+                            <span id="up-meta-resolution-before" class="bg-slate-950 px-2 py-0.5 rounded border border-slate-800">0x0</span>
+                            <span id="up-meta-arrow" class="hidden">➔</span>
+                            <span id="up-meta-resolution-after" class="hidden bg-brand-500/10 text-brand-300 font-bold px-2 py-0.5 rounded border border-brand-500/30">0x0</span>
+                            <span id="up-meta-time" class="hidden text-slate-500">0.0s</span>
+                        </div>
+                    </div>
+
+                    <!-- Dropzone -->
+                    <div id="up-dropzone" class="flex-1 border-2 border-dashed border-slate-800 rounded-xl bg-slate-950/40 hover:bg-slate-900/60 hover:border-brand-500 transition cursor-pointer flex flex-col items-center justify-center p-8 text-center relative group min-h-[350px]">
+                        <input type="file" id="up-file-input" multiple accept="image/png, image/jpeg, image/webp" class="hidden">
+                        <div class="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-brand-400 mb-4 group-hover:scale-110 transition">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                        <p class="text-sm font-bold text-slate-200 mb-1">Tarik & Lepas Foto di Sini, atau <span class="text-brand-400 underline">Cari Berkas</span></p>
+                        <p class="text-xs text-slate-500">Mendukung format PNG, JPG, WebP atau tekan Ctrl+V</p>
+                    </div>
+
+                    <!-- Viewport -->
+                    <div id="up-preview-viewport" class="hidden flex-1 relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center min-h-[380px]">
+                        
+                        <!-- Progress Overlay -->
+                        <div id="up-processing-overlay" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-white text-center">
+                            <div class="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                            <p id="up-progress-status" class="text-sm font-bold mb-1">Memproses Ubin Resolusi...</p>
+                            <p id="up-progress-sub" class="text-xs text-slate-400 mb-3 font-mono">Tile 0 / 0</p>
+                            <div id="up-tile-grid-viz" class="w-48 h-28 bg-slate-900 rounded-lg border border-slate-800 p-1 grid gap-0.5 overflow-hidden"></div>
+                        </div>
+
+                        <!-- Canvases Container -->
+                        <div id="up-comparison-container" class="relative w-full h-full flex items-center justify-center comparison-slider overflow-hidden select-none p-2">
+                            <!-- After / Scaled Canvas -->
+                            <canvas id="up-canvas-after" class="hidden max-w-full max-h-[420px] object-contain rounded-lg shadow-2xl"></canvas>
+                            <!-- Before Canvas -->
+                            <canvas id="up-canvas-before" class="max-w-full max-h-[420px] object-contain rounded-lg shadow-2xl"></canvas>
+                            
+                            <!-- Slider Divider Handle -->
+                            <div id="up-slider-handle" class="hidden absolute top-0 bottom-0 w-1 bg-white cursor-ew-resize z-20 shadow-[0_0_12px_rgba(0,0,0,0.9)] flex items-center justify-center" style="left: 50%;">
+                                <div class="w-6 h-6 rounded-full bg-white text-slate-900 shadow-md flex items-center justify-center text-xs font-bold pointer-events-none">
+                                    ↔
+                                </div>
+                            </div>
+                            
+                            <!-- Badges -->
+                            <span id="up-badge-before" class="absolute top-3 left-3 bg-slate-900/80 text-white text-[10px] font-bold uppercase px-2 py-1 rounded backdrop-blur-sm pointer-events-none z-20">Asli</span>
+                            <span id="up-badge-after" class="hidden absolute top-3 right-3 bg-brand-600/90 text-white text-[10px] font-bold uppercase px-2 py-1 rounded backdrop-blur-sm pointer-events-none z-20">Upscaled</span>
+                        </div>
+                    </div>
+
+                    <!-- Export Bar & Bridge to Vectorer -->
+                    <div id="up-export-bar" class="hidden pt-4 border-t border-slate-800 mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs font-semibold text-slate-400">Format Ekspor:</label>
+                            <select id="up-export-format" class="text-xs bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 font-medium text-slate-300 outline-none">
+                                <option value="image/png">PNG (Kualitas Penuh)</option>
+                                <option value="image/jpeg">JPG (Ringan)</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button id="up-btn-send-to-vectorer" class="py-2 px-3 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 text-brand-300 border border-brand-500/30 text-xs font-bold flex items-center gap-1.5 transition">
+                                ➔ Kirim ke Vectorer
+                            </button>
+                            <button id="up-btn-download" class="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                Unduh Gambar
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Batch Queue Card -->
+                <div class="bg-slate-900/80 rounded-2xl border border-slate-800 shadow-xl p-4 space-y-3">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <h3 class="font-bold text-slate-200 text-xs flex items-center gap-2">
+                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                            </svg>
+                            Antrean Foto
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <button id="up-btn-add-more" class="text-xs text-brand-400 hover:text-brand-300 font-medium">+ Tambah Foto</button>
+                            <button id="up-btn-clear-batch" class="text-xs text-rose-400 hover:underline">Hapus Semua</button>
+                        </div>
+                    </div>
+
+                    <div id="up-batch-list" class="max-h-40 overflow-y-auto space-y-2 pr-1">
+                        <p id="up-empty-batch-text" class="text-xs text-slate-500 py-3 text-center">Belum ada foto dalam antrean.</p>
+                    </div>
+                </div>
+
+            </section>
+
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- TAB 3: VECTORER (Raster to Vector Tracing & Editor)       -->
+        <!-- ======================================================== -->
+        <div id="tab-vectorer" class="tab-pane hidden max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+            
+            <!-- Left Vector Controls Panel -->
+            <section class="lg:col-span-4 space-y-5 flex flex-col">
+                
+                <!-- 1. Source Upload Box -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-sm">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-xs font-semibold uppercase tracking-wider text-slate-300">1. Sumber Gambar Raster</label>
+                        <div class="flex gap-1.5">
+                            <button id="vec-btn-pull-bm" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded border border-slate-700 transition" title="Tarik dari hasil BackMove">
+                                dari BackMove
+                            </button>
+                            <button id="vec-btn-pull-up" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded border border-slate-700 transition" title="Tarik dari hasil Upscaler">
+                                dari Upscaler
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="vec-dropZone" class="border-2 border-dashed border-slate-700 hover:border-brand-500 transition-colors rounded-xl p-4 text-center cursor-pointer bg-slate-950/60 hover:bg-slate-900 group">
+                        <input type="file" id="vec-fileInput" accept="image/*, .tif, .tiff" class="hidden">
+                        <div class="flex flex-col items-center justify-center space-y-1.5">
+                            <div class="p-2.5 bg-slate-800 group-hover:bg-brand-500/20 group-hover:text-brand-400 rounded-full transition-colors text-slate-400">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5"/>
+                                </svg>
+                            </div>
+                            <p class="text-xs font-medium text-slate-300">Pilih atau Seret Foto ke sini</p>
+                            <p class="text-[11px] text-slate-500">Mendukung JPG, PNG, WEBP, dan TIFF (.tif)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Tracing & Color Settings -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-sm space-y-4 flex-1">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-200 border-b border-slate-800 pb-2 flex items-center justify-between">
+                        <span>2. Mode Vektor & Warna</span>
+                        <span id="vec-status-badge" class="text-[10px] text-slate-500 font-mono">Belum ada gambar</span>
+                    </h2>
+
+                    <!-- Color Mode Selector -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Tipe Tampilan Vektor</label>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <button type="button" data-vmode="detailed" class="vec-mode-btn active-vmode py-2 px-2 rounded-xl border border-brand-500 bg-brand-500/15 text-brand-300 text-xs font-semibold text-center transition">
+                                Persis Asli
+                            </button>
+                            <button type="button" data-vmode="flat" class="vec-mode-btn py-2 px-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold text-center transition hover:border-slate-700">
+                                Flat Art
+                            </button>
+                            <button type="button" data-vmode="monochrome" class="vec-mode-btn py-2 px-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold text-center transition hover:border-slate-700">
+                                Monokrom
+                            </button>
+                        </div>
+                        <p id="vec-mode-hint" class="text-[11px] text-slate-500 mt-1.5">Mendeteksi gradasi bertingkat, bayangan, dan kilau menggunakan palet warna terperinci.</p>
+                    </div>
+
+                    <!-- Colors Count Slider -->
+                    <div id="vec-colors-wrapper">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">Jumlah Warna Vektor</span>
+                            <span id="vec-val-colors" class="text-brand-400 font-mono font-bold">16 Warna</span>
+                        </div>
+                        <input type="range" id="vec-slider-colors" min="2" max="32" value="16" class="w-full accent-brand-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
+                    </div>
+
+                    <!-- Line & Node Precision -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">Presisi Garis & Titik</span>
+                            <span id="vec-val-precision" class="text-brand-400 font-mono">Presisi Tinggi</span>
+                        </div>
+                        <input type="range" id="vec-slider-precision" min="1" max="5" value="4" class="w-full accent-brand-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-slate-600 mt-0.5">
+                            <span>Sederhana / Halus</span>
+                            <span>Akurat / Tajam</span>
+                        </div>
+                    </div>
+
+                    <!-- Filter Speckle / Noise -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">Filter Bintik Kecil (Noise)</span>
+                            <span id="vec-val-speckle" class="text-brand-400 font-mono">4 px</span>
+                        </div>
+                        <input type="range" id="vec-slider-speckle" min="0" max="25" value="4" class="w-full accent-brand-500 bg-slate-800 rounded-lg h-2 cursor-pointer">
+                    </div>
+
+                    <!-- Bézier Smooth Curves Toggle -->
+                    <div class="flex items-center justify-between py-1">
+                        <span class="text-xs text-slate-300">Kurva Halus (Bézier Splines)</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="vec-toggle-bezier" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                        </label>
+                    </div>
+
+                    <!-- 3. Multi-Image Set Detection -->
+                    <div class="pt-3 border-t border-slate-800 space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-xs font-semibold text-slate-200">Deteksi Set Gambar (Multi-Objek)</h3>
+                                <p class="text-[10px] text-slate-500">Pisahkan objek terisolasi pada lembar gambar</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="vec-toggle-multisplit" class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                            </label>
+                        </div>
+
+                        <!-- Detected Sub-Images Strip -->
+                        <div id="vec-multisplit-container" class="hidden space-y-2 pt-1">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-slate-400">Objek Ditemukan:</span>
+                                <span id="vec-detected-count" class="font-mono text-indigo-400 font-bold">0 Objek</span>
+                            </div>
+                            <div id="vec-subimages-grid" class="grid grid-cols-4 gap-1.5 max-h-28 overflow-y-auto p-1 bg-slate-950 rounded-xl border border-slate-800"></div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Color Palette & Combine Manager -->
+                    <div class="pt-3 border-t border-slate-800 space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-slate-200">Manajemen Palet Warna</span>
+                            <button id="vec-btn-merge-colors" disabled class="text-[11px] px-2 py-0.5 rounded bg-brand-600/30 text-brand-300 hover:bg-brand-600/50 disabled:opacity-30 disabled:cursor-not-allowed border border-brand-500/30 transition">
+                                Gabungkan Terpilih
+                            </button>
+                        </div>
+                        <div id="vec-palette-list" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                            <p class="text-slate-600 text-[11px] italic py-1">Palet warna akan muncul setelah vektor dibuat.</p>
+                        </div>
+                    </div>
+
+                    <!-- Main Tracing Trigger Button -->
+                    <div class="pt-2">
+                        <button id="vec-btn-trace" disabled class="w-full py-3 px-4 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold text-xs shadow-lg shadow-brand-600/25 disabled:shadow-none flex items-center justify-center gap-2 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5"/>
+                            </svg>
+                            <span id="vec-btn-trace-text">Ubah Gambar Menjadi Vektor</span>
+                        </button>
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- Right Vector Workspace & Node Editor -->
+            <section class="lg:col-span-8 flex flex-col gap-4">
+                
+                <!-- Main Workspace Card -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-sm flex-1 flex flex-col min-h-[500px]">
+                    
+                    <!-- Workspace Header with Toolbars & View Modes -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800 mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-brand-400"></span>
+                            <h3 class="font-bold text-slate-200 text-xs">Kanvas Interaktif Vektor</h3>
+                            <span id="vec-meta-dim" class="text-xs font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">0 x 0 px</span>
+                        </div>
+
+                        <!-- View Mode Switcher -->
+                        <div id="vec-view-mode-group" class="hidden flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                            <button id="vec-tab-view-raster" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">
+                                Gambar Asli
+                            </button>
+                            <button id="vec-tab-view-vector" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-brand-600 text-white shadow transition">
+                                Hasil Vektor
+                            </button>
+                        </div>
+
+                        <!-- Canvas Zoom & Node View Controls -->
+                        <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                            <button id="vec-tool-select" class="p-1.5 rounded-lg text-brand-400 bg-slate-800 border border-slate-700 text-xs flex items-center gap-1" title="Mode Pilih Bentuk">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/>
+                                </svg>
+                                <span class="hidden sm:inline text-[11px]">Pilih</span>
+                            </button>
+                            <button id="vec-tool-nodes" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 text-xs flex items-center gap-1" title="Mode Edit Titik & Garis">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                                <span class="hidden sm:inline text-[11px]">Node</span>
+                            </button>
+                            <div class="w-px h-4 bg-slate-800 mx-1"></div>
+                            <button id="vec-btn-zoom-in" class="p-1.5 text-slate-400 hover:text-white rounded" title="Perbesar">🔍+</button>
+                            <button id="vec-btn-zoom-out" class="p-1.5 text-slate-400 hover:text-white rounded" title="Perkecil">🔍-</button>
+                            <button id="vec-btn-zoom-reset" class="p-1.5 text-slate-400 hover:text-white rounded text-[11px]" title="Reset Tampilan">100%</button>
+                        </div>
+                    </div>
+
+                    <!-- Node Editing Action Sub-Bar -->
+                    <div id="vec-node-bar" class="hidden bg-slate-950 p-2 rounded-xl border border-brand-500/30 mb-3 flex flex-wrap items-center justify-between text-xs gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-brand-300 font-semibold text-[11px]">Mode Edit Titik:</span>
+                            <span id="vec-node-count-label" class="text-slate-400 font-mono text-[11px]">Pilih salah satu bentuk kurva</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button id="vec-btn-simplify-path" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] border border-slate-700">
+                                Sederhanakan Titik
+                            </button>
+                            <button id="vec-btn-delete-path" class="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-[11px] border border-rose-500/30">
+                                Hapus Bentuk
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Viewport Canvas Area -->
+                    <div id="vec-viewport-wrapper" class="flex-1 w-full bg-checker-light rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center min-h-[420px]">
+                        
+                        <!-- Empty Vector State -->
+                        <div id="vec-emptyState" class="text-center p-8 space-y-3">
+                            <div class="w-16 h-16 mx-auto bg-slate-800/80 rounded-2xl flex items-center justify-center text-slate-500 border border-slate-700">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <p class="text-sm font-medium text-slate-400">Belum ada gambar yang dimuat</p>
+                            <p class="text-xs text-slate-500">Unggah foto raster di sebelah kiri, tarik dari BackMove / Upscaler, atau tekan Ctrl+V</p>
+                        </div>
+
+                        <!-- Processing Indicator Overlay -->
+                        <div id="vec-loading-overlay" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-white">
+                            <div class="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                            <p class="text-sm font-bold text-slate-100">Mentransformasi Piksel ke Kurva Vektor...</p>
+                            <p class="text-xs text-slate-400 font-mono mt-1">Mendeteksi titik batas, poligon, & kurva Bézier</p>
+                        </div>
+
+                        <!-- 1. Source Raster Stage (Direct Upload Preview) -->
+                        <div id="vec-raster-stage" class="hidden w-full h-full flex items-center justify-center p-4">
+                            <canvas id="vec-raster-canvas" class="max-w-full max-h-[460px] object-contain rounded-lg shadow-2xl transition-transform duration-75"></canvas>
+                        </div>
+
+                        <!-- 2. Vector Render Stage (Scalable / Zoomable SVG Container) -->
+                        <div id="vec-stage" class="hidden w-full h-full flex items-center justify-center overflow-auto p-4 cursor-default">
+                            <div id="vec-svg-host" class="w-full h-full flex items-center justify-center transition-transform duration-75 origin-center"></div>
+                        </div>
+
+                    </div>
+
+                    <!-- Export Bar -->
+                    <div id="vec-export-bar" class="hidden pt-4 border-t border-slate-800 mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 text-xs text-slate-400">
+                            <span id="vec-stats-paths" class="font-mono bg-slate-950 px-2 py-1 rounded border border-slate-800">0 Path</span>
+                            <span id="vec-stats-time" class="font-mono bg-slate-950 px-2 py-1 rounded border border-slate-800">0 ms</span>
+                        </div>
+
+                        <!-- Export Buttons -->
+                        <div class="flex items-center gap-2">
+                            <button id="vec-btn-export-svg" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                Unduh SVG
+                            </button>
+                            <button id="vec-btn-export-eps" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                Unduh EPS
+                            </button>
+                            <button id="vec-btn-export-zip" class="py-2 px-4 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs shadow-md shadow-brand-600/30 transition flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 01-2 2M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                </svg>
+                                Ekspor Semua (ZIP)
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        /**
+         * VECT APPLICATION CORE STATE & INTER-TAB BRIDGE
+         */
+        const App = {
+            activeTab: 'backmove',
+            sharedRasterCanvas: null,
+            showToast(msg, type = 'info') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                const colors = {
+                    info: 'bg-slate-900 text-indigo-400 border-indigo-500/30',
+                    success: 'bg-slate-900 text-emerald-400 border-emerald-500/30',
+                    error: 'bg-slate-900 text-rose-400 border-rose-500/30'
+                };
+                toast.className = `p-3 px-4 rounded-xl border shadow-2xl text-xs font-semibold flex items-center gap-2 pointer-events-auto transition-all transform translate-y-2 opacity-0 ${colors[type] || colors.info}`;
+                toast.innerHTML = `<span>●</span><span>${msg}</span>`;
+                container.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.classList.remove('translate-y-2', 'opacity-0');
+                }, 10);
+
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-y-2');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3500);
+            },
+            showModal(title, msg) {
+                const modal = document.getElementById('custom-modal');
+                document.getElementById('modal-title').textContent = title;
+                document.getElementById('modal-message').textContent = msg;
+                modal.classList.remove('hidden');
+                document.getElementById('modal-btn-ok').onclick = () => {
+                    modal.classList.add('hidden');
+                };
+            },
+            setSharedCanvas(canvas, sourceName) {
+                App.sharedRasterCanvas = canvas;
+            }
+        };
+
+        // Tab Navigation Switcher
+        function switchTab(tabId) {
+            App.activeTab = tabId;
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-sm');
+                btn.classList.add('text-slate-400');
+            });
+
+            const targetContent = document.getElementById(`tab-${tabId}`);
+            const targetBtn = document.getElementById(`tab-btn-${tabId}`);
+
+            if (targetContent) targetContent.classList.remove('hidden');
+            if (targetBtn) {
+                targetBtn.classList.remove('text-slate-400');
+                targetBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+            }
+        }
+
+        /* ========================================================================= */
+        /* MODULE 1: BACKMOVE LOGIC (Transparansi Latar Belakang)                     */
+        /* ========================================================================= */
+        const BackMove = (() => {
+            let rawImage = null;
+            let targetRGB = { r: 255, g: 255, b: 255 };
+            let isImageLoaded = false;
+            let renderPending = false;
+
+            const dropZone = document.getElementById('bm-dropZone');
+            const fileInput = document.getElementById('bm-fileInput');
+            const mainCanvas = document.getElementById('bm-mainCanvas');
+            const ctx = mainCanvas.getContext('2d', { willReadFrequently: true });
+            
+            const targetColorSwatch = document.getElementById('bm-targetColorSwatch');
+            const targetColorHex = document.getElementById('bm-targetColorHex');
+            const toleranceSlider = document.getElementById('bm-toleranceSlider');
+            const toleranceVal = document.getElementById('bm-toleranceVal');
+            const featherSlider = document.getElementById('bm-featherSlider');
+            const featherVal = document.getElementById('bm-featherVal');
+            
+            const btnAutoPick = document.getElementById('bm-btnAutoPick');
+            const btnReset = document.getElementById('bm-btnReset');
+            const btnDownload = document.getElementById('bm-btnDownload');
+            const btnSendToUpscaler = document.getElementById('bm-btnSendToUpscaler');
+            const btnSendToVectorer = document.getElementById('bm-btnSendToVectorer');
+            const emptyState = document.getElementById('bm-emptyState');
+            const canvasContainer = document.getElementById('bm-canvasContainer');
+            const statusMessage = document.getElementById('bm-statusMessage');
+            const imgDimensions = document.getElementById('bm-imgDimensions');
+            const processTime = document.getElementById('bm-processTime');
+            const colorIndicator = document.getElementById('bm-colorIndicator');
+            const bgPreviewBtns = document.querySelectorAll('.bm-btn-bg-preview');
+
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+
+            function init() {
+                dropZone.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        loadImageFromFile(e.target.files[0]);
+                    }
+                });
+
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-indigo-500', 'bg-indigo-500/10');
+                });
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('border-indigo-500', 'bg-indigo-500/10');
+                });
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-indigo-500', 'bg-indigo-500/10');
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        loadImageFromFile(e.dataTransfer.files[0]);
+                    }
+                });
+
+                btnAutoPick.addEventListener('click', () => {
+                    if (!isImageLoaded) return;
+                    autoDetectBackgroundColor();
+                    showStatus('Warna latar terdeteksi otomatis');
+                });
+
+                mainCanvas.addEventListener('click', (e) => {
+                    if (!isImageLoaded) return;
+                    const rect = mainCanvas.getBoundingClientRect();
+                    const scaleX = mainCanvas.width / rect.width;
+                    const scaleY = mainCanvas.height / rect.height;
+
+                    const x = Math.floor((e.clientX - rect.left) * scaleX);
+                    const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+                    const pixel = offCtx.getImageData(x, y, 1, 1).data;
+                    setTargetColor(pixel[0], pixel[1], pixel[2]);
+
+                    colorIndicator.style.left = `${e.clientX - canvasContainer.getBoundingClientRect().left}px`;
+                    colorIndicator.style.top = `${e.clientY - canvasContainer.getBoundingClientRect().top}px`;
+                    colorIndicator.style.backgroundColor = `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
+                    colorIndicator.classList.remove('hidden');
+                    setTimeout(() => colorIndicator.classList.add('hidden'), 500);
+                });
+
+                toleranceSlider.addEventListener('input', (e) => {
+                    toleranceVal.textContent = `${e.target.value}%`;
+                    requestProcessing();
+                });
+
+                featherSlider.addEventListener('input', (e) => {
+                    featherVal.textContent = `${e.target.value}%`;
+                    requestProcessing();
+                });
+
+                bgPreviewBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        bgPreviewBtns.forEach(b => {
+                            b.classList.remove('border-indigo-500');
+                            b.classList.add('border-slate-700');
+                        });
+                        btn.classList.remove('border-slate-700');
+                        btn.classList.add('border-indigo-500');
+                        const newBg = btn.getAttribute('data-bg');
+                        canvasContainer.className = `flex-1 w-full rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center min-h-[380px] ${newBg}`;
+                    });
+                });
+
+                btnReset.addEventListener('click', () => {
+                    if (!isImageLoaded) return;
+                    ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+                    ctx.drawImage(rawImage, 0, 0);
+                    toleranceSlider.value = 30;
+                    toleranceVal.textContent = '30%';
+                    featherSlider.value = 15;
+                    featherVal.textContent = '15%';
+                    autoDetectBackgroundColor();
+                    showStatus('Gambar telah direset');
+                });
+
+                btnDownload.addEventListener('click', () => {
+                    if (!isImageLoaded) return;
+                    const link = document.createElement('a');
+                    link.download = `backmove-clean-${Date.now()}.png`;
+                    link.href = mainCanvas.toDataURL('image/png');
+                    link.click();
+                    App.showToast('File PNG transparan berhasil diunduh', 'success');
+                });
+
+                btnSendToUpscaler.addEventListener('click', () => {
+                    if (!isImageLoaded) return;
+                    Upscaler.loadExternalCanvas(mainCanvas, 'BackMove');
+                    switchTab('upscaler');
+                    App.showToast('Gambar dikirim ke Upscaler', 'info');
+                });
+
+                btnSendToVectorer.addEventListener('click', () => {
+                    if (!isImageLoaded) return;
+                    Vectorer.loadExternalCanvas(mainCanvas, 'BackMove');
+                    switchTab('vectorer');
+                    App.showToast('Gambar transparan dikirim ke Vectorer', 'info');
+                });
+            }
+
+            function loadImageFromFile(file) {
+                if (!file.type.startsWith('image/')) {
+                    App.showToast('File harus berupa citra gambar valid!', 'error');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        rawImage = img;
+                        offCanvas.width = img.width;
+                        offCanvas.height = img.height;
+                        mainCanvas.width = img.width;
+                        mainCanvas.height = img.height;
+
+                        offCtx.clearRect(0, 0, img.width, img.height);
+                        offCtx.drawImage(img, 0, 0);
+
+                        emptyState.classList.add('hidden');
+                        mainCanvas.classList.remove('hidden');
+                        btnDownload.disabled = false;
+                        btnSendToUpscaler.disabled = false;
+                        btnSendToVectorer.disabled = false;
+                        isImageLoaded = true;
+
+                        imgDimensions.textContent = `${img.width} x ${img.height} px`;
+                        showStatus('Gambar berhasil dimuat');
+                        autoDetectBackgroundColor();
+                        App.setSharedCanvas(mainCanvas, 'BackMove');
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            function autoDetectBackgroundColor() {
+                if (!isImageLoaded) return;
+                const pixelData = offCtx.getImageData(0, 0, 1, 1).data;
+                setTargetColor(pixelData[0], pixelData[1], pixelData[2]);
+            }
+
+            function setTargetColor(r, g, b) {
+                targetRGB = { r, g, b };
+                const hex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+                targetColorSwatch.style.backgroundColor = hex;
+                targetColorHex.textContent = hex.toUpperCase();
+                requestProcessing();
+            }
+
+            function requestProcessing() {
+                if (!isImageLoaded) return;
+                if (!renderPending) {
+                    renderPending = true;
+                    requestAnimationFrame(processTransparency);
+                }
+            }
+
+            function processTransparency() {
+                renderPending = false;
+                if (!isImageLoaded) return;
+
+                const startTime = performance.now();
+                const width = offCanvas.width;
+                const height = offCanvas.height;
+
+                const imgData = offCtx.getImageData(0, 0, width, height);
+                const data = imgData.data;
+
+                const tr = targetRGB.r;
+                const tg = targetRGB.g;
+                const tb = targetRGB.b;
+
+                const tolerance = parseInt(toleranceSlider.value, 10);
+                const feather = parseInt(featherSlider.value, 10);
+
+                const maxDistance = (tolerance / 100) * 441.67;
+                const featherRange = (feather / 100) * 200;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+
+                    const dr = r - tr;
+                    const dg = g - tg;
+                    const db = b - tb;
+                    const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+
+                    if (dist <= maxDistance) {
+                        if (featherRange > 0 && dist > (maxDistance - featherRange)) {
+                            const alphaRatio = (dist - (maxDistance - featherRange)) / featherRange;
+                            data[i + 3] = Math.floor(data[i + 3] * alphaRatio);
+                        } else {
+                            data[i + 3] = 0;
+                        }
+                    }
+                }
+
+                ctx.putImageData(imgData, 0, 0);
+                App.setSharedCanvas(mainCanvas, 'BackMove');
+                const duration = (performance.now() - startTime).toFixed(1);
+                processTime.textContent = `Proses: ${duration} ms`;
+            }
+
+            function showStatus(msg) {
+                statusMessage.textContent = msg;
+            }
+
+            return {
+                init,
+                loadDirect: (canvas) => {
+                    rawImage = canvas;
+                    offCanvas.width = canvas.width;
+                    offCanvas.height = canvas.height;
+                    mainCanvas.width = canvas.width;
+                    mainCanvas.height = canvas.height;
+                    offCtx.drawImage(canvas, 0, 0);
+
+                    emptyState.classList.add('hidden');
+                    mainCanvas.classList.remove('hidden');
+                    btnDownload.disabled = false;
+                    btnSendToUpscaler.disabled = false;
+                    btnSendToVectorer.disabled = false;
+                    isImageLoaded = true;
+                    imgDimensions.textContent = `${canvas.width} x ${canvas.height} px`;
+                    autoDetectBackgroundColor();
+                }
+            };
+        })();
+
+        /* ========================================================================= */
+        /* MODULE 2: UPSCALER LOGIC (Peningkat Kualitas & Slider Komparasi)           */
+        /* ========================================================================= */
+        const Upscaler = (() => {
+            const state = {
+                scale: 2,
+                tileSize: 256,
+                sharpness: 15,
+                denoise: 10,
+                contrast: 0,
+                batch: [],
+                activeBatchIndex: -1,
+                isProcessing: false,
+                sliderPct: 50
+            };
+
+            const dropzone = document.getElementById('up-dropzone');
+            const fileInput = document.getElementById('up-file-input');
+            const btnStart = document.getElementById('up-btn-start');
+            const btnDownload = document.getElementById('up-btn-download');
+            const btnClearBatch = document.getElementById('up-btn-clear-batch');
+            const btnAddMore = document.getElementById('up-btn-add-more');
+            const btnSendToVectorer = document.getElementById('up-btn-send-to-vectorer');
+
+            const viewport = document.getElementById('up-preview-viewport');
+            const canvasBefore = document.getElementById('up-canvas-before');
+            const canvasAfter = document.getElementById('up-canvas-after');
+            const sliderHandle = document.getElementById('up-slider-handle');
+            const badgeBefore = document.getElementById('up-badge-before');
+            const badgeAfter = document.getElementById('up-badge-after');
+            const previewMeta = document.getElementById('up-preview-meta');
+            const metaResBefore = document.getElementById('up-meta-resolution-before');
+            const metaArrow = document.getElementById('up-meta-arrow');
+            const metaResAfter = document.getElementById('up-meta-resolution-after');
+            const metaTime = document.getElementById('up-meta-time');
+            const exportBar = document.getElementById('up-export-bar');
+            const viewportTitle = document.getElementById('up-viewport-title');
+
+            function init() {
+                dropzone.onclick = () => fileInput.click();
+                btnAddMore.onclick = () => fileInput.click();
+                fileInput.onchange = (e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                        addFilesToBatch(e.target.files);
+                    }
+                };
+
+                dropzone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropzone.classList.add('border-brand-500', 'bg-brand-500/10');
+                });
+                dropzone.addEventListener('dragleave', () => {
+                    dropzone.classList.remove('border-brand-500', 'bg-brand-500/10');
+                });
+                dropzone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropzone.classList.remove('border-brand-500', 'bg-brand-500/10');
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        addFilesToBatch(e.dataTransfer.files);
+                    }
+                });
+
+                document.querySelectorAll('.up-scale-btn').forEach(btn => {
+                    btn.onclick = () => {
+                        document.querySelectorAll('.up-scale-btn').forEach(b => {
+                            b.classList.remove('active-scale', 'border-brand-500', 'bg-brand-500/10', 'text-brand-300');
+                            b.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-400');
+                        });
+                        btn.classList.add('active-scale', 'border-brand-500', 'bg-brand-500/10', 'text-brand-300');
+                        state.scale = parseInt(btn.dataset.scale);
+                        updateMetadataDisplay();
+                    };
+                });
+
+                document.getElementById('up-tile-size').onchange = (e) => {
+                    state.tileSize = parseInt(e.target.value);
+                    document.getElementById('up-tile-size-val').innerText = state.tileSize > 0 ? `${state.tileSize} px` : 'Off';
+                };
+
+                document.getElementById('up-slider-sharpness').oninput = (e) => {
+                    state.sharpness = parseInt(e.target.value);
+                    document.getElementById('up-val-sharpness').innerText = `${state.sharpness}%`;
+                };
+
+                document.getElementById('up-slider-denoise').oninput = (e) => {
+                    state.denoise = parseInt(e.target.value);
+                    document.getElementById('up-val-denoise').innerText = `${state.denoise}%`;
+                };
+
+                document.getElementById('up-slider-contrast').oninput = (e) => {
+                    state.contrast = parseInt(e.target.value);
+                    document.getElementById('up-val-contrast').innerText = state.contrast;
+                };
+
+                document.getElementById('up-btn-reset-filters').onclick = () => {
+                    document.getElementById('up-slider-sharpness').value = 15;
+                    document.getElementById('up-slider-denoise').value = 10;
+                    document.getElementById('up-slider-contrast').value = 0;
+                    state.sharpness = 15;
+                    state.denoise = 10;
+                    state.contrast = 0;
+                    document.getElementById('up-val-sharpness').innerText = '15%';
+                    document.getElementById('up-val-denoise').innerText = '10%';
+                    document.getElementById('up-val-contrast').innerText = '0';
+                };
+
+                btnStart.onclick = runUpscale;
+
+                btnDownload.onclick = () => {
+                    const activeItem = state.batch[state.activeBatchIndex];
+                    if (!activeItem || !activeItem.resultCanvas) return;
+                    const format = document.getElementById('up-export-format').value;
+                    const ext = format === 'image/jpeg' ? 'jpg' : 'png';
+                    const link = document.createElement('a');
+                    link.download = `upscaled_${activeItem.name.replace(/\.[^/.]+$/, '')}.${ext}`;
+                    link.href = activeItem.resultCanvas.toDataURL(format, 0.95);
+                    link.click();
+                    App.showToast('Foto resolusi tinggi berhasil diunduh', 'success');
+                };
+
+                btnSendToVectorer.onclick = () => {
+                    const activeItem = state.batch[state.activeBatchIndex];
+                    if (!activeItem || !activeItem.resultCanvas) return;
+                    Vectorer.loadExternalCanvas(activeItem.resultCanvas, 'Upscaler');
+                    switchTab('vectorer');
+                    App.showToast('Hasil Upscaler dikirim ke Vectorer', 'info');
+                };
+
+                btnClearBatch.onclick = () => {
+                    state.batch = [];
+                    state.activeBatchIndex = -1;
+                    renderBatchList();
+                    resetViewportToEmpty();
+                };
+
+                setupSliderInteraction();
+            }
+
+            function resetViewportToEmpty() {
+                dropzone.classList.remove('hidden');
+                viewport.classList.add('hidden');
+                exportBar.classList.add('hidden');
+                previewMeta.classList.add('hidden');
+                viewportTitle.innerText = 'Viewport Gambar';
+                btnStart.disabled = true;
+            }
+
+            function createThumbnailDataUrl(sourceCanvas, size = 64) {
+                const thumb = document.createElement('canvas');
+                thumb.width = size;
+                thumb.height = size;
+                const tCtx = thumb.getContext('2d');
+                const minSide = Math.min(sourceCanvas.width, sourceCanvas.height);
+                const sx = (sourceCanvas.width - minSide) / 2;
+                const sy = (sourceCanvas.height - minSide) / 2;
+                tCtx.drawImage(sourceCanvas, sx, sy, minSide, minSide, 0, 0, size, size);
+                return thumb.toDataURL('image/jpeg', 0.8);
+            }
+
+            function addFilesToBatch(files) {
+                let addedCount = 0;
+                Array.from(files).forEach((file) => {
+                    if (!file.type.startsWith('image/')) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const sourceCanvas = document.createElement('canvas');
+                            sourceCanvas.width = img.width;
+                            sourceCanvas.height = img.height;
+                            sourceCanvas.getContext('2d').drawImage(img, 0, 0);
+
+                            const thumbUrl = createThumbnailDataUrl(sourceCanvas, 72);
+
+                            state.batch.push({
+                                id: Date.now() + Math.random(),
+                                file: file,
+                                name: file.name,
+                                sourceCanvas: sourceCanvas,
+                                resultCanvas: null,
+                                thumbUrl: thumbUrl,
+                                duration: null,
+                                status: 'pending'
+                            });
+
+                            if (state.batch.length === 1 || state.activeBatchIndex === -1) {
+                                state.activeBatchIndex = state.batch.length - 1;
+                            }
+
+                            renderBatchList();
+                            showActiveItemPreview();
+                            btnStart.disabled = false;
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                    addedCount++;
+                });
+
+                if (addedCount > 0) {
+                    App.showToast(`${addedCount} gambar ditambahkan ke antrean`, 'info');
+                }
+            }
+
+            function showActiveItemPreview() {
+                if (state.activeBatchIndex < 0 || state.activeBatchIndex >= state.batch.length) {
+                    resetViewportToEmpty();
+                    return;
+                }
+
+                const item = state.batch[state.activeBatchIndex];
+                if (!item) return;
+
+                dropzone.classList.add('hidden');
+                viewport.classList.remove('hidden');
+                previewMeta.classList.remove('hidden');
+
+                canvasBefore.width = item.sourceCanvas.width;
+                canvasBefore.height = item.sourceCanvas.height;
+                const ctxB = canvasBefore.getContext('2d');
+                ctxB.clearRect(0, 0, canvasBefore.width, canvasBefore.height);
+                ctxB.drawImage(item.sourceCanvas, 0, 0);
+
+                metaResBefore.innerText = `${item.sourceCanvas.width}x${item.sourceCanvas.height} px`;
+
+                if (item.resultCanvas) {
+                    canvasAfter.classList.remove('hidden');
+                    canvasBefore.classList.add('absolute');
+                    sliderHandle.classList.remove('hidden');
+                    badgeAfter.classList.remove('hidden');
+                    exportBar.classList.remove('hidden');
+                    metaArrow.classList.remove('hidden');
+                    metaResAfter.classList.remove('hidden');
+                    metaTime.classList.remove('hidden');
+
+                    canvasAfter.width = item.resultCanvas.width;
+                    canvasAfter.height = item.resultCanvas.height;
+                    const ctxA = canvasAfter.getContext('2d');
+                    ctxA.clearRect(0, 0, canvasAfter.width, canvasAfter.height);
+                    ctxA.drawImage(item.resultCanvas, 0, 0);
+
+                    metaResAfter.innerText = `${item.resultCanvas.width}x${item.resultCanvas.height} px`;
+                    metaTime.innerText = `${item.duration || '0.00'}s`;
+                    viewportTitle.innerText = 'Viewport Komparasi (Geser untuk melihat perbedaan)';
+
+                    applySliderPosition(state.sliderPct);
+                } else {
+                    canvasAfter.classList.add('hidden');
+                    canvasBefore.classList.remove('absolute');
+                    canvasBefore.style.clipPath = 'none';
+                    sliderHandle.classList.add('hidden');
+                    badgeAfter.classList.add('hidden');
+                    exportBar.classList.add('hidden');
+                    metaArrow.classList.add('hidden');
+                    metaResAfter.classList.add('hidden');
+                    metaTime.classList.add('hidden');
+
+                    viewportTitle.innerText = 'Pratinjau Gambar Asli (Siap Ditingkatkan)';
+                }
+            }
+
+            function updateMetadataDisplay() {
+                const item = state.batch[state.activeBatchIndex];
+                if (item && item.resultCanvas) {
+                    metaResAfter.innerText = `${item.resultCanvas.width}x${item.resultCanvas.height} px`;
+                }
+            }
+
+            function applySliderPosition(pct) {
+                state.sliderPct = pct;
+                canvasBefore.style.clipPath = `inset(0 calc(100% - ${pct}%) 0 0)`;
+                sliderHandle.style.left = `${pct}%`;
+            }
+
+            function setupSliderInteraction() {
+                const container = document.getElementById('up-comparison-container');
+                let isDragging = false;
+
+                function update(clientX) {
+                    const rect = container.getBoundingClientRect();
+                    let x = clientX - rect.left;
+                    if (x < 0) x = 0;
+                    if (x > rect.width) x = rect.width;
+                    const pct = Math.round((x / rect.width) * 100);
+                    applySliderPosition(pct);
+                }
+
+                container.addEventListener('mousedown', () => {
+                    const item = state.batch[state.activeBatchIndex];
+                    if (!item || !item.resultCanvas) return;
+                    isDragging = true;
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (isDragging) update(e.clientX);
+                });
+
+                window.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+
+                container.addEventListener('touchstart', (e) => {
+                    const item = state.batch[state.activeBatchIndex];
+                    if (!item || !item.resultCanvas) return;
+                    isDragging = true;
+                    update(e.touches[0].clientX);
+                }, { passive: true });
+
+                window.addEventListener('touchmove', (e) => {
+                    if (isDragging) update(e.touches[0].clientX);
+                }, { passive: true });
+
+                window.addEventListener('touchend', () => {
+                    isDragging = false;
+                });
+            }
+
+            async function processTileGrid(sourceCanvas, scale, tileSize, onProgress) {
+                const sw = sourceCanvas.width;
+                const sh = sourceCanvas.height;
+                const dw = sw * scale;
+                const dh = sh * scale;
+
+                const outCanvas = document.createElement('canvas');
+                outCanvas.width = dw;
+                outCanvas.height = dh;
+                const ctx = outCanvas.getContext('2d', { willReadFrequently: true });
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+
+                if (tileSize <= 0 || tileSize >= Math.max(sw, sh)) {
+                    onProgress(1, 1);
+                    ctx.drawImage(sourceCanvas, 0, 0, dw, dh);
+                    return outCanvas;
+                }
+
+                const tilesX = Math.ceil(sw / tileSize);
+                const tilesY = Math.ceil(sh / tileSize);
+                const totalTiles = tilesX * tilesY;
+                let completedTiles = 0;
+
+                const srcCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+
+                for (let ty = 0; ty < tilesY; ty++) {
+                    for (let tx = 0; tx < tilesX; tx++) {
+                        const x = tx * tileSize;
+                        const y = ty * tileSize;
+                        const w = Math.min(tileSize, sw - x);
+                        const h = Math.min(tileSize, sh - y);
+
+                        const tileImgData = srcCtx.getImageData(x, y, w, h);
+                        const tempTile = document.createElement('canvas');
+                        tempTile.width = w;
+                        tempTile.height = h;
+                        tempTile.getContext('2d').putImageData(tileImgData, 0, 0);
+
+                        const scaledTile = document.createElement('canvas');
+                        scaledTile.width = w * scale;
+                        scaledTile.height = h * scale;
+                        const stCtx = scaledTile.getContext('2d');
+                        stCtx.imageSmoothingEnabled = true;
+                        stCtx.imageSmoothingQuality = 'high';
+                        stCtx.drawImage(tempTile, 0, 0, w * scale, h * scale);
+
+                        ctx.drawImage(scaledTile, x * scale, y * scale);
+                        completedTiles++;
+                        onProgress(completedTiles, totalTiles);
+                        await new Promise((r) => setTimeout(r, 8));
+                    }
+                }
+                return outCanvas;
+            }
+
+            function applyPostFilters(canvas, sharpnessVal, denoiseVal, contrastVal) {
+                const ctx = canvas.getContext('2d');
+                const w = canvas.width;
+                const h = canvas.height;
+                const imgData = ctx.getImageData(0, 0, w, h);
+                const data = imgData.data;
+
+                const sharpFactor = sharpnessVal / 100;
+                if (sharpFactor > 0) {
+                    const copy = new Uint8ClampedArray(data);
+                    for (let y = 1; y < h - 1; y++) {
+                        for (let x = 1; x < w - 1; x++) {
+                            const i = (y * w + x) * 4;
+                            for (let c = 0; c < 3; c++) {
+                                const center = copy[i + c];
+                                const surrounding = (
+                                    copy[((y - 1) * w + x) * 4 + c] +
+                                    copy[((y + 1) * w + x) * 4 + c] +
+                                    copy[(y * w + (x - 1)) * 4 + c] +
+                                    copy[(y * w + (x + 1)) * 4 + c]
+                                ) / 4;
+                                const delta = center - surrounding;
+                                data[i + c] = Math.min(255, Math.max(0, center + delta * sharpFactor * 2.2));
+                            }
+                        }
+                    }
+                }
+
+                if (contrastVal !== 0) {
+                    const factor = (259 * (contrastVal + 255)) / (255 * (259 - contrastVal));
+                    for (let i = 0; i < data.length; i += 4) {
+                        data[i] = Math.min(255, Math.max(0, factor * (data[i] - 128) + 128));
+                        data[i+1] = Math.min(255, Math.max(0, factor * (data[i+1] - 128) + 128));
+                        data[i+2] = Math.min(255, Math.max(0, factor * (data[i+2] - 128) + 128));
+                    }
+                }
+                ctx.putImageData(imgData, 0, 0);
+            }
+
+            async function runUpscale() {
+                if (state.batch.length === 0 || state.isProcessing) return;
+                const item = state.batch[state.activeBatchIndex >= 0 ? state.activeBatchIndex : 0];
+                if (!item) return;
+
+                state.isProcessing = true;
+                btnStart.disabled = true;
+                document.getElementById('up-processing-overlay').classList.remove('hidden');
+
+                const startTime = performance.now();
+                const progressStatus = document.getElementById('up-progress-status');
+                const progressSub = document.getElementById('up-progress-sub');
+                progressStatus.innerText = 'Memproses Ubin Super-Resolution...';
+
+                try {
+                    const upscaledCanvas = await processTileGrid(
+                        item.sourceCanvas, 
+                        state.scale, 
+                        state.tileSize, 
+                        (done, total) => {
+                            progressSub.innerText = `Tile ${done} / ${total}`;
+                            const viz = document.getElementById('up-tile-grid-viz');
+                            const cols = Math.ceil(item.sourceCanvas.width / (state.tileSize || item.sourceCanvas.width));
+                            viz.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+                            viz.innerHTML = '';
+                            for (let t = 0; t < total; t++) {
+                                const tileBox = document.createElement('div');
+                                tileBox.className = t < done ? 'bg-brand-500 rounded-sm' : 'bg-slate-800 rounded-sm';
+                                viz.appendChild(tileBox);
+                            }
+                        }
+                    );
+
+                    progressStatus.innerText = 'Menyempurnakan Tepi & Ketajaman...';
+                    applyPostFilters(upscaledCanvas, state.sharpness, state.denoise, state.contrast);
+
+                    const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+                    item.resultCanvas = upscaledCanvas;
+                    item.duration = duration;
+                    item.status = 'completed';
+                    App.setSharedCanvas(upscaledCanvas, 'Upscaler');
+
+                    showActiveItemPreview();
+                    renderBatchList();
+                    App.showToast(`Upscaling ${state.scale}x selesai (${duration} detik)`, 'success');
+                } catch (err) {
+                    App.showToast('Gagal memproses gambar: ' + err.message, 'error');
+                } finally {
+                    state.isProcessing = false;
+                    document.getElementById('up-processing-overlay').classList.add('hidden');
+                    btnStart.disabled = false;
+                }
+            }
+
+            function renderBatchList() {
+                const list = document.getElementById('up-batch-list');
+                const empty = document.getElementById('up-empty-batch-text');
+                if (state.batch.length === 0) {
+                    list.innerHTML = '';
+                    list.appendChild(empty);
+                    btnStart.disabled = true;
+                    return;
+                }
+                list.innerHTML = '';
+                state.batch.forEach((item, idx) => {
+                    const card = document.createElement('div');
+                    card.className = `p-2 rounded-xl border flex items-center justify-between gap-3 text-xs cursor-pointer transition ${
+                        idx === state.activeBatchIndex 
+                            ? 'border-brand-500 bg-brand-500/10' 
+                            : 'border-slate-800 bg-slate-950 hover:border-slate-700'
+                    }`;
+                    card.innerHTML = `
+                        <div class="flex items-center gap-2.5 overflow-hidden">
+                            <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex-shrink-0 overflow-hidden">
+                                <img src="${item.thumbUrl}" class="w-full h-full object-cover">
+                            </div>
+                            <div class="truncate">
+                                <p class="font-semibold text-slate-200 truncate text-[11px]">${item.name}</p>
+                                <p class="text-[10px] text-slate-500 font-mono">${item.sourceCanvas.width}x${item.sourceCanvas.height}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${item.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'}">
+                                ${item.status === 'completed' ? 'Selesai' : 'Siap'}
+                            </span>
+                            <button data-remove="${idx}" class="p-1 text-slate-500 hover:text-rose-400">✕</button>
+                        </div>
+                    `;
+                    card.onclick = (e) => {
+                        if (e.target.dataset.remove !== undefined) {
+                            e.stopPropagation();
+                            state.batch.splice(idx, 1);
+                            if (state.activeBatchIndex >= state.batch.length) {
+                                state.activeBatchIndex = state.batch.length - 1;
+                            }
+                            renderBatchList();
+                            showActiveItemPreview();
+                            return;
+                        }
+                        state.activeBatchIndex = idx;
+                        renderBatchList();
+                        showActiveItemPreview();
+                    };
+                    list.appendChild(card);
+                });
+            }
+
+            return {
+                init,
+                loadExternalCanvas: (canvas, sourceName) => {
+                    const sourceCanvas = document.createElement('canvas');
+                    sourceCanvas.width = canvas.width;
+                    sourceCanvas.height = canvas.height;
+                    sourceCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+                    const thumbUrl = createThumbnailDataUrl(sourceCanvas, 72);
+
+                    state.batch.unshift({
+                        id: Date.now(),
+                        name: `${sourceName}_Export.png`,
+                        sourceCanvas: sourceCanvas,
+                        resultCanvas: null,
+                        thumbUrl: thumbUrl,
+                        duration: null,
+                        status: 'pending'
+                    });
+                    state.activeBatchIndex = 0;
+                    renderBatchList();
+                    showActiveItemPreview();
+                    btnStart.disabled = false;
+                }
+            };
+        })();
+
+        /* ========================================================================= */
+        /* MODULE 3: VECTORER LOGIC (Tracing, Pratinjau Raster, SVG & Node Editor)   */
+        /* ========================================================================= */
+        const Vectorer = (() => {
+            const state = {
+                currentCanvas: null,
+                detectedSubImages: [],
+                activeSubIndex: -1,
+                vectorMode: 'detailed',
+                colorsCount: 16,
+                precision: 4,
+                speckleFilter: 4,
+                bezierCurve: true,
+                multiSplitEnabled: false,
+                svgString: '',
+                parsedPaths: [],
+                selectedPathId: null,
+                activeTool: 'select',
+                activeViewTab: 'raster',
+                zoomLevel: 1.0,
+                palette: [],
+            };
+
+            const dropZone = document.getElementById('vec-dropZone');
+            const fileInput = document.getElementById('vec-fileInput');
+            const btnPullBM = document.getElementById('vec-btn-pull-bm');
+            const btnPullUP = document.getElementById('vec-btn-pull-up');
+            const btnTrace = document.getElementById('vec-btn-trace');
+            const btnTraceText = document.getElementById('vec-btn-trace-text');
+            const sliderColors = document.getElementById('vec-slider-colors');
+            const valColors = document.getElementById('vec-val-colors');
+            const colorsWrapper = document.getElementById('vec-colors-wrapper');
+            const sliderPrecision = document.getElementById('vec-slider-precision');
+            const sliderSpeckle = document.getElementById('vec-slider-speckle');
+            const toggleBezier = document.getElementById('vec-toggle-bezier');
+            const toggleMultiSplit = document.getElementById('vec-toggle-multisplit');
+            const multiSplitContainer = document.getElementById('vec-multisplit-container');
+            const subImagesGrid = document.getElementById('vec-subimages-grid');
+            const detectedCount = document.getElementById('vec-detected-count');
+            const paletteList = document.getElementById('vec-palette-list');
+            const btnMergeColors = document.getElementById('vec-btn-merge-colors');
+            
+            const emptyState = document.getElementById('vec-emptyState');
+            const rasterStage = document.getElementById('vec-raster-stage');
+            const rasterCanvas = document.getElementById('vec-raster-canvas');
+            const stage = document.getElementById('vec-stage');
+            const svgHost = document.getElementById('vec-svg-host');
+            const loadingOverlay = document.getElementById('vec-loading-overlay');
+            const exportBar = document.getElementById('vec-export-bar');
+            const metaDim = document.getElementById('vec-meta-dim');
+            const statsPaths = document.getElementById('vec-stats-paths');
+            const statsTime = document.getElementById('vec-stats-time');
+            const nodeBar = document.getElementById('vec-node-bar');
+            const nodeCountLabel = document.getElementById('vec-node-count-label');
+            const btnSimplifyPath = document.getElementById('vec-btn-simplify-path');
+            const btnDeletePath = document.getElementById('vec-btn-delete-path');
+            const viewModeGroup = document.getElementById('vec-view-mode-group');
+            const tabViewRaster = document.getElementById('vec-tab-view-raster');
+            const tabViewVector = document.getElementById('vec-tab-view-vector');
+            const statusBadge = document.getElementById('vec-status-badge');
+            
+            const btnExportSvg = document.getElementById('vec-btn-export-svg');
+            const btnExportEps = document.getElementById('vec-btn-export-eps');
+            const btnExportZip = document.getElementById('vec-btn-export-zip');
+
+            function init() {
+                dropZone.onclick = () => fileInput.click();
+                fileInput.onchange = handleFileUpload;
+
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-brand-500', 'bg-brand-500/10');
+                });
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('border-brand-500', 'bg-brand-500/10');
+                });
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-brand-500', 'bg-brand-500/10');
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        processFile(e.dataTransfer.files[0]);
+                    }
+                });
+
+                btnPullBM.onclick = () => {
+                    const bmCanvas = document.getElementById('bm-mainCanvas');
+                    if (bmCanvas && bmCanvas.width > 0) {
+                        loadExternalCanvas(bmCanvas, 'BackMove');
+                        App.showToast('Memuat gambar dari BackMove', 'info');
+                    } else {
+                        App.showToast('Belum ada gambar di BackMove', 'error');
+                    }
+                };
+
+                btnPullUP.onclick = () => {
+                    const upCanvas = document.getElementById('up-canvas-after');
+                    const upBefore = document.getElementById('up-canvas-before');
+                    const target = (upCanvas && upCanvas.width > 0 && !upCanvas.classList.contains('hidden')) ? upCanvas : upBefore;
+                    if (target && target.width > 0) {
+                        loadExternalCanvas(target, 'Upscaler');
+                        App.showToast('Memuat gambar dari Upscaler', 'info');
+                    } else {
+                        App.showToast('Belum ada gambar di Upscaler', 'error');
+                    }
+                };
+
+                tabViewRaster.onclick = () => switchVectorerView('raster');
+                tabViewVector.onclick = () => switchVectorerView('vector');
+
+                document.querySelectorAll('.vec-mode-btn').forEach(btn => {
+                    btn.onclick = () => {
+                        document.querySelectorAll('.vec-mode-btn').forEach(b => {
+                            b.classList.remove('active-vmode', 'border-brand-500', 'bg-brand-500/15', 'text-brand-300');
+                            b.classList.add('border-slate-800', 'bg-slate-950', 'text-slate-400');
+                        });
+                        btn.classList.add('active-vmode', 'border-brand-500', 'bg-brand-500/15', 'text-brand-300');
+                        state.vectorMode = btn.dataset.vmode;
+
+                        const hint = document.getElementById('vec-mode-hint');
+                        if (state.vectorMode === 'detailed') {
+                            colorsWrapper.classList.remove('hidden');
+                            sliderColors.max = 32;
+                            sliderColors.value = 16;
+                            valColors.innerText = '16 Warna';
+                            hint.innerText = 'Mendeteksi gradasi bertingkat, bayangan, dan kilau menggunakan palet warna terperinci.';
+                        } else if (state.vectorMode === 'flat') {
+                            colorsWrapper.classList.remove('hidden');
+                            sliderColors.max = 16;
+                            sliderColors.value = 6;
+                            valColors.innerText = '6 Warna';
+                            hint.innerText = 'Seni datar posterized yang rapi, ideal untuk ilustrasi, logo, dan ikon.';
+                        } else {
+                            colorsWrapper.classList.add('hidden');
+                            hint.innerText = 'Siluet monokrom 2 warna hitam-putih, ideal untuk sketsa garis, stempel, atau tato.';
+                        }
+                    };
+                });
+
+                sliderColors.oninput = (e) => {
+                    state.colorsCount = parseInt(e.target.value);
+                    valColors.innerText = `${state.colorsCount} Warna`;
+                };
+
+                sliderPrecision.oninput = (e) => {
+                    state.precision = parseInt(e.target.value);
+                    const labels = ['Sangat Kasual', 'Sederhana', 'Standar', 'Presisi Tinggi', 'Ultra Tajam'];
+                    document.getElementById('vec-val-precision').innerText = labels[state.precision - 1];
+                };
+
+                sliderSpeckle.oninput = (e) => {
+                    state.speckleFilter = parseInt(e.target.value);
+                    document.getElementById('vec-val-speckle').innerText = `${state.speckleFilter} px`;
+                };
+
+                toggleBezier.onchange = (e) => {
+                    state.bezierCurve = e.target.checked;
+                };
+
+                toggleMultiSplit.onchange = (e) => {
+                    state.multiSplitEnabled = e.target.checked;
+                    if (state.multiSplitEnabled) {
+                        multiSplitContainer.classList.remove('hidden');
+                        if (state.currentCanvas) {
+                            runConnectedComponentsDetection();
+                        }
+                    } else {
+                        multiSplitContainer.classList.add('hidden');
+                        state.detectedSubImages = [];
+                        state.activeSubIndex = -1;
+                    }
+                };
+
+                btnTrace.onclick = executeVectorTracing;
+
+                document.getElementById('vec-tool-select').onclick = () => setToolMode('select');
+                document.getElementById('vec-tool-nodes').onclick = () => setToolMode('nodes');
+
+                document.getElementById('vec-btn-zoom-in').onclick = () => setZoom(state.zoomLevel + 0.25);
+                document.getElementById('vec-btn-zoom-out').onclick = () => setZoom(Math.max(0.25, state.zoomLevel - 0.25));
+                document.getElementById('vec-btn-zoom-reset').onclick = () => setZoom(1.0);
+
+                btnSimplifyPath.onclick = simplifySelectedPath;
+                btnDeletePath.onclick = deleteSelectedPath;
+                btnMergeColors.onclick = mergeSelectedColors;
+
+                btnExportSvg.onclick = downloadSingleSvg;
+                btnExportEps.onclick = downloadSingleEps;
+                btnExportZip.onclick = downloadAllInZip;
+            }
+
+            function setZoom(lvl) {
+                state.zoomLevel = Math.max(0.25, Math.min(4, Math.round(lvl * 100) / 100));
+                svgHost.style.transform = `scale(${state.zoomLevel})`;
+                rasterCanvas.style.transform = `scale(${state.zoomLevel})`;
+                document.getElementById('vec-btn-zoom-reset').innerText = `${Math.round(state.zoomLevel * 100)}%`;
+            }
+
+            function setToolMode(mode) {
+                state.activeTool = mode;
+                const btnSel = document.getElementById('vec-tool-select');
+                const btnNod = document.getElementById('vec-tool-nodes');
+
+                if (mode === 'select') {
+                    btnSel.className = 'p-1.5 rounded-lg text-brand-400 bg-slate-800 border border-slate-700 text-xs flex items-center gap-1';
+                    btnNod.className = 'p-1.5 rounded-lg text-slate-400 hover:text-slate-200 text-xs flex items-center gap-1';
+                    nodeBar.classList.add('hidden');
+                    removeNodeHandles();
+                } else {
+                    btnNod.className = 'p-1.5 rounded-lg text-brand-400 bg-slate-800 border border-slate-700 text-xs flex items-center gap-1';
+                    btnSel.className = 'p-1.5 rounded-lg text-slate-400 hover:text-slate-200 text-xs flex items-center gap-1';
+                    nodeBar.classList.remove('hidden');
+                    if (state.selectedPathId) {
+                        renderNodeHandlesForPath(state.selectedPathId);
+                    }
+                }
+            }
+
+            function switchVectorerView(tab) {
+                state.activeViewTab = tab;
+                if (tab === 'raster') {
+                    tabViewRaster.className = 'px-2.5 py-1 rounded-lg text-xs font-medium bg-brand-600 text-white shadow transition';
+                    tabViewVector.className = 'px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition';
+                    rasterStage.classList.remove('hidden');
+                    stage.classList.add('hidden');
+                } else {
+                    tabViewVector.className = 'px-2.5 py-1 rounded-lg text-xs font-medium bg-brand-600 text-white shadow transition';
+                    tabViewRaster.className = 'px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition';
+                    stage.classList.remove('hidden');
+                    rasterStage.classList.add('hidden');
+                }
+            }
+
+            function handleFileUpload(e) {
+                const file = e.target.files && e.target.files[0];
+                if (file) processFile(file);
+            }
+
+            function processFile(file) {
+                const fileName = file.name.toLowerCase();
+                const isTiff = fileName.endsWith('.tif') || fileName.endsWith('.tiff');
+
+                if (isTiff) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        try {
+                            const buffer = ev.target.result;
+                            const ifds = UTIF.decode(buffer);
+                            UTIF.decodeImages(buffer, ifds);
+                            const firstImage = ifds[0];
+                            const rgba = UTIF.toRGBA8(firstImage);
+
+                            const canvas = document.createElement('canvas');
+                            canvas.width = firstImage.width;
+                            canvas.height = firstImage.height;
+                            const ctx = canvas.getContext('2d');
+                            const imgData = ctx.createImageData(firstImage.width, firstImage.height);
+                            imgData.data.set(rgba);
+                            ctx.putImageData(imgData, 0, 0);
+
+                            setupSourceCanvas(canvas, file.name);
+                            App.showToast('Berkas TIFF berhasil didekode', 'success');
+                        } catch (err) {
+                            App.showToast('Gagal memuat format TIFF: ' + err.message, 'error');
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            canvas.getContext('2d').drawImage(img, 0, 0);
+                            setupSourceCanvas(canvas, file.name);
+                        };
+                        img.src = ev.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+
+            function setupSourceCanvas(canvas, name) {
+                state.currentCanvas = canvas;
+                metaDim.textContent = `${canvas.width} x ${canvas.height} px`;
+                btnTrace.disabled = false;
+                statusBadge.textContent = 'Gambar Siap';
+                statusBadge.className = 'text-[10px] text-emerald-400 font-mono';
+                App.setSharedCanvas(canvas, 'Vectorer');
+
+                rasterCanvas.width = canvas.width;
+                rasterCanvas.height = canvas.height;
+                const rCtx = rasterCanvas.getContext('2d');
+                rCtx.clearRect(0, 0, rasterCanvas.width, rasterCanvas.height);
+                rCtx.drawImage(canvas, 0, 0);
+
+                emptyState.classList.add('hidden');
+                rasterStage.classList.remove('hidden');
+                stage.classList.add('hidden');
+                viewModeGroup.classList.remove('hidden');
+                switchVectorerView('raster');
+
+                if (state.multiSplitEnabled) {
+                    runConnectedComponentsDetection();
+                }
+                App.showToast(`Gambar siap divektorkan`, 'info');
+            }
+
+            function loadExternalCanvas(canvas, sourceName) {
+                const c = document.createElement('canvas');
+                c.width = canvas.width;
+                c.height = canvas.height;
+                c.getContext('2d').drawImage(canvas, 0, 0);
+                setupSourceCanvas(c, `dari ${sourceName}`);
+            }
+
+            function runConnectedComponentsDetection() {
+                if (!state.currentCanvas) return;
+                const srcCanvas = state.currentCanvas;
+                const w = srcCanvas.width;
+                const h = srcCanvas.height;
+
+                const scale = Math.min(1, 300 / Math.max(w, h));
+                const sw = Math.floor(w * scale);
+                const sh = Math.floor(h * scale);
+
+                const smallCanvas = document.createElement('canvas');
+                smallCanvas.width = sw;
+                smallCanvas.height = sh;
+                const sCtx = smallCanvas.getContext('2d');
+                sCtx.drawImage(srcCanvas, 0, 0, sw, sh);
+                const sData = sCtx.getImageData(0, 0, sw, sh).data;
+
+                const bgR = sData[0], bgG = sData[1], bgB = sData[2], bgA = sData[3];
+                const isFg = new Uint8Array(sw * sh);
+
+                for (let i = 0; i < sw * sh; i++) {
+                    const idx = i * 4;
+                    const a = sData[idx + 3];
+                    if (bgA < 10) {
+                        isFg[i] = a > 25 ? 1 : 0;
+                    } else {
+                        const dr = sData[idx] - bgR;
+                        const dg = sData[idx + 1] - bgG;
+                        const db = sData[idx + 2] - bgB;
+                        const diff = Math.sqrt(dr * dr + dg * dg + db * db);
+                        isFg[i] = diff > 35 ? 1 : 0;
+                    }
+                }
+
+                const visited = new Uint8Array(sw * sh);
+                const boxes = [];
+
+                for (let y = 0; y < sh; y++) {
+                    for (let x = 0; x < sw; x++) {
+                        const idx = y * sw + x;
+                        if (isFg[idx] && !visited[idx]) {
+                            let minX = x, maxX = x, minY = y, maxY = y;
+                            let count = 0;
+                            const queue = [x, y];
+                            visited[idx] = 1;
+
+                            while (queue.length > 0) {
+                                const cy = queue.pop();
+                                const cx = queue.pop();
+                                count++;
+
+                                if (cx < minX) minX = cx;
+                                if (cx > maxX) maxX = cx;
+                                if (cy < minY) minY = cy;
+                                if (cy > maxY) maxY = cy;
+
+                                const neighbors = [
+                                    [cx + 1, cy], [cx - 1, cy],
+                                    [cx, cy + 1], [cx, cy - 1]
+                                ];
+                                for (let n = 0; n < 4; n++) {
+                                    const nx = neighbors[n][0];
+                                    const ny = neighbors[n][1];
+                                    if (nx >= 0 && nx < sw && ny >= 0 && ny < sh) {
+                                        const nIdx = ny * sw + nx;
+                                        if (isFg[nIdx] && !visited[nIdx]) {
+                                            visited[nIdx] = 1;
+                                            queue.push(nx, ny);
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (count > 40 && (maxX - minX) > 6 && (maxY - minY) > 6) {
+                                boxes.push({
+                                    minX: Math.max(0, Math.floor(minX / scale) - 8),
+                                    minY: Math.max(0, Math.floor(minY / scale) - 8),
+                                    maxX: Math.min(w, Math.ceil(maxX / scale) + 8),
+                                    maxY: Math.min(h, Math.ceil(maxY / scale) + 8),
+                                    area: count
+                                });
+                            }
+                        }
+                    }
+                }
+
+                boxes.sort((a, b) => b.area - a.area);
+                const topBoxes = boxes.slice(0, 30);
+
+                state.detectedSubImages = topBoxes.map((b, idx) => {
+                    const bw = b.maxX - b.minX;
+                    const bh = b.maxY - b.minY;
+                    const subCanvas = document.createElement('canvas');
+                    subCanvas.width = bw;
+                    subCanvas.height = bh;
+                    subCanvas.getContext('2d').drawImage(srcCanvas, b.minX, b.minY, bw, bh, 0, 0, bw, bh);
+                    return {
+                        id: idx,
+                        canvas: subCanvas,
+                        box: b,
+                        svg: null,
+                    };
+                });
+
+                detectedCount.innerText = `${state.detectedSubImages.length} Objek`;
+                renderSubImagesThumbnails();
+            }
+
+            function renderSubImagesThumbnails() {
+                subImagesGrid.innerHTML = '';
+                if (state.detectedSubImages.length === 0) {
+                    subImagesGrid.innerHTML = '<span class="text-[10px] text-slate-500 col-span-4 p-2 text-center">Tidak ditemukan pulau objek terpisah. Menggunakan 1 gambar penuh.</span>';
+                    return;
+                }
+
+                state.detectedSubImages.forEach((item, idx) => {
+                    const thumb = document.createElement('div');
+                    thumb.className = `p-1 rounded-lg border cursor-pointer transition ${state.activeSubIndex === idx ? 'border-brand-500 bg-brand-500/20' : 'border-slate-800 bg-slate-900 hover:border-slate-700'}`;
+                    thumb.innerHTML = `
+                        <div class="w-full h-12 bg-checker-dark rounded flex items-center justify-center overflow-hidden">
+                            <img src="${item.canvas.toDataURL()}" class="max-w-full max-h-full object-contain">
+                        </div>
+                        <p class="text-[9px] text-center font-mono text-slate-400 mt-1">#${idx + 1}</p>
+                    `;
+                    thumb.onclick = () => {
+                        state.activeSubIndex = idx;
+                        renderSubImagesThumbnails();
+                        setupSourceCanvas(item.canvas, `Objek #${idx + 1}`);
+                    };
+                    subImagesGrid.appendChild(thumb);
+                });
+            }
+
+            async function executeVectorTracing() {
+                if (!state.currentCanvas) return;
+
+                loadingOverlay.classList.remove('hidden');
+                btnTrace.disabled = true;
+                btnTraceText.innerText = 'Memvektorkan...';
+                const startTime = performance.now();
+
+                // Berikan jeda sejenak agar UI spinner merender di layar
+                await new Promise(r => setTimeout(r, 40));
+
+                try {
+                    const origCanvas = state.currentCanvas;
+                    const origW = origCanvas.width;
+                    const origH = origCanvas.height;
+
+                    // Batasi resolusi maksimal kerja ImageTracer (1024px) agar browser tidak kehabisan call-stack / memori
+                    const maxDim = 1024;
+                    let traceCanvas = origCanvas;
+                    let scaleDown = 1;
+                    if (origW > maxDim || origH > maxDim) {
+                        scaleDown = Math.min(maxDim / origW, maxDim / origH);
+                        const tw = Math.max(1, Math.round(origW * scaleDown));
+                        const th = Math.max(1, Math.round(origH * scaleDown));
+                        traceCanvas = document.createElement('canvas');
+                        traceCanvas.width = tw;
+                        traceCanvas.height = th;
+                        const tCtx = traceCanvas.getContext('2d');
+                        tCtx.drawImage(origCanvas, 0, 0, tw, th);
+                    }
+
+                    // Ambil ImageData untuk penelusuran kurva
+                    const traceCtx = traceCanvas.getContext('2d', { willReadFrequently: true });
+                    const imgData = traceCtx.getImageData(0, 0, traceCanvas.width, traceCanvas.height);
+                    const d = imgData.data;
+
+                    // Periksa apakah gambar memiliki piksel transparan (misal hasil dari BackMove)
+                    let hasAlpha = false;
+                    for (let i = 3; i < d.length; i += 4) {
+                        if (d[i] < 240) {
+                            hasAlpha = true;
+                            break;
+                        }
+                    }
+
+                    // Normalisasi kanal transparan agar tidak terdeteksi sebagai kotak hitam pekat oleh ImageTracer
+                    if (hasAlpha) {
+                        for (let i = 0; i < d.length; i += 4) {
+                            const a = d[i + 3] / 255;
+                            d[i] = Math.round(d[i] * a + 255 * (1 - a));
+                            d[i + 1] = Math.round(d[i + 1] * a + 255 * (1 - a));
+                            d[i + 2] = Math.round(d[i + 2] * a + 255 * (1 - a));
+                            d[i + 3] = 255;
+                        }
+                        traceCtx.putImageData(imgData, 0, 0);
+                    }
+
+                    let svgOutput = '';
+
+                    if (typeof ImageTracer !== 'undefined') {
+                        let numColors = state.colorsCount;
+                        let colorquantcycles = 2;
+                        let lineFilter = Math.max(2, state.speckleFilter);
+
+                        if (state.vectorMode === 'monochrome') {
+                            numColors = 2;
+                            colorquantcycles = 1;
+                        } else if (state.vectorMode === 'flat') {
+                            numColors = Math.min(16, state.colorsCount);
+                            colorquantcycles = 2;
+                        } else {
+                            numColors = Math.min(32, state.colorsCount);
+                            colorquantcycles = 3;
+                        }
+
+                        // Petakan koordinat hasil penelusuran kembali ke ukuran asli gambar
+                        const coordScale = origW / traceCanvas.width;
+
+                        const options = {
+                            corsenabled: false,
+                            ltres: Math.max(0.5, (6 - state.precision) * 0.5),
+                            qtres: Math.max(0.5, (6 - state.precision) * 0.5),
+                            pathomit: lineFilter,
+                            rightangleenhance: false,
+                            colorsampling: 2,
+                            numberofcolors: numColors,
+                            mincolorratio: 0.015,
+                            colorquantcycles: colorquantcycles,
+                            scale: coordScale,
+                            simplifytolerance: (6 - state.precision) * 0.35,
+                            roundcoords: 1,
+                            lcpr: 0,
+                            qcpr: 0,
+                            desc: false,
+                            viewbox: true,
+                            blurradius: state.bezierCurve ? 1 : 0,
+                            blurdelta: 20
+                        };
+
+                        svgOutput = ImageTracer.imagedataToSVG(imgData, options);
+                    } else {
+                        svgOutput = fallbackVectorize(imgData, origW, origH);
+                    }
+
+                    state.svgString = svgOutput;
+                    parseSvgToInteractiveModel(svgOutput, origW, origH);
+
+                    // Sembunyikan latar belakang putih artifisial jika sumber gambar semula transparan
+                    if (hasAlpha && state.parsedPaths.length > 0) {
+                        const first = state.parsedPaths[0];
+                        const fillCol = (first.fill || '').toLowerCase();
+                        if (fillCol === '#ffffff' || fillCol === '#fff' || fillCol === 'rgb(255,255,255)') {
+                            first.elem.setAttribute('fill-opacity', '0');
+                            first.elem.setAttribute('data-bg-omitted', 'true');
+                        }
+                    }
+
+                    const duration = (performance.now() - startTime).toFixed(0);
+                    statsTime.innerText = `${duration} ms`;
+                    statsPaths.innerText = `${state.parsedPaths.length} Path`;
+
+                    emptyState.classList.add('hidden');
+                    exportBar.classList.remove('hidden');
+
+                    extractAndRenderPalette();
+                    switchVectorerView('vector');
+                    App.showToast(`Vektorisasi selesai (${state.parsedPaths.length} kurva, ${duration} ms)`, 'success');
+                } catch (err) {
+                    console.error(err);
+                    App.showToast('Gagal memvektorkan gambar: ' + err.message, 'error');
+                } finally {
+                    loadingOverlay.classList.add('hidden');
+                    btnTrace.disabled = false;
+                    btnTraceText.innerText = 'Ubah Gambar Menjadi Vektor';
+                }
+            }
+
+            function fallbackVectorize(imgData, w, h) {
+                const data = imgData.data;
+                const step = Math.max(4, Math.floor(Math.max(w, h) / 100));
+                const paths = [];
+                for (let y = 0; y < h; y += step) {
+                    for (let x = 0; x < w; x += step) {
+                        const i = (y * w + x) * 4;
+                        const a = data[i + 3];
+                        if (a > 30) {
+                            const hex = rgbToHex(data[i], data[i+1], data[i+2]);
+                            paths.push(`<rect x="${x}" y="${y}" width="${step}" height="${step}" fill="${hex}" />`);
+                        }
+                    }
+                }
+                return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${paths.join('')}</svg>`;
+            }
+
+            function parseSvgToInteractiveModel(svgStr, width, height) {
+                // Tembakkan langsung string SVG ke innerHTML kontainer agar bebas dari masalah cross-document parser
+                svgHost.innerHTML = svgStr;
+                const svgElem = svgHost.querySelector('svg');
+
+                if (!svgElem) {
+                    throw new Error('Hasil string SVG kosong atau tidak terbaca.');
+                }
+
+                // Berikan atribut dimensi paten & viewBox agar elemen SVG tidak menciut menjadi 0 piksel
+                svgElem.setAttribute('id', 'vec-interactive-svg');
+                svgElem.setAttribute('viewBox', `0 0 ${width} ${height}`);
+                svgElem.setAttribute('width', width);
+                svgElem.setAttribute('height', height);
+
+                // Pengaturan gaya responsif agar tampil seimbang di dalam kanvas
+                svgElem.style.width = '100%';
+                svgElem.style.height = '100%';
+                svgElem.style.maxWidth = `${Math.min(width, 720)}px`;
+                svgElem.style.maxHeight = '460px';
+                svgElem.style.objectFit = 'contain';
+                svgElem.style.display = 'block';
+
+                const pathNodes = svgElem.querySelectorAll('path, polygon, rect');
+                state.parsedPaths = [];
+
+                pathNodes.forEach((node, idx) => {
+                    const id = `vec-p-${idx}`;
+                    node.setAttribute('data-path-id', id);
+                    node.classList.add('vector-path-selectable');
+
+                    let fill = node.getAttribute('fill') || '#000000';
+                    let d = node.getAttribute('d') || '';
+
+                    if (node.tagName.toLowerCase() === 'polygon') {
+                        const pts = (node.getAttribute('points') || '').trim().split(/\s+|,/);
+                        if (pts.length >= 2) {
+                            d = `M ${pts[0]} ${pts[1]} ` + pts.slice(2).map((_, i, arr) => i % 2 === 0 ? `L ${arr[i]} ${arr[i+1]}` : '').filter(Boolean).join(' ') + ' Z';
+                        }
+                    } else if (node.tagName.toLowerCase() === 'rect') {
+                        const rx = parseFloat(node.getAttribute('x') || 0);
+                        const ry = parseFloat(node.getAttribute('y') || 0);
+                        const rw = parseFloat(node.getAttribute('width') || 0);
+                        const rh = parseFloat(node.getAttribute('height') || 0);
+                        d = `M ${rx} ${ry} L ${rx+rw} ${ry} L ${rx+rw} ${ry+rh} L ${rx} ${ry+rh} Z`;
+                    }
+
+                    state.parsedPaths.push({
+                        id: id,
+                        fill: fill,
+                        d: d,
+                        elem: node
+                    });
+
+                    node.onclick = (e) => {
+                        e.stopPropagation();
+                        selectPath(id);
+                    };
+                });
+
+                svgElem.onclick = (e) => {
+                    if (e.target === svgElem) {
+                        deselectPath();
+                    }
+                };
+            }
+
+            function selectPath(id) {
+                state.selectedPathId = id;
+                document.querySelectorAll('.vector-path-selectable').forEach(el => {
+                    el.classList.remove('vector-path-selected');
+                });
+                const target = document.querySelector(`[data-path-id="${id}"]`);
+                if (target) {
+                    target.classList.add('vector-path-selected');
+                }
+
+                if (state.activeTool === 'nodes') {
+                    renderNodeHandlesForPath(id);
+                } else {
+                    nodeCountLabel.innerText = `Path ${id} Terpilih (${target ? target.getAttribute('fill') : ''})`;
+                }
+            }
+
+            function deselectPath() {
+                state.selectedPathId = null;
+                document.querySelectorAll('.vector-path-selectable').forEach(el => {
+                    el.classList.remove('vector-path-selected');
+                });
+                removeNodeHandles();
+                nodeCountLabel.innerText = 'Pilih salah satu bentuk kurva';
+            }
+
+            function renderNodeHandlesForPath(pathId) {
+                removeNodeHandles();
+                const pathObj = state.parsedPaths.find(p => p.id === pathId);
+                const svgElem = document.getElementById('vec-interactive-svg');
+                if (!pathObj || !svgElem) return;
+
+                const d = pathObj.d;
+                const pointRegex = /([MLCQZ])([^MLCQZ]*)/gi;
+                let match;
+                const points = [];
+
+                while ((match = pointRegex.exec(d)) !== null) {
+                    const cmd = match[1].toUpperCase();
+                    const coords = match[2].trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+                    if (cmd === 'M' || cmd === 'L') {
+                        if (coords.length >= 2) points.push({ type: cmd, x: coords[0], y: coords[1], rawCoords: coords });
+                    } else if (cmd === 'C') {
+                        if (coords.length >= 6) {
+                            points.push({ type: 'C', cp1x: coords[0], cp1y: coords[1], cp2x: coords[2], cp2y: coords[3], x: coords[4], y: coords[5], rawCoords: coords });
+                        }
+                    } else if (cmd === 'Q') {
+                        if (coords.length >= 4) {
+                            points.push({ type: 'Q', cp1x: coords[0], cp1y: coords[1], x: coords[2], y: coords[3], rawCoords: coords });
+                        }
+                    }
+                }
+
+                nodeCountLabel.innerText = `${points.length} Titik Kontrol (Tarik titik untuk mengubah bentuk)`;
+
+                let handleGroup = document.getElementById('vec-node-handle-group');
+                if (!handleGroup) {
+                    handleGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    handleGroup.setAttribute('id', 'vec-node-handle-group');
+                    svgElem.appendChild(handleGroup);
+                }
+
+                points.forEach((pt) => {
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', pt.x);
+                    circle.setAttribute('cy', pt.y);
+                    circle.setAttribute('r', '5');
+                    circle.setAttribute('fill', '#6366f1');
+                    circle.setAttribute('stroke', '#ffffff');
+                    circle.setAttribute('stroke-width', '1.5');
+                    circle.setAttribute('class', 'node-handle');
+
+                    let isDragging = false;
+
+                    circle.onmousedown = (e) => {
+                        e.stopPropagation();
+                        isDragging = true;
+                        circle.classList.add('active');
+
+                        const onMove = (ev) => {
+                            if (!isDragging) return;
+                            const ptMatrix = svgElem.getScreenCTM()?.inverse();
+                            if (!ptMatrix) return;
+
+                            const svgP = svgElem.createSVGPoint();
+                            svgP.x = ev.clientX;
+                            svgP.y = ev.clientY;
+                            const transformed = svgP.matrixTransform(ptMatrix);
+
+                            pt.x = Math.round(transformed.x * 10) / 10;
+                            pt.y = Math.round(transformed.y * 10) / 10;
+                            circle.setAttribute('cx', pt.x);
+                            circle.setAttribute('cy', pt.y);
+
+                            reconstructPathD(pathObj, points);
+                        };
+
+                        const onUp = () => {
+                            isDragging = false;
+                            circle.classList.remove('active');
+                            window.removeEventListener('mousemove', onMove);
+                            window.removeEventListener('mouseup', onUp);
+                        };
+
+                        window.addEventListener('mousemove', onMove);
+                        window.addEventListener('mouseup', onUp);
+                    };
+
+                    handleGroup.appendChild(circle);
+                });
+            }
+
+            function reconstructPathD(pathObj, points) {
+                let newD = '';
+                points.forEach(pt => {
+                    if (pt.type === 'M') newD += `M ${pt.x} ${pt.y} `;
+                    else if (pt.type === 'L') newD += `L ${pt.x} ${pt.y} `;
+                    else if (pt.type === 'C') newD += `C ${pt.cp1x} ${pt.cp1y} ${pt.cp2x} ${pt.cp2y} ${pt.x} ${pt.y} `;
+                    else if (pt.type === 'Q') newD += `Q ${pt.cp1x} ${pt.cp1y} ${pt.x} ${pt.y} `;
+                });
+                newD += 'Z';
+                pathObj.d = newD;
+
+                const nodeElem = document.querySelector(`[data-path-id="${pathObj.id}"]`);
+                if (nodeElem) {
+                    nodeElem.setAttribute('d', newD);
+                }
+            }
+
+            function removeNodeHandles() {
+                const handleGroup = document.getElementById('vec-node-handle-group');
+                if (handleGroup) handleGroup.remove();
+            }
+
+            function deleteSelectedPath() {
+                if (!state.selectedPathId) {
+                    App.showToast('Pilih salah satu bentuk kurva yang ingin dihapus', 'error');
+                    return;
+                }
+                const elem = document.querySelector(`[data-path-id="${state.selectedPathId}"]`);
+                if (elem) elem.remove();
+                state.parsedPaths = state.parsedPaths.filter(p => p.id !== state.selectedPathId);
+                deselectPath();
+                statsPaths.innerText = `${state.parsedPaths.length} Path`;
+                extractAndRenderPalette();
+                App.showToast('Bentuk kurva berhasil dihapus', 'info');
+            }
+
+            function simplifySelectedPath() {
+                if (!state.selectedPathId) return;
+                const pathObj = state.parsedPaths.find(p => p.id === state.selectedPathId);
+                if (!pathObj) return;
+
+                const coords = pathObj.d.match(/-?\d+(\.\d+)?/g);
+                if (!coords || coords.length < 8) return;
+
+                const pts = [];
+                for (let i = 0; i < coords.length; i += 2) {
+                    pts.push({ x: parseFloat(coords[i]), y: parseFloat(coords[i+1]) });
+                }
+
+                const simplified = pts.filter((_, idx) => idx % 2 === 0 || idx === pts.length - 1);
+                const newD = `M ${simplified[0].x} ${simplified[0].y} ` + simplified.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ') + ' Z';
+                pathObj.d = newD;
+
+                const elem = document.querySelector(`[data-path-id="${pathObj.id}"]`);
+                if (elem) elem.setAttribute('d', newD);
+
+                renderNodeHandlesForPath(pathObj.id);
+                App.showToast('Titik kurva berhasil disederhanakan', 'success');
+            }
+
+            function extractAndRenderPalette() {
+                const colorMap = {};
+                state.parsedPaths.forEach(p => {
+                    const c = p.fill.toLowerCase();
+                    if (!colorMap[c]) colorMap[c] = { color: c, count: 0, checked: false };
+                    colorMap[c].count++;
+                });
+
+                state.palette = Object.values(colorMap).sort((a, b) => b.count - a.count);
+                renderPaletteUI();
+            }
+
+            function renderPaletteUI() {
+                paletteList.innerHTML = '';
+                if (state.palette.length === 0) {
+                    paletteList.innerHTML = '<p class="text-slate-500 text-[11px] py-1 italic">Tidak ada warna terdeteksi.</p>';
+                    btnMergeColors.disabled = true;
+                    return;
+                }
+
+                state.palette.forEach((item, idx) => {
+                    const chip = document.createElement('div');
+                    chip.className = 'flex items-center gap-1.5 p-1 bg-slate-900 rounded-lg border border-slate-800 text-[11px]';
+                    chip.innerHTML = `
+                        <input type="checkbox" data-palette-idx="${idx}" class="vec-pal-check rounded bg-slate-800 border-slate-700 text-brand-500 text-xs">
+                        <input type="color" value="${formatColorToHex(item.color)}" data-change-idx="${idx}" class="w-4 h-4 rounded cursor-pointer border-0 p-0 bg-transparent">
+                        <span class="font-mono text-[10px] text-slate-300">${item.color}</span>
+                        <span class="text-[9px] text-slate-500 font-mono">(${item.count})</span>
+                    `;
+
+                    const colorInput = chip.querySelector(`[data-change-idx="${idx}"]`);
+                    colorInput.onchange = (e) => {
+                        const newColor = e.target.value;
+                        replaceColorInSvg(item.color, newColor);
+                        item.color = newColor;
+                        extractAndRenderPalette();
+                    };
+
+                    const check = chip.querySelector(`[data-palette-idx="${idx}"]`);
+                    check.checked = item.checked;
+                    check.onchange = (e) => {
+                        item.checked = e.target.checked;
+                        const anyChecked = state.palette.some(p => p.checked);
+                        btnMergeColors.disabled = !anyChecked;
+                    };
+
+                    paletteList.appendChild(chip);
+                });
+            }
+
+            function replaceColorInSvg(oldColor, newColor) {
+                state.parsedPaths.forEach(p => {
+                    if (p.fill.toLowerCase() === oldColor.toLowerCase()) {
+                        p.fill = newColor;
+                        const elem = document.querySelector(`[data-path-id="${p.id}"]`);
+                        if (elem) elem.setAttribute('fill', newColor);
+                    }
+                });
+            }
+
+            function mergeSelectedColors() {
+                const selected = state.palette.filter(p => p.checked);
+                if (selected.length < 2) {
+                    App.showToast('Pilih minimal 2 warna untuk digabungkan', 'error');
+                    return;
+                }
+
+                const targetColor = selected[0].color;
+                selected.slice(1).forEach(item => {
+                    replaceColorInSvg(item.color, targetColor);
+                });
+
+                extractAndRenderPalette();
+                App.showToast(`${selected.length} warna berhasil digabungkan`, 'success');
+            }
+
+            function formatColorToHex(c) {
+                if (!c) return '#6366f1';
+                if (c.startsWith('#')) return c.length === 4 ? `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}` : c;
+                if (c.startsWith('rgb')) {
+                    const nums = c.match(/\d+/g);
+                    if (nums && nums.length >= 3) {
+                        return rgbToHex(parseInt(nums[0]), parseInt(nums[1]), parseInt(nums[2]));
+                    }
+                }
+                return '#6366f1';
+            }
+
+            function rgbToHex(r, g, b) {
+                return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+            }
+
+            function generateEpsFromSvg(svgElement, width, height) {
+                const paths = svgElement.querySelectorAll('path, polygon, rect');
+                let epsBody = '';
+
+                paths.forEach(node => {
+                    if (node.getAttribute('data-bg-omitted') === 'true') return;
+
+                    const fill = node.getAttribute('fill') || '#000000';
+                    const hex = formatColorToHex(fill);
+                    const r = (parseInt(hex.slice(1, 3), 16) / 255).toFixed(3);
+                    const g = (parseInt(hex.slice(3, 5), 16) / 255).toFixed(3);
+                    const b = (parseInt(hex.slice(5, 7), 16) / 255).toFixed(3);
+
+                    const d = node.getAttribute('d') || '';
+                    if (!d) return;
+
+                    epsBody += `\n% Shape\n${r} ${g} ${b} setrgbcolor\nnewpath\n`;
+                    const cmdRegex = /([MLCQZ])([^MLCQZ]*)/gi;
+                    let m;
+                    while ((m = cmdRegex.exec(d)) !== null) {
+                        const cmd = m[1].toUpperCase();
+                        const nums = m[2].trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+                        if (cmd === 'M' && nums.length >= 2) {
+                            epsBody += `${nums[0]} ${nums[1]} moveto\n`;
+                        } else if (cmd === 'L' && nums.length >= 2) {
+                            epsBody += `${nums[0]} ${nums[1]} lineto\n`;
+                        } else if (cmd === 'C' && nums.length >= 6) {
+                            epsBody += `${nums[0]} ${nums[1]} ${nums[2]} ${nums[3]} ${nums[4]} ${nums[5]} curveto\n`;
+                        } else if (cmd === 'Q' && nums.length >= 4) {
+                            epsBody += `${nums[0]} ${nums[1]} ${nums[0]} ${nums[1]} ${nums[2]} ${nums[3]} curveto\n`;
+                        } else if (cmd === 'Z') {
+                            epsBody += `closepath\n`;
+                        }
+                    }
+                    epsBody += `fill\n`;
+                });
+
+                return `%!PS-Adobe-3.0 EPSF-3.0
+%%BoundingBox: 0 0 ${width} ${height}
+%%Creator: Vect Studio
+%%Pages: 1
+%%EndComments
+gsave
+0 ${height} translate
+1 -1 scale
+${epsBody}
+grestore
+showpage
+%%EOF`;
+            }
+
+            function getCleanSvgContent() {
+                const svgClone = document.getElementById('vec-interactive-svg')?.cloneNode(true);
+                if (!svgClone) return '';
+                const handleGroup = svgClone.querySelector('#vec-node-handle-group');
+                if (handleGroup) handleGroup.remove();
+                svgClone.removeAttribute('class');
+                svgClone.removeAttribute('id');
+                svgClone.querySelectorAll('[data-path-id]').forEach(p => p.removeAttribute('data-path-id'));
+                return new XMLSerializer().serializeToString(svgClone);
+            }
+
+            function downloadSingleSvg() {
+                const svgData = getCleanSvgContent();
+                if (!svgData) return;
+                const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `vect-export-${Date.now()}.svg`;
+                a.click();
+                URL.revokeObjectURL(url);
+                App.showToast('Berkas SVG berhasil diunduh', 'success');
+            }
+
+            function downloadSingleEps() {
+                const svgElem = document.getElementById('vec-interactive-svg');
+                if (!svgElem || !state.currentCanvas) return;
+                const epsData = generateEpsFromSvg(svgElem, state.currentCanvas.width, state.currentCanvas.height);
+                const blob = new Blob([epsData], { type: 'application/postscript' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `vect-export-${Date.now()}.eps`;
+                a.click();
+                URL.revokeObjectURL(url);
+                App.showToast('Berkas EPS berhasil diekspor', 'success');
+            }
+
+            async function downloadAllInZip() {
+                if (typeof JSZip === 'undefined') {
+                    App.showToast('Pustaka JSZip belum siap', 'error');
+                    return;
+                }
+
+                const zip = new JSZip();
+                const svgFolder = zip.folder('svg');
+                const epsFolder = zip.folder('eps');
+
+                loadingOverlay.classList.remove('hidden');
+                App.showToast('Mengemas multi-vektor ke dalam arsip ZIP...', 'info');
+
+                try {
+                    if (state.detectedSubImages.length > 0) {
+                        for (let i = 0; i < state.detectedSubImages.length; i++) {
+                            const sub = state.detectedSubImages[i];
+                            const sCtx = sub.canvas.getContext('2d');
+                            const sImgData = sCtx.getImageData(0, 0, sub.canvas.width, sub.canvas.height);
+
+                            let subSvg = '';
+                            if (typeof ImageTracer !== 'undefined') {
+                                subSvg = ImageTracer.imagedataToSVG(sImgData, {
+                                    numberofcolors: Math.min(16, state.colorsCount),
+                                    pathomit: state.speckleFilter,
+                                    scale: 1,
+                                    roundcoords: 1,
+                                    viewbox: true
+                                });
+                            } else {
+                                subSvg = fallbackVectorize(sImgData, sub.canvas.width, sub.canvas.height);
+                            }
+
+                            const parser = new DOMParser();
+                            const subDoc = parser.parseFromString(subSvg, 'image/svg+xml');
+                            const subSvgElem = subDoc.querySelector('svg');
+                            const subEps = generateEpsFromSvg(subSvgElem, sub.canvas.width, sub.canvas.height);
+
+                            svgFolder.file(`objek_${i + 1}.svg`, subSvg);
+                            epsFolder.file(`objek_${i + 1}.eps`, subEps);
+                        }
+                    } else {
+                        const svgData = getCleanSvgContent();
+                        const svgElem = document.getElementById('vec-interactive-svg');
+                        const epsData = generateEpsFromSvg(svgElem, state.currentCanvas.width, state.currentCanvas.height);
+                        svgFolder.file('vektor_utama.svg', svgData);
+                        epsFolder.file('vektor_utama.eps', epsData);
+                    }
+
+                    const zipContent = await zip.generateAsync({ type: 'blob' });
+                    const url = URL.createObjectURL(zipContent);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `vect-multi-export-${Date.now()}.zip`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    App.showToast('Arsip ZIP multi-vektor berhasil diunduh', 'success');
+                } catch (err) {
+                    App.showToast('Gagal membuat berkas ZIP: ' + err.message, 'error');
+                } finally {
+                    loadingOverlay.classList.add('hidden');
+                }
+            }
+
+            return {
+                init,
+                loadExternalCanvas
+            };
+        })();
+
+        // Global Paste Listener
+        window.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData)?.items;
+            if (!items) return;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const c = document.createElement('canvas');
+                            c.width = img.width;
+                            c.height = img.height;
+                            c.getContext('2d').drawImage(img, 0, 0);
+
+                            if (App.activeTab === 'backmove') {
+                                BackMove.loadDirect(c);
+                            } else if (App.activeTab === 'upscaler') {
+                                Upscaler.loadExternalCanvas(c, 'Clipboard');
+                            } else {
+                                Vectorer.loadExternalCanvas(c, 'Clipboard');
+                            }
+                            App.showToast('Gambar dari Clipboard berhasil dimuat', 'success');
+                        };
+                        img.src = ev.target.result;
+                    };
+                    reader.readAsDataURL(blob);
+                    break;
+                }
+            }
+        });
+
+        // Initialize All Studio Modules on Window Load
+        window.onload = () => {
+            BackMove.init();
+            Upscaler.init();
+            Vectorer.init();
+        };
+    </script>
+</body>
+</html>

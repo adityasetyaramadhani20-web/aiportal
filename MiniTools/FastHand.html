@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastHand</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* Custom animation for visual chord feedback */
+        @keyframes ripple {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            100% { transform: scale(1.05); opacity: 0; }
+        }
+        .ripple-effect {
+            animation: ripple 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 font-sans min-h-screen flex flex-col antialiased">
+
+    <!-- TOP HEADER -->
+    <header class="border-b border-slate-800 bg-[#0f172a]/80 backdrop-blur sticky top-0 z-40 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <!-- Brand -->
+            <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                    <i data-lucide="zap" class="h-5 w-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">FastHand</h1>
+                    <p class="text-xs text-slate-400">Asisten Ketik Cepat & Stenografi Digital</p>
+                </div>
+            </div>
+
+            <!-- Mode Switcher Badge & Settings Trigger -->
+            <div class="flex items-center gap-3 self-start md:self-auto">
+                <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1.5 rounded-xl">
+                    <button id="btnModeShorthand" onclick="switchMode('shorthand')" class="px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 bg-brand-600 text-white shadow-md">
+                        <i data-lucide="keyboard" class="w-4 h-4"></i>
+                        Ketik Cepat
+                    </button>
+                    <button id="btnModeSteno" onclick="switchMode('steno')" class="px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 text-slate-400 hover:text-white">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                        Stenografi (Akor)
+                    </button>
+                </div>
+
+                <!-- Settings Button -->
+                <button onclick="openSettingsModal()" class="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition duration-200" title="Setelan Aplikasi">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Live Status & Stats -->
+            <div class="flex items-center gap-4 text-xs text-slate-400 border-l border-slate-800 pl-4 hidden lg:flex">
+                <div class="text-right">
+                    <div class="text-slate-500">Substitusi Aktif</div>
+                    <div class="font-semibold text-slate-200" id="statSubCount">0 Kali</div>
+                </div>
+                <div class="h-8 w-[1px] bg-slate-800"></div>
+                <div class="text-right">
+                    <div class="text-slate-500">Kecepatan Sesi</div>
+                    <div class="font-semibold text-emerald-400" id="statWpm">0 WPM</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- SIDE PANEL (Dictionary Library) -->
+        <section class="lg:col-span-4 flex flex-col gap-6">
+            <!-- Dictionary Manager (Library) -->
+            <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-5 flex flex-col gap-4 shadow-xl h-[480px] lg:h-[630px] overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-semibold text-sm text-slate-300 flex items-center gap-2">
+                        <i data-lucide="book-open" class="w-4 h-4 text-brand-500"></i> Kamus Singkatan
+                    </h3>
+                    <span id="dictionaryCountBadge" class="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-700 font-mono">0 Item</span>
+                </div>
+
+                <!-- Add New Entry inline -->
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="text-xs font-semibold text-slate-400" id="dictInputTitle">Tambah Singkatan Manual</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="addInputKey" placeholder="Tombol (mis: yg)" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-500 font-mono">
+                        <input type="text" id="addOutputVal" placeholder="Hasil (mis: yang)" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-500">
+                    </div>
+                    <button onclick="addDictionaryEntry()" class="w-full bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold py-1.5 rounded-lg transition duration-200 flex items-center justify-center gap-1">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Simpan Singkatan
+                    </button>
+                </div>
+
+                <!-- Import / Export Actions -->
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
+                    <button onclick="triggerCSVImport()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold py-2 rounded-lg transition duration-200 flex items-center justify-center gap-1.5">
+                        <i data-lucide="file-up" class="w-3.5 h-3.5"></i> Impor CSV
+                    </button>
+                    <button onclick="exportDictionaryToCSV()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold py-2 rounded-lg transition duration-200 flex items-center justify-center gap-1.5">
+                        <i data-lucide="file-down" class="w-3.5 h-3.5"></i> Ekspor CSV
+                    </button>
+                </div>
+
+                <!-- Search Library -->
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i data-lucide="search" class="h-3.5 w-3.5 text-slate-500"></i>
+                    </span>
+                    <input type="text" id="dictionarySearchInput" oninput="renderDictionaryList()" placeholder="Cari singkatan atau arti..." class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500">
+                </div>
+
+                <!-- Dict Item Container (Scrollable) -->
+                <div id="dictionaryListContainer" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                    <!-- Rendered dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- MAIN EDITOR PANEL -->
+        <section class="lg:col-span-8 flex flex-col gap-4">
+            
+            <!-- Quick Actions Toolbar -->
+            <div class="bg-[#0f172a] border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+                <!-- Text Formatting info or Mode Tips -->
+                <div class="flex items-center gap-2">
+                    <div id="modeStatusIndicator" class="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span id="modeDescription" class="text-xs text-slate-300 font-medium">Mode Ketik Cepat Aktif (Trigger: Spasi)</span>
+                </div>
+
+                <!-- Exporters -->
+                <div class="flex items-center gap-2">
+                    <button onclick="clearCanvasWithConfirm()" class="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-900 rounded-xl transition duration-150" title="Bersihkan Catatan">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="copyToClipboard()" class="p-2 text-slate-400 hover:text-brand-400 hover:bg-slate-900 rounded-xl transition duration-150" title="Salin Catatan">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                    </button>
+                    <div class="h-4 w-[1px] bg-slate-800 mx-1"></div>
+                    
+                    <button onclick="downloadText('txt')" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> .TXT
+                    </button>
+                    <button onclick="downloadText('docx')" class="bg-brand-600/10 hover:bg-brand-600/20 border border-brand-500/20 text-brand-400 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+                        <i data-lucide="file-check" class="w-3.5 h-3.5"></i> .DOCX (Word)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom visual Feedback for Chords / Replacement -->
+            <div id="replacementPopup" class="fixed bottom-24 right-8 bg-slate-900/90 backdrop-blur text-brand-400 px-3 py-1.5 rounded-xl border border-brand-500/30 text-xs font-mono shadow-2xl transition-all duration-300 opacity-0 transform translate-y-2 pointer-events-none flex items-center gap-2 z-50">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span id="replacementText">yg → yang</span>
+            </div>
+
+            <!-- Note Taking Core Area -->
+            <div class="relative bg-[#0f172a] border border-slate-800 rounded-2xl shadow-xl flex flex-col flex-1 min-h-[300px] lg:min-h-[380px]">
+                <textarea 
+                    id="editorTextarea" 
+                    placeholder="Mulai ketik di sini..." 
+                    class="w-full flex-1 bg-transparent border-0 resize-none outline-none focus:ring-0 text-slate-100 placeholder-slate-600 px-6 py-5 leading-relaxed text-base font-sans"
+                    oninput="handleEditorInput()"
+                    onkeydown="handleEditorKeyDown(event)"
+                    onkeyup="handleEditorKeyUp(event)"
+                ></textarea>
+
+                <!-- Footer statistics on canvas -->
+                <div class="border-t border-slate-800/80 px-6 py-3 flex items-center justify-between text-xs text-slate-500 bg-slate-950/40 rounded-b-2xl">
+                    <div class="flex items-center gap-4">
+                        <span><strong id="charCount" class="text-slate-400 font-mono">0</strong> Karakter</span>
+                        <span><strong id="wordCount" class="text-slate-400 font-mono">0</strong> Kata</span>
+                    </div>
+                    <div class="flex items-center gap-2 font-mono">
+                        <i data-lucide="hourglass" class="w-3.5 h-3.5 text-slate-600"></i>
+                        <span id="sessionDuration">Sesi: 0s</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIRTUAL STENOTYPE KEYBOARD CONTAINER -->
+            <div id="virtualStenoSection" class="bg-[#0f172a] border border-slate-800 rounded-2xl p-5 shadow-xl hidden transition-all duration-300">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-xs text-slate-400 flex items-center gap-1.5">
+                        <i data-lucide="info" class="w-4 h-4 text-brand-500"></i>
+                        <span id="layoutInstruction">Tekan kombinasi tombol akor secara bersamaan, lalu lepas untuk mengirim kata steno.</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="clearStenoCurrentChord()" class="text-slate-400 hover:text-slate-200 text-xs px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-lg">Reset Akor</button>
+                    </div>
+                </div>
+
+                <!-- PLACEHOLDER FOR DYNAMIC STENOTYPE BOARD DESIGN -->
+                <div id="stenotypeKeyboardContainer" class="select-none">
+                    <!-- Loaded dynamically based on layout setting (Simple or Complete) -->
+                </div>
+
+                <!-- Live Akor Monitor -->
+                <div class="mt-4 flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800 font-mono text-xs">
+                    <span class="text-slate-500">Akor Tertekan:</span>
+                    <span id="currentChordBufferText" class="text-brand-400 font-bold text-sm tracking-wide">[]</span>
+                    <div class="flex gap-2">
+                        <button onclick="commitManualChord()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 rounded-lg">Kirim Akor</button>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-slate-800/80 bg-slate-950/80 py-4 px-6 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>FastHand - Dikembangkan dengan performa tinggi untuk Notulensi Cepat.</div>
+            <div>Dibuat sepenuhnya client-side demi privasi berkas Anda.</div>
+        </div>
+    </footer>
+
+    <!-- SETTINGS MODAL DIALOG -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden transition-opacity duration-200 opacity-0">
+        <div class="bg-[#0f172a] border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-200">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                <h3 class="font-bold text-slate-200 flex items-center gap-2">
+                    <i data-lucide="sliders-horizontal" class="w-5 h-5 text-brand-500"></i> Setelan FastHand
+                </h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Settings Controls) -->
+            <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                
+                <!-- Sound Feedback Profile -->
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                            <i data-lucide="volume-2" class="w-4 h-4 text-slate-400"></i> Efek Suara Ketikan
+                        </span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="modalCheckSound" class="sr-only peer" checked onchange="handleModalSettingChange('soundEnabled', this.checked)">
+                            <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setSoundProfile('soft')" id="sndProfileSoft" class="px-3 py-1.5 rounded-lg text-xs bg-brand-600 text-white font-medium border border-transparent transition">Soft Click</button>
+                        <button onclick="setSoundProfile('brown')" id="sndProfileBrown" class="px-3 py-1.5 rounded-lg text-xs bg-slate-800 text-slate-400 font-medium border border-slate-700 transition">Brown Switch</button>
+                        <button onclick="setSoundProfile('blue')" id="sndProfileBlue" class="px-3 py-1.5 rounded-lg text-xs bg-slate-800 text-slate-400 font-medium border border-slate-700 transition">Blue Switch</button>
+                    </div>
+                </div>
+
+                <div class="h-[1px] bg-slate-800/80 my-3"></div>
+
+                <!-- Virtual Keyboard Options -->
+                <div class="space-y-3">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Virtual Stenotype</h4>
+                    
+                    <!-- Toggle Visibility -->
+                    <div class="flex items-center justify-between p-2.5 bg-slate-900/40 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-300 flex items-center gap-2">
+                            <i data-lucide="monitor" class="w-4 h-4 text-slate-400"></i> Tampilkan Keyboard Virtual
+                        </span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="modalCheckVirtualSteno" class="sr-only peer" onchange="handleModalSettingChange('virtualStenoEnabled', this.checked)">
+                            <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                        </label>
+                    </div>
+
+                    <!-- Keyboard Layout (Simple vs Complete) -->
+                    <div class="flex items-center justify-between p-2.5 bg-slate-900/40 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-300 flex items-center gap-2">
+                            <i data-lucide="layout" class="w-4 h-4 text-slate-400"></i> Pilih Desain Layout Keyboard
+                        </span>
+                        <div class="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
+                            <button id="layoutBtnSimple" onclick="setStenoLayout('simple')" class="px-2.5 py-1 rounded bg-brand-600 text-white font-medium transition">Sederhana</button>
+                            <button id="layoutBtnComplete" onclick="setStenoLayout('complete')" class="px-2.5 py-1 rounded text-slate-400 hover:text-white font-medium transition">Lengkap</button>
+                        </div>
+                    </div>
+
+                    <!-- Touch Typing Release Behavior -->
+                    <div class="flex items-center justify-between p-2.5 bg-slate-900/40 rounded-xl border border-slate-800/80">
+                        <span class="text-xs text-slate-300 flex items-center gap-2">
+                            <i data-lucide="corner-down-left" class="w-4 h-4 text-slate-400"></i> Kirim Akor saat Layar Dilepas
+                        </span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="modalCheckReleaseSend" class="sr-only peer" checked onchange="handleModalSettingChange('stenoReleaseSend', this.checked)">
+                            <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="h-[1px] bg-slate-800/80 my-3"></div>
+
+                <!-- Dictionary Control Actions -->
+                <div class="space-y-3">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 font-sans">Kamus Data Bawaan</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="loadDefaultLibrary('shorthand')" class="px-3 py-2 text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 font-medium transition flex items-center justify-center gap-1.5">
+                            <i data-lucide="book-plus" class="w-3.5 h-3.5"></i> Muat Kamus Ketik Cepat
+                        </button>
+                        <button onclick="loadDefaultLibrary('steno')" class="px-3 py-2 text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 font-medium transition flex items-center justify-center gap-1.5">
+                            <i data-lucide="layers" class="w-3.5 h-3.5"></i> Muat Kamus Steno
+                        </button>
+                    </div>
+                    <button onclick="clearCurrentDictionaries()" class="w-full py-2 bg-red-950/30 hover:bg-red-950/50 border border-red-500/20 text-red-400 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Seluruh Kamus (Kosongkan)
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-slate-900/30 border-t border-slate-800 text-right">
+                <button onclick="closeSettingsModal()" class="px-5 py-2 text-xs bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition">
+                    Selesai & Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM CONFIRMATION MODAL -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 z-[70] hidden transition-opacity duration-150 opacity-0">
+        <div class="bg-[#0f172a] border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4 text-center transform scale-95 transition-transform duration-150">
+            <div class="w-12 h-12 bg-red-950/50 border border-red-500/30 text-red-400 rounded-full flex items-center justify-center mx-auto shadow-lg">
+                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+            </div>
+            <div class="space-y-1">
+                <h4 class="font-bold text-slate-200" id="confirmTitle">Konfirmasi</h4>
+                <p class="text-xs text-slate-400 leading-relaxed" id="confirmDesc">Apakah Anda yakin dengan tindakan ini?</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <button id="btnConfirmCancel" class="py-2 text-xs bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold rounded-xl transition">Batal</button>
+                <button id="btnConfirmProceed" class="py-2 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition">Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLIENT LOGIC / JAVASCRIPT -->
+    <script>
+        // Default Shorthand Library (Optional, Empty by default)
+        const DEFAULT_SHORTHAND_LIBRARY = {
+            "yg": "yang",
+            "dng": "dengan",
+            "bhs": "bahasa",
+            "utk": "untuk",
+            "tdk": "tidak",
+            "bkn": "bukan",
+            "sdg": "sedang",
+            "dlm": "dalam",
+            "adlh": "adalah",
+            "kpd": "kepada",
+            "dr": "dari",
+            "pd": "pada",
+            "mrt": "menurut",
+            "spt": "seperti",
+            "bnyk": "banyak",
+            "kmr": "kemarin",
+            "skrg": "sekarang",
+            "bs": "bisa",
+            "krn": "karena",
+            "tgl": "tanggal",
+            "dpt": "dapat",
+            "sbg": "sebagai",
+            "sy": "saya",
+            "km": "kamu",
+            "msh": "masih"
+        };
+
+        // Default Steno Library (Standardized layout representations - Uppercased!)
+        const DEFAULT_STENO_LIBRARY = {
+            "S-": "saya",
+            "K-": "kamu",
+            "K--D": "dia",
+            "T-": "tidak",
+            "P-": "perihal",
+            "P--U": "punya",
+            "-E-R": "benar",
+            "S--L": "salah",
+            "P-": "per",
+            "A-": "ya",
+            "-E": "ke",
+            "-D": "di",
+            "P-A-": "pria",
+            "W-A-": "wanita",
+            "H--L": "notulensi",
+            "H--D": "fasthand"
+        };
+
+        // Layout Keys mapping configs
+        const STENO_KEYS_SIMPLE = [
+            'S-', 'K-', 'T-', 'W-', 'P-', 'R-', 'H-', 'N-', // Left Hand
+            'A-', 'O-', 'E-', 'U-',                         // Thumbs
+            '-F', '-R', '-P', '-S', '-L', '-D', '-T', '-Z'  // Right Hand
+        ];
+
+        const STENO_KEYS_COMPLETE = [
+            '#',                                            // Number Bar
+            'S-', 'T-', 'K-', 'P-', 'W-', 'H-', 'R-',       // Initial Consonants (Left)
+            'A-', 'O-', '*', '-E', '-U',                    // Vowels & Star Keys (Thumbs / Index)
+            '-F', '-R', '-P', '-S', '-L', '-T', '-G', '-D', '-B', '-Z' // Final Consonants (Right)
+        ];
+
+        // Physical Keyboard maps to Steno Keys (Direct Map for Simple / Default Complete)
+        const STENO_PHYSICAL_KEYMAP_SIMPLE = {
+            'q': 'S-', 'a': 'K-',
+            'w': 'T-', 's': 'W-',
+            'e': 'P-', 'd': 'R-',
+            'r': 'H-', 'f': 'N-',
+            'c': 'A-', 'v': 'O-',
+            'b': 'E-', 'n': 'U-',
+            'u': '-F', 'j': '-R',
+            'i': '-P', 'k': '-S',
+            'o': '-L', 'l': '-D',
+            'p': '-T', ';': '-Z'
+        };
+
+        const STENO_PHYSICAL_KEYMAP_COMPLETE = {
+            // Number Row (Simulated layout)
+            '1': '#', '2': '#', '3': '#', '4': '#', '5': '#', '6': '#', '7': '#', '8': '#', '9': '#', '0': '#',
+            // Initial (Left hand)
+            'q': 'S-', 'a': 'S-',
+            'w': 'T-', 's': 'K-',
+            'e': 'P-', 'd': 'W-',
+            'r': 'H-', 'f': 'R-',
+            // Thumbs
+            'c': 'A-', 'v': 'O-',
+            't': '*', 'g': '*',
+            'b': '-E', 'n': '-U',
+            // Final (Right hand)
+            'u': '-F', 'j': '-R',
+            'i': '-P', 'k': '-S',
+            'o': '-L', 'l': '-T',
+            'p': '-G', ';': '-D',
+            '[': '-B', "'": '-Z'
+        };
+
+        // App State
+        let appState = {
+            activeMode: 'shorthand', // shorthand | steno
+            shorthandDict: {}, // Starts EMPTY by default
+            stenoDict: {}, // Standard capitalized Keys dictionary
+            soundEnabled: true,
+            soundProfile: 'soft', // soft | brown | blue
+            virtualStenoEnabled: false,
+            stenoLayout: 'simple', // simple | complete
+            stenoReleaseSend: true,
+            substitutionCount: 0,
+            startTime: Date.now(),
+            typingSpeed: 0,
+            currentStenoChord: new Set(),
+            keysCurrentlyDown: new Set(),
+            stenoActiveTouches: new Set()
+        };
+
+        // Undo & Smart spacing Track
+        let lastSubstitution = null; // Stores: { index, original, replaced, autoSpace }
+
+        // Local Storage Debounce Tracker
+        let debounceTimer = null;
+
+        // DOM elements
+        const editor = document.getElementById('editorTextarea');
+        const countBadge = document.getElementById('dictionaryCountBadge');
+        const container = document.getElementById('dictionaryListContainer');
+        const charCountEl = document.getElementById('charCount');
+        const wordCountEl = document.getElementById('wordCount');
+        const timeEl = document.getElementById('sessionDuration');
+        const replacementPopup = document.getElementById('replacementPopup');
+        const replacementText = document.getElementById('replacementText');
+        const statSubCount = document.getElementById('statSubCount');
+        const statWpm = document.getElementById('statWpm');
+
+        // AUDIO CONTEXT
+        let audioCtx = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            
+            // Set stats and timers
+            setInterval(updateSessionStats, 1000);
+            
+            // Initialize Lucide icons
+            lucide.createIcons();
+        });
+
+        // Load State from Cache
+        function loadState() {
+            // Retrieve Shorthand (Starts EMPTY if not found in cache)
+            const cachedShorthand = localStorage.getItem('fasthand_shorthand_dict');
+            if (cachedShorthand) {
+                appState.shorthandDict = JSON.parse(cachedShorthand);
+            } else {
+                appState.shorthandDict = {}; // Empty by default as requested!
+            }
+
+            // Retrieve Steno Dictionary
+            const cachedSteno = localStorage.getItem('fasthand_steno_dict');
+            if (cachedSteno) {
+                appState.stenoDict = JSON.parse(cachedSteno);
+            } else {
+                appState.stenoDict = { ...DEFAULT_STENO_LIBRARY };
+            }
+
+            // Retrieve editor text
+            const cachedText = localStorage.getItem('fasthand_editor_text');
+            if (cachedText) {
+                editor.value = cachedText;
+                updateCounts();
+            }
+
+            // Retrieve Settings
+            const cachedSound = localStorage.getItem('fasthand_sound');
+            if (cachedSound !== null) {
+                appState.soundEnabled = cachedSound === 'true';
+            }
+            document.getElementById('modalCheckSound').checked = appState.soundEnabled;
+
+            const cachedSoundProfile = localStorage.getItem('fasthand_sound_profile');
+            if (cachedSoundProfile) {
+                appState.soundProfile = cachedSoundProfile;
+            }
+            setSoundProfile(appState.soundProfile);
+
+            const cachedVirtualSteno = localStorage.getItem('fasthand_virtual_steno');
+            if (cachedVirtualSteno !== null) {
+                appState.virtualStenoEnabled = cachedVirtualSteno === 'true';
+            }
+            document.getElementById('modalCheckVirtualSteno').checked = appState.virtualStenoEnabled;
+
+            const cachedStenoLayout = localStorage.getItem('fasthand_steno_layout');
+            if (cachedStenoLayout) {
+                appState.stenoLayout = cachedStenoLayout;
+            }
+            setStenoLayout(appState.stenoLayout);
+
+            const cachedReleaseSend = localStorage.getItem('fasthand_release_send');
+            if (cachedReleaseSend !== null) {
+                appState.stenoReleaseSend = cachedReleaseSend === 'true';
+            }
+            document.getElementById('modalCheckReleaseSend').checked = appState.stenoReleaseSend;
+
+            // Sync Stats
+            const cachedSubCount = localStorage.getItem('fasthand_sub_count');
+            if (cachedSubCount) {
+                appState.substitutionCount = parseInt(cachedSubCount, 10);
+                statSubCount.innerText = `${appState.substitutionCount} Kali`;
+            }
+
+            // Sync active mode
+            const cachedActiveMode = localStorage.getItem('fasthand_active_mode');
+            if (cachedActiveMode) {
+                appState.activeMode = cachedActiveMode;
+            }
+
+            // Render Layout & Lists
+            switchMode(appState.activeMode);
+            renderDictionaryList();
+        }
+
+        // Debounced Save Dictionaries to Cache (Protects client-side CPU overhead)
+        function debouncedSave() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                localStorage.setItem('fasthand_shorthand_dict', JSON.stringify(appState.shorthandDict));
+                localStorage.setItem('fasthand_steno_dict', JSON.stringify(appState.stenoDict));
+            }, 300);
+        }
+
+        // Mode Switcher Control
+        function switchMode(mode) {
+            appState.activeMode = mode;
+            localStorage.setItem('fasthand_active_mode', mode);
+            
+            const btnShorthand = document.getElementById('btnModeShorthand');
+            const btnSteno = document.getElementById('btnModeSteno');
+            const modeStatusIndicator = document.getElementById('modeStatusIndicator');
+            const modeDescription = document.getElementById('modeDescription');
+            const dictInputTitle = document.getElementById('dictInputTitle');
+
+            if (mode === 'shorthand') {
+                btnShorthand.className = "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 bg-brand-600 text-white shadow-md";
+                btnSteno.className = "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 text-slate-400 hover:text-white";
+                
+                modeStatusIndicator.className = "h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse";
+                modeDescription.innerText = "Mode Ketik Cepat Aktif (Trigger: Spasi, Titik, Koma)";
+                dictInputTitle.innerText = "Tambah Singkatan Manual";
+                
+                document.getElementById('virtualStenoSection').classList.add('hidden');
+            } else {
+                btnSteno.className = "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 bg-brand-600 text-white shadow-md";
+                btnShorthand.className = "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 text-slate-400 hover:text-white";
+                
+                modeStatusIndicator.className = "h-2.5 w-2.5 rounded-full bg-brand-500 animate-pulse";
+                modeDescription.innerText = "Mode Stenografi Aktif (Gunakan Akor Keyboard Fisik / Virtual)";
+                dictInputTitle.innerText = "Tambah Akor Steno (Uppercase)";
+                
+                if (appState.virtualStenoEnabled) {
+                    document.getElementById('virtualStenoSection').classList.remove('hidden');
+                }
+            }
+            renderDictionaryList();
+        }
+
+        // Web Audio API Click sound with advanced profiles
+        function playClickSound() {
+            if (!appState.soundEnabled) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                // Randomized micro-pitch variation for natural acoustic sensation (prevents ear fatigue)
+                const microPitch = (Math.random() - 0.5) * 20;
+
+                if (appState.soundProfile === 'soft') {
+                    // Soft, subtle, light bubble click
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(450 + microPitch, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.04);
+                    
+                    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.04);
+                } else if (appState.soundProfile === 'brown') {
+                    // Solid, deeper mechanical click
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(220 + microPitch, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.06);
+                    
+                    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.06);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.06);
+                } else if (appState.soundProfile === 'blue') {
+                    // High pitch crisp double click (Blue switch emulation)
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800 + microPitch, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(250, audioCtx.currentTime + 0.02);
+                    
+                    gain.gain.setValueAtTime(0.07, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.002, audioCtx.currentTime + 0.02);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.02);
+                }
+            } catch (e) {
+                console.warn("Audio Context blocked or failed:", e);
+            }
+        }
+
+        // Modal Settings Helpers
+        function setSoundProfile(profile) {
+            appState.soundProfile = profile;
+            localStorage.setItem('fasthand_sound_profile', profile);
+
+            // Toggle active classes on Sound Profile Selectors
+            const btnSoft = document.getElementById('sndProfileSoft');
+            const btnBrown = document.getElementById('sndProfileBrown');
+            const btnBlue = document.getElementById('sndProfileBlue');
+
+            [btnSoft, btnBrown, btnBlue].forEach(btn => {
+                btn.className = "px-3 py-1.5 rounded-lg text-xs bg-slate-800 text-slate-400 font-medium border border-slate-700 transition";
+            });
+
+            if (profile === 'soft') {
+                btnSoft.className = "px-3 py-1.5 rounded-lg text-xs bg-brand-600 text-white font-medium border border-transparent transition shadow-md shadow-brand-500/20";
+            } else if (profile === 'brown') {
+                btnBrown.className = "px-3 py-1.5 rounded-lg text-xs bg-brand-600 text-white font-medium border border-transparent transition shadow-md shadow-brand-500/20";
+            } else if (profile === 'blue') {
+                btnBlue.className = "px-3 py-1.5 rounded-lg text-xs bg-brand-600 text-white font-medium border border-transparent transition shadow-md shadow-brand-500/20";
+            }
+        }
+
+        function handleModalSettingChange(key, value) {
+            appState[key] = value;
+            
+            if (key === 'soundEnabled') {
+                localStorage.setItem('fasthand_sound', value);
+            } else if (key === 'virtualStenoEnabled') {
+                localStorage.setItem('fasthand_virtual_steno', value);
+                if (value && appState.activeMode === 'steno') {
+                    document.getElementById('virtualStenoSection').classList.remove('hidden');
+                } else {
+                    document.getElementById('virtualStenoSection').classList.add('hidden');
+                }
+            } else if (key === 'stenoReleaseSend') {
+                localStorage.setItem('fasthand_release_send', value);
+            }
+        }
+
+        function setStenoLayout(layout) {
+            appState.stenoLayout = layout;
+            localStorage.setItem('fasthand_steno_layout', layout);
+
+            const btnSimple = document.getElementById('layoutBtnSimple');
+            const btnComplete = document.getElementById('layoutBtnComplete');
+
+            btnSimple.className = "px-2.5 py-1 rounded text-slate-400 hover:text-white font-medium transition";
+            btnComplete.className = "px-2.5 py-1 rounded text-slate-400 hover:text-white font-medium transition";
+
+            if (layout === 'simple') {
+                btnSimple.className = "px-2.5 py-1 rounded bg-brand-600 text-white font-medium transition shadow";
+                document.getElementById('layoutInstruction').innerText = "Gunakan keyboard fisik (QWER ASDF dll.) atau ketuk virtual untuk mengirim steno.";
+                renderSimpleStenoBoard();
+            } else {
+                btnComplete.className = "px-2.5 py-1 rounded bg-brand-600 text-white font-medium transition shadow";
+                document.getElementById('layoutInstruction').innerText = "Layout Lengkap (Berbasis Plover). Sesuai untuk keyboard steno profesional.";
+                renderCompleteStenoBoard();
+            }
+            
+            setupVirtualStenoTouchEvents();
+        }
+
+        function renderSimpleStenoBoard() {
+            const container = document.getElementById('stenotypeKeyboardContainer');
+            
+            container.innerHTML = `
+                <!-- STENOTYPE BOARD DESIGN (SIMPLE) -->
+                <div class="grid grid-cols-12 gap-1.5 max-w-3xl mx-auto">
+                    <!-- LEFT HAND (S-, T-, P-, H-, K-, W-, R-, N-) -->
+                    <div class="col-span-4 grid grid-cols-4 gap-1">
+                        <div class="flex flex-col gap-1">
+                            <button data-steno-key="S-" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>S-</span>
+                                <span class="text-[9px] text-slate-600">Q</span>
+                            </button>
+                            <button data-steno-key="K-" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>K-</span>
+                                <span class="text-[9px] text-slate-600">A</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <button data-steno-key="T-" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>T-</span>
+                                <span class="text-[9px] text-slate-600">W</span>
+                            </button>
+                            <button data-steno-key="W-" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>W-</span>
+                                <span class="text-[9px] text-slate-600">S</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <button data-steno-key="P-" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>P-</span>
+                                <span class="text-[9px] text-slate-600">E</span>
+                            </button>
+                            <button data-steno-key="R-" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>R-</span>
+                                <span class="text-[9px] text-slate-600">D</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <button data-steno-key="H-" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>H-</span>
+                                <span class="text-[9px] text-slate-600">R</span>
+                            </button>
+                            <button data-steno-key="N-" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>N-</span>
+                                <span class="text-[9px] text-slate-600">F</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- THUMBS (A-, O-, E-, U-) -->
+                    <div class="col-span-4 grid grid-cols-4 gap-1 items-end pb-1 px-2">
+                        <button data-steno-key="A-" class="steno-btn bg-slate-950 hover:bg-slate-800 active:bg-indigo-600 active:text-white text-slate-300 border border-slate-800 rounded-xl h-16 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                            <span>A-</span>
+                            <span class="text-[9px] text-slate-600">C</span>
+                        </button>
+                        <button data-steno-key="O-" class="steno-btn bg-slate-950 hover:bg-slate-800 active:bg-indigo-600 active:text-white text-slate-300 border border-slate-800 rounded-xl h-16 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                            <span>O-</span>
+                            <span class="text-[9px] text-slate-600">V</span>
+                        </button>
+                        <button data-steno-key="E-" class="steno-btn bg-slate-950 hover:bg-slate-800 active:bg-indigo-600 active:text-white text-slate-300 border border-slate-800 rounded-xl h-16 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                            <span>-E</span>
+                            <span class="text-[9px] text-slate-600">B</span>
+                        </button>
+                        <button data-steno-key="U-" class="steno-btn bg-slate-950 hover:bg-slate-800 active:bg-indigo-600 active:text-white text-slate-300 border border-slate-800 rounded-xl h-16 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                            <span>-U</span>
+                            <span class="text-[9px] text-slate-600">N</span>
+                        </button>
+                    </div>
+
+                    <!-- RIGHT HAND (-F, -P, -L, -T, -R, -S, -D, -Z) -->
+                    <div class="col-span-4 grid grid-cols-4 gap-1">
+                        <div class="flex flex-col gap-1">
+                            <button data-steno-key="-F" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>-F</span>
+                                <span class="text-[9px] text-slate-600">U</span>
+                            </button>
+                            <button data-steno-key="-R" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>-R</span>
+                                <span class="text-[9px] text-slate-600">J</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <button data-steno-key="-P" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>-P</span>
+                                <span class="text-[9px] text-slate-600">I</span>
+                            </button>
+                            <button data-steno-key="-S" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>-S</span>
+                                <span class="text-[9px] text-slate-600">K</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <button data-steno-key="-L" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>-L</span>
+                                <span class="text-[9px] text-slate-600">O</span>
+                            </button>
+                            <button data-steno-key="-D" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>-D</span>
+                                <span class="text-[9px] text-slate-600">L</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <button data-steno-key="-T" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>-T</span>
+                                <span class="text-[9px] text-slate-600">P</span>
+                            </button>
+                            <button data-steno-key="-Z" class="steno-btn bg-slate-900 hover:bg-slate-800 active:bg-brand-600 active:text-white text-slate-400 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-xs font-bold font-mono transition-all">
+                                <span>-Z</span>
+                                <span class="text-[9px] text-slate-600">;</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCompleteStenoBoard() {
+            const container = document.getElementById('stenotypeKeyboardContainer');
+            
+            container.innerHTML = `
+                <!-- STENOTYPE BOARD DESIGN (COMPLETE / INDUSTRIAL PLOVER LAYOUT) -->
+                <div class="flex flex-col gap-2 max-w-4xl mx-auto font-mono text-xs font-bold text-slate-400">
+                    
+                    <!-- Top Number Bar Row -->
+                    <div class="grid grid-cols-10 gap-1 mb-1">
+                        <button data-steno-key="#" class="col-span-10 steno-btn bg-slate-950 hover:bg-slate-900 border border-slate-800 rounded-xl h-10 flex items-center justify-center transition-all">
+                            <span>BAR ANGKA (#) - [1 2 3 4 5 6 7 8 9 0]</span>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-10 gap-1">
+                        
+                        <!-- LEFT HAND (INITIALS) -->
+                        <div class="col-span-4 grid grid-cols-4 gap-1">
+                            <!-- Column 1 (S-) -->
+                            <div class="flex flex-col gap-1">
+                                <button data-steno-key="S-" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>S-</span> <span class="text-[9px] text-slate-600">Q</span>
+                                </button>
+                                <button data-steno-key="S-" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>S-</span> <span class="text-[9px] text-slate-600">A</span>
+                                </button>
+                            </div>
+                            <!-- Column 2 (T-, K-) -->
+                            <div class="flex flex-col gap-1">
+                                <button data-steno-key="T-" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>T-</span> <span class="text-[9px] text-slate-600">W</span>
+                                </button>
+                                <button data-steno-key="K-" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>K-</span> <span class="text-[9px] text-slate-600">S</span>
+                                </button>
+                            </div>
+                            <!-- Column 3 (P-, W-) -->
+                            <div class="flex flex-col gap-1">
+                                <button data-steno-key="P-" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>P-</span> <span class="text-[9px] text-slate-600">E</span>
+                                </button>
+                                <button data-steno-key="W-" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>W-</span> <span class="text-[9px] text-slate-600">D</span>
+                                </button>
+                            </div>
+                            <!-- Column 4 (H-, R-) -->
+                            <div class="flex flex-col gap-1">
+                                <button data-steno-key="H-" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>H-</span> <span class="text-[9px] text-slate-600">R</span>
+                                </button>
+                                <button data-steno-key="R-" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>R-</span> <span class="text-[9px] text-slate-600">F</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- CENTER STARS (*) -->
+                        <div class="col-span-1 flex flex-col gap-1">
+                            <button data-steno-key="*" class="steno-btn bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-indigo-400">
+                                <span>*</span> <span class="text-[9px] text-slate-600">T</span>
+                            </button>
+                            <button data-steno-key="*" class="steno-btn bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center text-indigo-400">
+                                <span>*</span> <span class="text-[9px] text-slate-600">G</span>
+                            </button>
+                        </div>
+
+                        <!-- RIGHT HAND (FINALS) -->
+                        <div class="col-span-5 grid grid-cols-5 gap-1">
+                            <!-- Column 1 (-F, -R) -->
+                            <div class="flex flex-col gap-1">
+                                <button data-steno-key="-F" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-F</span> <span class="text-[9px] text-slate-600">U</span>
+                                </button>
+                                <button data-steno-key="-R" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-R</span> <span class="text-[9px] text-slate-600">J</span>
+                                </button>
+                            </div>
+                            <!-- Column 2 (-P, -S) -->
+                            <div class="flex flex-col gap-1">
+                                <button data-steno-key="-P" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-P</span> <span class="text-[9px] text-slate-600">I</span>
+                                </button>
+                                <button data-steno-key="-S" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-S</span> <span class="text-[9px] text-slate-600">K</span>
+                                </button>
+                            </div>
+                            <!-- Column 3 (-L, -T) -->
+                            <div class="flex flex-col gap-1">
+                                <button data-steno-key="-L" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-L</span> <span class="text-[9px] text-slate-600">O</span>
+                                </button>
+                                <button data-steno-key="-T" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-T</span> <span class="text-[9px] text-slate-600">L</span>
+                                </button>
+                            </div>
+                            <!-- Column 4 (-G, -D) -->
+                            <div class="flex flex-col gap-1">
+                                <button data-steno-key="-G" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-G</span> <span class="text-[9px] text-slate-600">P</span>
+                                </button>
+                                <button data-steno-key="-D" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-D</span> <span class="text-[9px] text-slate-600">;</span>
+                                </button>
+                            </div>
+                            <!-- Column 5 (-B, -Z) -->
+                            <div class="flex flex-col gap-1">
+                                <button data-steno-key="-B" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-B</span> <span class="text-[9px] text-slate-600">[</span>
+                                </button>
+                                <button data-steno-key="-Z" class="steno-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl h-14 flex flex-col justify-center items-center">
+                                    <span>-Z</span> <span class="text-[9px] text-slate-600">'</span>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- THUMB KEYS ROW (A-, O-, -E, -U) -->
+                    <div class="grid grid-cols-10 gap-1 mt-1 justify-center">
+                        <div class="col-span-3"></div>
+                        <div class="col-span-4 grid grid-cols-4 gap-1">
+                            <button data-steno-key="A-" class="steno-btn bg-slate-950 hover:bg-slate-800 border border-slate-850 rounded-xl h-16 flex flex-col justify-center items-center text-slate-200">
+                                <span>A-</span> <span class="text-[9px] text-slate-600">C</span>
+                            </button>
+                            <button data-steno-key="O-" class="steno-btn bg-slate-950 hover:bg-slate-800 border border-slate-850 rounded-xl h-16 flex flex-col justify-center items-center text-slate-200">
+                                <span>O-</span> <span class="text-[9px] text-slate-600">V</span>
+                            </button>
+                            <button data-steno-key="E-" class="steno-btn bg-slate-950 hover:bg-slate-800 border border-slate-850 rounded-xl h-16 flex flex-col justify-center items-center text-slate-200">
+                                <span>-E</span> <span class="text-[9px] text-slate-600">B</span>
+                            </button>
+                            <button data-steno-key="U-" class="steno-btn bg-slate-950 hover:bg-slate-800 border border-slate-850 rounded-xl h-16 flex flex-col justify-center items-center text-slate-200">
+                                <span>-U</span> <span class="text-[9px] text-slate-600">N</span>
+                            </button>
+                        </div>
+                        <div class="col-span-3"></div>
+                    </div>
+
+                </div>
+            `;
+        }
+
+        // Modal Handlers
+        function openSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('.transform').classList.remove('scale-95');
+                modal.querySelector('.transform').classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('.transform').classList.add('scale-95');
+            modal.querySelector('.transform').classList.remove('scale-100');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        // Confirmation Modal Handlers
+        function showConfirmModal(title, desc, callback) {
+            const modal = document.getElementById('confirmModal');
+            document.getElementById('confirmTitle').innerText = title;
+            document.getElementById('confirmDesc').innerText = desc;
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('.transform').classList.remove('scale-95');
+                modal.querySelector('.transform').classList.add('scale-100');
+            }, 10);
+
+            const proceedBtn = document.getElementById('btnConfirmProceed');
+            const cancelBtn = document.getElementById('btnConfirmCancel');
+
+            // Cleanup old event listeners
+            const newProceed = proceedBtn.cloneNode(true);
+            const newCancel = cancelBtn.cloneNode(true);
+            proceedBtn.parentNode.replaceChild(newProceed, proceedBtn);
+            cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+            newProceed.addEventListener('click', () => {
+                closeConfirmModal();
+                callback();
+            });
+
+            newCancel.addEventListener('click', () => {
+                closeConfirmModal();
+            });
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('.transform').classList.add('scale-95');
+            modal.querySelector('.transform').classList.remove('scale-100');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 150);
+        }
+
+        // Statistics Processing & Calculations
+        function updateCounts() {
+            const text = editor.value;
+            charCountEl.innerText = text.length;
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            wordCountEl.innerText = words;
+
+            // Save editor text
+            localStorage.setItem('fasthand_editor_text', text);
+        }
+
+        function updateSessionStats() {
+            const elapsed = Math.floor((Date.now() - appState.startTime) / 1000);
+            
+            // Format time elapsed
+            let timeStr = "";
+            if (elapsed < 60) {
+                timeStr = `Sesi: ${elapsed}s`;
+            } else {
+                const min = Math.floor(elapsed / 60);
+                const sec = elapsed % 60;
+                timeStr = `Sesi: ${min}m ${sec}s`;
+            }
+            timeEl.innerText = timeStr;
+
+            // Calculate Words Per Minute (WPM)
+            const minutes = elapsed / 60;
+            const words = editor.value.trim() ? editor.value.trim().split(/\s+/).length : 0;
+            if (minutes > 0) {
+                appState.typingSpeed = Math.round(words / minutes);
+                statWpm.innerText = `${appState.typingSpeed} WPM`;
+            }
+        }
+
+        function showReplacementFeedback(input, output) {
+            replacementText.innerText = `${input} → ${output}`;
+            replacementPopup.classList.remove('opacity-0', 'translate-y-2');
+            replacementPopup.classList.add('opacity-100', 'translate-y-0');
+            
+            appState.substitutionCount++;
+            statSubCount.innerText = `${appState.substitutionCount} Kali`;
+            localStorage.setItem('fasthand_sub_count', appState.substitutionCount);
+
+            setTimeout(() => {
+                replacementPopup.classList.add('opacity-0', 'translate-y-2');
+                replacementPopup.classList.remove('opacity-100', 'translate-y-0');
+            }, 1200);
+        }
+
+        // KEYBOARD EVENT HANDLING
+        function handleEditorKeyDown(event) {
+            playClickSound();
+
+            // Undo (Backspace Rollback) implementation
+            if (event.key === 'Backspace' && lastSubstitution) {
+                const cursorPosition = editor.selectionStart;
+                
+                // If cursor is immediately after the replaced word
+                if (cursorPosition === lastSubstitution.index) {
+                    event.preventDefault();
+                    
+                    const text = editor.value;
+                    const before = text.substring(0, lastSubstitution.start);
+                    const after = text.substring(cursorPosition);
+                    
+                    // Revert text to original shorthand
+                    editor.value = before + lastSubstitution.original + after;
+                    
+                    // Reposition cursor right after shorthand
+                    const restoredCursor = lastSubstitution.start + lastSubstitution.original.length;
+                    editor.setSelectionRange(restoredCursor, restoredCursor);
+                    
+                    lastSubstitution = null; // Clear rollback slot
+                    updateCounts();
+                    showVisualAlert("Substitusi dibatalkan", "success");
+                    return;
+                }
+            }
+
+            // Normal typing continues: clear undo tracking on other keypresses
+            if (event.key !== 'Backspace') {
+                lastSubstitution = null;
+            }
+
+            // Shorthand Translation Processing
+            if (appState.activeMode === 'shorthand') {
+                const triggers = [' ', '.', ',', '?', '!', ';', '\n'];
+                if (triggers.includes(event.key)) {
+                    processShorthand(event);
+                }
+            } else if (appState.activeMode === 'steno') {
+                // Handle Physical Keyboard Chording
+                const physicalKey = event.key.toLowerCase();
+                const keymap = appState.stenoLayout === 'simple' ? STENO_PHYSICAL_KEYMAP_SIMPLE : STENO_PHYSICAL_KEYMAP_COMPLETE;
+                
+                if (keymap[physicalKey]) {
+                    event.preventDefault();
+                    
+                    const stenoSymbol = keymap[physicalKey];
+                    appState.currentStenoChord.add(stenoSymbol);
+                    appState.keysCurrentlyDown.add(physicalKey);
+                    
+                    highlightVirtualKey(stenoSymbol, true);
+                    updateCurrentChordDisplay();
+                }
+            }
+        }
+
+        function handleEditorKeyUp(event) {
+            if (appState.activeMode === 'steno') {
+                const physicalKey = event.key.toLowerCase();
+                const keymap = appState.stenoLayout === 'simple' ? STENO_PHYSICAL_KEYMAP_SIMPLE : STENO_PHYSICAL_KEYMAP_COMPLETE;
+
+                if (keymap[physicalKey]) {
+                    event.preventDefault();
+                    
+                    appState.keysCurrentlyDown.delete(physicalKey);
+                    highlightVirtualKey(keymap[physicalKey], false);
+
+                    // If all physical keys have been released, trigger chord translation commit
+                    if (appState.keysCurrentlyDown.size === 0 && appState.currentStenoChord.size > 0) {
+                        commitChord();
+                    }
+                }
+            }
+        }
+
+        function handleEditorInput() {
+            updateCounts();
+        }
+
+        // Shorthand Engine Processing (Smart auto-spacing & casing matching)
+        function processShorthand(event) {
+            const cursorPosition = editor.selectionStart;
+            const text = editor.value;
+            
+            // Extract the word preceding the cursor
+            const textBeforeCursor = text.substring(0, cursorPosition);
+            const wordsMatch = textBeforeCursor.match(/([A-Za-z0-9À-ÿ_-]+)$/);
+            
+            if (wordsMatch) {
+                const lastWord = wordsMatch[1];
+                const cleanWord = lastWord.toLowerCase();
+                const replacement = appState.shorthandDict[cleanWord];
+                
+                if (replacement) {
+                    event.preventDefault(); // Suspend standard key insertions
+                    
+                    // Handle Casing (Capital, Uppercase, or Standard Lowercase)
+                    let formattedReplacement = replacement;
+                    if (lastWord === lastWord.toUpperCase()) {
+                        formattedReplacement = replacement.toUpperCase();
+                    } else if (lastWord[0] === lastWord[0].toUpperCase()) {
+                        formattedReplacement = replacement.charAt(0).toUpperCase() + replacement.slice(1);
+                    }
+
+                    // Smart Auto-spacing logic: handle spaces preceding punctuation marks correctly
+                    const triggerKey = event.key;
+                    let endSpacing = triggerKey;
+                    
+                    // Perform replacement
+                    const replaceStart = cursorPosition - lastWord.length;
+                    editor.value = text.substring(0, replaceStart) + formattedReplacement + endSpacing + text.substring(cursorPosition);
+                    
+                    // Reposition cursor
+                    const newCursorPos = replaceStart + formattedReplacement.length + endSpacing.length;
+                    editor.setSelectionRange(newCursorPos, newCursorPos);
+                    
+                    // Record last substitution for Backspace Undo tracking
+                    lastSubstitution = {
+                        start: replaceStart,
+                        index: newCursorPos,
+                        original: lastWord,
+                        replaced: formattedReplacement
+                    };
+
+                    showReplacementFeedback(lastWord, formattedReplacement);
+                    updateCounts();
+                }
+            }
+        }
+
+        // STENOGRAPHY CORE ENGINE
+        function getStenoChordString() {
+            // Sorting rule list (Left hands, Thumbs, right hand elements standard order)
+            const orderList = [
+                '#', // Number key
+                'S-', 'K-', 'T-', 'W-', 'P-', 'R-', 'H-', 'N-', // Left
+                'A-', 'O-', '*', 'E-', 'U-',                    // Thumbs
+                '-F', '-R', '-P', '-S', '-L', '-D', '-T', '-Z', '-B', '-G'  // Right
+            ];
+            
+            const sortedChordParts = Array.from(appState.currentStenoChord).sort((a, b) => {
+                return orderList.indexOf(a) - orderList.indexOf(b);
+            });
+            
+            // Force strict uppercase formatting to avoid lookup failures!
+            return sortedChordParts.join('').toUpperCase();
+        }
+
+        function updateCurrentChordDisplay() {
+            const chordText = getStenoChordString();
+            document.getElementById('currentChordBufferText').innerText = chordText ? `[ ${chordText} ]` : '[]';
+        }
+
+        function commitChord() {
+            // Chord string output is always converted to uppercase (eliminating lowercase lookup failures!)
+            const chordString = getStenoChordString().toUpperCase();
+            if (!chordString) return;
+
+            const replacement = appState.stenoDict[chordString];
+            
+            if (replacement) {
+                // Auto spacing: insert with clean trailing whitespace
+                insertTextAtCursor(replacement + ' ');
+                showReplacementFeedback(chordString, replacement);
+            } else {
+                // Failsafe backup output so the typist gets input diagnostics
+                insertTextAtCursor(`[${chordString}] `);
+            }
+
+            // Reset current buffers
+            appState.currentStenoChord.clear();
+            updateCurrentChordDisplay();
+        }
+
+        function commitManualChord() {
+            commitChord();
+            editor.focus();
+        }
+
+        function clearStenoCurrentChord() {
+            appState.currentStenoChord.clear();
+            updateCurrentChordDisplay();
+            
+            // Remove keyboard visual feedback states
+            document.querySelectorAll('.steno-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-600', 'text-white');
+                const isThumb = ['A-', 'O-', 'E-', 'U-', '-E', '-U', '*'].includes(btn.getAttribute('data-steno-key'));
+                btn.classList.add(isThumb ? 'bg-slate-950' : 'bg-slate-900');
+            });
+        }
+
+        function insertTextAtCursor(text) {
+            const startPos = editor.selectionStart;
+            const endPos = editor.selectionEnd;
+            const textVal = editor.value;
+            
+            editor.value = textVal.substring(0, startPos) + text + textVal.substring(endPos);
+            editor.selectionStart = editor.selectionEnd = startPos + text.length;
+            
+            updateCounts();
+        }
+
+        function highlightVirtualKey(stenoSymbol, activate) {
+            // Match buttons by their custom data properties
+            const buttons = document.querySelectorAll(`[data-steno-key="${stenoSymbol}"]`);
+            buttons.forEach(button => {
+                if (activate) {
+                    button.classList.remove('bg-slate-900', 'bg-slate-950', 'text-slate-400', 'text-slate-300');
+                    button.classList.add('bg-brand-600', 'text-white');
+                } else {
+                    button.classList.remove('bg-brand-600', 'text-white');
+                    const isThumb = ['A-', 'O-', 'E-', 'U-', '-E', '-U', '*'].includes(stenoSymbol);
+                    button.classList.add(isThumb ? 'bg-slate-950' : 'bg-slate-900');
+                    button.classList.add(isThumb ? 'text-slate-300' : 'text-slate-400');
+                }
+            });
+        }
+
+        // Mobile Multitouch Engines for both layout configs
+        function setupVirtualStenoTouchEvents() {
+            const buttons = document.querySelectorAll('.steno-btn');
+            
+            buttons.forEach(button => {
+                const key = button.getAttribute('data-steno-key');
+                if (!key) return;
+
+                // Mouse Click Actions (Backups)
+                button.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    appState.currentStenoChord.add(key);
+                    highlightVirtualKey(key, true);
+                    updateCurrentChordDisplay();
+                    playClickSound();
+                });
+
+                button.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    highlightVirtualKey(key, false);
+                    if (appState.stenoReleaseSend) {
+                        commitChord();
+                    }
+                });
+
+                // True Touchscreen Multitouch API bindings
+                button.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    appState.stenoActiveTouches.add(key);
+                    appState.currentStenoChord.add(key);
+                    highlightVirtualKey(key, true);
+                    updateCurrentChordDisplay();
+                    playClickSound();
+                });
+
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    appState.stenoActiveTouches.delete(key);
+                    highlightVirtualKey(key, false);
+
+                    if (appState.stenoActiveTouches.size === 0) {
+                        if (appState.stenoReleaseSend) {
+                            commitChord();
+                        }
+                    }
+                });
+            });
+        }
+
+        // DICTIONARY LIBRARIES UI / MANAGERS
+        function renderDictionaryList() {
+            const searchQuery = document.getElementById('dictionarySearchInput').value.toLowerCase();
+            const dict = appState.activeMode === 'shorthand' ? appState.shorthandDict : appState.stenoDict;
+            
+            container.innerHTML = '';
+            const entries = Object.entries(dict).sort((a, b) => a[0].localeCompare(b[0]));
+            let renderedCount = 0;
+
+            entries.forEach(([key, val]) => {
+                if (key.toLowerCase().includes(searchQuery) || val.toLowerCase().includes(searchQuery)) {
+                    renderedCount++;
+                    
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = "flex items-center justify-between bg-slate-900 border border-slate-800/80 px-3 py-2 rounded-xl text-xs hover:border-slate-700 transition duration-150";
+                    
+                    // Visual formatting: force uppercase visually for steno chord keys
+                    const formattedKey = appState.activeMode === 'steno' ? key.toUpperCase() : key;
+
+                    itemDiv.innerHTML = `
+                        <div class="flex items-center gap-2 overflow-hidden mr-2">
+                            <span class="font-mono text-brand-400 font-semibold truncate max-w-[120px] select-all" title="${formattedKey}">${formattedKey}</span>
+                            <span class="text-slate-500">→</span>
+                            <span class="text-slate-300 truncate" title="${val}">${val}</span>
+                        </div>
+                        <button onclick="deleteDictionaryEntry('${key}')" class="text-slate-600 hover:text-red-400 p-1 transition duration-100 flex-shrink-0">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    `;
+                    container.appendChild(itemDiv);
+                }
+            });
+
+            // Update statistics label values
+            countBadge.innerText = `${Object.keys(dict).length} Item`;
+            lucide.createIcons();
+
+            if (renderedCount === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-slate-500 text-xs py-12">
+                        <i data-lucide="book" class="w-8 h-8 text-slate-700 mx-auto mb-2"></i>
+                        Kamus kosong atau tidak ada kecocokan.
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        }
+
+        function addDictionaryEntry() {
+            let inputKey = document.getElementById('addInputKey').value.trim();
+            const outputVal = document.getElementById('addOutputVal').value.trim();
+
+            if (!inputKey || !outputVal) {
+                showVisualAlert("Harap isi seluruh kolom input!", "error");
+                return;
+            }
+
+            // BUG FIX: Automatically force steno chord keys to UPPERCASE!
+            if (appState.activeMode === 'steno') {
+                inputKey = inputKey.toUpperCase();
+                
+                // Validate correct steno notation symbols (+ optionally Star key, # sign, and hyphens)
+                if (!/^[A-Z\-#\*]+$/i.test(inputKey)) {
+                    showVisualAlert("Akor steno harus berupa karakter alfabet, *, #, dan tanda hubung (mis: S-)", "error");
+                    return;
+                }
+            } else {
+                inputKey = inputKey.toLowerCase();
+            }
+
+            const dict = appState.activeMode === 'shorthand' ? appState.shorthandDict : appState.stenoDict;
+            dict[inputKey] = outputVal;
+            
+            debouncedSave();
+            renderDictionaryList();
+            
+            // Reset input values
+            document.getElementById('addInputKey').value = '';
+            document.getElementById('addOutputVal').value = '';
+            
+            showVisualAlert("Singkatan disimpan!", "success");
+        }
+
+        function deleteDictionaryEntry(key) {
+            const dict = appState.activeMode === 'shorthand' ? appState.shorthandDict : appState.stenoDict;
+            if (dict[key]) {
+                delete dict[key];
+                debouncedSave();
+                renderDictionaryList();
+                showVisualAlert("Item terhapus.", "success");
+            }
+        }
+
+        // Default Dictionary Loader Actions
+        function loadDefaultLibrary(type) {
+            if (type === 'shorthand') {
+                appState.shorthandDict = { ...DEFAULT_SHORTHAND_LIBRARY };
+                showVisualAlert("Kamus ketik cepat dimuat!", "success");
+            } else if (type === 'steno') {
+                // Ensure all default steno dictionary elements are strictly uppercase
+                appState.stenoDict = {};
+                Object.entries(DEFAULT_STENO_LIBRARY).forEach(([k, v]) => {
+                    appState.stenoDict[k.toUpperCase()] = v;
+                });
+                showVisualAlert("Kamus steno bawaan dimuat!", "success");
+            }
+            debouncedSave();
+            renderDictionaryList();
+        }
+
+        function clearCurrentDictionaries() {
+            showConfirmModal(
+                "Kosongkan Kamus", 
+                "Tindakan ini akan menghapus seluruh data pada kamus Ketik Cepat dan Steno. Lanjutkan?", 
+                () => {
+                    appState.shorthandDict = {};
+                    appState.stenoDict = {};
+                    debouncedSave();
+                    renderDictionaryList();
+                    showVisualAlert("Seluruh kamus dibersihkan!", "success");
+                }
+            );
+        }
+
+        // CSV IMPORT & EXPORTS
+        function triggerCSVImport() {
+            document.getElementById('csvFileInput').click();
+        }
+
+        function handleCSVImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseCSV(e.target.result);
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Clean
+        }
+
+        function parseCSV(content) {
+            try {
+                const lines = content.split('\n');
+                let count = 0;
+                const dict = appState.activeMode === 'shorthand' ? appState.shorthandDict : appState.stenoDict;
+
+                lines.forEach(line => {
+                    if (!line.trim()) return;
+                    let parts = line.split(',');
+                    if (parts.length < 2) parts = line.split(';');
+
+                    if (parts.length >= 2) {
+                        let key = parts[0].trim().replace(/^["']|["']$/g, '');
+                        const val = parts[1].trim().replace(/^["']|["']$/g, '');
+                        
+                        // Force uppercase for steno imports to avoid casing lookup failure bugs
+                        if (appState.activeMode === 'steno') {
+                            key = key.toUpperCase();
+                        } else {
+                            key = key.toLowerCase();
+                        }
+
+                        if (key && val) {
+                            dict[key] = val;
+                            count++;
+                        }
+                    }
+                });
+
+                if (count > 0) {
+                    debouncedSave();
+                    renderDictionaryList();
+                    showVisualAlert(`Impor ${count} item berhasil!`, "success");
+                } else {
+                    showVisualAlert("Gagal mengimpor. Pastikan kolom berupa: singkatan,arti", "error");
+                }
+            } catch (err) {
+                showVisualAlert("Terjadi kegagalan parsing CSV.", "error");
+            }
+        }
+
+        function exportDictionaryToCSV() {
+            const dict = appState.activeMode === 'shorthand' ? appState.shorthandDict : appState.stenoDict;
+            if (Object.keys(dict).length === 0) {
+                showVisualAlert("Kamus kosong. Tidak ada data untuk diekspor.", "error");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            Object.entries(dict).forEach(([key, val]) => {
+                const formattedKey = appState.activeMode === 'steno' ? key.toUpperCase() : key;
+                csvContent += `"${formattedKey}","${val}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `fasthand_library_${appState.activeMode}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // WRITING CANVAS UTILITIES
+        function clearCanvasWithConfirm() {
+            if (editor.value.trim() === '') return;
+            
+            showConfirmModal(
+                "Hapus Catatan", 
+                "Tindakan ini akan menghapus seluruh catatan Anda pada editor. Lanjutkan?", 
+                () => {
+                    editor.value = '';
+                    updateCounts();
+                    showVisualAlert("Catatan dibersihkan", "success");
+                }
+            );
+        }
+
+        function copyToClipboard() {
+            if (!editor.value.trim()) {
+                showVisualAlert("Catatan Anda masih kosong!", "error");
+                return;
+            }
+            try {
+                editor.select();
+                document.execCommand('copy');
+                window.getSelection().removeAllRanges();
+                showVisualAlert("Teks disalin ke papan klip!", "success");
+            } catch (e) {
+                showVisualAlert("Gagal menyalin catatan.", "error");
+            }
+        }
+
+        function downloadText(format) {
+            const content = editor.value;
+            if (!content.trim()) {
+                showVisualAlert("Catatan Anda masih kosong!", "error");
+                return;
+            }
+
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const filename = `catatan_fasthand_${dateStr}`;
+
+            if (format === 'txt') {
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${filename}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } else if (format === 'docx') {
+                // Highly standard print-layout compliant Office XML package markup
+                const docHeader = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><title>Catatan FastHand</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]--><style>body { font-family: 'Arial', sans-serif; line-height: 1.6; font-size: 11pt; color: #333333; padding: 1in; }</style></head><body>";
+                const docFooter = "</body></html>";
+                const bodyHtml = content.replace(/\n/g, '<br>');
+                const finalDoc = docHeader + bodyHtml + docFooter;
+
+                const blob = new Blob(['\ufeff' + finalDoc], { type: 'application/msword' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${filename}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        // Premium Floating Toast Notification
+        function showVisualAlert(msg, type = "success") {
+            const popup = document.createElement('div');
+            popup.className = `fixed bottom-6 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-xl border text-xs font-semibold shadow-2xl transition-all duration-300 z-[80] flex items-center gap-2 ${
+                type === 'success' 
+                    ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-400' 
+                    : 'bg-red-950/90 border-red-500/30 text-red-400'
+            }`;
+            
+            const iconName = type === 'success' ? 'check-circle' : 'alert-triangle';
+            popup.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4"></i> ${msg}`;
+            
+            document.body.appendChild(popup);
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                popup.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => {
+                    document.body.removeChild(popup);
+                }, 300);
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

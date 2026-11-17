@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RandNamer</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                            900: '#164e63',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Canvas Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            user-select: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.05);
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 0.7);
+        }
+
+        /* Card flip animation styles */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .transform-style-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+
+        /* Pulsing Glow Animation */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(14, 165, 233, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(14, 165, 233, 0.8); }
+        }
+        .pulse-glow {
+            animation: pulseGlow 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200 flex flex-col overflow-x-hidden">
+
+    <!-- Top Navbar -->
+    <header class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700/60 sticky top-0 z-30 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <!-- App Brand -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30">
+                    <i class="fa-solid fa-arrows-spin text-xl animate-spin-slow"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">
+                        RandNamer
+                    </h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Pengacak Nama & Item Serbaguna</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Controls -->
+            <div class="flex items-center flex-wrap gap-2">
+                <!-- Visual Mode Selector -->
+                <div class="flex bg-slate-200 dark:bg-slate-700/60 p-1 rounded-lg text-xs font-semibold">
+                    <button id="modeWheelBtn" onclick="setVisualMode('wheel')" class="px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm">
+                        <i class="fa-solid fa-dharmachakra"></i>
+                        <span class="hidden sm:inline">Roda</span>
+                    </button>
+                    <button id="modeSlotBtn" onclick="setVisualMode('slot')" class="px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">
+                        <i class="fa-solid fa-cubes"></i>
+                        <span class="hidden sm:inline">Slot</span>
+                    </button>
+                    <button id="modeCardBtn" onclick="setVisualMode('card')" class="px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span class="hidden sm:inline">Kartu</span>
+                    </button>
+                </div>
+
+                <div class="h-6 w-[1px] bg-slate-300 dark:bg-slate-700 mx-1 hidden sm:block"></div>
+
+                <!-- Active Wheels Count selector -->
+                <div class="flex items-center bg-slate-200 dark:bg-slate-700/60 p-1 rounded-lg text-xs font-semibold">
+                    <span class="px-2 text-slate-500 dark:text-slate-400 hidden md:inline">Jumlah Roda:</span>
+                    <button onclick="setWheelCount(1)" id="wheelCount1Btn" class="w-7 h-7 rounded-md flex items-center justify-center bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 font-bold shadow-sm">1</button>
+                    <button onclick="setWheelCount(2)" id="wheelCount2Btn" class="w-7 h-7 rounded-md flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900">2</button>
+                    <button onclick="setWheelCount(3)" id="wheelCount3Btn" class="w-7 h-7 rounded-md flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900">3</button>
+                    <button onclick="setWheelCount(4)" id="wheelCount4Btn" class="w-7 h-7 rounded-md flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900">4</button>
+                </div>
+
+                <!-- Utility Buttons -->
+                <button onclick="toggleThemeModal()" title="Kustomisasi Tema Warna" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-palette"></i>
+                </button>
+                <button onclick="toggleConfigModal()" title="Impor / Ekspor JSON" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-file-code"></i>
+                </button>
+                <button onclick="toggleSound()" id="soundToggleBtn" title="Suara On/Off" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-600 text-cyan-600 dark:text-cyan-400 transition-colors">
+                    <i class="fa-solid fa-volume-high"></i>
+                </button>
+                <button onclick="toggleDarkMode()" title="Mode Gelap/Terang" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-moon dark:hidden"></i>
+                    <i class="fa-solid fa-sun hidden dark:inline text-amber-400"></i>
+                </button>
+                <button onclick="toggleFullscreen()" title="Layar Penuh" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <!-- LEFT PANEL: Data Input & Configuration (4 Cols on LG) -->
+        <section class="lg:col-span-4 flex flex-col space-y-4">
+            
+            <!-- Wheel Selector Tabs -->
+            <div id="wheelTabsContainer" class="bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 flex space-x-1 shadow-sm">
+                <!-- Dynamic Wheel Tabs Generated JS -->
+            </div>
+
+            <!-- Input Panel Card -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700/80 shadow-sm flex flex-col flex-1">
+                
+                <div class="flex items-center justify-between mb-2">
+                    <label id="inputLabel" for="itemInput" class="font-bold text-sm text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-list-ul text-cyan-500"></i>
+                        <span>Daftar Item (Roda 1)</span>
+                    </label>
+                    <span id="itemCounter" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                        0 / 1000
+                    </span>
+                </div>
+
+                <!-- Help Tip for Weight Mode -->
+                <div class="text-[11px] text-slate-500 dark:text-slate-400 mb-2 flex items-start gap-1.5 bg-slate-50 dark:bg-slate-900/40 p-2 rounded-lg border border-slate-200/60 dark:border-slate-700/40">
+                    <i class="fa-solid fa-circle-info text-cyan-500 mt-0.5"></i>
+                    <span>Tulis 1 nama per baris. Untuk menambah bobot/peluang: <strong>Nama, Bobot</strong> (contoh: <code>Budi, 3</code>).</span>
+                </div>
+
+                <!-- Textarea -->
+                <textarea id="itemInput" oninput="handleInputChange()" placeholder="Masukkan daftar nama/item di sini...&#10;Contoh:&#10;Andi&#10;Budi, 2&#10;Citra&#10;Dewi, 3" 
+                    class="w-full h-44 sm:h-52 p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:outline-none resize-none font-mono transition-all"></textarea>
+
+                <!-- Input Tools Toolbar -->
+                <div class="grid grid-cols-4 gap-1.5 mt-3">
+                    <button onclick="shuffleCurrentItems()" title="Acak urutan item" class="py-1.5 px-2 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-700/80 hover:bg-cyan-50 dark:hover:bg-slate-700 hover:text-cyan-600 dark:hover:text-cyan-400 text-slate-600 dark:text-slate-300 transition-colors flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-shuffle"></i>
+                        <span>Acak</span>
+                    </button>
+                    <button onclick="sortCurrentItems(true)" title="Urutkan A ke Z" class="py-1.5 px-2 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-700/80 hover:bg-cyan-50 dark:hover:bg-slate-700 hover:text-cyan-600 dark:hover:text-cyan-400 text-slate-600 dark:text-slate-300 transition-colors flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-arrow-down-a-z"></i>
+                        <span>A-Z</span>
+                    </button>
+                    <button onclick="sortCurrentItems(false)" title="Urutkan Z ke A" class="py-1.5 px-2 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-700/80 hover:bg-cyan-50 dark:hover:bg-slate-700 hover:text-cyan-600 dark:hover:text-cyan-400 text-slate-600 dark:text-slate-300 transition-colors flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-arrow-up-z-a"></i>
+                        <span>Z-A</span>
+                    </button>
+                    <button onclick="clearCurrentItems()" title="Bersihkan teks" class="py-1.5 px-2 text-xs font-semibold rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition-colors flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Hapus</span>
+                    </button>
+                </div>
+
+                <!-- Sample Data Quick Load -->
+                <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs">
+                    <span class="text-slate-500">Contoh Cepat:</span>
+                    <div class="flex gap-2">
+                        <button onclick="loadSampleData('names')" class="text-cyan-600 dark:text-cyan-400 font-medium hover:underline">Nama</button>
+                        <span class="text-slate-300 dark:text-slate-700">•</span>
+                        <button onclick="loadSampleData('numbers')" class="text-cyan-600 dark:text-cyan-400 font-medium hover:underline">Angka 1-20</button>
+                        <span class="text-slate-300 dark:text-slate-700">•</span>
+                        <button onclick="loadSampleData('prizes')" class="text-cyan-600 dark:text-cyan-400 font-medium hover:underline">Hadiah</button>
+                    </div>
+                </div>
+
+                <!-- Spin Tempo Control -->
+                <div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/60 space-y-2">
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                        <span class="flex items-center gap-1.5">
+                            <i class="fa-solid fa-stopwatch text-cyan-500"></i>
+                            Tempo Spin:
+                        </span>
+                        <span id="spinDurationValue" class="text-cyan-600 dark:text-cyan-400 font-mono text-sm">5 Detik</span>
+                    </div>
+                    <input type="range" id="spinDurationInput" min="1" max="60" value="5" oninput="updateSpinDuration(this.value)" 
+                        class="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                    <div class="flex justify-between text-[10px] text-slate-400 font-semibold px-0.5">
+                        <span>1s (Cepat)</span>
+                        <span>15s</span>
+                        <span>30s</span>
+                        <span>60s (Lama)</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Global Action Button -->
+            <button onclick="spinAllWheels()" id="spinAllBtn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-extrabold text-lg tracking-wide shadow-xl shadow-cyan-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-cyan-300/30">
+                <i class="fa-solid fa-play text-xl"></i>
+                <span id="spinAllBtnText">SPIN SEMUA RODA</span>
+            </button>
+
+        </section>
+
+        <!-- CENTER STAGE: Visual Wheels Display Area (8 Cols on LG) -->
+        <section class="lg:col-span-8 flex flex-col space-y-4">
+            
+            <!-- Stage Container Grid -->
+            <div id="visualStageGrid" class="grid grid-cols-1 gap-4 min-h-[420px] sm:min-h-[500px]">
+                <!-- Dynamic Visual Wheel Containers will be injected here JS -->
+            </div>
+
+            <!-- History Cache & Management Drawer / Bottom Section -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700/80 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-trophy text-amber-500 text-lg"></i>
+                        <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm sm:text-base">Riwayat Pemenang (Cache)</h3>
+                        <span id="historyBadge" class="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold">0</span>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 text-xs">
+                        <button onclick="sortHistory()" title="Urutkan Riwayat" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700/80 hover:bg-slate-200 dark:hover:bg-slate-700 font-medium text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1">
+                            <i class="fa-solid fa-sort"></i>
+                            <span>Urutkan</span>
+                        </button>
+                        <button onclick="exportHistoryTxt()" title="Ekspor sebagai File TXT" class="px-2.5 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-950/50 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 font-medium text-cyan-600 dark:text-cyan-400 transition-colors flex items-center gap-1">
+                            <i class="fa-solid fa-file-export"></i>
+                            <span>Ekspor TXT</span>
+                        </button>
+                        <button onclick="clearHistory()" title="Bersihkan Riwayat" class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 font-medium text-rose-600 dark:text-rose-400 transition-colors flex items-center gap-1">
+                            <i class="fa-solid fa-broom"></i>
+                            <span>Bersihkan</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- History Items Scroll List -->
+                <div id="historyListContainer" class="max-h-36 overflow-y-auto space-y-1.5 pr-1 text-xs">
+                    <p id="emptyHistoryMsg" class="text-slate-400 text-center py-6 italic">Belum ada hasil undian terpilih. Putar roda untuk memulai!</p>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- MODAL 1: Winner Celebration Modal -->
+    <div id="winnerModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center border border-slate-200 dark:border-slate-700 shadow-2xl transform scale-90 transition-transform duration-300" id="winnerModalBox">
+            
+            <div class="w-20 h-20 bg-amber-100 dark:bg-amber-900/50 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-500 text-3xl animate-bounce">
+                <i class="fa-solid fa-crown"></i>
+            </div>
+
+            <p id="modalSubTitle" class="text-xs uppercase tracking-widest font-extrabold text-cyan-500 mb-1">Pemenang Terpilih!</p>
+            <h2 id="winnerNameText" class="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white my-2 break-words leading-tight">
+                -
+            </h2>
+            <p id="winnerWheelSource" class="text-xs text-slate-500 dark:text-slate-400 mb-6 font-medium">Dari Roda 1</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-bold">
+                <button onclick="removeWinnerAndClose()" class="py-3 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/25 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-user-minus"></i>
+                    <span>Hapus Item Ini</span>
+                </button>
+                <button onclick="closeWinnerModal()" class="py-3 px-4 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Simpan & Tutup</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Theme & Palette Customizer Modal -->
+    <div id="themeModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-700 shadow-2xl">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">
+                <h3 class="font-bold text-lg text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-palette text-cyan-500"></i>
+                    <span>Kustomisasi Tema Warna Roda</span>
+                </h3>
+                <button onclick="toggleThemeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Pilih skema warna preset atau sesuaikan palet irisan roda Anda:</p>
+
+            <!-- Theme Presets Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-6">
+                <button onclick="applyPalettePreset('rainbow')" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-cyan-500 flex flex-col items-center gap-2 transition-all">
+                    <div class="flex w-full h-5 rounded-lg overflow-hidden">
+                        <div class="flex-1 bg-red-500"></div>
+                        <div class="flex-1 bg-amber-500"></div>
+                        <div class="flex-1 bg-emerald-500"></div>
+                        <div class="flex-1 bg-blue-500"></div>
+                        <div class="flex-1 bg-purple-500"></div>
+                    </div>
+                    <span class="text-xs font-semibold">Pelangi (Default)</span>
+                </button>
+
+                <button onclick="applyPalettePreset('pastel')" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-cyan-500 flex flex-col items-center gap-2 transition-all">
+                    <div class="flex w-full h-5 rounded-lg overflow-hidden">
+                        <div class="flex-1 bg-pink-300"></div>
+                        <div class="flex-1 bg-purple-300"></div>
+                        <div class="flex-1 bg-indigo-300"></div>
+                        <div class="flex-1 bg-teal-300"></div>
+                        <div class="flex-1 bg-amber-200"></div>
+                    </div>
+                    <span class="text-xs font-semibold">Pastel Calm</span>
+                </button>
+
+                <button onclick="applyPalettePreset('neon')" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-cyan-500 flex flex-col items-center gap-2 transition-all">
+                    <div class="flex w-full h-5 rounded-lg overflow-hidden">
+                        <div class="flex-1 bg-lime-400"></div>
+                        <div class="flex-1 bg-cyan-400"></div>
+                        <div class="flex-1 bg-fuchsia-500"></div>
+                        <div class="flex-1 bg-yellow-300"></div>
+                    </div>
+                    <span class="text-xs font-semibold">Neon Night</span>
+                </button>
+
+                <button onclick="applyPalettePreset('sunset')" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-cyan-500 flex flex-col items-center gap-2 transition-all">
+                    <div class="flex w-full h-5 rounded-lg overflow-hidden">
+                        <div class="flex-1 bg-amber-600"></div>
+                        <div class="flex-1 bg-orange-500"></div>
+                        <div class="flex-1 bg-rose-600"></div>
+                        <div class="flex-1 bg-purple-800"></div>
+                    </div>
+                    <span class="text-xs font-semibold">Sunset Glow</span>
+                </button>
+
+                <button onclick="applyPalettePreset('cyberpunk')" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-cyan-500 flex flex-col items-center gap-2 transition-all">
+                    <div class="flex w-full h-5 rounded-lg overflow-hidden">
+                        <div class="flex-1 bg-yellow-400"></div>
+                        <div class="flex-1 bg-cyan-500"></div>
+                        <div class="flex-1 bg-pink-600"></div>
+                        <div class="flex-1 bg-slate-900"></div>
+                    </div>
+                    <span class="text-xs font-semibold">Cyberpunk</span>
+                </button>
+
+                <button onclick="applyPalettePreset('monochrome')" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-cyan-500 flex flex-col items-center gap-2 transition-all">
+                    <div class="flex w-full h-5 rounded-lg overflow-hidden">
+                        <div class="flex-1 bg-slate-800"></div>
+                        <div class="flex-1 bg-slate-600"></div>
+                        <div class="flex-1 bg-slate-400"></div>
+                        <div class="flex-1 bg-slate-200"></div>
+                    </div>
+                    <span class="text-xs font-semibold">Monokrom</span>
+                </button>
+            </div>
+
+            <div class="flex justify-end">
+                <button onclick="toggleThemeModal()" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs">
+                    Selesai
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: JSON Config Import/Export -->
+    <div id="configModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-700 shadow-2xl">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">
+                <h3 class="font-bold text-lg text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-file-code text-cyan-500"></i>
+                    <span>Konfigurasi Wheel (JSON)</span>
+                </h3>
+                <button onclick="toggleConfigModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Simpan atau muat pengaturan semua roda dalam format JSON:</p>
+
+            <div class="space-y-3">
+                <div class="flex gap-2">
+                    <button onclick="exportConfigJSON()" class="flex-1 py-2.5 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Unduh Konfigurasi (.json)</span>
+                    </button>
+                    <label class="flex-1 py-2.5 px-3 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer">
+                        <i class="fa-solid fa-upload"></i>
+                        <span>Unggah File JSON</span>
+                        <input type="file" id="jsonFileInput" accept=".json" onchange="importConfigJSON(event)" class="hidden">
+                    </label>
+                </div>
+
+                <div class="pt-2">
+                    <label class="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 block">Pratinjau JSON Pengaturan Saat Ini:</label>
+                    <textarea id="jsonPreviewArea" readonly class="w-full h-36 p-2 text-[11px] font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 resize-none"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end mt-4">
+                <button onclick="toggleConfigModal()" class="px-5 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-xs font-bold">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global Application State
+        let appState = {
+            activeWheelCount: 1,
+            activeTab: 0, // Currently selected wheel index for input panel
+            visualMode: 'wheel', // 'wheel', 'slot', 'card'
+            spinDuration: 5, // in seconds
+            soundEnabled: true,
+            activePalette: ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'],
+            wheels: [
+                { id: 0, title: 'Roda 1', rawInput: "Andi\nBudi, 2\nCitra\nDewi, 3\nEko\nFani", isSpinning: false, currentAngle: 0 },
+                { id: 1, title: 'Roda 2', rawInput: "Pilihan A\nPilihan B\nPilihan C, 2\nPilihan D", isSpinning: false, currentAngle: 0 },
+                { id: 2, title: 'Roda 3', rawInput: "Merah\nKuning\nHijau\nBiru", isSpinning: false, currentAngle: 0 },
+                { id: 3, title: 'Roda 4', rawInput: "Hadiah Utama\nHadiah Kedua\nZonk, 3\nHadiah Hiburan", isSpinning: false, currentAngle: 0 }
+            ],
+            history: [],
+            lastWinner: null
+        };
+
+        // Web Audio API Synthesizer Context
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        // Play synthetic click tick sound
+        function playTickSound() {
+            if (!appState.soundEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.04);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.04);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.04);
+            } catch (e) {
+                console.warn("Audio play error:", e);
+            }
+        }
+
+        // Play synthetic winner fanfare chime
+        function playWinFanfare() {
+            if (!appState.soundEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    const startTime = ctx.currentTime + (idx * 0.1);
+                    gain.gain.setValueAtTime(0, startTime);
+                    gain.gain.linearRampToValueAtTime(0.2, startTime + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.5);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.5);
+                });
+            } catch (e) {
+                console.warn("Win fanfare error:", e);
+            }
+        }
+
+        // Helper: Parse raw text into structured items array with weights
+        function parseItems(rawText) {
+            if (!rawText) return [];
+            const lines = rawText.split('\n');
+            const items = [];
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+                
+                // Check if line has comma separating name and weight (e.g. "Name, 3")
+                const lastCommaIdx = line.lastIndexOf(',');
+                let name = line;
+                let weight = 1;
+
+                if (lastCommaIdx !== -1) {
+                    const possibleWeightStr = line.substring(lastCommaIdx + 1).trim();
+                    const parsedWeight = parseFloat(possibleWeightStr);
+                    if (!isNaN(parsedWeight) && parsedWeight > 0) {
+                        name = line.substring(0, lastCommaIdx).trim();
+                        weight = parsedWeight;
+                    }
+                }
+
+                if (name.length > 0) {
+                    items.push({ name, weight });
+                }
+            }
+            return items.slice(0, 1000); // Max 1000 items constraint
+        }
+
+        window.onload = function() {
+            loadFromLocalStorage();
+            renderWheelTabs();
+            syncInputAreaWithTab();
+            renderVisualStage();
+            renderHistoryList();
+            
+            // Auto resize listener for Canvas responsiveness
+            window.addEventListener('resize', () => {
+                renderVisualStage();
+            });
+        };
+
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('randnamer_state', JSON.stringify({
+                    wheels: appState.wheels,
+                    activeWheelCount: appState.activeWheelCount,
+                    spinDuration: appState.spinDuration,
+                    soundEnabled: appState.soundEnabled,
+                    history: appState.history,
+                    activePalette: appState.activePalette
+                }));
+            } catch(e) {
+                console.warn("LocalStorage save error:", e);
+            }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem('randnamer_state');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.wheels) appState.wheels = parsed.wheels;
+                    if (parsed.activeWheelCount) appState.activeWheelCount = parsed.activeWheelCount;
+                    if (parsed.spinDuration) appState.spinDuration = parsed.spinDuration;
+                    if (parsed.history) appState.history = parsed.history;
+                    if (parsed.activePalette) appState.activePalette = parsed.activePalette;
+                    if (typeof parsed.soundEnabled === 'boolean') appState.soundEnabled = parsed.soundEnabled;
+
+                    // Update UI elements
+                    document.getElementById('spinDurationInput').value = appState.spinDuration;
+                    document.getElementById('spinDurationValue').innerText = appState.spinDuration + " Detik";
+                    updateWheelCountUI();
+                    updateSoundUI();
+                }
+            } catch(e) {
+                console.warn("LocalStorage load error:", e);
+            }
+        }
+
+        function renderWheelTabs() {
+            const container = document.getElementById('wheelTabsContainer');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < appState.activeWheelCount; i++) {
+                const wheel = appState.wheels[i];
+                const isActive = appState.activeTab === i;
+                const tabBtn = document.createElement('button');
+                tabBtn.className = `flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    isActive 
+                        ? 'bg-cyan-500 text-white shadow-sm' 
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                }`;
+                tabBtn.onclick = () => switchTab(i);
+                tabBtn.innerHTML = `
+                    <i class="fa-solid fa-circle-dot text-[10px]"></i>
+                    <span>${wheel.title}</span>
+                `;
+                container.appendChild(tabBtn);
+            }
+        }
+
+        function switchTab(index) {
+            appState.activeTab = index;
+            renderWheelTabs();
+            syncInputAreaWithTab();
+        }
+
+        function syncInputAreaWithTab() {
+            const wheel = appState.wheels[appState.activeTab];
+            const textarea = document.getElementById('itemInput');
+            const label = document.getElementById('inputLabel');
+            
+            label.innerHTML = `<i class="fa-solid fa-list-ul text-cyan-500"></i><span>Daftar Item (${wheel.title})</span>`;
+            textarea.value = wheel.rawInput;
+            handleInputChange();
+        }
+
+        function handleInputChange() {
+            const textarea = document.getElementById('itemInput');
+            const currentRaw = textarea.value;
+            appState.wheels[appState.activeTab].rawInput = currentRaw;
+            
+            const parsed = parseItems(currentRaw);
+            document.getElementById('itemCounter').innerText = `${parsed.length} / 1000`;
+            
+            saveToLocalStorage();
+            renderVisualStage();
+        }
+
+        function setWheelCount(count) {
+            appState.activeWheelCount = count;
+            if (appState.activeTab >= count) {
+                appState.activeTab = count - 1;
+            }
+            updateWheelCountUI();
+            renderWheelTabs();
+            syncInputAreaWithTab();
+            renderVisualStage();
+            saveToLocalStorage();
+        }
+
+        function updateWheelCountUI() {
+            for (let i = 1; i <= 4; i++) {
+                const btn = document.getElementById(`wheelCount${i}Btn`);
+                if (i === appState.activeWheelCount) {
+                    btn.className = "w-7 h-7 rounded-md flex items-center justify-center bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 font-bold shadow-sm";
+                } else {
+                    btn.className = "w-7 h-7 rounded-md flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900";
+                }
+            }
+        }
+
+        function setVisualMode(mode) {
+            appState.visualMode = mode;
+            ['Wheel', 'Slot', 'Card'].forEach(m => {
+                const btn = document.getElementById(`mode${m}Btn`);
+                if (m.toLowerCase() === mode) {
+                    btn.className = "px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm font-bold";
+                } else {
+                    btn.className = "px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white";
+                }
+            });
+            renderVisualStage();
+        }
+
+        function updateSpinDuration(val) {
+            appState.spinDuration = parseInt(val, 10);
+            document.getElementById('spinDurationValue').innerText = val + " Detik";
+            saveToLocalStorage();
+        }
+
+        function shuffleCurrentItems() {
+            const parsed = parseItems(appState.wheels[appState.activeTab].rawInput);
+            if (parsed.length === 0) return;
+            // Fisher-Yates shuffle algorithm
+            for (let i = parsed.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [parsed[i], parsed[j]] = [parsed[j], parsed[i]];
+            }
+            appState.wheels[appState.activeTab].rawInput = parsed.map(it => it.weight !== 1 ? `${it.name}, ${it.weight}` : it.name).join('\n');
+            syncInputAreaWithTab();
+            renderVisualStage();
+        }
+
+        function sortCurrentItems(ascending = true) {
+            const parsed = parseItems(appState.wheels[appState.activeTab].rawInput);
+            if (parsed.length === 0) return;
+            parsed.sort((a, b) => ascending ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+            appState.wheels[appState.activeTab].rawInput = parsed.map(it => it.weight !== 1 ? `${it.name}, ${it.weight}` : it.name).join('\n');
+            syncInputAreaWithTab();
+            renderVisualStage();
+        }
+
+        function clearCurrentItems() {
+            appState.wheels[appState.activeTab].rawInput = "";
+            syncInputAreaWithTab();
+            renderVisualStage();
+        }
+
+        function loadSampleData(type) {
+            let data = "";
+            if (type === 'names') {
+                data = "Budi Santoso\nSiti Aminah, 2\nDewi Lestari\nAndi Wijaya, 3\nRizal Ramli\nFitriani\nAgus Setiawan\nNadia Putri";
+            } else if (type === 'numbers') {
+                data = Array.from({length: 20}, (_, i) => `Nomor ${i + 1}`).join('\n');
+            } else if (type === 'prizes') {
+                data = "Smartphone\nLaptop Gaming\nVoucher 50rb, 5\nKaos Eksklusif, 3\nZonk, 4\nHeadphone Wireless";
+            }
+            appState.wheels[appState.activeTab].rawInput = data;
+            syncInputAreaWithTab();
+            renderVisualStage();
+        }
+
+        function renderVisualStage() {
+            const grid = document.getElementById('visualStageGrid');
+            grid.innerHTML = '';
+
+            const count = appState.activeWheelCount;
+            if (count === 1) grid.className = "grid grid-cols-1 gap-4";
+            else if (count === 2) grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
+            else grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
+
+            for (let i = 0; i < count; i++) {
+                const wheel = appState.wheels[i];
+                const items = parseItems(wheel.rawInput);
+                const card = document.createElement('div');
+                card.className = "bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700/80 shadow-sm flex flex-col items-center justify-between relative min-h-[360px]";
+
+                card.innerHTML = `
+                    <div class="w-full flex items-center justify-between mb-2">
+                        <span class="font-bold text-sm text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
+                            ${wheel.title}
+                        </span>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-500">
+                            ${items.length} Item
+                        </span>
+                    </div>
+
+                    <div id="visualDisplayContainer_${i}" class="w-full flex-1 flex items-center justify-center my-2 relative overflow-hidden min-h-[260px]">
+                        <!-- Visual Element Container -->
+                    </div>
+
+                    <button onclick="spinWheel(${i})" id="spinBtn_${i}" ${wheel.isSpinning || items.length === 0 ? 'disabled' : ''} 
+                        class="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-rotate-right ${wheel.isSpinning ? 'animate-spin' : ''}"></i>
+                        <span>${wheel.isSpinning ? 'Memutar...' : 'Spin Roda ini'}</span>
+                    </button>
+                `;
+
+                grid.appendChild(card);
+
+                // Render specific visual mode inside container
+                const displayContainer = document.getElementById(`visualDisplayContainer_${i}`);
+                if (appState.visualMode === 'wheel') {
+                    renderWheelCanvas(i, displayContainer, items);
+                } else if (appState.visualMode === 'slot') {
+                    renderSlotMachineUI(i, displayContainer, items);
+                } else if (appState.visualMode === 'card') {
+                    renderCardFlipUI(i, displayContainer, items);
+                }
+            }
+        }
+
+        function renderWheelCanvas(wheelIndex, container, items) {
+            container.innerHTML = '';
+            
+            if (items.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic">Masukkan daftar item untuk melihat roda</p>`;
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            const size = Math.min(container.clientWidth || 300, 320);
+            canvas.width = size * window.devicePixelRatio || 300;
+            canvas.height = size * window.devicePixelRatio || 300;
+            canvas.style.width = size + 'px';
+            canvas.style.height = size + 'px';
+            canvas.id = `canvas_${wheelIndex}`;
+
+            container.appendChild(canvas);
+
+            // Add Pointer Indicator at top
+            const pointer = document.createElement('div');
+            pointer.className = "absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-10 text-rose-500 drop-shadow-md text-2xl pointer-events-none";
+            pointer.innerHTML = `<i class="fa-solid fa-location-pin fa-rotate-180"></i>`;
+            container.appendChild(pointer);
+
+            drawWheelOnCanvas(canvas, items, appState.wheels[wheelIndex].currentAngle);
+        }
+
+        function drawWheelOnCanvas(canvas, items, currentAngle) {
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const radius = Math.min(width, height) / 2 - 12;
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            ctx.clearRect(0, 0, width, height);
+
+            const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+            let startAngle = currentAngle;
+
+            const palette = appState.activePalette;
+
+            items.forEach((item, index) => {
+                const sliceAngle = (item.weight / totalWeight) * (2 * Math.PI);
+                const endAngle = startAngle + sliceAngle;
+
+                // Slice Fill
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = palette[index % palette.length];
+                ctx.fill();
+
+                // Slice Border
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2 * (width / 300);
+                ctx.stroke();
+
+                // Label Text (Only if item count <= 60 for legibility)
+                if (items.length <= 60) {
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(startAngle + sliceAngle / 2);
+                    ctx.textAlign = 'right';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `bold ${Math.max(10, Math.min(16, 260 / items.length))}px 'Plus Jakarta Sans', sans-serif`;
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    ctx.shadowBlur = 4;
+                    
+                    // Truncate long text
+                    let text = item.name;
+                    if (text.length > 15) text = text.substring(0, 13) + '..';
+                    ctx.fillText(text, radius - 15, 4);
+                    ctx.restore();
+                }
+
+                startAngle = endAngle;
+            });
+
+            // Outer ring accent
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#0891b2';
+            ctx.lineWidth = 6 * (width / 300);
+            ctx.stroke();
+
+            // Center Pin / Cap
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 20 * (width / 300), 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = 'rgba(0,0,0,0.3)';
+            ctx.shadowBlur = 8;
+            ctx.fill();
+            ctx.strokeStyle = '#0891b2';
+            ctx.lineWidth = 4 * (width / 300);
+            ctx.stroke();
+            ctx.shadowBlur = 0; // reset
+        }
+
+        function renderSlotMachineUI(wheelIndex, container, items) {
+            container.innerHTML = '';
+            if (items.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic">Masukkan daftar item</p>`;
+                return;
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.className = "w-full max-w-xs h-48 bg-slate-900 rounded-2xl border-4 border-amber-400 shadow-xl flex items-center justify-center relative overflow-hidden p-2";
+            
+            const reel = document.createElement('div');
+            reel.id = `slotReel_${wheelIndex}`;
+            reel.className = "w-full text-center flex flex-col items-center justify-center transition-all";
+            
+            const initialItem = items[0].name;
+            reel.innerHTML = `
+                <div class="py-4 px-6 text-2xl font-extrabold text-amber-300 tracking-wider font-mono bg-slate-800 border-2 border-amber-500/50 rounded-xl shadow-inner w-full break-words">
+                    ${initialItem}
+                </div>
+            `;
+
+            wrapper.appendChild(reel);
+            container.appendChild(wrapper);
+        }
+
+        function renderCardFlipUI(wheelIndex, container, items) {
+            container.innerHTML = '';
+            if (items.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic">Masukkan daftar item</p>`;
+                return;
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.className = "w-full max-w-xs h-48 perspective-1000 flex items-center justify-center";
+
+            const card = document.createElement('div');
+            card.id = `cardFlip_${wheelIndex}`;
+            card.className = "w-full h-full rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-700 text-white font-bold p-4 flex flex-col items-center justify-center shadow-xl border-2 border-cyan-300/40 transform-style-3d transition-transform duration-700 cursor-pointer";
+            
+            card.innerHTML = `
+                <i class="fa-solid fa-gift text-4xl mb-2 text-cyan-200 animate-pulse"></i>
+                <p class="text-sm">Klik SPIN untuk membuka kartu</p>
+            `;
+
+            wrapper.appendChild(card);
+            container.appendChild(wrapper);
+        }
+
+        function spinAllWheels() {
+            for (let i = 0; i < appState.activeWheelCount; i++) {
+                spinWheel(i);
+            }
+        }
+
+        function spinWheel(wheelIndex) {
+            const wheel = appState.wheels[wheelIndex];
+            const items = parseItems(wheel.rawInput);
+            if (items.length === 0 || wheel.isSpinning) return;
+
+            wheel.isSpinning = true;
+            renderVisualStage();
+
+            // Calculate weighted winner selection
+            const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+            let randomWeight = Math.random() * totalWeight;
+            let winningIndex = 0;
+            
+            for (let i = 0; i < items.length; i++) {
+                if (randomWeight < items[i].weight) {
+                    winningIndex = i;
+                    break;
+                }
+                randomWeight -= items[i].weight;
+            }
+
+            const winningItem = items[winningIndex];
+
+            if (appState.visualMode === 'wheel') {
+                animateWheelSpin(wheelIndex, items, winningIndex, winningItem);
+            } else if (appState.visualMode === 'slot') {
+                animateSlotSpin(wheelIndex, items, winningItem);
+            } else if (appState.visualMode === 'card') {
+                animateCardFlip(wheelIndex, items, winningItem);
+            }
+        }
+
+        function animateWheelSpin(wheelIndex, items, winningIndex, winningItem) {
+            const wheel = appState.wheels[wheelIndex];
+            const canvas = document.getElementById(`canvas_${wheelIndex}`);
+            if (!canvas) return;
+
+            const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+            
+            // Calculate slice angles
+            let accumulatedWeight = 0;
+            for (let i = 0; i < winningIndex; i++) {
+                accumulatedWeight += items[i].weight;
+            }
+            const winnerSliceWeight = items[winningIndex].weight;
+            const sliceStartAngle = (accumulatedWeight / totalWeight) * 2 * Math.PI;
+            const sliceAngle = (winnerSliceWeight / totalWeight) * 2 * Math.PI;
+            
+            // Target angle so pointer at TOP (-Math.PI / 2 or 3*Math.PI / 2) points to middle of winning slice
+            const winnerCenterAngle = sliceStartAngle + (sliceAngle / 2);
+            const targetPointerAngle = (3 * Math.PI / 2); 
+            
+            // Required angle offset
+            let targetAngleOffset = targetPointerAngle - winnerCenterAngle;
+            // Add full random extra rotations (e.g. 5 to 10 full turns)
+            const extraTurns = (5 + Math.floor(Math.random() * 5)) * 2 * Math.PI;
+            const startAngle = wheel.currentAngle;
+            const targetAngle = startAngle + extraTurns + (targetAngleOffset - (startAngle % (2 * Math.PI)));
+
+            const duration = appState.spinDuration * 1000;
+            const startTime = performance.now();
+            let lastTickAngle = startAngle;
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Cubic easing out curve for realistic deceleration
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                wheel.currentAngle = startAngle + (targetAngle - startAngle) * easeOut;
+
+                // Tick sound trigger on slice passage
+                if (Math.abs(wheel.currentAngle - lastTickAngle) > (Math.PI / 18)) {
+                    playTickSound();
+                    lastTickAngle = wheel.currentAngle;
+                }
+
+                drawWheelOnCanvas(canvas, items, wheel.currentAngle);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    wheel.isSpinning = false;
+                    renderVisualStage();
+                    onSpinWinnerSelected(wheelIndex, winningItem.name);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function animateSlotSpin(wheelIndex, items, winningItem) {
+            const reel = document.getElementById(`slotReel_${wheelIndex}`);
+            const duration = appState.spinDuration * 1000;
+            const startTime = performance.now();
+
+            let interval = setInterval(() => {
+                const randomItem = items[Math.floor(Math.random() * items.length)].name;
+                reel.innerHTML = `
+                    <div class="py-4 px-6 text-2xl font-extrabold text-amber-300 font-mono bg-slate-800 border-2 border-amber-500/50 rounded-xl shadow-inner w-full break-words animate-pulse">
+                        ${randomItem}
+                    </div>
+                `;
+                playTickSound();
+            }, 80);
+
+            setTimeout(() => {
+                clearInterval(interval);
+                reel.innerHTML = `
+                    <div class="py-4 px-6 text-2xl font-extrabold text-emerald-400 font-mono bg-slate-800 border-2 border-emerald-400 rounded-xl shadow-2xl w-full break-words pulse-glow">
+                        ${winningItem.name}
+                    </div>
+                `;
+                appState.wheels[wheelIndex].isSpinning = false;
+                renderVisualStage();
+                onSpinWinnerSelected(wheelIndex, winningItem.name);
+            }, duration);
+        }
+
+        function animateCardFlip(wheelIndex, items, winningItem) {
+            const card = document.getElementById(`cardFlip_${wheelIndex}`);
+            card.classList.add('rotate-y-180');
+            
+            setTimeout(() => {
+                card.className = "w-full h-full rounded-2xl bg-gradient-to-tr from-amber-500 to-emerald-600 text-white font-extrabold p-4 flex flex-col items-center justify-center shadow-2xl border-2 border-amber-200 transform-style-3d transition-transform duration-700";
+                card.innerHTML = `
+                    <p class="text-xs text-amber-200 uppercase tracking-widest mb-1">Hasil Undian</p>
+                    <p class="text-2xl text-center break-words">${winningItem.name}</p>
+                `;
+                playTickSound();
+            }, 350);
+
+            setTimeout(() => {
+                appState.wheels[wheelIndex].isSpinning = false;
+                renderVisualStage();
+                onSpinWinnerSelected(wheelIndex, winningItem.name);
+            }, 1000);
+        }
+
+        function onSpinWinnerSelected(wheelIndex, winnerName) {
+            playWinFanfare();
+            
+            // Trigger Confetti effect
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+
+            // Save to history
+            const historyItem = {
+                id: Date.now(),
+                winner: winnerName,
+                wheelTitle: appState.wheels[wheelIndex].title,
+                wheelIndex: wheelIndex,
+                timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            };
+            
+            appState.history.unshift(historyItem);
+            appState.lastWinner = historyItem;
+            saveToLocalStorage();
+            renderHistoryList();
+
+            // Open Winner Modal
+            openWinnerModal(historyItem);
+        }
+
+        function openWinnerModal(historyItem) {
+            document.getElementById('winnerNameText').innerText = historyItem.winner;
+            document.getElementById('winnerWheelSource').innerText = `Dari ${historyItem.wheelTitle}`;
+            
+            const modal = document.getElementById('winnerModal');
+            const modalBox = document.getElementById('winnerModalBox');
+            
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modalBox.classList.remove('scale-90');
+            modalBox.classList.add('scale-100');
+        }
+
+        function closeWinnerModal() {
+            const modal = document.getElementById('winnerModal');
+            const modalBox = document.getElementById('winnerModalBox');
+            
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            modalBox.classList.remove('scale-100');
+            modalBox.classList.add('scale-90');
+        }
+
+        function removeWinnerAndClose() {
+            if (!appState.lastWinner) {
+                closeWinnerModal();
+                return;
+            }
+
+            const wheelIdx = appState.lastWinner.wheelIndex;
+            const winnerName = appState.lastWinner.winner;
+            const parsed = parseItems(appState.wheels[wheelIdx].rawInput);
+            
+            // Remove first matching item by name
+            const updated = parsed.filter(item => item.name !== winnerName);
+            appState.wheels[wheelIdx].rawInput = updated.map(it => it.weight !== 1 ? `${it.name}, ${it.weight}` : it.name).join('\n');
+            
+            syncInputAreaWithTab();
+            renderVisualStage();
+            saveToLocalStorage();
+            closeWinnerModal();
+        }
+
+        // History Management
+        function renderHistoryList() {
+            const container = document.getElementById('historyListContainer');
+            const badge = document.getElementById('historyBadge');
+            badge.innerText = appState.history.length;
+
+            if (appState.history.length === 0) {
+                container.innerHTML = `<p id="emptyHistoryMsg" class="text-slate-400 text-center py-6 italic">Belum ada hasil undian terpilih. Putar roda untuk memulai!</p>`;
+                return;
+            }
+
+            container.innerHTML = appState.history.map((item, idx) => `
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/60">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-600 dark:text-amber-300 font-bold text-[10px] flex items-center justify-center">
+                            ${appState.history.length - idx}
+                        </span>
+                        <div>
+                            <span class="font-bold text-slate-800 dark:text-slate-100 text-sm">${item.winner}</span>
+                            <span class="text-[10px] text-slate-400 block">${item.wheelTitle} • ${item.timestamp}</span>
+                        </div>
+                    </div>
+                    <button onclick="deleteHistoryItem(${item.id})" class="text-slate-400 hover:text-rose-500 p-1">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function deleteHistoryItem(id) {
+            appState.history = appState.history.filter(h => h.id !== id);
+            saveToLocalStorage();
+            renderHistoryList();
+        }
+
+        function clearHistory() {
+            if (appState.history.length === 0) return;
+            appState.history = [];
+            saveToLocalStorage();
+            renderHistoryList();
+        }
+
+        function sortHistory() {
+            appState.history.sort((a, b) => a.winner.localeCompare(b.winner));
+            renderHistoryList();
+        }
+
+        function exportHistoryTxt() {
+            if (appState.history.length === 0) {
+                alert("Riwayat masih kosong!");
+                return;
+            }
+            const textContent = appState.history.map((h, i) => `${i + 1}. ${h.winner} (${h.wheelTitle} - ${h.timestamp})`).join('\n');
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `RandNamer_Hasil_Undian_${new Date().toISOString().slice(0, 10)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function toggleThemeModal() {
+            const modal = document.getElementById('themeModal');
+            if (modal.classList.contains('opacity-0')) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+            } else {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        function applyPalettePreset(themeName) {
+            const palettes = {
+                rainbow: ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'],
+                pastel: ['#fca5a5', '#fcd34d', '#86efac', '#93c5fd', '#c084fc', '#f472b6', '#67e8f9'],
+                neon: ['#a3e635', '#22d3ee', '#d946ef', '#facc15', '#f43f5e', '#38bdf8'],
+                sunset: ['#d97706', '#f97316', '#e11d48', '#7e22ce', '#4338ca'],
+                cyberpunk: ['#facc15', '#06b6d4', '#db2777', '#1e293b', '#3b82f6'],
+                monochrome: ['#1e293b', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1']
+            };
+            if (palettes[themeName]) {
+                appState.activePalette = palettes[themeName];
+                saveToLocalStorage();
+                renderVisualStage();
+            }
+        }
+
+        function toggleConfigModal() {
+            const modal = document.getElementById('configModal');
+            if (modal.classList.contains('opacity-0')) {
+                const preview = document.getElementById('jsonPreviewArea');
+                preview.value = JSON.stringify({
+                    activeWheelCount: appState.activeWheelCount,
+                    spinDuration: appState.spinDuration,
+                    wheels: appState.wheels.map(w => ({ title: w.title, rawInput: w.rawInput })),
+                    activePalette: appState.activePalette
+                }, null, 2);
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+            } else {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        function exportConfigJSON() {
+            const configData = {
+                appName: "RandNamer",
+                version: "1.0",
+                exportDate: new Date().toISOString(),
+                activeWheelCount: appState.activeWheelCount,
+                spinDuration: appState.spinDuration,
+                wheels: appState.wheels,
+                activePalette: appState.activePalette
+            };
+            const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `RandNamer_Config_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importConfigJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed.wheels && Array.isArray(parsed.wheels)) {
+                        appState.wheels = parsed.wheels;
+                        if (parsed.activeWheelCount) appState.activeWheelCount = parsed.activeWheelCount;
+                        if (parsed.spinDuration) appState.spinDuration = parsed.spinDuration;
+                        if (parsed.activePalette) appState.activePalette = parsed.activePalette;
+
+                        saveToLocalStorage();
+                        renderWheelTabs();
+                        syncInputAreaWithTab();
+                        renderVisualStage();
+                        toggleConfigModal();
+                    } else {
+                        alert("Format JSON tidak valid untuk konfigurasi RandNamer!");
+                    }
+                } catch (err) {
+                    alert("Gagal membaca file JSON!");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Toggle Sound & Dark Mode & Fullscreen
+        function toggleSound() {
+            appState.soundEnabled = !appState.soundEnabled;
+            updateSoundUI();
+            saveToLocalStorage();
+        }
+
+        function updateSoundUI() {
+            const btn = document.getElementById('soundToggleBtn');
+            if (appState.soundEnabled) {
+                btn.innerHTML = `<i class="fa-solid fa-volume-high"></i>`;
+                btn.className = "p-2 rounded-lg bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-600 text-cyan-600 dark:text-cyan-400 transition-colors";
+            } else {
+                btn.innerHTML = `<i class="fa-solid fa-volume-xmark"></i>`;
+                btn.className = "p-2 rounded-lg bg-slate-200 dark:bg-slate-700/60 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-400 transition-colors";
+            }
+        }
+
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+            } else {
+                html.classList.add('dark');
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.warn(`Error fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+    </script>
+</body>
+</html>

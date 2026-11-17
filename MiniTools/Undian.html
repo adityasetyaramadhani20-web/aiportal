@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Undian</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Utility Class for Glass Effect */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        .glass-input:focus {
+            outline: none;
+            border-color: rgba(167, 139, 250, 0.5);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Animations */
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(-5%); }
+            50% { transform: translateY(5%); }
+        }
+        .animate-bounce-slow {
+            animation: bounce-slow 3s infinite ease-in-out;
+        }
+
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .slot-spinning .slot-item {
+            animation: blurText 0.1s infinite;
+        }
+        @keyframes blurText {
+            0% { filter: blur(0px); transform: translateY(0); }
+            50% { filter: blur(2px); transform: translateY(-10px); }
+            100% { filter: blur(0px); transform: translateY(0); }
+        }
+
+        /* Hide number input arrows */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+
+        .active-tab {
+            background: linear-gradient(to right, #f59e0b, #ea580c);
+            color: white;
+            border-color: rgba(255,255,255,0.5);
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+        }
+
+        /* Dice Animations */
+        .dice-shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0) rotate(-10deg); }
+            20%, 80% { transform: translate3d(2px, 0, 0) rotate(10deg); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0) rotate(-10deg); }
+            40%, 60% { transform: translate3d(4px, 0, 0) rotate(10deg); }
+        }
+
+        /* Coin Flip */
+        .coin-flip {
+            animation: flip 1s ease-out forwards;
+        }
+        @keyframes flip {
+            0% { transform: rotateY(0); }
+            100% { transform: rotateY(1800deg); }
+        }
+
+        /* Confetti */
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #ffd300;
+            animation: confettiFall 3s linear forwards;
+        }
+        @keyframes confettiFall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1;}
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0;}
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white flex flex-col items-center overflow-x-hidden">
+
+    <!-- Background Decor -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden">
+        <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-600/30 rounded-full blur-[100px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-600/30 rounded-full blur-[100px]"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="w-full max-w-6xl p-6 flex flex-col md:flex-row items-center justify-between z-10 gap-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl shadow-lg shadow-orange-500/20">
+                <i data-lucide="dices" class="w-8 h-8 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Undian</h1>
+                <p class="text-xs text-white/50 uppercase tracking-widest">Simulasi undian, #STOPJUDI!</p>
+            </div>
+        </div>
+        
+        <!-- Navigation Tabs -->
+        <nav class="w-full md:w-auto overflow-x-auto custom-scrollbar pb-2 md:pb-0">
+            <div class="flex gap-2 p-1">
+                <button onclick="switchTab('doorprize')" class="nav-btn active-tab px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10" id="btn-doorprize">Doorprize</button>
+                <button onclick="switchTab('wheel')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10 text-white/70" id="btn-wheel">Roda</button>
+                <button onclick="switchTab('slot')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10 text-white/70" id="btn-slot">Slot</button>
+                <button onclick="switchTab('slot3x')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10 text-white/70" id="btn-slot3x">Slot 3x</button>
+                <button onclick="switchTab('dice')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10 text-white/70" id="btn-dice">Dadu</button>
+                <button onclick="switchTab('coin')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10 text-white/70" id="btn-coin">Koin</button>
+                <button onclick="switchTab('duel')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10 text-white/70" id="btn-duel">Duel</button>
+                <button onclick="switchTab('hompimpa')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10 text-white/70" id="btn-hompimpa">Hompimpa</button>
+                <button onclick="switchTab('updown')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10 text-white/70" id="btn-updown">Naik/Turun</button>
+                <button onclick="switchTab('rng')" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap border border-transparent hover:bg-white/10 text-white/70" id="btn-rng">RNG</button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="w-full max-w-6xl p-4 z-10 relative min-h-[600px]">
+        
+        <!-- 1. DOORPRIZE SECTION -->
+        <div id="tab-doorprize" class="game-section grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left: Controls & Display -->
+            <div class="lg:col-span-2 space-y-6">
+                <div class="relative group">
+                    <div id="dp-display" class="h-64 md:h-80 w-full glass-panel rounded-3xl flex items-center justify-center transition-all duration-500">
+                        <span id="dp-number" class="text-white/30 text-5xl md:text-8xl font-black text-center px-4 tracking-tighter">
+                            Siap?
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="glass-panel p-6 rounded-2xl space-y-4">
+                    <div class="flex flex-col md:flex-row gap-4 items-center justify-center p-4 bg-black/20 rounded-xl">
+                        <span class="text-sm text-gray-300 font-medium"><i data-lucide="settings-2" class="inline w-4 h-4 mr-1"></i> Rentang Angka:</span>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="dp-min" value="1" class="glass-input w-24 rounded-lg px-3 py-2 text-center text-lg font-bold" placeholder="Min">
+                            <span class="text-gray-400">-</span>
+                            <input type="number" id="dp-max" value="100" class="glass-input w-24 rounded-lg px-3 py-2 text-center text-lg font-bold" placeholder="Max">
+                        </div>
+                    </div>
+                    <button onclick="rollDoorprize()" class="w-full py-4 rounded-xl font-bold text-xl uppercase tracking-wider bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-400 hover:to-orange-500 transform hover:scale-[1.01] active:scale-95 transition-all shadow-lg text-white">
+                        Acak Nomor!
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: History -->
+            <div class="glass-panel rounded-2xl flex flex-col h-[500px] lg:h-auto">
+                <div class="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+                    <span class="font-semibold flex items-center gap-2"><i data-lucide="history" class="w-4 h-4"></i> Riwayat</span>
+                    <button onclick="resetDoorprizeHistory()" class="text-xs text-red-300 hover:text-red-100 flex items-center gap-1"><i data-lucide="trash" class="w-3 h-3"></i> Reset</button>
+                </div>
+                <div id="dp-history" class="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                    <div class="text-center text-white/20 mt-10">Belum ada data</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. RODA (WHEEL) SECTION -->
+        <div id="tab-wheel" class="game-section hidden grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <div class="glass-panel p-6 rounded-3xl flex flex-col items-center justify-center min-h-[400px]">
+                <div class="relative">
+                    <!-- Pointer -->
+                    <div class="absolute top-0 left-1/2 -translate-x-1/2 -mt-4 z-20 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-yellow-400 drop-shadow-lg"></div>
+                    <canvas id="wheel-canvas" width="400" height="400" class="max-w-full h-auto rounded-full shadow-2xl border-4 border-white/10"></canvas>
+                </div>
+                <button onclick="spinWheel()" id="btn-spin-wheel" class="mt-8 px-12 py-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 font-bold text-lg shadow-lg hover:scale-105 transition-transform">
+                    PUTAR RODA
+                </button>
+            </div>
+
+            <div class="glass-panel p-6 rounded-3xl space-y-4">
+                <h3 class="text-xl font-bold flex items-center gap-2"><i data-lucide="list-plus" class="w-5 h-5"></i> Edit Item</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="wheel-input" class="glass-input flex-1 px-4 py-2 rounded-lg" placeholder="Masukkan nama item..." onkeypress="if(event.key==='Enter') addWheelItem()">
+                    <button onclick="addWheelItem()" class="px-4 py-2 bg-green-500/20 text-green-300 border border-green-500/30 rounded-lg hover:bg-green-500/40"><i data-lucide="plus" class="w-5 h-5"></i></button>
+                </div>
+                <div class="max-h-[300px] overflow-y-auto custom-scrollbar space-y-2" id="wheel-list">
+                    <!-- Items injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. SLOT MACHINE SECTION -->
+        <div id="tab-slot" class="game-section hidden flex flex-col items-center justify-center py-10">
+            <div class="glass-panel p-8 rounded-[3rem] border-4 border-yellow-500/30 shadow-2xl bg-black/40 relative">
+                <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-yellow-500 text-black font-bold px-6 py-1 rounded-full uppercase tracking-widest text-sm shadow-lg">Classic Slot</div>
+                
+                <div class="flex gap-4 mb-8" id="slot-container-1">
+                    <!-- Slots Injected JS -->
+                </div>
+
+                <div class="flex justify-center gap-4">
+                     <div class="flex items-center gap-2 bg-black/30 px-3 rounded-lg">
+                        <label class="text-xs text-gray-400">Slots:</label>
+                        <input type="number" id="slot-count" value="3" min="3" max="5" class="w-12 bg-transparent text-center font-bold focus:outline-none" onchange="initSlots()">
+                    </div>
+                    <button onclick="spinSlot()" id="btn-spin-slot" class="px-12 py-3 rounded-xl bg-gradient-to-b from-red-500 to-red-700 font-bold text-xl shadow-[0_4px_0_rgb(153,27,27)] active:shadow-none active:translate-y-[4px] transition-all">
+                        SPIN!
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. SLOT 3X SECTION -->
+        <div id="tab-slot3x" class="game-section hidden flex flex-col items-center justify-center py-5">
+            <div class="glass-panel p-6 md:p-10 rounded-[2rem] border-2 border-purple-500/30 shadow-purple-500/20 shadow-2xl bg-black/60">
+                <div class="flex flex-col gap-2 md:gap-4 mb-8" id="slot3x-container">
+                    <!-- 3 Rows Injected JS -->
+                </div>
+                
+                <div class="flex flex-col md:flex-row items-center justify-center gap-6">
+                    <div class="flex items-center gap-3">
+                         <span class="text-sm text-gray-400">Kolom:</span>
+                         <div class="flex items-center bg-white/10 rounded-lg p-1">
+                             <button onclick="changeSlot3xCol(-1)" class="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded">-</button>
+                             <span id="slot3x-col-display" class="w-8 text-center font-bold">3</span>
+                             <button onclick="changeSlot3xCol(1)" class="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded">+</button>
+                         </div>
+                    </div>
+                    <button onclick="spinSlot3x()" id="btn-spin-slot3x" class="w-full md:w-auto px-16 py-4 rounded-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-black font-black text-2xl shadow-lg hover:scale-105 transition-transform uppercase tracking-wider">
+                        Mega Spin
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. DADU (DICE) SECTION -->
+        <div id="tab-dice" class="game-section hidden flex flex-col items-center justify-center h-[500px]">
+             <div class="flex gap-8 mb-12 perspective-1000">
+                <div id="dice-1" class="w-24 h-24 bg-white rounded-2xl flex items-center justify-center text-4xl font-bold text-slate-900 shadow-[0_10px_20px_rgba(0,0,0,0.5)] transform transition-transform">1</div>
+                <div id="dice-2" class="w-24 h-24 bg-white rounded-2xl flex items-center justify-center text-4xl font-bold text-slate-900 shadow-[0_10px_20px_rgba(0,0,0,0.5)] transform transition-transform">6</div>
+             </div>
+             <button onclick="rollDice()" id="btn-roll-dice" class="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-bold transition-all shadow-lg flex items-center gap-2">
+                 <i data-lucide="dices" class="w-5 h-5"></i> Kocok Dadu
+             </button>
+        </div>
+
+        <!-- 6. KOIN (COIN) SECTION -->
+        <div id="tab-coin" class="game-section hidden flex flex-col items-center justify-center h-[500px]">
+            <div class="relative w-40 h-40 mb-10 perspective-1000">
+                <div id="coin" class="w-full h-full relative preserve-3d transition-transform duration-1000">
+                    <!-- Heads -->
+                    <div class="absolute inset-0 w-full h-full bg-yellow-400 rounded-full flex items-center justify-center border-4 border-yellow-600 shadow-xl backface-hidden">
+                        <div class="text-yellow-800 font-bold text-xl border-2 border-yellow-600 rounded-full w-32 h-32 flex items-center justify-center border-dashed">
+                            KOIN
+                        </div>
+                    </div>
+                    <!-- Tails -->
+                    <div class="absolute inset-0 w-full h-full bg-gray-300 rounded-full flex items-center justify-center border-4 border-gray-500 shadow-xl backface-hidden transform rotate-y-180">
+                         <div class="text-gray-700 font-bold text-xl border-2 border-gray-500 rounded-full w-32 h-32 flex items-center justify-center border-dashed">
+                            KOIN
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="coin-result" class="h-8 text-xl font-bold text-yellow-300 mb-4 opacity-0 transition-opacity">HASIL: KEPALA</div>
+            <button onclick="flipCoin()" id="btn-flip-coin" class="px-8 py-3 rounded-xl bg-yellow-600 hover:bg-yellow-500 font-bold transition-all shadow-lg text-white">
+                Lempar Koin
+            </button>
+        </div>
+
+        <!-- 7. DUEL SECTION (NEW) -->
+        <div id="tab-duel" class="game-section hidden flex flex-col items-center max-w-2xl mx-auto">
+            <div class="glass-panel p-2 rounded-xl flex gap-2 mb-8">
+                <button onclick="setDuelMode('rps')" id="mode-rps" class="duel-mode-btn bg-white/20 px-4 py-2 rounded-lg text-sm font-bold">Batu Gunting Kertas</button>
+                <button onclick="setDuelMode('pingsut')" id="mode-pingsut" class="duel-mode-btn px-4 py-2 rounded-lg text-sm font-bold opacity-50 hover:opacity-100">Pingsut Jawa</button>
+            </div>
+
+            <div class="flex justify-between items-center w-full px-4 md:px-10 mb-8">
+                <div class="flex flex-col items-center">
+                    <span class="text-blue-300 font-bold mb-2">Player 1</span>
+                    <div id="duel-p1" class="w-24 h-24 md:w-32 md:h-32 glass-panel rounded-2xl flex items-center justify-center text-5xl md:text-6xl animate-bounce-slow">❓</div>
+                </div>
+                <div class="text-2xl font-black text-white/20 italic">VS</div>
+                <div class="flex flex-col items-center">
+                    <span class="text-red-300 font-bold mb-2">Player 2</span>
+                    <div id="duel-p2" class="w-24 h-24 md:w-32 md:h-32 glass-panel rounded-2xl flex items-center justify-center text-5xl md:text-6xl animate-bounce-slow" style="animation-delay: 0.5s">❓</div>
+                </div>
+            </div>
+
+            <div id="duel-result" class="h-10 text-2xl font-bold text-yellow-400 mb-6 text-center"></div>
+
+            <button onclick="startDuel()" id="btn-duel-start" class="w-full py-4 rounded-xl font-bold text-xl uppercase tracking-wider bg-gradient-to-r from-blue-600 to-purple-600 hover:scale-[1.02] transition-transform shadow-lg">
+                Mulai Duel!
+            </button>
+        </div>
+
+        <!-- 8. HOMPIMPA SECTION (NEW) -->
+        <div id="tab-hompimpa" class="game-section hidden flex flex-col items-center max-w-4xl mx-auto">
+            <div class="glass-panel p-4 rounded-2xl w-full mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="font-bold">Jumlah Pemain:</span>
+                    <input type="range" id="hp-count" min="3" max="12" value="5" class="w-32 accent-purple-500" oninput="document.getElementById('hp-val').innerText = this.value; renderHompimpaPlaceholder()">
+                    <span id="hp-val" class="bg-white/10 px-3 py-1 rounded font-mono">5</span>
+                </div>
+                <button onclick="playHompimpa()" class="px-6 py-2 bg-pink-600 rounded-lg font-bold hover:bg-pink-500 transition-colors shadow-lg">
+                    Hompimpa Alaium Gambreng!
+                </button>
+            </div>
+
+            <div id="hompimpa-area" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 w-full">
+                <!-- Hands injected here -->
+            </div>
+            
+            <div id="hompimpa-status" class="mt-6 text-xl font-bold text-center h-8"></div>
+            
+            <div id="duel-suggestion" class="hidden mt-4 p-4 glass-panel rounded-xl text-center animate-pulse">
+                <p class="mb-2 text-yellow-300">Tersisa 2 kubu/pemain!</p>
+                <button onclick="switchTab('duel')" class="px-4 py-2 bg-blue-600 rounded-lg text-sm font-bold">Lanjut ke Duel &rarr;</button>
+            </div>
+        </div>
+
+        <!-- 9. NAIK/TURUN (NEW) -->
+        <div id="tab-updown" class="game-section hidden flex flex-col items-center justify-center h-[500px]">
+            <div class="glass-panel p-10 rounded-3xl flex flex-col items-center justify-center w-full max-w-md text-center bg-black/40">
+                <h2 class="text-gray-400 uppercase tracking-widest text-sm mb-6">Analisis Pasar Ajaib</h2>
+                
+                <div id="ud-icon" class="mb-6 transition-all duration-500 transform scale-100">
+                    <i data-lucide="activity" class="w-32 h-32 text-gray-600"></i>
+                </div>
+                
+                <div id="ud-text" class="text-4xl font-black text-white/20 mb-8">MENUNGGU DATA...</div>
+                
+                <button onclick="predictUpDown()" id="btn-updown-start" class="w-full py-4 rounded-xl bg-gradient-to-r from-gray-700 to-gray-600 hover:from-blue-600 hover:to-blue-500 font-bold text-lg shadow-lg transition-all">
+                    ANALISA ARAH
+                </button>
+            </div>
+        </div>
+
+        <!-- 10. RNG DIGIT (NEW) -->
+        <div id="tab-rng" class="game-section hidden flex flex-col items-center justify-center max-w-2xl mx-auto h-[500px]">
+            <div class="glass-panel w-full p-8 rounded-3xl space-y-6 text-center">
+                 <h2 class="text-2xl font-bold flex items-center justify-center gap-2">
+                    <i data-lucide="binary" class="w-6 h-6 text-green-400"></i> Random Number Generator
+                 </h2>
+                 
+                 <div class="bg-black/30 p-8 rounded-xl border border-white/10">
+                     <div id="rng-display" class="font-mono text-5xl md:text-7xl font-bold tracking-widest text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]">
+                         0000
+                     </div>
+                 </div>
+
+                 <div class="flex items-center justify-center gap-4">
+                     <label class="text-sm text-gray-400">Jumlah Digit (1-9):</label>
+                     <input type="number" id="rng-digits" value="4" min="1" max="9" class="glass-input w-20 p-2 text-center rounded-lg font-bold">
+                 </div>
+
+                 <button onclick="generateRNG()" class="w-full py-3 bg-green-600 hover:bg-green-500 rounded-xl font-bold text-lg shadow-lg shadow-green-900/50 transition-all">
+                     GENERATE
+                 </button>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="mt-auto py-6 text-center text-white/20 text-sm w-full border-t border-white/5 bg-black/20 backdrop-blur-sm">
+        <p>&copy; 2026 Master Undian & Games.</p>
+    </footer>
+
+    <!-- JS Logic -->
+    <script>
+        // --- GLOBAL & TABS ---
+        function switchTab(tabId) {
+            // Hide all sections
+            document.querySelectorAll('.game-section').forEach(el => {
+                el.classList.add('hidden');
+            });
+            // Remove active class from buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active-tab');
+                btn.classList.remove('opacity-100');
+                btn.classList.add('text-white/70');
+            });
+
+            // Show selected
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            
+            // Highlight button
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.add('active-tab');
+            activeBtn.classList.remove('text-white/70');
+            
+            // Init specific components if needed
+            if(tabId === 'wheel') drawWheel();
+            if(tabId === 'slot') initSlots();
+            if(tabId === 'slot3x') initSlot3x();
+            if(tabId === 'hompimpa') renderHompimpaPlaceholder();
+        }
+
+        // Initialize Icons
+        lucide.createIcons();
+
+        // --- 1. DOORPRIZE LOGIC ---
+        let dpHistory = [];
+
+        function rollDoorprize() {
+            const min = parseInt(document.getElementById('dp-min').value) || 1;
+            const max = parseInt(document.getElementById('dp-max').value) || 100;
+            const display = document.getElementById('dp-number');
+            const historyContainer = document.getElementById('dp-history');
+            
+            if (min >= max) { alert("Min harus lebih kecil dari Max"); return; }
+
+            // Animation
+            let count = 0;
+            const interval = setInterval(() => {
+                display.innerText = Math.floor(Math.random() * (max - min + 1)) + min;
+                display.classList.add('scale-110', 'text-yellow-200');
+                count++;
+                if (count > 20) {
+                    clearInterval(interval);
+                    const result = Math.floor(Math.random() * (max - min + 1)) + min;
+                    display.innerText = result;
+                    display.classList.remove('scale-110', 'text-yellow-200');
+                    display.classList.add('text-yellow-400', 'scale-125');
+                    setTimeout(() => display.classList.remove('scale-125'), 200);
+                    
+                    // Add to history
+                    dpHistory.unshift(result);
+                    renderDoorprizeHistory();
+                    createConfetti();
+                }
+            }, 50);
+        }
+
+        function renderDoorprizeHistory() {
+            const container = document.getElementById('dp-history');
+            container.innerHTML = dpHistory.map((num, i) => `
+                <div class="flex justify-between items-center p-3 rounded-lg bg-white/5 border border-white/5 ${i===0 ? 'bg-green-500/20 border-green-500/50' : ''}">
+                    <span class="text-xs text-gray-400">#${dpHistory.length - i}</span>
+                    <span class="font-bold text-lg">${num}</span>
+                </div>
+            `).join('');
+        }
+
+        function resetDoorprizeHistory() {
+            if(confirm("Hapus riwayat?")) {
+                dpHistory = [];
+                renderDoorprizeHistory();
+            }
+        }
+
+        function createConfetti() {
+            for(let i=0; i<50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti-piece';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.backgroundColor = ['#ff0', '#f0f', '#0ff', '#0f0'][Math.floor(Math.random()*4)];
+                confetti.style.animationDuration = (Math.random() * 2 + 1) + 's';
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 3000);
+            }
+        }
+
+        // --- 2. WHEEL LOGIC ---
+        let wheelItems = ['Hadiah 1', 'Hadiah 2', 'Zonk', 'Jackpot', 'Coba Lagi', 'Uang Tunai'];
+        let wheelCtx = document.getElementById('wheel-canvas').getContext('2d');
+        let currentAngle = 0;
+        let isSpinningWheel = false;
+
+        function drawWheel() {
+            const canvas = document.getElementById('wheel-canvas');
+            const ctx = wheelCtx;
+            const w = canvas.width;
+            const h = canvas.height;
+            const cx = w/2;
+            const cy = h/2;
+            const radius = cx - 10;
+            const step = (2 * Math.PI) / wheelItems.length;
+            const colors = ['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+
+            ctx.clearRect(0, 0, w, h);
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(currentAngle);
+
+            wheelItems.forEach((item, i) => {
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, radius, i * step, (i + 1) * step);
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.save();
+                ctx.rotate(i * step + step / 2);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 16px Outfit';
+                ctx.textAlign = 'right';
+                ctx.fillText(item, radius - 20, 5);
+                ctx.restore();
+            });
+            ctx.restore();
+            
+            // Render List
+            const list = document.getElementById('wheel-list');
+            list.innerHTML = wheelItems.map((item, i) => `
+                <div class="flex justify-between items-center p-2 bg-white/5 rounded text-sm">
+                    <span>${item}</span>
+                    <button onclick="removeWheelItem(${i})" class="text-red-400 hover:text-red-200">&times;</button>
+                </div>
+            `).join('');
+        }
+
+        function addWheelItem() {
+            const input = document.getElementById('wheel-input');
+            if(input.value.trim()) {
+                wheelItems.push(input.value.trim());
+                input.value = '';
+                drawWheel();
+            }
+        }
+        function removeWheelItem(i) {
+            if(wheelItems.length > 2) {
+                wheelItems.splice(i, 1);
+                drawWheel();
+            } else {
+                alert("Minimal 2 item");
+            }
+        }
+
+        function spinWheel() {
+            if(isSpinningWheel) return;
+            isSpinningWheel = true;
+            document.getElementById('btn-spin-wheel').disabled = true;
+
+            const duration = 4000;
+            const start = performance.now();
+            const startAngle = currentAngle;
+            // Spin setidaknya 5 putaran penuh + random
+            const finalRotation = startAngle + (10 * Math.PI) + (Math.random() * 2 * Math.PI); 
+
+            function animate(time) {
+                const elapsed = time - start;
+                const progress = Math.min(elapsed / duration, 1);
+                // Ease out cubic
+                const ease = 1 - Math.pow(1 - progress, 3);
+                
+                currentAngle = startAngle + (finalRotation - startAngle) * ease;
+                drawWheel();
+
+                if(progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    isSpinningWheel = false;
+                    document.getElementById('btn-spin-wheel').disabled = false;
+                    createConfetti();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // --- 3. SLOT LOGIC ---
+        function initSlots() {
+            const count = parseInt(document.getElementById('slot-count').value);
+            const container = document.getElementById('slot-container-1');
+            container.innerHTML = '';
+            for(let i=0; i<count; i++) {
+                container.innerHTML += `<div class="slot-item w-20 h-28 bg-white text-black text-5xl font-bold flex items-center justify-center rounded-lg shadow-inner border-4 border-gray-300">7</div>`;
+            }
+        }
+
+        function spinSlot() {
+            const slots = document.querySelectorAll('#slot-container-1 .slot-item');
+            const btn = document.getElementById('btn-spin-slot');
+            btn.disabled = true;
+            
+            document.getElementById('slot-container-1').classList.add('slot-spinning');
+
+            let iterations = 0;
+            const interval = setInterval(() => {
+                slots.forEach(slot => {
+                    slot.innerText = Math.floor(Math.random() * 9) + 1;
+                });
+                iterations++;
+                if(iterations > 20) {
+                    clearInterval(interval);
+                    document.getElementById('slot-container-1').classList.remove('slot-spinning');
+                    btn.disabled = false;
+                    
+                    // Set final
+                    const final = [];
+                    slots.forEach(slot => {
+                        const num = Math.floor(Math.random() * 9) + 1;
+                        slot.innerText = num;
+                        final.push(num);
+                    });
+
+                    // Check jackpot (all same)
+                    if(final.every(val => val === final[0])) {
+                        createConfetti();
+                        alert("JACKPOT!");
+                    }
+                }
+            }, 100);
+        }
+
+        // --- 4. SLOT 3X LOGIC ---
+        let slot3xCols = 3;
+        function initSlot3x() {
+            const container = document.getElementById('slot3x-container');
+            container.innerHTML = '';
+            for(let row=0; row<3; row++) {
+                let rowHtml = `<div class="flex gap-2 justify-center">`;
+                for(let col=0; col<slot3xCols; col++) {
+                    rowHtml += `<div id="s3-${row}-${col}" class="w-16 h-16 md:w-20 md:h-20 bg-gray-800 border border-gray-600 rounded-lg flex items-center justify-center text-3xl font-bold text-yellow-500 shadow-inner">?</div>`;
+                }
+                rowHtml += `</div>`;
+                container.innerHTML += rowHtml;
+            }
+            document.getElementById('slot3x-col-display').innerText = slot3xCols;
+        }
+        
+        function changeSlot3xCol(delta) {
+            const newVal = slot3xCols + delta;
+            if(newVal >= 3 && newVal <= 6) {
+                slot3xCols = newVal;
+                initSlot3x();
+            }
+        }
+
+        function spinSlot3x() {
+             const btn = document.getElementById('btn-spin-slot3x');
+             btn.disabled = true;
+             
+             // Animate column by column
+             for(let c=0; c<slot3xCols; c++) {
+                 setTimeout(() => {
+                     for(let r=0; r<3; r++) {
+                        const el = document.getElementById(`s3-${r}-${c}`);
+                        // Fake spin
+                        let spinCount = 0;
+                        const spinner = setInterval(() => {
+                            el.innerText = Math.floor(Math.random()*9)+1;
+                            el.classList.add('bg-white', 'text-black');
+                            el.classList.remove('bg-gray-800', 'text-yellow-500');
+                            spinCount++;
+                            if(spinCount > 10) {
+                                clearInterval(spinner);
+                                const finalNum = Math.floor(Math.random()*9)+1;
+                                el.innerText = finalNum;
+                                el.classList.remove('bg-white', 'text-black');
+                                el.classList.add('bg-gray-800', 'text-yellow-500');
+                                
+                                if(c === slot3xCols-1 && r === 2) btn.disabled = false;
+                            }
+                        }, 50);
+                     }
+                 }, c * 300);
+             }
+        }
+
+        // --- 5. DICE LOGIC ---
+        function rollDice() {
+            const d1 = document.getElementById('dice-1');
+            const d2 = document.getElementById('dice-2');
+            const btn = document.getElementById('btn-roll-dice');
+            
+            btn.disabled = true;
+            d1.classList.add('dice-shake');
+            d2.classList.add('dice-shake');
+
+            setTimeout(() => {
+                d1.classList.remove('dice-shake');
+                d2.classList.remove('dice-shake');
+                d1.innerText = Math.floor(Math.random() * 6) + 1;
+                d2.innerText = Math.floor(Math.random() * 6) + 1;
+                btn.disabled = false;
+            }, 500);
+        }
+
+        // --- 6. COIN LOGIC ---
+        function flipCoin() {
+            const coin = document.getElementById('coin');
+            const btn = document.getElementById('btn-flip-coin');
+            const resultTxt = document.getElementById('coin-result');
+            
+            btn.disabled = true;
+            resultTxt.style.opacity = 0;
+            
+            // Random rotations
+            const outcome = Math.random() > 0.5 ? 'heads' : 'tails';
+            const rotation = outcome === 'heads' ? 1800 : 1980; // 1800 = 5 full spins (heads), 1980 = 5.5 spins (tails)
+
+            coin.style.transition = "transform 2s ease-out";
+            coin.style.transform = `rotateY(${rotation}deg)`;
+
+            setTimeout(() => {
+                // Reset rotation without animation for next spin capability
+                coin.style.transition = "none";
+                const finalDeg = outcome === 'heads' ? 0 : 180;
+                coin.style.transform = `rotateY(${finalDeg}deg)`;
+                
+                resultTxt.innerText = `HASIL: ${outcome === 'heads' ? 'KEPALA' : 'EKOR'}`;
+                resultTxt.style.opacity = 1;
+                btn.disabled = false;
+                if(outcome === 'heads') createConfetti();
+            }, 2000);
+        }
+
+        // --- 7. DUEL LOGIC ---
+        let duelMode = 'rps'; // rps or pingsut
+        const rpsIcons = ['🗻', '📄', '✂️']; // Batu, Kertas, Gunting
+        const pingsutIcons = ['🐘', '👤', '🐜']; // Gajah, Orang, Semut
+        // Rules:
+        // RPS: 0 beats 2, 1 beats 0, 2 beats 1
+        // Pingsut: 0 (Gajah) beats 1 (Orang), 1 (Orang) beats 2 (Semut), 2 (Semut) beats 0 (Gajah)
+
+        function setDuelMode(mode) {
+            duelMode = mode;
+            document.querySelectorAll('.duel-mode-btn').forEach(b => b.classList.add('opacity-50', 'bg-transparent'));
+            document.querySelectorAll('.duel-mode-btn').forEach(b => b.classList.remove('bg-white/20'));
+            
+            document.getElementById('mode-'+mode).classList.remove('opacity-50', 'bg-transparent');
+            document.getElementById('mode-'+mode).classList.add('bg-white/20');
+            
+            document.getElementById('duel-p1').innerText = '❓';
+            document.getElementById('duel-p2').innerText = '❓';
+            document.getElementById('duel-result').innerText = '';
+        }
+
+        function startDuel() {
+            const btn = document.getElementById('btn-duel-start');
+            btn.disabled = true;
+            const p1El = document.getElementById('duel-p1');
+            const p2El = document.getElementById('duel-p2');
+            const resEl = document.getElementById('duel-result');
+            
+            resEl.innerText = "";
+            let count = 0;
+            const icons = duelMode === 'rps' ? rpsIcons : pingsutIcons;
+
+            const interval = setInterval(() => {
+                p1El.innerText = icons[Math.floor(Math.random()*3)];
+                p2El.innerText = icons[Math.floor(Math.random()*3)];
+                count++;
+                if(count > 15) {
+                    clearInterval(interval);
+                    const idx1 = Math.floor(Math.random()*3);
+                    const idx2 = Math.floor(Math.random()*3);
+                    p1El.innerText = icons[idx1];
+                    p2El.innerText = icons[idx2];
+                    
+                    // Determine Winner
+                    let winner = 'draw';
+                    if (idx1 !== idx2) {
+                        if (duelMode === 'rps') {
+                            if ((idx1 === 0 && idx2 === 2) || (idx1 === 1 && idx2 === 0) || (idx1 === 2 && idx2 === 1)) winner = 'p1';
+                            else winner = 'p2';
+                        } else {
+                            // Pingsut: 0(G)>1(O), 1(O)>2(S), 2(S)>0(G)
+                            if ((idx1 === 0 && idx2 === 1) || (idx1 === 1 && idx2 === 2) || (idx1 === 2 && idx2 === 0)) winner = 'p1';
+                            else winner = 'p2';
+                        }
+                    }
+
+                    if(winner === 'draw') resEl.innerText = "SERI!";
+                    else if(winner === 'p1') { resEl.innerText = "PLAYER 1 MENANG!"; createConfetti(); }
+                    else { resEl.innerText = "PLAYER 2 MENANG!"; createConfetti(); }
+                    
+                    btn.disabled = false;
+                }
+            }, 100);
+        }
+
+        // --- 8. HOMPIMPA LOGIC ---
+        function renderHompimpaPlaceholder() {
+            const count = document.getElementById('hp-count').value;
+            const area = document.getElementById('hompimpa-area');
+            area.innerHTML = '';
+            document.getElementById('hompimpa-status').innerText = '';
+            document.getElementById('duel-suggestion').classList.add('hidden');
+
+            for(let i=0; i<count; i++) {
+                area.innerHTML += `
+                    <div class="glass-panel p-2 rounded-xl flex flex-col items-center gap-2 aspect-square justify-center">
+                        <span class="text-xs text-gray-400">P${i+1}</span>
+                        <div class="text-4xl hp-hand">✋</div>
+                    </div>
+                `;
+            }
+        }
+
+        function playHompimpa() {
+            const hands = document.querySelectorAll('.hp-hand');
+            const status = document.getElementById('hompimpa-status');
+            const duelSugg = document.getElementById('duel-suggestion');
+            
+            // 0 = Putih (Telapak/Palm) - '✋'
+            // 1 = Hitam (Punggung/Back) - '👊' (Represented as Fist/Black here for visual distinction)
+            // Or better: use colors. Let's use Icons colored.
+            // White = Light Hand, Black = Dark Hand.
+
+            let results = [];
+            
+            hands.forEach(h => {
+                h.classList.add('animate-spin');
+            });
+
+            setTimeout(() => {
+                let whiteCount = 0;
+                let blackCount = 0;
+
+                hands.forEach((h, i) => {
+                    h.classList.remove('animate-spin');
+                    const isWhite = Math.random() > 0.5;
+                    results.push(isWhite);
+                    if(isWhite) {
+                        h.innerText = '✋'; // Putih
+                        h.style.filter = "brightness(1.5) drop-shadow(0 0 5px white)";
+                        whiteCount++;
+                    } else {
+                        h.innerText = '🤚🏿'; // Hitam (Dark skin tone visual)
+                        h.style.filter = "brightness(0.5)";
+                        blackCount++;
+                    }
+                });
+
+                const total = results.length;
+                if (whiteCount === total || blackCount === total) {
+                    status.innerText = "ULANG! (Seragam)";
+                    status.className = "mt-6 text-xl font-bold text-center h-8 text-yellow-300";
+                    duelSugg.classList.add('hidden');
+                } else {
+                    // Logic: Minority wins/out?
+                    const minority = whiteCount < blackCount ? 'Putih' : 'Hitam';
+                    const minCount = Math.min(whiteCount, blackCount);
+                    
+                    status.innerText = `${minCount} Orang (${minority}) Berbeda!`;
+                    status.className = "mt-6 text-xl font-bold text-center h-8 text-green-400";
+                    
+                    if(minCount <= 2 || (total - minCount) <= 2) {
+                        duelSugg.classList.remove('hidden');
+                    } else {
+                        duelSugg.classList.add('hidden');
+                    }
+                }
+
+            }, 500);
+        }
+
+        // --- 9. UP/DOWN LOGIC ---
+        function predictUpDown() {
+            const icon = document.getElementById('ud-icon');
+            const text = document.getElementById('ud-text');
+            const btn = document.getElementById('btn-updown-start');
+            
+            btn.disabled = true;
+            text.innerText = "MENGANALISA...";
+            text.className = "text-2xl font-bold text-gray-300 mb-8 animate-pulse";
+            
+            // Fake loading
+            setTimeout(() => {
+                const isUp = Math.random() > 0.5;
+                if(isUp) {
+                    icon.innerHTML = '<i data-lucide="trending-up" class="w-32 h-32 text-green-500 drop-shadow-[0_0_15px_rgba(34,197,94,0.8)]"></i>';
+                    text.innerText = "NAIK (CALL)";
+                    text.className = "text-5xl font-black text-green-500 mb-8 scale-110 transition-all";
+                } else {
+                    icon.innerHTML = '<i data-lucide="trending-down" class="w-32 h-32 text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)]"></i>';
+                    text.innerText = "TURUN (PUT)";
+                    text.className = "text-5xl font-black text-red-500 mb-8 scale-110 transition-all";
+                }
+                lucide.createIcons();
+                btn.disabled = false;
+            }, 1500);
+        }
+
+        // --- 10. RNG DIGIT LOGIC ---
+        function generateRNG() {
+            const digits = parseInt(document.getElementById('rng-digits').value) || 4;
+            const display = document.getElementById('rng-display');
+            
+            if(digits < 1 || digits > 12) { alert("Max 12 digit"); return; }
+            
+            let count = 0;
+            const interval = setInterval(() => {
+                let temp = '';
+                for(let i=0; i<digits; i++) temp += Math.floor(Math.random()*10);
+                display.innerText = temp;
+                count++;
+                if(count > 10) {
+                    clearInterval(interval);
+                    createConfetti();
+                }
+            }, 50);
+        }
+
+        // --- INIT ---
+        window.onload = () => {
+            switchTab('doorprize'); // Default tab
+        };
+
+    </script>
+</body>
+</html>

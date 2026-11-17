@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SQLGen - Visual SQL Query Builder yang mudah digunakan, mendukung ekspor multi-format, penyimpanan otomatis, dan pembuatan kueri instan di browser.">
+    <title>SQLGen</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.05);
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 0.6);
+        }
+
+        .command-card {
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        }
+        .command-card:hover {
+            transform: translateY(-1px);
+        }
+
+        /* Toast animation */
+        @keyframes toastEnter {
+            from {
+                opacity: 0;
+                transform: translateY(16px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .toast-animate {
+            animation: toastEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen font-sans flex flex-col antialiased transition-colors duration-200">
+
+    <header class="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            <!-- Brand -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-emerald-500 dark:from-indigo-400 dark:to-emerald-400 bg-clip-text text-transparent">SQLGen</h1>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Visual Query Builder, Formatter & Multi-Format Exporter</p>
+                </div>
+            </div>
+
+            <!-- Quick Actions Header -->
+            <div class="flex items-center gap-2">
+                <!-- Preset Dropdown -->
+                <div class="relative inline-block">
+                    <select id="preset-selector" onchange="handlePresetChange(this.value)" class="text-xs sm:text-sm bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+                        <option value="">📂 Pilih Preset...</option>
+                        <option value="select_basic">SELECT Dasar (Pencarian)</option>
+                        <option value="select_pagination">SELECT dengan Paginasi</option>
+                        <option value="join_two_tables">INNER JOIN 2 Tabel</option>
+                        <option value="aggregate_group">Agregasi & GROUP BY</option>
+                        <option value="insert_row">INSERT INTO Nilai Baru</option>
+                        <option value="update_row">UPDATE Data Berdasarkan Kondisi</option>
+                        <option value="delete_row">DELETE Filtered Record</option>
+                    </select>
+                </div>
+
+                <!-- Bagikan URL -->
+                <button onclick="shareQueryUrl()" class="p-2 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-medium rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 flex items-center gap-1.5 transition" title="Salin Tautan Berbagi Kueri">
+                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                    </svg>
+                    <span class="hidden md:inline">Bagikan</span>
+                </button>
+
+                <!-- Help Button -->
+                <button onclick="openHelpModal()" class="p-2 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-medium rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 flex items-center gap-1.5 transition" title="Bantuan Sintaks & Panduan">
+                    <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="hidden md:inline">Bantuan</span>
+                </button>
+
+                <!-- Theme Toggle -->
+                <button onclick="toggleTheme()" class="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition" title="Ganti Tema Gelap/Terang" aria-label="Ganti Tema">
+                    <svg id="theme-icon-sun" class="w-5 h-5 hidden dark:block text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <svg id="theme-icon-moon" class="w-5 h-5 block dark:hidden text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6">
+        
+        <!-- Top Builder Toolbar -->
+        <section class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="addSqlCommand()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition shadow-md shadow-indigo-500/20 flex items-center gap-2 active:scale-95">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Tambah Baris Perintah
+                </button>
+                <div class="h-6 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
+                <button onclick="initializeSqlCommands(true)" class="px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Kembalikan ke SELECT, FROM, WHERE">
+                    Reset Template
+                </button>
+                <button onclick="requestClearCanvas()" class="px-3 py-2 text-xs sm:text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition">
+                    Kosongkan Semua
+                </button>
+            </div>
+
+            <!-- Toggles: Smart Sort & Real-time Compilation -->
+            <div class="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="toggle-smart-sort" checked onchange="handleSmartSortToggle()" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 dark:bg-slate-800 dark:border-slate-700">
+                    <span class="text-slate-700 dark:text-slate-300 font-medium">Auto Urutkan Logis (Smart Sort)</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="toggle-realtime" checked onchange="handleRealtimeToggle()" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 dark:bg-slate-800 dark:border-slate-700">
+                    <span class="text-slate-700 dark:text-slate-300 font-medium">Kompilasi Otomatis</span>
+                </label>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- LEFT PANEL: Visual Query Builder (7 cols on lg) -->
+            <section class="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-4 sm:p-6 flex flex-col min-h-[560px]">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                        <h2 class="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                            <span class="flex h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
+                            Kanvas Perakit Kueri
+                        </h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Susun klausa SQL di bawah ini. Gunakan tombol panah untuk mengatur urutan manual.</p>
+                    </div>
+                    <span id="command-count-badge" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">0 baris</span>
+                </div>
+
+                <!-- Commands Container -->
+                <div id="sql-commands-container" class="space-y-3 flex-grow overflow-y-auto pr-1 max-h-[640px]">
+                    <!-- Dynamically populated by JavaScript -->
+                </div>
+
+                <!-- Bottom Run Button -->
+                <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <button onclick="generateSql(true)" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Generate Kueri SQL</span>
+                        <span class="text-xs font-normal opacity-80">(Ctrl + Enter)</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: Result and Export Tools (5 cols on lg) -->
+            <section class="lg:col-span-5 bg-slate-900 dark:bg-slate-950 rounded-2xl border border-slate-800 shadow-xl p-4 sm:p-6 flex flex-col min-h-[560px] text-slate-100">
+                
+                <!-- Output Header -->
+                <div class="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <span class="h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <h3 class="text-base sm:text-lg font-bold font-mono tracking-tight text-white">Hasil Kueri</h3>
+                    </div>
+
+                    <!-- Output Format Options -->
+                    <div class="flex items-center gap-1.5 text-xs">
+                        <button id="btn-format-pretty" onclick="setQueryFormat('pretty')" class="px-2.5 py-1 rounded-md font-mono bg-slate-800 text-indigo-400 font-semibold border border-indigo-500/40" title="Format bertingkat / rapi">
+                            Pretty
+                        </button>
+                        <button id="btn-format-minify" onclick="setQueryFormat('minify')" class="px-2.5 py-1 rounded-md font-mono bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700" title="Format satu baris (inline)">
+                            Inline
+                        </button>
+                        <button id="btn-format-case" onclick="toggleKeywordCase()" class="px-2.5 py-1 rounded-md font-mono bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700" title="Ubah huruf besar/kecil klausa SQL">
+                            aA
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Textarea Code View -->
+                <div class="relative flex-grow flex flex-col">
+                    <textarea 
+                        id="sql-output" 
+                        readonly 
+                        class="w-full flex-grow p-4 rounded-xl bg-slate-950/80 dark:bg-slate-900/90 text-emerald-400 font-mono text-xs sm:text-sm leading-relaxed border border-slate-800 resize-none focus:outline-none focus:border-indigo-500/50 min-h-[300px]" 
+                        placeholder="-- Kueri yang Anda susun akan muncul di sini secara langsung..."
+                        spellcheck="false"
+                    ></textarea>
+
+                    <!-- Overlay Quick Copy Button -->
+                    <button onclick="copyToClipboard()" class="absolute top-3 right-3 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 shadow flex items-center gap-1.5 backdrop-blur transition active:scale-95">
+                        <svg id="copy-icon" class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                        <span id="copy-text">Salin</span>
+                    </button>
+                </div>
+
+                <!-- Query Diagnostics & Syntax Hints -->
+                <div id="syntax-warning-box" class="hidden mt-3 p-3 rounded-lg bg-amber-950/40 border border-amber-800/60 text-amber-300 text-xs flex items-start gap-2">
+                    <svg class="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span id="syntax-warning-text">Peringatan sintaks terdeteksi.</span>
+                </div>
+
+                <!-- Statistics Bar -->
+                <div class="mt-3 flex items-center justify-between text-[11px] text-slate-500 font-mono border-t border-slate-800/80 pt-2">
+                    <div class="flex gap-3">
+                        <span>Karakter: <strong id="stat-chars" class="text-slate-300 font-semibold">0</strong></span>
+                        <span>Baris: <strong id="stat-lines" class="text-slate-300 font-semibold">0</strong></span>
+                        <span>Klausa: <strong id="stat-clauses" class="text-slate-300 font-semibold">0</strong></span>
+                    </div>
+                    <span id="stat-status" class="text-emerald-400 font-medium">Siap</span>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-slate-800 flex flex-wrap items-center gap-2">
+                    <span class="text-xs text-slate-400 font-medium mr-1">Ekspor Sebagai:</span>
+
+                    <!-- Export Plain Text (.txt) -->
+                    <button onclick="exportFile('txt')" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95" title="Unduh sebagai file catatan Teks biasa (.txt)">
+                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Teks (.txt)</span>
+                    </button>
+
+                    <!-- Export SQL Script (.sql) -->
+                    <button onclick="exportFile('sql')" class="flex-1 py-2 px-3 rounded-xl bg-indigo-600/90 hover:bg-indigo-600 text-white text-xs font-semibold border border-indigo-500/50 transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95" title="Unduh skrip eksekusi .sql">
+                        <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span>SQL (.sql)</span>
+                    </button>
+
+                    <!-- Export Markdown Document (.md) -->
+                    <button onclick="exportFile('md')" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95" title="Unduh sebagai blok kueri Markdown (.md)">
+                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        <span>Markdown (.md)</span>
+                    </button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Datalist Autocomplete Helpers -->
+    <datalist id="sql-syntax-suggestions">
+        <option value="*"></option>
+        <option value="COUNT(*) AS total"></option>
+        <option value="SUM()"></option>
+        <option value="AVG()"></option>
+        <option value="id ASC"></option>
+        <option value="id DESC"></option>
+        <option value="created_at DESC"></option>
+        <option value="status = 'active'"></option>
+        <option value="is_deleted = 0"></option>
+        <option value="LIKE '%keyword%'"></option>
+        <option value="IS NOT NULL"></option>
+        <option value="10 OFFSET 0"></option>
+    </datalist>
+
+    <!-- Modal Konfirmasi Hapus / Kosongkan Kanvas -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div class="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-4">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Kosongkan Kanvas Kueri?</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mt-2">Semua baris perintah yang telah Anda buat akan dihapus dari editor dan penyimpanan sesi saat ini.</p>
+            <div class="mt-6 flex items-center justify-end gap-3">
+                <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    Batal
+                </button>
+                <button onclick="executeClearCanvas()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
+                    Ya, Kosongkan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Panduan SQL & Dokumentasi Fitur -->
+    <div id="help-modal" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+                <div class="flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">?</span>
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">Bantuan & Panduan Fitur SQLGen</h3>
+                </div>
+                <button onclick="closeHelpModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="mt-4 space-y-4 overflow-y-auto pr-2 text-sm text-slate-600 dark:text-slate-300 leading-relaxed flex-grow">
+                <div>
+                    <h4 class="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span>✨</span> Fitur-Fitur Utama Baru:
+                    </h4>
+                    <ul class="mt-2 list-disc list-inside space-y-1.5 text-xs sm:text-sm pl-1">
+                        <li><strong>Ekspor Teks (.txt), .sql, & .md:</strong> Simpan hasil kueri sesuai kebutuhan dokumentasi atau skrip database.</li>
+                        <li><strong>Penyimpanan Otomatis (Auto-Save):</strong> Perubahan disimpan secara instan di browser (`localStorage`). Halaman aman untuk di-refresh.</li>
+                        <li><strong>Tautan Berbagi (Shareable Link):</strong> Klik tombol <em>Bagikan</em> untuk menghasilkan URL instan berisi state kueri Anda tanpa server backend.</li>
+                        <li><strong>Smart Sort vs Manual Order:</strong> Anda bisa membiarkan sistem menyusun urutan logis SQL, atau menggunakan tombol panah atas/bawah di tiap baris untuk kustomisasi manual.</li>
+                        <li><strong>Format Output:</strong> Pilih antara mode rapi bertingkat (<em>Pretty</em>) atau format satu baris (<em>Inline</em>).</li>
+                    </ul>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <h4 class="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <span>⌨️</span> Pintasan Papan Ketik (Keyboard Shortcuts):
+                    </h4>
+                    <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+                        <div class="p-2 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex justify-between">
+                            <span class="text-slate-500">Kompilasi Kueri:</span>
+                            <span class="font-bold text-indigo-500">Ctrl / Cmd + Enter</span>
+                        </div>
+                        <div class="p-2 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex justify-between">
+                            <span class="text-slate-500">Tambah Baris Baru:</span>
+                            <span class="font-bold text-indigo-500">Tekan Enter di input</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <h4 class="font-semibold text-slate-900 dark:text-white">Tips Pembuatan Kueri:</h4>
+                    <p class="mt-1 text-xs">Jika input klausa <code class="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-indigo-500 font-mono">SELECT</code> dibiarkan kosong, sistem akan otomatis mengisinya dengan tanda bintang (<code class="font-mono text-indigo-500">*</code>).</p>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                <button onclick="closeHelpModal()" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition shadow">
+                    Saya Mengerti
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <script>
+        // Koleksi Perintah SQL Terstruktur
+        const SQL_COMMAND_DICTIONARY = [
+            // Ambil Data (DQL)
+            { value: 'SELECT', label: 'SELECT (Pilih Kolom)', group: 'Ambil Data (DQL)' },
+            { value: 'SELECT DISTINCT', label: 'SELECT DISTINCT (Nilai Unik)', group: 'Ambil Data (DQL)' },
+            { value: 'FROM', label: 'FROM (Nama Tabel)', group: 'Ambil Data (DQL)' },
+            { value: 'WHERE', label: 'WHERE (Kondisi Filter)', group: 'Ambil Data (DQL)' },
+            { value: 'AND', label: 'AND (Syarat Bersama)', group: 'Ambil Data (DQL)' },
+            { value: 'OR', label: 'OR (Syarat Alternatif)', group: 'Ambil Data (DQL)' },
+            { value: 'GROUP BY', label: 'GROUP BY (Kelompokkan)', group: 'Ambil Data (DQL)' },
+            { value: 'HAVING', label: 'HAVING (Filter Kelompok)', group: 'Ambil Data (DQL)' },
+            { value: 'ORDER BY', label: 'ORDER BY (Pengurutan)', group: 'Ambil Data (DQL)' },
+            { value: 'LIMIT', label: 'LIMIT (Pembatas Jumlah)', group: 'Ambil Data (DQL)' },
+            { value: 'OFFSET', label: 'OFFSET (Lewati Baris)', group: 'Ambil Data (DQL)' },
+
+            // Gabung Relasi Tabel (JOINs)
+            { value: 'INNER JOIN', label: 'INNER JOIN (Gabung Beririsan)', group: 'Relasi Tabel (JOIN)' },
+            { value: 'LEFT JOIN', label: 'LEFT JOIN (Gabung Kiri)', group: 'Relasi Tabel (JOIN)' },
+            { value: 'RIGHT JOIN', label: 'RIGHT JOIN (Gabung Kanan)', group: 'Relasi Tabel (JOIN)' },
+            { value: 'FULL OUTER JOIN', label: 'FULL OUTER JOIN (Gabung Luar)', group: 'Relasi Tabel (JOIN)' },
+            { value: 'CROSS JOIN', label: 'CROSS JOIN (Perkalian Silang)', group: 'Relasi Tabel (JOIN)' },
+            { value: 'ON', label: 'ON (Kondisi Relasi)', group: 'Relasi Tabel (JOIN)' },
+
+            // Manipulasi Data (DML)
+            { value: 'INSERT INTO', label: 'INSERT INTO (Tambah Baris)', group: 'Manipulasi Data (DML)' },
+            { value: 'VALUES', label: 'VALUES (Nilai Record)', group: 'Manipulasi Data (DML)' },
+            { value: 'UPDATE', label: 'UPDATE (Perbarui Tabel)', group: 'Manipulasi Data (DML)' },
+            { value: 'SET', label: 'SET (Pasang Nilai Baru)', group: 'Manipulasi Data (DML)' },
+            { value: 'DELETE FROM', label: 'DELETE FROM (Hapus Record)', group: 'Manipulasi Data (DML)' },
+
+            // Definisi Struktur (DDL)
+            { value: 'CREATE TABLE', label: 'CREATE TABLE (Buat Tabel)', group: 'Definisi Skema (DDL)' },
+            { value: 'ALTER TABLE', label: 'ALTER TABLE (Ubah Struktur)', group: 'Definisi Skema (DDL)' },
+            { value: 'DROP TABLE', label: 'DROP TABLE (Hapus Tabel)', group: 'Definisi Skema (DDL)' },
+            { value: 'TRUNCATE TABLE', label: 'TRUNCATE TABLE (Kosongkan)', group: 'Definisi Skema (DDL)' }
+        ];
+
+        // Definisi Bobot Blok Logis untuk Pengurutan Otomatis (Smart Sort)
+        const BLOCK_PRIORITY = {
+            'CREATE TABLE': 1, 'ALTER TABLE': 1, 'DROP TABLE': 1, 'TRUNCATE TABLE': 1,
+            'INSERT INTO': 1, 'UPDATE': 1, 'DELETE FROM': 1,
+            'SELECT': 1, 'SELECT DISTINCT': 1,
+            'SET': 2, 'VALUES': 2,
+            'FROM': 3,
+            'JOIN': 4, 'ON': 4,
+            'WHERE': 5, 'AND': 5, 'OR': 5,
+            'GROUP BY': 6,
+            'HAVING': 7,
+            'ORDER BY': 8,
+            'LIMIT': 9,
+            'OFFSET': 10
+        };
+
+        // Preset Templates Siap Pakai
+        const PRESETS = {
+            'select_basic': [
+                { value: 'SELECT', text: 'id, nama, email, created_at' },
+                { value: 'FROM', text: 'users' },
+                { value: 'WHERE', text: "status = 'active'" },
+                { value: 'ORDER BY', text: 'id DESC' }
+            ],
+            'select_pagination': [
+                { value: 'SELECT', text: '*' },
+                { value: 'FROM', text: 'produk' },
+                { value: 'WHERE', text: 'stok > 0' },
+                { value: 'ORDER BY', text: 'harga ASC' },
+                { value: 'LIMIT', text: '20' },
+                { value: 'OFFSET', text: '0' }
+            ],
+            'join_two_tables': [
+                { value: 'SELECT', text: 'pesanan.id, pelanggan.nama, pesanan.total_harga' },
+                { value: 'FROM', text: 'pesanan' },
+                { value: 'INNER JOIN', text: 'pelanggan' },
+                { value: 'ON', text: 'pesanan.pelanggan_id = pelanggan.id' },
+                { value: 'WHERE', text: "pesanan.status = 'PAID'" }
+            ],
+            'aggregate_group': [
+                { value: 'SELECT', text: 'kategori, COUNT(*) AS total_produk, AVG(harga) AS rata_harga' },
+                { value: 'FROM', text: 'produk' },
+                { value: 'GROUP BY', text: 'kategori' },
+                { value: 'HAVING', text: 'COUNT(*) >= 5' },
+                { value: 'ORDER BY', text: 'total_produk DESC' }
+            ],
+            'insert_row': [
+                { value: 'INSERT INTO', text: 'users (nama, email, role)' },
+                { value: 'VALUES', text: "('Ahmad Maulana', 'ahmad@example.com', 'admin')" }
+            ],
+            'update_row': [
+                { value: 'UPDATE', text: 'users' },
+                { value: 'SET', text: "status = 'suspended', updated_at = NOW()" },
+                { value: 'WHERE', text: 'id = 42' }
+            ],
+            'delete_row': [
+                { value: 'DELETE FROM', text: 'sessions' },
+                { value: 'WHERE', text: 'expired_at < NOW()' }
+            ]
+        };
+
+        let currentSqlCommands = [];
+        let appConfig = {
+            smartSort: true,
+            realtime: true,
+            formatMode: 'pretty', // 'pretty' atau 'minify'
+            isUppercase: true,
+            theme: 'dark'
+        };
+
+        const STORAGE_KEY = 'sqlgen_persisted_state_v2';
+        const CONFIG_KEY = 'sqlgen_app_config_v2';
+
+        // --- TOAST NOTIFICATION SYSTEM (No alert() used) ---
+        function showNotification(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            let bg = 'bg-slate-900 border-slate-700 text-slate-100';
+            let icon = '<svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+
+            if (type === 'success') {
+                bg = 'bg-emerald-950/90 border-emerald-800/80 text-emerald-100';
+                icon = '<svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+            } else if (type === 'error') {
+                bg = 'bg-rose-950/90 border-rose-800/80 text-rose-100';
+                icon = '<svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+            }
+
+            toast.className = `pointer-events-auto flex items-center gap-3 p-3.5 rounded-xl border shadow-xl backdrop-blur-md text-xs sm:text-sm font-medium transition duration-200 toast-animate ${bg}`;
+            toast.innerHTML = `${icon} <span class="flex-grow">${message}</span>`;
+            
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px) scale(0.95)';
+                setTimeout(() => toast.remove(), 200);
+            }, duration);
+        }
+
+        function saveToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSqlCommands));
+                localStorage.setItem(CONFIG_KEY, JSON.stringify(appConfig));
+            } catch (e) {
+                console.warn('Gagal menyimpan ke LocalStorage:', e);
+            }
+        }
+
+        function loadFromStorage() {
+            try {
+                // Periksa konfigurasi tema
+                const savedConfig = localStorage.getItem(CONFIG_KEY);
+                if (savedConfig) {
+                    appConfig = { ...appConfig, ...JSON.parse(savedConfig) };
+                }
+
+                // Cek state dari URL Hash terlebih dahulu (Share Link)
+                if (window.location.hash.startsWith('#query=')) {
+                    const hashData = window.location.hash.replace('#query=', '');
+                    const parsed = JSON.parse(decodeURIComponent(escape(atob(hashData))));
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        currentSqlCommands = parsed;
+                        showNotification('Kueri berhasil dimuat dari tautan berbagi!', 'success');
+                        return;
+                    }
+                }
+
+                // Jika tidak ada hash, ambil dari localStorage
+                const savedData = localStorage.getItem(STORAGE_KEY);
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        currentSqlCommands = parsed;
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn('Gagal mem-parsing state tersimpan:', err);
+            }
+
+            // Default fallback jika kosong
+            initializeDefaultCommands();
+        }
+
+        window.shareQueryUrl = function() {
+            if (currentSqlCommands.length === 0) {
+                showNotification('Tidak ada kueri yang dapat dibagikan.', 'error');
+                return;
+            }
+
+            try {
+                const jsonStr = JSON.stringify(currentSqlCommands);
+                const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+                const shareableUrl = `${window.location.origin}${window.location.pathname}#query=${encoded}`;
+                
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(shareableUrl).then(() => {
+                        showNotification('Tautan kueri disalin ke clipboard!', 'success');
+                    }).catch(() => fallbackCopyPrompt(shareableUrl));
+                } else {
+                    fallbackCopyPrompt(shareableUrl);
+                }
+            } catch (e) {
+                showNotification('Gagal membuat tautan berbagi.', 'error');
+            }
+        };
+
+        function fallbackCopyPrompt(text) {
+            const input = document.createElement('textarea');
+            input.value = text;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            showNotification('Tautan kueri disalin ke clipboard!', 'success');
+        }
+
+        function applyTheme(isDark) {
+            if (isDark) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            appConfig.theme = isDark ? 'dark' : 'light';
+            saveToStorage();
+        }
+
+        window.toggleTheme = function() {
+            const isDark = document.documentElement.classList.contains('dark');
+            applyTheme(!isDark);
+        };
+
+        window.handleSmartSortToggle = function() {
+            appConfig.smartSort = document.getElementById('toggle-smart-sort').checked;
+            saveToStorage();
+            if (appConfig.realtime) generateSql();
+        };
+
+        window.handleRealtimeToggle = function() {
+            appConfig.realtime = document.getElementById('toggle-realtime').checked;
+            saveToStorage();
+            if (appConfig.realtime) generateSql();
+        };
+
+        window.setQueryFormat = function(mode) {
+            appConfig.formatMode = mode;
+            const btnPretty = document.getElementById('btn-format-pretty');
+            const btnMinify = document.getElementById('btn-format-minify');
+
+            if (mode === 'pretty') {
+                btnPretty.className = 'px-2.5 py-1 rounded-md font-mono bg-slate-800 text-indigo-400 font-semibold border border-indigo-500/40';
+                btnMinify.className = 'px-2.5 py-1 rounded-md font-mono bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700';
+            } else {
+                btnMinify.className = 'px-2.5 py-1 rounded-md font-mono bg-slate-800 text-indigo-400 font-semibold border border-indigo-500/40';
+                btnPretty.className = 'px-2.5 py-1 rounded-md font-mono bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700';
+            }
+            saveToStorage();
+            generateSql();
+        };
+
+        window.toggleKeywordCase = function() {
+            appConfig.isUppercase = !appConfig.isUppercase;
+            const btn = document.getElementById('btn-format-case');
+            btn.textContent = appConfig.isUppercase ? 'AA' : 'aa';
+            saveToStorage();
+            generateSql();
+        };
+
+        function renderSqlCommands() {
+            const container = document.getElementById('sql-commands-container');
+            const countBadge = document.getElementById('command-count-badge');
+            container.innerHTML = '';
+            countBadge.textContent = `${currentSqlCommands.length} baris`;
+
+            if (currentSqlCommands.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-16 px-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-center">
+                        <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700 dark:text-slate-300">Kanvas Masih Kosong</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Klik tombol "Tambah Baris Perintah" di atas atau pilih salah satu preset untuk mulai merakit kueri SQL.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Buat grup dropdown opsi
+            const groupedCommands = SQL_COMMAND_DICTIONARY.reduce((acc, item) => {
+                acc[item.group] = acc[item.group] || [];
+                acc[item.group].push(item);
+                return acc;
+            }, {});
+
+            currentSqlCommands.forEach((cmd, idx) => {
+                const card = document.createElement('div');
+                card.className = 'command-card bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl p-2.5 sm:p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shadow-sm';
+                card.dataset.id = cmd.id;
+
+                // Nomor baris & tombol susun
+                const reorderBox = document.createElement('div');
+                reorderBox.className = 'flex items-center justify-between sm:justify-start gap-1 flex-shrink-0';
+
+                const numberBadge = document.createElement('span');
+                numberBadge.className = 'w-6 h-6 rounded-md bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-mono font-bold';
+                numberBadge.textContent = idx + 1;
+                reorderBox.appendChild(numberBadge);
+
+                // Tombol Panah Naik & Turun
+                const arrowGroup = document.createElement('div');
+                arrowGroup.className = 'flex items-center gap-0.5';
+
+                const btnUp = document.createElement('button');
+                btnUp.type = 'button';
+                btnUp.className = `p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition ${idx === 0 ? 'opacity-30 cursor-not-allowed' : ''}`;
+                btnUp.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>';
+                btnUp.disabled = idx === 0;
+                btnUp.onclick = () => moveCommand(idx, -1);
+
+                const btnDown = document.createElement('button');
+                btnDown.type = 'button';
+                btnDown.className = `p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition ${idx === currentSqlCommands.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}`;
+                btnDown.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
+                btnDown.disabled = idx === currentSqlCommands.length - 1;
+                btnDown.onclick = () => moveCommand(idx, 1);
+
+                arrowGroup.appendChild(btnUp);
+                arrowGroup.appendChild(btnDown);
+                reorderBox.appendChild(arrowGroup);
+                card.appendChild(reorderBox);
+
+                // Dropdown Perintah SQL
+                const select = document.createElement('select');
+                select.className = 'w-full sm:w-44 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm font-semibold font-mono text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer flex-shrink-0';
+                select.onchange = (e) => updateCommandField(cmd.id, 'value', e.target.value);
+
+                for (const group in groupedCommands) {
+                    const optGroup = document.createElement('optgroup');
+                    optGroup.label = group;
+                    groupedCommands[group].forEach(item => {
+                        const opt = document.createElement('option');
+                        opt.value = item.value;
+                        opt.textContent = item.label;
+                        if (item.value === cmd.value) opt.selected = true;
+                        optGroup.appendChild(opt);
+                    });
+                    select.appendChild(optGroup);
+                }
+                card.appendChild(select);
+
+                // Input Nilai / Argumen Kueri
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = cmd.text;
+                input.placeholder = `Argumen untuk ${cmd.value}...`;
+                input.setAttribute('list', 'sql-syntax-suggestions');
+                input.className = 'flex-grow w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm font-mono text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none placeholder-slate-400';
+                input.oninput = (e) => updateCommandField(cmd.id, 'text', e.target.value);
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addSqlCommand();
+                    }
+                };
+                card.appendChild(input);
+
+                // Action Buttons: Duplikasi & Hapus
+                const actionGroup = document.createElement('div');
+                actionGroup.className = 'flex items-center justify-end gap-1 flex-shrink-0';
+
+                // Duplikasi
+                const btnDuplicate = document.createElement('button');
+                btnDuplicate.type = 'button';
+                btnDuplicate.className = 'p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition';
+                btnDuplicate.title = 'Duplikasi Baris';
+                btnDuplicate.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
+                btnDuplicate.onclick = () => duplicateCommand(cmd.id);
+                actionGroup.appendChild(btnDuplicate);
+
+                // Hapus
+                const btnDelete = document.createElement('button');
+                btnDelete.type = 'button';
+                btnDelete.className = 'p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition';
+                btnDelete.title = 'Hapus Baris';
+                btnDelete.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>';
+                btnDelete.onclick = () => removeCommand(cmd.id);
+                actionGroup.appendChild(btnDelete);
+
+                card.appendChild(actionGroup);
+                container.appendChild(card);
+            });
+        }
+
+        window.updateCommandField = function(id, key, value) {
+            const item = currentSqlCommands.find(c => c.id === id);
+            if (item) {
+                item[key] = value;
+                saveToStorage();
+                if (appConfig.realtime) generateSql();
+            }
+        };
+
+        window.addSqlCommand = function(customValue = null) {
+            let nextValue = customValue;
+            if (!nextValue) {
+                nextValue = 'WHERE';
+                if (currentSqlCommands.length > 0) {
+                    const last = currentSqlCommands[currentSqlCommands.length - 1].value;
+                    if (last.includes('SELECT')) nextValue = 'FROM';
+                    else if (last === 'FROM') nextValue = 'WHERE';
+                    else if (last.includes('JOIN')) nextValue = 'ON';
+                    else if (['WHERE', 'AND', 'OR'].includes(last)) nextValue = 'AND';
+                    else if (last === 'INSERT INTO') nextValue = 'VALUES';
+                    else if (last === 'UPDATE') nextValue = 'SET';
+                }
+            }
+
+            const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'id_' + Date.now() + Math.random().toString(36).substr(2, 5);
+            currentSqlCommands.push({
+                id: newId,
+                value: nextValue,
+                text: ''
+            });
+
+            renderSqlCommands();
+            saveToStorage();
+
+            const container = document.getElementById('sql-commands-container');
+            container.scrollTop = container.scrollHeight;
+
+            if (appConfig.realtime) generateSql();
+        };
+
+        window.duplicateCommand = function(id) {
+            const index = currentSqlCommands.findIndex(c => c.id === id);
+            if (index !== -1) {
+                const source = currentSqlCommands[index];
+                const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'id_' + Date.now();
+                currentSqlCommands.splice(index + 1, 0, {
+                    id: newId,
+                    value: source.value,
+                    text: source.text
+                });
+                renderSqlCommands();
+                saveToStorage();
+                if (appConfig.realtime) generateSql();
+                showNotification('Baris berhasil diduplikasi.', 'info');
+            }
+        };
+
+        window.removeCommand = function(id) {
+            currentSqlCommands = currentSqlCommands.filter(c => c.id !== id);
+            renderSqlCommands();
+            saveToStorage();
+            if (appConfig.realtime) generateSql();
+        };
+
+        window.moveCommand = function(index, direction) {
+            const targetIndex = index + direction;
+            if (targetIndex < 0 || targetIndex >= currentSqlCommands.length) return;
+
+            const temp = currentSqlCommands[index];
+            currentSqlCommands[index] = currentSqlCommands[targetIndex];
+            currentSqlCommands[targetIndex] = temp;
+
+            renderSqlCommands();
+            saveToStorage();
+            if (appConfig.realtime) generateSql();
+        };
+
+        // Reset Template Default
+        window.initializeSqlCommands = function(isManual = false) {
+            initializeDefaultCommands();
+            renderSqlCommands();
+            saveToStorage();
+            generateSql();
+            if (isManual) showNotification('Kueri diatur ulang ke pola default.', 'info');
+        };
+
+        function initializeDefaultCommands() {
+            currentSqlCommands = [
+                { id: '1', value: 'SELECT', text: '*' },
+                { id: '2', value: 'FROM', text: 'tabel_data' },
+                { id: '3', value: 'WHERE', text: 'id > 0' }
+            ];
+        }
+
+        // Preset Handler
+        window.handlePresetChange = function(presetKey) {
+            if (!presetKey || !PRESETS[presetKey]) return;
+            
+            currentSqlCommands = PRESETS[presetKey].map(item => ({
+                id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'id_' + Math.random(),
+                value: item.value,
+                text: item.text
+            }));
+
+            renderSqlCommands();
+            saveToStorage();
+            generateSql();
+            document.getElementById('preset-selector').value = '';
+            showNotification(`Preset "${presetKey}" berhasil diterapkan.`, 'success');
+        };
+
+        // Clear Canvas Modals (Safe confirmation without confirm())
+        window.requestClearCanvas = function() {
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        };
+        window.closeConfirmModal = function() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+        };
+        window.executeClearCanvas = function() {
+            currentSqlCommands = [];
+            renderSqlCommands();
+            document.getElementById('sql-output').value = '';
+            updateQueryStats('', 0);
+            closeConfirmModal();
+            saveToStorage();
+            showNotification('Kanvas kueri telah dikosongkan.', 'info');
+        };
+
+        function getSyntaxWeight(keyword) {
+            if (keyword.includes('JOIN')) return 4;
+            return BLOCK_PRIORITY[keyword] || 99;
+        }
+
+        window.generateSql = function(isExplicit = false) {
+            const outputArea = document.getElementById('sql-output');
+            
+            // Filter klausa: SELECT dibolehkan kosong (akan diubah ke *)
+            let activeClauses = currentSqlCommands.filter(c => c.text.trim() !== '' || c.value.includes('SELECT'));
+
+            if (activeClauses.length === 0) {
+                outputArea.value = '';
+                updateQueryStats('', 0);
+                if (isExplicit) showNotification('Silakan isi argumen perintah terlebih dahulu.', 'error');
+                return;
+            }
+
+            // Atur urutan: Smart Sort vs Manual
+            let sortedClauses = activeClauses.map((cmd, idx) => ({
+                value: cmd.value,
+                text: cmd.text.trim(),
+                weight: getSyntaxWeight(cmd.value),
+                originalOrder: idx
+            }));
+
+            if (appConfig.smartSort) {
+                sortedClauses.sort((a, b) => {
+                    if (a.weight !== b.weight) return a.weight - b.weight;
+                    return a.originalOrder - b.originalOrder;
+                });
+            }
+
+            // Rakit baris kueri
+            let assembledLines = sortedClauses.map(item => {
+                let cmdWord = appConfig.isUppercase ? item.value.toUpperCase() : item.value.toLowerCase();
+                let argText = item.text;
+
+                if (item.value.includes('SELECT') && argText === '') {
+                    argText = '*';
+                }
+
+                if (appConfig.formatMode === 'pretty') {
+                    let indentation = '';
+                    const indentedWords = ['AND', 'OR', 'ON', 'SET', 'VALUES', 'OFFSET'];
+                    if (indentedWords.includes(item.value) || item.value.includes('JOIN')) {
+                        indentation = '  ';
+                    }
+                    return `${indentation}${cmdWord} ${argText}`;
+                } else {
+                    return `${cmdWord} ${argText}`;
+                }
+            });
+
+            let finalResult = '';
+            if (appConfig.formatMode === 'pretty') {
+                finalResult = assembledLines.join('\n') + ';';
+            } else {
+                finalResult = assembledLines.join(' ') + ';';
+            }
+
+            outputArea.value = finalResult;
+            updateQueryStats(finalResult, sortedClauses.length);
+            runSyntaxDiagnostics(sortedClauses);
+
+            if (isExplicit) {
+                showNotification('Kueri SQL berhasil dirakit!', 'success');
+            }
+        };
+
+        function updateQueryStats(queryStr, clauseCount) {
+            const charCount = queryStr.length;
+            const lineCount = queryStr.trim() === '' ? 0 : queryStr.split('\n').length;
+
+            document.getElementById('stat-chars').textContent = charCount;
+            document.getElementById('stat-lines').textContent = lineCount;
+            document.getElementById('stat-clauses').textContent = clauseCount;
+        }
+
+        function runSyntaxDiagnostics(clauses) {
+            const warnBox = document.getElementById('syntax-warning-box');
+            const warnText = document.getElementById('syntax-warning-text');
+            const statusLabel = document.getElementById('stat-status');
+            const keywords = clauses.map(c => c.value);
+
+            let warnings = [];
+
+            // Cek 1: SELECT tanpa FROM
+            const hasSelect = keywords.some(k => k.includes('SELECT'));
+            const hasFrom = keywords.includes('FROM');
+            if (hasSelect && !hasFrom) {
+                warnings.push('Klausa SELECT disarankan memiliki klausa FROM pendamping.');
+            }
+
+            // Cek 2: JOIN tanpa ON
+            const hasJoin = keywords.some(k => k.includes('JOIN') && k !== 'CROSS JOIN');
+            const hasOn = keywords.includes('ON');
+            if (hasJoin && !hasOn) {
+                warnings.push('Anda menyertakan JOIN namun belum menambahkan klausa ON untuk menentukan kolom relasi.');
+            }
+
+            // Cek 3: Tanda kurung tidak seimbang
+            const allText = clauses.map(c => c.text).join(' ');
+            const openParen = (allText.match(/\(/g) || []).length;
+            const closeParen = (allText.match(/\)/g) || []).length;
+            if (openParen !== closeParen) {
+                warnings.push(`Tanda kurung tidak seimbang: ditemukan ${openParen} buka '(' dan ${closeParen} tutup ')'.`);
+            }
+
+            if (warnings.length > 0) {
+                warnBox.classList.remove('hidden');
+                warnText.textContent = warnings[0];
+                statusLabel.textContent = 'Ada Peringatan';
+                statusLabel.className = 'text-amber-400 font-semibold';
+            } else {
+                warnBox.classList.add('hidden');
+                statusLabel.textContent = 'Valid';
+                statusLabel.className = 'text-emerald-400 font-medium';
+            }
+        }
+
+        window.copyToClipboard = function() {
+            const outputArea = document.getElementById('sql-output');
+            const query = outputArea.value.trim();
+
+            if (!query) {
+                showNotification('Tidak ada kueri untuk disalin.', 'error');
+                return;
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(query).then(() => {
+                    showCopySuccessFeedback();
+                }).catch(() => fallbackLegacyCopy(outputArea));
+            } else {
+                fallbackLegacyCopy(outputArea);
+            }
+        };
+
+        function fallbackLegacyCopy(element) {
+            element.select();
+            element.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                showCopySuccessFeedback();
+            } catch (err) {
+                showNotification('Gagal menyalin kueri.', 'error');
+            }
+        }
+
+        function showCopySuccessFeedback() {
+            const btnText = document.getElementById('copy-text');
+            const icon = document.getElementById('copy-icon');
+            const prevText = btnText.textContent;
+
+            btnText.textContent = 'Disalin!';
+            icon.classList.remove('text-indigo-400');
+            icon.classList.add('text-emerald-400');
+
+            showNotification('Kueri disalin ke clipboard!', 'success');
+
+            setTimeout(() => {
+                btnText.textContent = prevText;
+                icon.classList.remove('text-emerald-400');
+                icon.classList.add('text-indigo-400');
+            }, 2000);
+        }
+
+        window.exportFile = function(format) {
+            const query = document.getElementById('sql-output').value.trim();
+            if (!query) {
+                showNotification('Harap susun kueri terlebih dahulu sebelum mengekspor.', 'error');
+                return;
+            }
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            let fileContent = '';
+            let fileName = `sqlgen_${timestamp}.${format}`;
+            let mimeType = 'text/plain;charset=utf-8';
+
+            if (format === 'txt') {
+                fileContent = [
+                    '==================================================',
+                    ' SQLGen Export - Plain Text Query File',
+                    ` Tanggal Ekspor : ${new Date().toLocaleString('id-ID')}`,
+                    '==================================================',
+                    '',
+                    query,
+                    '',
+                    '-- Akhir Berkas --'
+                ].join('\n');
+                mimeType = 'text/plain;charset=utf-8';
+            } else if (format === 'sql') {
+                fileContent = [
+                    '/*',
+                    ' * SQLGen Generated Script',
+                    ` * Tanggal: ${new Date().toISOString()}`,
+                    ' */',
+                    '',
+                    query,
+                    ''
+                ].join('\n');
+                mimeType = 'application/sql;charset=utf-8';
+            } else if (format === 'md') {
+                fileContent = [
+                    '# Dokumentasi Kueri SQL',
+                    '',
+                    `> Dibuat secara otomatis menggunakan [SQLGen] pada ${new Date().toLocaleDateString('id-ID')}.`,
+                    '',
+                    '```sql',
+                    query,
+                    '```',
+                    '',
+                    '### Ringkasan Eksekusi',
+                    `- **Jumlah Klausa:** ${currentSqlCommands.length}`,
+                    `- **Dialek Standar:** ANSI SQL`,
+                    ''
+                ].join('\n');
+                mimeType = 'text/markdown;charset=utf-8';
+            }
+
+            try {
+                const blob = new Blob([fileContent], { type: mimeType });
+                const downloadLink = document.createElement('a');
+                const objectUrl = URL.createObjectURL(blob);
+
+                downloadLink.href = objectUrl;
+                downloadLink.download = fileName;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                URL.revokeObjectURL(objectUrl);
+
+                showNotification(`File "${fileName}" berhasil diunduh!`, 'success');
+            } catch (err) {
+                showNotification('Gagal mengunduh file hasil ekspor.', 'error');
+            }
+        };
+
+        window.openHelpModal = function() {
+            document.getElementById('help-modal').classList.remove('hidden');
+        };
+        window.closeHelpModal = function() {
+            document.getElementById('help-modal').classList.add('hidden');
+        };
+
+        // Window click modal dismiss
+        window.addEventListener('click', (e) => {
+            const helpModal = document.getElementById('help-modal');
+            const confirmModal = document.getElementById('confirm-modal');
+            if (e.target === helpModal) closeHelpModal();
+            if (e.target === confirmModal) closeConfirmModal();
+        });
+
+        // Global Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                generateSql(true);
+            }
+            if (e.key === 'Escape') {
+                closeHelpModal();
+                closeConfirmModal();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFromStorage();
+            
+            // Sinkronisasi Toggle UI dengan config
+            document.getElementById('toggle-smart-sort').checked = appConfig.smartSort;
+            document.getElementById('toggle-realtime').checked = appConfig.realtime;
+            applyTheme(appConfig.theme === 'dark');
+            setQueryFormat(appConfig.formatMode || 'pretty');
+            
+            renderSqlCommands();
+            generateSql();
+        });
+    </script>
+</body>
+</html>

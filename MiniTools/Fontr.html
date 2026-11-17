@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fontr</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- OpenType.js for Font Generation & Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+  
+  <!-- jsPDF for Printable Template Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      user-select: none;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    
+    /* Touch canvas optimization */
+    canvas {
+      touch-action: none;
+    }
+    
+    /* Subtle grid pattern for drawing canvas */
+    .canvas-bg-grid {
+      background-size: 20px 20px;
+      background-image: 
+        linear-gradient(to right, rgba(226, 232, 240, 0.6) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(226, 232, 240, 0.6) 1px, transparent 1px);
+    }
+    
+    /* Handle drag metrics */
+    .metric-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      pointer-events: none;
+      transition: border-color 0.15s ease;
+    }
+    .metric-handle {
+      pointer-events: auto;
+      cursor: ns-resize;
+    }
+    .metric-v-line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+    .metric-v-handle {
+      pointer-events: auto;
+      cursor: ew-resize;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 bg-slate-50 antialiased overflow-hidden">
+
+  <!-- Top Navigation Bar -->
+  <header class="h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 z-30 shadow-xs">
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center justify-center w-9 h-9 rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/20 font-bold text-lg">
+        F
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <input id="fontFamilyName" type="text" value="Fontr" 
+                 class="font-semibold text-slate-800 text-sm bg-transparent hover:bg-slate-100 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded px-1.5 py-0.5 border border-transparent transition w-36 sm:w-48 outline-none" 
+                 title="Klik untuk mengubah nama font">
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs font-medium text-slate-600">
+      <button id="tabBtnGlyphs" onclick="switchMainTab('glyphs')" class="px-3 py-1.5 rounded-lg bg-white text-blue-600 shadow-xs flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-shapes"></i>
+        <span class="hidden md:inline">Karakter</span>
+        <span id="drawnGlyphBadge" class="ml-1 px-1.5 py-0.2 bg-blue-100 text-blue-700 text-[10px] rounded-full font-bold">0/94</span>
+      </button>
+      <button id="tabBtnStudio" onclick="switchMainTab('studio')" class="px-3 py-1.5 rounded-lg hover:text-slate-900 flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-pen-nib"></i>
+        <span>Studio Gambar</span>
+      </button>
+      <button id="tabBtnLigatures" onclick="switchMainTab('ligatures')" class="px-3 py-1.5 rounded-lg hover:text-slate-900 flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-link"></i>
+        <span class="hidden md:inline">Ligatur</span>
+      </button>
+      <button id="tabBtnTester" onclick="switchMainTab('tester')" class="px-3 py-1.5 rounded-lg hover:text-slate-900 flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-keyboard"></i>
+        <span>Uji Font</span>
+      </button>
+    </div>
+
+    <!-- Action Controls: Save, Template, Export -->
+    <div class="flex items-center space-x-2">
+      <!-- Project Dropdown -->
+      <div class="relative">
+        <button onclick="toggleDropdown('projectMenu')" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg flex items-center space-x-1.5 transition shadow-2xs">
+          <i class="fa-solid fa-folder-open text-slate-500"></i>
+          <span class="hidden lg:inline">Proyek</span>
+          <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+        </button>
+        <div id="projectMenu" class="hidden absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 text-xs z-50">
+          <button onclick="exportProjectJSON()" class="w-full text-left px-3 py-2 hover:bg-blue-50 hover:text-blue-600 flex items-center space-x-2">
+            <i class="fa-solid fa-file-export w-4 text-slate-400"></i>
+            <span>Simpan Proyek (JSON)</span>
+          </button>
+          <label class="w-full text-left px-3 py-2 hover:bg-blue-50 hover:text-blue-600 flex items-center space-x-2 cursor-pointer">
+            <i class="fa-solid fa-file-import w-4 text-slate-400"></i>
+            <span>Buka Proyek (JSON)</span>
+            <input type="file" id="importProjectFile" accept=".json" class="hidden" onchange="importProjectJSON(event)">
+          </label>
+          <div class="my-1 border-t border-slate-100"></div>
+          <button onclick="openTemplateModal()" class="w-full text-left px-3 py-2 hover:bg-blue-50 hover:text-blue-600 flex items-center space-x-2">
+            <i class="fa-solid fa-print w-4 text-slate-400"></i>
+            <span>Cetak Template Kertas</span>
+          </button>
+          <button onclick="openScanModal()" class="w-full text-left px-3 py-2 hover:bg-blue-50 hover:text-blue-600 flex items-center space-x-2">
+            <i class="fa-solid fa-camera w-4 text-slate-400"></i>
+            <span>Impor Hasil Foto/Scan</span>
+          </button>
+          <div class="my-1 border-t border-slate-100"></div>
+          <button onclick="resetEntireProject()" class="w-full text-left px-3 py-2 hover:bg-red-50 text-red-600 flex items-center space-x-2">
+            <i class="fa-solid fa-trash-can w-4 text-red-400"></i>
+            <span>Reset Semua Glif</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Export Font Button Group -->
+      <button onclick="exportFont('otf')" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg flex items-center space-x-1.5 transition shadow-sm shadow-blue-600/20">
+        <i class="fa-solid fa-download"></i>
+        <span>Ekspor Font</span>
+        <span class="text-[10px] bg-blue-500/50 px-1 py-0.5 rounded font-mono">OTF</span>
+      </button>
+      <button onclick="exportFont('ttf')" class="hidden sm:flex px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 hover:bg-slate-100 border border-slate-200 rounded-lg items-center transition" title="Ekspor sebagai TTF">
+        <span class="font-mono text-[11px]">TTF</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Application Body -->
+  <main class="flex-1 relative overflow-hidden flex flex-col">
+    
+    <!-- ================================================================= -->
+    <!-- VIEW 1: GLYPH OVERVIEW GRID                                       -->
+    <!-- ================================================================= -->
+    <section id="viewGlyphs" class="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+      <!-- Sub-filter bar -->
+      <div class="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div class="flex items-center space-x-2 overflow-x-auto pb-1 sm:pb-0">
+          <button onclick="filterGlyphs('all')" class="filter-pill px-3 py-1 text-xs font-medium rounded-lg bg-blue-50 text-blue-600 border border-blue-200">Semua</button>
+          <button onclick="filterGlyphs('upper')" class="filter-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200">Huruf Besar (A-Z)</button>
+          <button onclick="filterGlyphs('lower')" class="filter-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200">Huruf Kecil (a-z)</button>
+          <button onclick="filterGlyphs('number')" class="filter-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200">Angka (0-9)</button>
+          <button onclick="filterGlyphs('punct')" class="filter-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200">Tanda Baca</button>
+          <button onclick="filterGlyphs('custom')" class="filter-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200">Kustom</button>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <button onclick="openAddGlyphModal()" class="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 flex items-center space-x-1.5 transition">
+            <i class="fa-solid fa-plus"></i>
+            <span>Tambah Karakter</span>
+          </button>
+          <button onclick="autoGenerateSampleGlyphs()" class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 flex items-center space-x-1.5 transition" title="Isi contoh huruf otomatis untuk uji coba cepat">
+            <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+            <span>Isi Otomatis (Demo)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Glyph Cards Grid -->
+      <div class="flex-1 overflow-y-auto p-6">
+        <div id="glyphGridContainer" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3.5">
+          <!-- Dynamically populated by renderGlyphGrid() -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- VIEW 2: GLYPH STUDIO CANVAS EDITOR                                -->
+    <!-- ================================================================= -->
+    <section id="viewStudio" class="hidden flex-1 flex flex-col md:flex-row bg-slate-100 overflow-hidden">
+      
+      <!-- Studio Left Sidebar: Tools & Settings -->
+      <aside class="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col shrink-0 z-10 overflow-y-auto">
+        
+        <!-- Active Glyph Info Header -->
+        <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+          <div class="flex items-center space-x-3">
+            <div id="studioCurrentGlyphBox" class="w-12 h-12 rounded-xl bg-blue-600 text-white font-bold text-2xl flex items-center justify-center shadow-xs">
+              A
+            </div>
+            <div>
+              <div class="flex items-center space-x-1.5">
+                <h3 id="studioCurrentGlyphName" class="font-bold text-slate-800 text-sm">Huruf 'A'</h3>
+                <span id="studioCurrentUnicode" class="font-mono text-[10px] text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">U+0041</span>
+              </div>
+              <p class="text-[11px] text-slate-500">Latin Capital Letter A</p>
+            </div>
+          </div>
+          
+          <div class="flex flex-col items-end space-y-1">
+            <div class="flex items-center space-x-1">
+              <button onclick="navigateStudioGlyph(-1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-blue-600 flex items-center justify-center transition" title="Karakter Sebelumnya">
+                <i class="fa-solid fa-chevron-left text-xs"></i>
+              </button>
+              <button onclick="navigateStudioGlyph(1)" class="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-blue-600 flex items-center justify-center transition" title="Karakter Berikutnya">
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Variants & Contextual Alternates (Random Variations) -->
+        <div class="p-4 border-b border-slate-200">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center space-x-1">
+              <i class="fa-solid fa-shuffle text-blue-600 mr-1"></i>
+              <span>Variasi Karakter</span>
+            </span>
+            <button onclick="addNewVariantForCurrentGlyph()" class="text-[11px] text-blue-600 hover:text-blue-700 font-medium flex items-center space-x-1">
+              <i class="fa-solid fa-plus text-[9px]"></i>
+              <span>Varian Baru</span>
+            </button>
+          </div>
+          <div id="variantPillContainer" class="flex flex-wrap gap-1.5">
+            <!-- Populated dynamically: Varian 1 (Utama), Varian 2, etc. -->
+          </div>
+          <p class="text-[10px] text-slate-400 mt-2 leading-relaxed">
+            Tambahkan variasi acak agar tulisan tangan terlihat alami dan bervariasi secara otomatis saat diketik.
+          </p>
+        </div>
+
+        <!-- Tool Selection -->
+        <div class="p-4 border-b border-slate-200 space-y-3">
+          <label class="text-xs font-semibold text-slate-700 uppercase tracking-wider block">Alat Gambar</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button id="toolPen" onclick="selectTool('pen')" class="tool-btn active p-2 rounded-xl border border-blue-600 bg-blue-50 text-blue-600 flex flex-col items-center justify-center space-y-1 transition">
+              <i class="fa-solid fa-pen-nib text-sm"></i>
+              <span class="text-[10px] font-medium">Kuas/Pena</span>
+            </button>
+            <button id="toolEraser" onclick="selectTool('eraser')" class="tool-btn p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex flex-col items-center justify-center space-y-1 transition">
+              <i class="fa-solid fa-eraser text-sm"></i>
+              <span class="text-[10px] font-medium">Penghapus</span>
+            </button>
+            <button id="toolSmooth" onclick="smoothCurrentStrokes()" class="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 flex flex-col items-center justify-center space-y-1 transition" title="Haluskan lekukan kurva">
+              <i class="fa-solid fa-wand-magic text-sm"></i>
+              <span class="text-[10px] font-medium">Haluskan</span>
+            </button>
+          </div>
+
+          <!-- Brush Size & Smoothing -->
+          <div class="space-y-2 pt-2">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-600 font-medium">Ukuran Goresan</span>
+              <span id="brushSizeLabel" class="font-mono text-slate-500 font-medium">18px</span>
+            </div>
+            <input id="brushSize" type="range" min="2" max="64" value="18" oninput="updateBrushSettings()" 
+                   class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+            
+            <div class="flex items-center justify-between pt-1">
+              <label class="text-xs text-slate-600 flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" id="pressureToggle" checked class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+                <span>Sensitivitas Tekanan Stylus</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Background Trace & Reference Image Tool -->
+        <div class="p-4 border-b border-slate-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-700 uppercase tracking-wider block">Gambar Acuan / Jiplak</label>
+            <button id="clearTraceImgBtn" onclick="clearTraceImage()" class="text-[10px] text-red-500 hover:text-red-700 hidden">Hapus Acuan</button>
+          </div>
+          
+          <label class="w-full flex items-center justify-center px-3 py-2 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl bg-slate-50/50 hover:bg-blue-50/30 text-slate-600 text-xs cursor-pointer transition">
+            <i class="fa-solid fa-cloud-arrow-up mr-2 text-blue-500"></i>
+            <span id="traceImgLabel">Unggah PNG / SVG Acuan</span>
+            <input type="file" id="traceImgInput" accept="image/png,image/jpeg,image/svg+xml" class="hidden" onchange="loadTraceImage(event)">
+          </label>
+
+          <div id="traceControls" class="space-y-2 pt-1 hidden">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-600">Transparansi Acuan</span>
+              <span id="traceOpacityLabel" class="font-mono text-slate-500">40%</span>
+            </div>
+            <input id="traceOpacity" type="range" min="5" max="100" value="40" oninput="updateTraceOpacity()" 
+                   class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+            
+            <button onclick="autoTraceImageToStrokes()" class="w-full py-1.5 px-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-medium border border-blue-200 flex items-center justify-center space-x-1 transition">
+              <i class="fa-solid fa-bolt text-xs"></i>
+              <span>Vektorisasi Otomatis (Auto-Trace)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Glyph Metrics & Bearing -->
+        <div class="p-4 space-y-3">
+          <label class="text-xs font-semibold text-slate-700 uppercase tracking-wider block">Spasi Samping & Lebar</label>
+          
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span class="text-slate-500 text-[11px] block">Left Bearing (LSB)</span>
+              <input id="metricLSB" type="number" value="60" onchange="updateGlyphMetrics()" 
+                     class="w-full mt-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono text-xs focus:ring-1 focus:ring-blue-500">
+            </div>
+            <div>
+              <span class="text-slate-500 text-[11px] block">Right Bearing (RSB)</span>
+              <input id="metricRSB" type="number" value="60" onchange="updateGlyphMetrics()" 
+                     class="w-full mt-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono text-xs focus:ring-1 focus:ring-blue-500">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <button onclick="autoFitMetrics()" class="w-full py-1.5 text-xs text-slate-600 hover:text-blue-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition">
+              <i class="fa-solid fa-arrows-left-right mr-1"></i>
+              <span>Auto-Fit Spasi Glif</span>
+            </button>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- Studio Center: Interactive Canvas Workspace -->
+      <div class="flex-1 flex flex-col relative overflow-hidden bg-slate-100">
+        
+        <!-- Canvas Action Overlay Toolbar -->
+        <div class="h-11 bg-white/90 backdrop-blur-xs border-b border-slate-200 px-4 flex items-center justify-between shrink-0 z-20">
+          <div class="flex items-center space-x-2 text-xs">
+            <button onclick="undoStroke()" class="px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition" title="Undo (Ctrl+Z)">
+              <i class="fa-solid fa-rotate-left mr-1"></i> Undo
+            </button>
+            <button onclick="redoStroke()" class="px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition" title="Redo (Ctrl+Y)">
+              <i class="fa-solid fa-rotate-right mr-1"></i> Redo
+            </button>
+            <div class="h-4 w-px bg-slate-200"></div>
+            <button onclick="clearCurrentCanvas()" class="px-2.5 py-1 text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus Gambar Glif Ini">
+              <i class="fa-solid fa-trash mr-1"></i> Bersihkan
+            </button>
+          </div>
+
+          <!-- Guide Line Toggles -->
+          <div class="flex items-center space-x-3 text-xs text-slate-500">
+            <label class="flex items-center space-x-1.5 cursor-pointer select-none">
+              <input type="checkbox" id="toggleGuidelines" checked onchange="redrawCanvas()" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+              <span>Garis Bantu</span>
+            </label>
+            <label class="flex items-center space-x-1.5 cursor-pointer select-none">
+              <input type="checkbox" id="toggleGrid" checked onchange="toggleGridBackground()" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+              <span>Grid</span>
+            </label>
+            <div class="h-4 w-px bg-slate-200"></div>
+            <div class="flex items-center space-x-1">
+              <button onclick="zoomCanvas(-0.1)" class="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center"><i class="fa-solid fa-minus text-[10px]"></i></button>
+              <span id="canvasZoomLabel" class="font-mono text-[11px] w-10 text-center">100%</span>
+              <button onclick="zoomCanvas(0.1)" class="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center"><i class="fa-solid fa-plus text-[10px]"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canvas Frame Container -->
+        <div id="canvasViewport" class="flex-1 overflow-auto flex items-center justify-center p-6 relative select-none">
+          
+          <div id="canvasWrapper" class="relative bg-white shadow-xl rounded-2xl border border-slate-200/90 canvas-bg-grid overflow-hidden transition-transform duration-75">
+            
+            <!-- Background Image Reference Layer -->
+            <img id="traceImageOverlay" class="absolute inset-0 w-full h-full object-contain pointer-events-none opacity-40 z-0 hidden" alt="Trace overlay">
+
+            <!-- Primary Drawing HTML5 Canvas -->
+            <canvas id="drawingCanvas" width="800" height="800" class="block relative z-10 cursor-crosshair"></canvas>
+
+            <!-- Interactive Metric Boundary Overlays -->
+            <div id="metricGuidesContainer" class="absolute inset-0 pointer-events-none z-20">
+              <!-- Ascender Line -->
+              <div id="guideAscender" class="metric-line border-b border-purple-400/80" style="top: 15%;">
+                <div class="absolute left-2 -top-4 bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-mono px-1.5 rounded metric-handle">
+                  Ascender: <span id="valAscender">800</span>
+                </div>
+              </div>
+              
+              <!-- Cap Height Line -->
+              <div id="guideCapHeight" class="metric-line border-b border-indigo-400/80" style="top: 25%;">
+                <div class="absolute left-2 -top-4 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-mono px-1.5 rounded metric-handle">
+                  Cap Height: <span id="valCapHeight">700</span>
+                </div>
+              </div>
+
+              <!-- X-Height Line -->
+              <div id="guideXHeight" class="metric-line border-b border-blue-400/80" style="top: 45%;">
+                <div class="absolute left-2 -top-4 bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-mono px-1.5 rounded metric-handle">
+                  x-Height: <span id="valXHeight">500</span>
+                </div>
+              </div>
+
+              <!-- Baseline (Utama) -->
+              <div id="guideBaseline" class="metric-line border-b-2 border-emerald-500" style="top: 75%;">
+                <div class="absolute left-2 -top-4 bg-emerald-50 text-emerald-700 border border-emerald-300 text-[10px] font-mono px-1.5 rounded font-bold">
+                  Baseline: 0
+                </div>
+              </div>
+
+              <!-- Descender Line -->
+              <div id="guideDescender" class="metric-line border-b border-rose-400/80" style="top: 90%;">
+                <div class="absolute left-2 -top-4 bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-mono px-1.5 rounded metric-handle">
+                  Descender: <span id="valDescender">-200</span>
+                </div>
+              </div>
+
+              <!-- Left Side Bearing (LSB) Vertical Guide -->
+              <div id="guideLSB" class="metric-v-line border-r-2 border-dashed border-amber-400" style="left: 10%;">
+                <div class="absolute top-2 left-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-mono px-1 rounded">
+                  LSB
+                </div>
+              </div>
+
+              <!-- Right Side Bearing (RSB) / Advance Width Vertical Guide -->
+              <div id="guideRSB" class="metric-v-line border-r-2 border-dashed border-amber-400" style="left: 85%;">
+                <div class="absolute top-2 right-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-mono px-1 rounded">
+                  RSB
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- VIEW 3: LIGATURES STUDIO                                          -->
+    <!-- ================================================================= -->
+    <section id="viewLigatures" class="hidden flex-1 flex flex-col bg-slate-50 overflow-hidden">
+      <!-- Ligatures Sub-header -->
+      <div class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
+        <div>
+          <h2 class="text-base font-bold text-slate-800">Studio Ligatur (Ligatures)</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Gabungkan dua atau lebih karakter menjadi satu glif artistik khusus (contoh: fi, fl, th, oo).</p>
+        </div>
+        <button onclick="openAddLigatureModal()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center space-x-1.5 transition shadow-sm shadow-blue-500/20">
+          <i class="fa-solid fa-plus"></i>
+          <span>Buat Ligatur Baru</span>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6">
+        <div id="ligatureGridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <!-- Populated dynamically -->
+        </div>
+        
+        <!-- Empty State if no ligatures -->
+        <div id="ligatureEmptyState" class="hidden flex flex-col items-center justify-center p-12 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl mb-3">
+            <i class="fa-solid fa-link"></i>
+          </div>
+          <h3 class="font-bold text-slate-800 text-sm">Belum Ada Ligatur</h3>
+          <p class="text-xs text-slate-500 max-w-sm mt-1">Tambahkan ligatur seperti "fi", "fl", "st", atau kata unik Anda sendiri untuk sentuhan tipografi profesional.</p>
+          <button onclick="openAddLigatureModal()" class="mt-4 px-3.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition">
+            Tambah Ligatur Pertama
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- VIEW 4: LIVE TYPE-TESTER & PREVIEW                                -->
+    <!-- ================================================================= -->
+    <section id="viewTester" class="hidden flex-1 flex flex-col bg-white overflow-hidden">
+      <!-- Tester Control Bar -->
+      <div class="bg-slate-50 border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-4 shrink-0">
+        <div class="flex flex-wrap items-center gap-4 text-xs">
+          <!-- Font Size Slider -->
+          <div class="flex items-center space-x-2">
+            <span class="text-slate-500 font-medium">Ukuran:</span>
+            <input id="testerFontSize" type="range" min="14" max="120" value="42" oninput="updateTesterTypography()" class="w-24 h-1.5 bg-slate-200 rounded-lg accent-blue-600 cursor-pointer">
+            <span id="testerFontSizeLabel" class="font-mono text-slate-700 w-10">42px</span>
+          </div>
+
+          <!-- Line Height Slider -->
+          <div class="flex items-center space-x-2">
+            <span class="text-slate-500 font-medium">Jarak Baris:</span>
+            <input id="testerLineHeight" type="range" min="0.8" max="2.5" step="0.1" value="1.4" oninput="updateTesterTypography()" class="w-20 h-1.5 bg-slate-200 rounded-lg accent-blue-600 cursor-pointer">
+            <span id="testerLineHeightLabel" class="font-mono text-slate-700 w-8">1.4</span>
+          </div>
+
+          <!-- Letter Spacing Slider -->
+          <div class="flex items-center space-x-2">
+            <span class="text-slate-500 font-medium">Spasi Huruf:</span>
+            <input id="testerLetterSpacing" type="range" min="-5" max="20" value="0" oninput="updateTesterTypography()" class="w-20 h-1.5 bg-slate-200 rounded-lg accent-blue-600 cursor-pointer">
+            <span id="testerLetterSpacingLabel" class="font-mono text-slate-700 w-8">0px</span>
+          </div>
+
+          <!-- Random Variations Switch -->
+          <label class="flex items-center space-x-2 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 font-medium">
+            <input type="checkbox" id="testerEnableVariants" checked onchange="refreshTesterPreview()" class="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
+            <span>Aktifkan Variasi Tulisan Acak</span>
+          </label>
+        </div>
+
+        <!-- Sample Text Presets -->
+        <div class="flex items-center space-x-2">
+          <select id="testerPresetSelect" onchange="applyTesterPreset(this.value)" class="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 font-medium outline-none">
+            <option value="id-pangram">Pangram Indonesia</option>
+            <option value="en-pangram">Pangram Bahasa Inggris</option>
+            <option value="alphabet">Alfabet Lengkap (A-Z, a-z, 0-9)</option>
+            <option value="ligature-demo">Uji Coba Ligatur (fi, fl, dll)</option>
+          </select>
+          <button onclick="refreshTesterFont()" class="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-medium rounded-lg border border-blue-200 flex items-center space-x-1 transition">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Refresh Font</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Realtime Editable Playground -->
+      <div class="flex-1 p-8 overflow-y-auto flex flex-col bg-white">
+        <textarea id="testerPlayground" spellcheck="false" 
+                  class="flex-1 w-full p-4 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded-xl outline-none resize-none transition bg-transparent text-slate-800"
+                  style="font-size: 42px; line-height: 1.4; letter-spacing: 0px;"
+                  placeholder="Ketik teks di sini untuk mencoba font kustom Anda secara langsung..."></textarea>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================================================================= -->
+  <!-- MODALS & OVERLAYS                                                 -->
+  <!-- ================================================================= -->
+
+  <!-- Modal: Printable Template Generator -->
+  <div id="modalTemplate" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-print"></i>
+          </div>
+          <h3 class="font-bold text-slate-800 text-sm">Cetak Lembar Template Kertas</h3>
+        </div>
+        <button onclick="closeModal('modalTemplate')" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-600 leading-relaxed">
+        Cetak lembaran ini pada kertas A4 standar, gambar huruf-huruf Anda dengan pulpen atau spidol hitam, kemudian foto/scan dan impor kembali untuk otomatisasi pembuatan font.
+      </p>
+
+      <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-2 text-xs">
+        <div class="font-semibold text-slate-700">Opsi Lembar Cetak:</div>
+        <label class="flex items-center space-x-2 cursor-pointer">
+          <input type="checkbox" id="tmplIncludeUpper" checked class="rounded text-blue-600">
+          <span>Sertakan Huruf Besar (A-Z)</span>
+        </label>
+        <label class="flex items-center space-x-2 cursor-pointer">
+          <input type="checkbox" id="tmplIncludeLower" checked class="rounded text-blue-600">
+          <span>Sertakan Huruf Kecil (a-z)</span>
+        </label>
+        <label class="flex items-center space-x-2 cursor-pointer">
+          <input type="checkbox" id="tmplIncludeNumbers" checked class="rounded text-blue-600">
+          <span>Sertakan Angka & Tanda Baca Dasar</span>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button onclick="closeModal('modalTemplate')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
+        <button onclick="generatePDFTemplate()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center space-x-1.5 shadow-sm shadow-blue-500/20">
+          <i class="fa-solid fa-file-pdf"></i>
+          <span>Unduh Template PDF</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Scan / Photo Sheet Auto Slicer -->
+  <div id="modalScan" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-camera"></i>
+          </div>
+          <h3 class="font-bold text-slate-800 text-sm">Impor Hasil Foto Lembar Template</h3>
+        </div>
+        <button onclick="closeModal('modalScan')" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-600 leading-relaxed">
+        Unggah foto atau hasil scan lembar template yang sudah Anda tulis tangan. Sistem akan memotong kotak karakter secara otomatis dan memasukkannya ke dalam glif.
+      </p>
+
+      <label class="w-full flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl bg-slate-50/50 hover:bg-blue-50/30 text-slate-600 text-xs cursor-pointer transition">
+        <i class="fa-solid fa-file-arrow-up text-2xl text-blue-500 mb-2"></i>
+        <span class="font-semibold text-slate-700">Pilih Foto atau Scan Template (JPG/PNG)</span>
+        <span class="text-[11px] text-slate-400 mt-1">Pastikan foto tegak lurus dan pencahayaan terang</span>
+        <input type="file" id="scanFileInput" accept="image/jpeg,image/png" class="hidden" onchange="processScannedSheet(event)">
+      </label>
+
+      <div id="scanStatus" class="hidden text-xs p-3 rounded-lg bg-blue-50 text-blue-700 flex items-center space-x-2">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <span id="scanStatusText">Memproses gambar dan mengekstrak glif...</span>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button onclick="closeModal('modalScan')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Custom Character -->
+  <div id="modalAddGlyph" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-slate-800 text-sm">Tambah Karakter Kustom</h3>
+        <button onclick="closeModal('modalAddGlyph')" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-semibold text-slate-700 block mb-1">Karakter / Simbol</label>
+          <input type="text" id="inputCustomChar" maxlength="2" placeholder="Contoh: é, ü, ©, ⚡" 
+                 class="w-full px-3 py-2 text-center text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button onclick="closeModal('modalAddGlyph')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
+        <button onclick="confirmAddCustomGlyph()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Tambahkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Custom Ligature -->
+  <div id="modalAddLigature" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-slate-800 text-sm">Buat Ligatur Baru</h3>
+        <button onclick="closeModal('modalAddLigature')" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">Urutan Karakter (Ketik huruf yang digabung)</label>
+          <input type="text" id="inputLigatureSequence" placeholder="Contoh: fi, fl, ffi, the, oo" 
+                 class="w-full px-3 py-2 text-base font-mono font-bold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <p class="text-[11px] text-slate-500">
+          Ketika urutan karakter ini diketik bersamaan, font akan otomatis menampilkan glif ligatur yang Anda gambar.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button onclick="closeModal('modalAddLigature')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
+        <button onclick="confirmAddLigature()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Buat & Gambar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <script>
+    /* =====================================================================
+       FONTR CORE JAVASCRIPT LOGIC
+       ===================================================================== */
+    
+    // Core Unicode Sets
+    const DEFAULT_GLYPHS = [
+      // Uppercase (65 - 90)
+      ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c => ({ char: c, unicode: c.charCodeAt(0), category: 'upper', name: `Capital ${c}` })),
+      // Lowercase (97 - 122)
+      ...'abcdefghijklmnopqrstuvwxyz'.split('').map(c => ({ char: c, unicode: c.charCodeAt(0), category: 'lower', name: `Small ${c}` })),
+      // Numbers (48 - 57)
+      ...'0123456789'.split('').map(c => ({ char: c, unicode: c.charCodeAt(0), category: 'number', name: `Digit ${c}` })),
+      // Punctuation & Symbols
+      ...'!@#$%^&*()-_=+[]{}|;:\'",.<>/?`~'.split('').map(c => ({ char: c, unicode: c.charCodeAt(0), category: 'punct', name: `Symbol ${c}` }))
+    ];
+
+    // Global Application State
+    const AppState = {
+      fontName: 'FontrCustom',
+      unitsPerEm: 1000,
+      ascender: 800,
+      capHeight: 700,
+      xHeight: 500,
+      baseline: 0,
+      descender: -200,
+      
+      currentTab: 'glyphs',
+      activeFilter: 'all',
+      selectedGlyphId: 'A',
+      selectedVariantIndex: 0,
+      
+      // Map of glyph ID -> Glyph Object
+      glyphs: {},
+      // List of custom ligatures
+      ligatures: {},
+      
+      // Drawing Engine State
+      tool: 'pen', // 'pen', 'eraser'
+      brushSize: 18,
+      usePressure: true,
+      isDrawing: false,
+      currentStroke: null,
+      undoStack: [],
+      redoStack: [],
+      
+      // Canvas View State
+      zoom: 1.0,
+      traceImage: null,
+      traceOpacity: 0.4
+    };
+
+    // Initialize empty glyph data structure
+    function initGlyphDatabase() {
+      DEFAULT_GLYPHS.forEach(g => {
+        AppState.glyphs[g.char] = {
+          id: g.char,
+          char: g.char,
+          unicode: g.unicode,
+          category: g.category,
+          name: g.name,
+          advanceWidth: 600,
+          lsb: 50,
+          rsb: 50,
+          // Array of variations (variants[0] is primary)
+          variants: [
+            { strokes: [] } // variant 0
+          ]
+        };
+      });
+
+      // Default common ligatures
+      AppState.ligatures['fi'] = {
+        id: 'fi',
+        sequence: 'fi',
+        name: 'Ligature fi',
+        advanceWidth: 850,
+        lsb: 50,
+        rsb: 50,
+        variants: [{ strokes: [] }]
+      };
+      AppState.ligatures['fl'] = {
+        id: 'fl',
+        sequence: 'fl',
+        name: 'Ligature fl',
+        advanceWidth: 850,
+        lsb: 50,
+        rsb: 50,
+        variants: [{ strokes: [] }]
+      };
+    }
+
+    // Canvas references
+    let canvas, ctx;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initGlyphDatabase();
+      loadFromLocalStorage();
+      
+      // Initialize Canvas
+      canvas = document.getElementById('drawingCanvas');
+      ctx = canvas.getContext('2d');
+
+      setupCanvasEvents();
+      setupWindowEvents();
+      
+      renderGlyphGrid();
+      renderLigatureGrid();
+      updateHeaderBadges();
+      refreshTesterFont();
+      
+      // Open default glyph
+      openGlyphInStudio('A');
+    });
+
+    function setupCanvasEvents() {
+      const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+          x: (e.clientX - rect.left) * scaleX,
+          y: (e.clientY - rect.top) * scaleY,
+          pressure: e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5
+        };
+      };
+
+      const startDrawing = (e) => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        AppState.isDrawing = true;
+        
+        saveUndoState();
+        
+        const pos = getPos(e);
+        const radius = AppState.usePressure ? (AppState.brushSize * (pos.pressure * 1.5)) : AppState.brushSize;
+
+        AppState.currentStroke = {
+          tool: AppState.tool,
+          size: AppState.brushSize,
+          points: [pos]
+        };
+
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius / 2, 0, Math.PI * 2);
+        ctx.fillStyle = AppState.tool === 'eraser' ? '#ffffff' : '#1e293b';
+        ctx.fill();
+
+        canvas.setPointerCapture(e.pointerId);
+      };
+
+      const drawMove = (e) => {
+        if (!AppState.isDrawing || !AppState.currentStroke) return;
+        const pos = getPos(e);
+        const pts = AppState.currentStroke.points;
+        const prev = pts[pts.length - 1];
+
+        pts.push(pos);
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        const strokeWidth = AppState.usePressure 
+          ? Math.max(2, AppState.brushSize * (pos.pressure * 1.6))
+          : AppState.brushSize;
+
+        ctx.lineWidth = strokeWidth;
+        ctx.strokeStyle = AppState.tool === 'eraser' ? '#ffffff' : '#1e293b';
+        
+        if (AppState.tool === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(prev.x, prev.y);
+        // Smooth quadratic curve midpoint
+        const midX = (prev.x + pos.x) / 2;
+        const midY = (prev.y + pos.y) / 2;
+        ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      const stopDrawing = (e) => {
+        if (!AppState.isDrawing) return;
+        AppState.isDrawing = false;
+        
+        if (AppState.currentStroke && AppState.currentStroke.points.length > 0) {
+          const activeGlyph = getActiveGlyphObject();
+          if (activeGlyph) {
+            activeGlyph.variants[AppState.selectedVariantIndex].strokes.push(AppState.currentStroke);
+          }
+          AppState.currentStroke = null;
+          redrawCanvas();
+          saveToLocalStorage();
+          updateHeaderBadges();
+          renderGlyphCard(AppState.selectedGlyphId);
+        }
+        
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch(err) {}
+      };
+
+      canvas.addEventListener('pointerdown', startDrawing);
+      canvas.addEventListener('pointermove', drawMove);
+      canvas.addEventListener('pointerup', stopDrawing);
+      canvas.addEventListener('pointercancel', stopDrawing);
+    }
+
+    function getActiveGlyphObject() {
+      if (AppState.ligatures[AppState.selectedGlyphId]) {
+        return AppState.ligatures[AppState.selectedGlyphId];
+      }
+      return AppState.glyphs[AppState.selectedGlyphId];
+    }
+
+    function redrawCanvas() {
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+
+      const variant = activeGlyph.variants[AppState.selectedVariantIndex] || activeGlyph.variants[0];
+      if (!variant) return;
+
+      // Render strokes
+      variant.strokes.forEach(stroke => {
+        if (!stroke.points || stroke.points.length === 0) return;
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        if (stroke.tool === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.strokeStyle = '#ffffff';
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = '#1e293b';
+        }
+
+        if (stroke.points.length === 1) {
+          const pt = stroke.points[0];
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, stroke.size / 2, 0, Math.PI * 2);
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.fill();
+        } else {
+          for (let i = 1; i < stroke.points.length; i++) {
+            const p1 = stroke.points[i - 1];
+            const p2 = stroke.points[i];
+            const width = AppState.usePressure 
+              ? Math.max(2, stroke.size * ((p2.pressure || 0.5) * 1.6))
+              : stroke.size;
+
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      });
+
+      updateMetricGuidesPosition();
+    }
+
+    function updateMetricGuidesPosition() {
+      // Map canvas 800x800 coordinates to font baseline
+      // Font Metrics: Baseline = 600px in canvas, Ascender = 160px, CapHeight = 240px, XHeight = 400px, Descender = 720px
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+
+      const lsbPercent = (activeGlyph.lsb / 800) * 100;
+      const rsbPercent = ((800 - activeGlyph.rsb) / 800) * 100;
+
+      const guideLSB = document.getElementById('guideLSB');
+      const guideRSB = document.getElementById('guideRSB');
+      if (guideLSB) guideLSB.style.left = `${Math.max(2, Math.min(98, lsbPercent))}%`;
+      if (guideRSB) guideRSB.style.left = `${Math.max(2, Math.min(98, rsbPercent))}%`;
+    }
+
+    function saveUndoState() {
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+      const variant = activeGlyph.variants[AppState.selectedVariantIndex];
+      AppState.undoStack.push(JSON.parse(JSON.stringify(variant.strokes)));
+      if (AppState.undoStack.length > 30) AppState.undoStack.shift();
+      AppState.redoStack = []; // Reset redo
+    }
+
+    function undoStroke() {
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph || AppState.undoStack.length === 0) return;
+      const variant = activeGlyph.variants[AppState.selectedVariantIndex];
+      AppState.redoStack.push(JSON.parse(JSON.stringify(variant.strokes)));
+      variant.strokes = AppState.undoStack.pop();
+      redrawCanvas();
+      saveToLocalStorage();
+      renderGlyphCard(AppState.selectedGlyphId);
+    }
+
+    function redoStroke() {
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph || AppState.redoStack.length === 0) return;
+      const variant = activeGlyph.variants[AppState.selectedVariantIndex];
+      AppState.undoStack.push(JSON.parse(JSON.stringify(variant.strokes)));
+      variant.strokes = AppState.redoStack.pop();
+      redrawCanvas();
+      saveToLocalStorage();
+      renderGlyphCard(AppState.selectedGlyphId);
+    }
+
+    function clearCurrentCanvas() {
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+      saveUndoState();
+      activeGlyph.variants[AppState.selectedVariantIndex].strokes = [];
+      redrawCanvas();
+      saveToLocalStorage();
+      updateHeaderBadges();
+      renderGlyphCard(AppState.selectedGlyphId);
+      showToast('Kanvas telah dibersihkan', 'info');
+    }
+
+    // Smooth curve algorithm (Ramer-Douglas-Peucker simplification + Chaikin smoothing)
+    function smoothCurrentStrokes() {
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+      const variant = activeGlyph.variants[AppState.selectedVariantIndex];
+      if (!variant.strokes || variant.strokes.length === 0) return;
+
+      saveUndoState();
+
+      variant.strokes.forEach(stroke => {
+        if (stroke.points.length < 3) return;
+        // Chaikin's Corner Cutting Smoothing Algorithm
+        const newPts = [stroke.points[0]];
+        for (let i = 0; i < stroke.points.length - 1; i++) {
+          const p0 = stroke.points[i];
+          const p1 = stroke.points[i + 1];
+          const q = {
+            x: 0.75 * p0.x + 0.25 * p1.x,
+            y: 0.75 * p0.y + 0.25 * p1.y,
+            pressure: (p0.pressure + p1.pressure) / 2
+          };
+          const r = {
+            x: 0.25 * p0.x + 0.75 * p1.x,
+            y: 0.25 * p0.y + 0.75 * p1.y,
+            pressure: (p0.pressure + p1.pressure) / 2
+          };
+          newPts.push(q);
+          newPts.push(r);
+        }
+        newPts.push(stroke.points[stroke.points.length - 1]);
+        stroke.points = newPts;
+      });
+
+      redrawCanvas();
+      saveToLocalStorage();
+      showToast('Goresan berhasil dihaluskan', 'success');
+    }
+
+    // Auto fit LSB / RSB based on drawn pixel bounds
+    function autoFitMetrics() {
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+      const variant = activeGlyph.variants[AppState.selectedVariantIndex];
+      if (!variant.strokes || variant.strokes.length === 0) return;
+
+      let minX = 800, maxX = 0;
+      variant.strokes.forEach(s => {
+        s.points.forEach(p => {
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+        });
+      });
+
+      if (minX < maxX) {
+        activeGlyph.lsb = Math.max(20, Math.round(minX - 20));
+        activeGlyph.rsb = Math.max(20, Math.round(800 - maxX - 20));
+        activeGlyph.advanceWidth = Math.round(800 - activeGlyph.lsb - activeGlyph.rsb);
+
+        document.getElementById('metricLSB').value = activeGlyph.lsb;
+        document.getElementById('metricRSB').value = activeGlyph.rsb;
+        updateMetricGuidesPosition();
+        saveToLocalStorage();
+        showToast('Spasi glif disesuaikan secara otomatis', 'success');
+      }
+    }
+
+    function selectTool(toolName) {
+      AppState.tool = toolName;
+      document.querySelectorAll('.tool-btn').forEach(b => {
+        b.classList.remove('active', 'border-blue-600', 'bg-blue-50', 'text-blue-600');
+        b.classList.add('border-slate-200', 'bg-white', 'text-slate-600');
+      });
+
+      if (toolName === 'pen') {
+        const btn = document.getElementById('toolPen');
+        btn.classList.add('active', 'border-blue-600', 'bg-blue-50', 'text-blue-600');
+      } else if (toolName === 'eraser') {
+        const btn = document.getElementById('toolEraser');
+        btn.classList.add('active', 'border-blue-600', 'bg-blue-50', 'text-blue-600');
+      }
+    }
+
+    function updateBrushSettings() {
+      const size = parseInt(document.getElementById('brushSize').value);
+      AppState.brushSize = size;
+      document.getElementById('brushSizeLabel').innerText = `${size}px`;
+      AppState.usePressure = document.getElementById('pressureToggle').checked;
+    }
+
+    function openGlyphInStudio(id) {
+      AppState.selectedGlyphId = id;
+      AppState.selectedVariantIndex = 0;
+      AppState.undoStack = [];
+      AppState.redoStack = [];
+
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+
+      // Update studio header
+      document.getElementById('studioCurrentGlyphBox').innerText = activeGlyph.char || activeGlyph.sequence || id;
+      document.getElementById('studioCurrentGlyphName').innerText = activeGlyph.name || `Karakter '${id}'`;
+      document.getElementById('studioCurrentUnicode').innerText = activeGlyph.unicode ? `U+${activeGlyph.unicode.toString(16).toUpperCase().padStart(4, '0')}` : 'LIGATURE';
+
+      // Update metrics inputs
+      document.getElementById('metricLSB').value = activeGlyph.lsb;
+      document.getElementById('metricRSB').value = activeGlyph.rsb;
+
+      renderVariantPills();
+      redrawCanvas();
+      switchMainTab('studio');
+    }
+
+    function navigateStudioGlyph(direction) {
+      const glyphKeys = Object.keys(AppState.glyphs);
+      const currentIndex = glyphKeys.indexOf(AppState.selectedGlyphId);
+      if (currentIndex === -1) return;
+
+      let nextIndex = currentIndex + direction;
+      if (nextIndex < 0) nextIndex = glyphKeys.length - 1;
+      if (nextIndex >= glyphKeys.length) nextIndex = 0;
+
+      openGlyphInStudio(glyphKeys[nextIndex]);
+    }
+
+    function renderVariantPills() {
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+
+      const container = document.getElementById('variantPillContainer');
+      container.innerHTML = '';
+
+      activeGlyph.variants.forEach((v, idx) => {
+        const btn = document.createElement('button');
+        const isActive = idx === AppState.selectedVariantIndex;
+        btn.className = `px-2.5 py-1 text-xs font-medium rounded-lg border transition flex items-center space-x-1.5 ${
+          isActive 
+            ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
+            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+        }`;
+        
+        btn.innerHTML = `
+          <span>Varian ${idx + 1}${idx === 0 ? ' (Utama)' : ''}</span>
+          ${idx > 0 ? `<i class="fa-solid fa-xmark text-[10px] hover:text-red-300 ml-1" onclick="deleteVariant(event, ${idx})"></i>` : ''}
+        `;
+        btn.onclick = () => switchVariant(idx);
+        container.appendChild(btn);
+      });
+    }
+
+    function addNewVariantForCurrentGlyph() {
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+      activeGlyph.variants.push({ strokes: [] });
+      AppState.selectedVariantIndex = activeGlyph.variants.length - 1;
+      renderVariantPills();
+      redrawCanvas();
+      saveToLocalStorage();
+      showToast(`Varian ${activeGlyph.variants.length} berhasil ditambahkan!`, 'success');
+    }
+
+    function deleteVariant(e, idx) {
+      e.stopPropagation();
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph || idx === 0) return;
+      activeGlyph.variants.splice(idx, 1);
+      AppState.selectedVariantIndex = 0;
+      renderVariantPills();
+      redrawCanvas();
+      saveToLocalStorage();
+      showToast('Varian berhasil dihapus', 'info');
+    }
+
+    function switchVariant(idx) {
+      AppState.selectedVariantIndex = idx;
+      AppState.undoStack = [];
+      AppState.redoStack = [];
+      renderVariantPills();
+      redrawCanvas();
+    }
+
+    function loadTraceImage(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = document.getElementById('traceImageOverlay');
+        img.src = event.target.result;
+        img.classList.remove('hidden');
+        document.getElementById('traceControls').classList.remove('hidden');
+        document.getElementById('clearTraceImgBtn').classList.remove('hidden');
+        document.getElementById('traceImgLabel').innerText = file.name.substring(0, 16) + '...';
+        showToast('Gambar acuan berhasil dimuat', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function updateTraceOpacity() {
+      const opacity = parseInt(document.getElementById('traceOpacity').value);
+      document.getElementById('traceOpacityLabel').innerText = `${opacity}%`;
+      const img = document.getElementById('traceImageOverlay');
+      img.style.opacity = (opacity / 100).toString();
+    }
+
+    function clearTraceImage() {
+      const img = document.getElementById('traceImageOverlay');
+      img.src = '';
+      img.classList.add('hidden');
+      document.getElementById('traceControls').classList.add('hidden');
+      document.getElementById('clearTraceImgBtn').classList.add('hidden');
+      document.getElementById('traceImgLabel').innerText = 'Unggah PNG / SVG Acuan';
+      document.getElementById('traceImgInput').value = '';
+    }
+
+    // Auto-trace raster image onto the canvas stroke list
+    function autoTraceImageToStrokes() {
+      const img = document.getElementById('traceImageOverlay');
+      if (!img.src || img.classList.contains('hidden')) return;
+
+      saveUndoState();
+
+      // Create off-screen canvas to extract pixels
+      const off = document.createElement('canvas');
+      off.width = 800;
+      off.height = 800;
+      const offCtx = off.getContext('2d');
+      offCtx.drawImage(img, 0, 0, 800, 800);
+      
+      const imgData = offCtx.getImageData(0, 0, 800, 800);
+      const data = imgData.data;
+
+      // Extract high density dark pixels as simulated pen paths
+      const activeGlyph = getActiveGlyphObject();
+      if (!activeGlyph) return;
+
+      const step = 8;
+      const detectedStrokes = [];
+
+      for (let y = 100; y < 700; y += step) {
+        let currentRun = [];
+        for (let x = 80; x < 720; x += step) {
+          const idx = (y * 800 + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const a = data[idx + 3];
+          const brightness = (r + g + b) / 3;
+
+          if (a > 120 && brightness < 160) {
+            currentRun.push({ x, y, pressure: 0.6 });
+          } else {
+            if (currentRun.length > 1) {
+              detectedStrokes.push({ tool: 'pen', size: 14, points: currentRun });
+              currentRun = [];
+            }
+          }
+        }
+        if (currentRun.length > 1) {
+          detectedStrokes.push({ tool: 'pen', size: 14, points: currentRun });
+        }
+      }
+
+      if (detectedStrokes.length > 0) {
+        activeGlyph.variants[AppState.selectedVariantIndex].strokes = detectedStrokes;
+        redrawCanvas();
+        saveToLocalStorage();
+        showToast('Berhasil menelusuri gambar secara otomatis!', 'success');
+      } else {
+        showToast('Tidak ada garis gelap yang terdeteksi pada gambar', 'warning');
+      }
+    }
+
+    function renderGlyphGrid() {
+      const container = document.getElementById('glyphGridContainer');
+      container.innerHTML = '';
+
+      Object.values(AppState.glyphs).forEach(g => {
+        // Filter by category
+        if (AppState.activeFilter !== 'all' && g.category !== AppState.activeFilter) {
+          return;
+        }
+
+        const card = createGlyphCardElement(g);
+        container.appendChild(card);
+      });
+    }
+
+    function createGlyphCardElement(g) {
+      const card = document.createElement('div');
+      card.id = `glyphCard_${g.char}`;
+      const hasStrokes = g.variants.some(v => v.strokes && v.strokes.length > 0);
+      const variantCount = g.variants.length;
+
+      card.className = `group relative bg-white rounded-2xl border p-3 flex flex-col items-center justify-between cursor-pointer transition hover:shadow-md hover:border-blue-400 ${
+        hasStrokes ? 'border-slate-200' : 'border-dashed border-slate-200 bg-slate-50/50'
+      }`;
+
+      // Mini preview canvas
+      const miniCanvasId = `miniCanvas_${g.char}`;
+      
+      card.innerHTML = `
+        <div class="w-full flex items-center justify-between text-[10px] text-slate-400 mb-1">
+          <span class="font-mono">${g.unicode ? '0x' + g.unicode.toString(16).toUpperCase() : ''}</span>
+          ${variantCount > 1 ? `<span class="bg-blue-100 text-blue-700 px-1 rounded text-[9px] font-bold">${variantCount} var</span>` : ''}
+        </div>
+        
+        <div class="w-16 h-16 flex items-center justify-center relative my-1">
+          ${hasStrokes 
+            ? `<canvas id="${miniCanvasId}" width="64" height="64" class="w-16 h-16 pointer-events-none"></canvas>`
+            : `<span class="text-3xl font-bold text-slate-300 group-hover:text-blue-400 transition">${g.char}</span>`
+          }
+        </div>
+
+        <div class="w-full flex items-center justify-between mt-1 pt-1 border-t border-slate-100 text-xs">
+          <span class="font-bold text-slate-700">${g.char}</span>
+          ${hasStrokes 
+            ? `<span class="w-2 h-2 rounded-full bg-emerald-500" title="Sudah Digambar"></span>` 
+            : `<span class="w-2 h-2 rounded-full bg-slate-300" title="Kosong"></span>`
+          }
+        </div>
+      `;
+
+      card.onclick = () => openGlyphInStudio(g.char);
+
+      // Render mini stroke preview after DOM mount
+      setTimeout(() => {
+        if (hasStrokes) {
+          const mini = document.getElementById(miniCanvasId);
+          if (mini) renderMiniPreview(mini, g.variants[0].strokes);
+        }
+      }, 0);
+
+      return card;
+    }
+
+    function renderMiniPreview(miniCanvas, strokes) {
+      const mCtx = miniCanvas.getContext('2d');
+      mCtx.clearRect(0, 0, 64, 64);
+      mCtx.lineCap = 'round';
+      mCtx.lineJoin = 'round';
+      mCtx.strokeStyle = '#1e293b';
+
+      strokes.forEach(s => {
+        if (!s.points || s.points.length === 0) return;
+        mCtx.save();
+        if (s.tool === 'eraser') {
+          mCtx.globalCompositeOperation = 'destination-out';
+        } else {
+          mCtx.globalCompositeOperation = 'source-over';
+        }
+
+        mCtx.lineWidth = Math.max(1, (s.size / 800) * 64);
+        mCtx.beginPath();
+        const start = s.points[0];
+        mCtx.moveTo((start.x / 800) * 64, (start.y / 800) * 64);
+
+        for (let i = 1; i < s.points.length; i++) {
+          const p = s.points[i];
+          mCtx.lineTo((p.x / 800) * 64, (p.y / 800) * 64);
+        }
+        mCtx.stroke();
+        mCtx.restore();
+      });
+    }
+
+    function renderGlyphCard(id) {
+      const g = AppState.glyphs[id];
+      if (!g) return;
+      const oldCard = document.getElementById(`glyphCard_${id}`);
+      if (oldCard && oldCard.parentElement) {
+        const newCard = createGlyphCardElement(g);
+        oldCard.parentElement.replaceChild(newCard, oldCard);
+      }
+    }
+
+    function renderLigatureGrid() {
+      const container = document.getElementById('ligatureGridContainer');
+      const emptyState = document.getElementById('ligatureEmptyState');
+      const list = Object.values(AppState.ligatures);
+
+      if (list.length === 0) {
+        container.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+      container.innerHTML = '';
+
+      list.forEach(lig => {
+        const card = document.createElement('div');
+        const hasStrokes = lig.variants.some(v => v.strokes && v.strokes.length > 0);
+        
+        card.className = `bg-white rounded-2xl border p-4 flex flex-col items-center justify-between cursor-pointer transition hover:shadow-md hover:border-blue-400 ${
+          hasStrokes ? 'border-slate-200' : 'border-dashed border-slate-200'
+        }`;
+
+        card.innerHTML = `
+          <div class="w-full flex items-center justify-between text-xs text-slate-400 mb-2">
+            <span class="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">"${lig.sequence}"</span>
+            <button onclick="deleteLigature(event, '${lig.id}')" class="text-slate-400 hover:text-red-500 transition p-1">
+              <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+          </div>
+
+          <div class="h-16 flex items-center justify-center my-2">
+            ${hasStrokes 
+              ? `<canvas id="ligMini_${lig.id}" width="64" height="64" class="w-16 h-16"></canvas>`
+              : `<span class="text-2xl font-bold text-slate-300">${lig.sequence}</span>`
+            }
+          </div>
+
+          <button class="w-full mt-2 py-1.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 text-slate-600 text-xs font-semibold rounded-lg border border-slate-200 transition">
+            Edit Ligatur
+          </button>
+        `;
+
+        card.onclick = () => openGlyphInStudio(lig.id);
+        container.appendChild(card);
+
+        if (hasStrokes) {
+          setTimeout(() => {
+            const mini = document.getElementById(`ligMini_${lig.id}`);
+            if (mini) renderMiniPreview(mini, lig.variants[0].strokes);
+          }, 0);
+        }
+      });
+    }
+
+    // Convert canvas strokes into an OpenType.js Path object
+    function convertStrokesToOpenTypePath(strokes, advanceWidth, lsb) {
+      const p = new opentype.Path();
+      if (!strokes || strokes.length === 0) return p;
+
+      // Coordinate Transform: 
+      // Canvas: 800x800 -> (0,0) is top-left, Baseline is Y=600.
+      // OpenType: 1000 UPM -> (0,0) is Baseline, Ascender +800, Descender -200.
+      const toFontX = (cx) => Math.round((cx / 800) * 1000);
+      const toFontY = (cy) => Math.round(((600 - cy) / 800) * 1000);
+
+      strokes.forEach(stroke => {
+        if (!stroke.points || stroke.points.length === 0 || stroke.tool === 'eraser') return;
+        
+        const pts = stroke.points;
+        const radius = (stroke.size / 800) * 1000 * 0.45;
+
+        if (pts.length === 1) {
+          // Single dot: create a small circular polygon
+          const center = pts[0];
+          const fx = toFontX(center.x);
+          const fy = toFontY(center.y);
+          p.moveTo(fx - radius, fy);
+          p.curveTo(fx - radius, fy + radius, fx + radius, fy + radius, fx + radius, fy);
+          p.curveTo(fx + radius, fy - radius, fx - radius, fy - radius, fx - radius, fy);
+          p.close();
+        } else {
+          // Thickened vector ribbon ribbon algorithm
+          const leftRibbon = [];
+          const rightRibbon = [];
+
+          for (let i = 0; i < pts.length; i++) {
+            const cur = pts[i];
+            const pPressure = cur.pressure || 0.5;
+            const curRad = AppState.usePressure ? radius * (pPressure * 1.5) : radius;
+            
+            let normalX = 0, normalY = 0;
+            if (i < pts.length - 1) {
+              const next = pts[i + 1];
+              const dx = next.x - cur.x;
+              const dy = next.y - cur.y;
+              const len = Math.sqrt(dx * dx + dy * dy) || 1;
+              normalX = -dy / len;
+              normalY = dx / len;
+            } else {
+              const prev = pts[i - 1];
+              const dx = cur.x - prev.x;
+              const dy = cur.y - prev.y;
+              const len = Math.sqrt(dx * dx + dy * dy) || 1;
+              normalX = -dy / len;
+              normalY = dx / len;
+            }
+
+            leftRibbon.push({
+              x: toFontX(cur.x + normalX * (curRad / 2)),
+              y: toFontY(cur.y + normalY * (curRad / 2))
+            });
+            rightRibbon.push({
+              x: toFontX(cur.x - normalX * (curRad / 2)),
+              y: toFontY(cur.y - normalY * (curRad / 2))
+            });
+          }
+
+          // Build continuous closed contour
+          p.moveTo(leftRibbon[0].x, leftRibbon[0].y);
+          for (let i = 1; i < leftRibbon.length; i++) {
+            p.lineTo(leftRibbon[i].x, leftRibbon[i].y);
+          }
+          for (let i = rightRibbon.length - 1; i >= 0; i--) {
+            p.lineTo(rightRibbon[i].x, rightRibbon[i].y);
+          }
+          p.close();
+        }
+      });
+
+      return p;
+    }
+
+    // Build OpenType font instance in client memory
+    function generateOpenTypeFontInstance() {
+      const notdefPath = new opentype.Path();
+      notdefPath.moveTo(100, 0);
+      notdefPath.lineTo(100, 700);
+      notdefPath.lineTo(500, 700);
+      notdefPath.lineTo(500, 0);
+      notdefPath.close();
+
+      const notdefGlyph = new opentype.Glyph({
+        name: '.notdef',
+        unicode: 0,
+        advanceWidth: 650,
+        path: notdefPath
+      });
+
+      const fontGlyphs = [notdefGlyph];
+
+      // Process standard and custom glyphs
+      Object.values(AppState.glyphs).forEach(g => {
+        const variant = g.variants[0];
+        const path = convertStrokesToOpenTypePath(variant.strokes, g.advanceWidth, g.lsb);
+        
+        const glyph = new opentype.Glyph({
+          name: g.char,
+          unicode: g.unicode,
+          advanceWidth: Math.round((g.advanceWidth / 800) * 1000) || 600,
+          path: path
+        });
+        fontGlyphs.push(glyph);
+      });
+
+      // Process Ligatures
+      Object.values(AppState.ligatures).forEach(lig => {
+        const variant = lig.variants[0];
+        const path = convertStrokesToOpenTypePath(variant.strokes, lig.advanceWidth, lig.lsb);
+
+        const ligGlyph = new opentype.Glyph({
+          name: lig.sequence,
+          advanceWidth: Math.round((lig.advanceWidth / 800) * 1000) || 850,
+          path: path
+        });
+        fontGlyphs.push(ligGlyph);
+      });
+
+      const font = new opentype.Font({
+        familyName: AppState.fontName || 'FontrCustom',
+        styleName: 'Regular',
+        unitsPerEm: 1000,
+        ascender: 800,
+        descender: -200,
+        glyphs: fontGlyphs
+      });
+
+      return font;
+    }
+
+    function exportFont(format) {
+      try {
+        const font = generateOpenTypeFontInstance();
+        const arrayBuffer = font.toArrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: 'font/opentype' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${AppState.fontName || 'FontrCustom'}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast(`Font berhasil diekspor sebagai ${format.toUpperCase()}!`, 'success');
+      } catch (err) {
+        console.error('Export Error:', err);
+        showToast('Gagal mengekspor font: ' + err.message, 'error');
+      }
+    }
+
+    // Refresh dynamic preview font in Live Type-Tester
+    function refreshTesterFont() {
+      try {
+        const font = generateOpenTypeFontInstance();
+        const arrayBuffer = font.toArrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: 'font/opentype' });
+        const fontUrl = URL.createObjectURL(blob);
+
+        const fontFace = new FontFace('FontrLivePreview', `url(${fontUrl})`);
+        fontFace.load().then(loadedFont => {
+          document.fonts.add(loadedFont);
+          const playground = document.getElementById('testerPlayground');
+          playground.style.fontFamily = `'FontrLivePreview', sans-serif`;
+          showToast('Pratinjau font langsung diperbarui', 'info');
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function updateTesterTypography() {
+      const size = document.getElementById('testerFontSize').value;
+      const lh = document.getElementById('testerLineHeight').value;
+      const ls = document.getElementById('testerLetterSpacing').value;
+
+      document.getElementById('testerFontSizeLabel').innerText = `${size}px`;
+      document.getElementById('testerLineHeightLabel').innerText = `${lh}`;
+      document.getElementById('testerLetterSpacingLabel').innerText = `${ls}px`;
+
+      const playground = document.getElementById('testerPlayground');
+      playground.style.fontSize = `${size}px`;
+      playground.style.lineHeight = `${lh}`;
+      playground.style.letterSpacing = `${ls}px`;
+    }
+
+    function applyTesterPreset(presetKey) {
+      const playground = document.getElementById('testerPlayground');
+      switch(presetKey) {
+        case 'id-pangram':
+          playground.value = "Jangkrik itu melompat melewati rubah coklat yang malas.\nPak Ogah mencuri kunci lemari dari sebuah gedung kaca.";
+          break;
+        case 'en-pangram':
+          playground.value = "The quick brown fox jumps over the lazy dog.\nPack my box with five dozen liquor jugs.";
+          break;
+        case 'alphabet':
+          playground.value = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789 !@#$%^&*()_+";
+          break;
+        case 'ligature-demo':
+          playground.value = "fi fl ffi st th oo office offline first aesthetic";
+          break;
+      }
+    }
+
+    function openTemplateModal() {
+      document.getElementById('modalTemplate').classList.remove('hidden');
+    }
+
+    function generatePDFTemplate() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text(`Fontr Template Sheet - ${AppState.fontName}`, 15, 18);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('Tulis huruf di dalam kotak menggunakan spidol/pulpen hitam tebal. Jaga agar tidak melebihi garis batas.', 15, 24);
+
+      // Registration corner markers
+      const drawCorner = (x, y) => {
+        doc.setLineWidth(0.8);
+        doc.line(x - 4, y, x + 4, y);
+        doc.line(x, y - 4, x, y + 4);
+      };
+      drawCorner(10, 10);
+      drawCorner(200, 10);
+      drawCorner(10, 287);
+      drawCorner(200, 287);
+
+      // Render Glyph Grid Cells
+      const charsToPrint = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*?'.split('');
+      const cols = 7;
+      const cellW = 24;
+      const cellH = 24;
+      const startX = 16;
+      const startY = 32;
+
+      charsToPrint.forEach((ch, idx) => {
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const x = startX + col * (cellW + 2);
+        const y = startY + row * (cellH + 2);
+
+        if (y + cellH < 280) {
+          // Box boundary
+          doc.setDrawColor(200, 200, 200);
+          doc.setLineWidth(0.3);
+          doc.rect(x, y, cellW, cellH);
+
+          // Baseline dashed
+          doc.setDrawColor(220, 220, 220);
+          doc.line(x, y + cellH * 0.75, x + cellW, y + cellH * 0.75);
+
+          // Label indicator
+          doc.setFontSize(8);
+          doc.setTextColor(150, 150, 150);
+          doc.text(ch, x + 2, y + 4);
+        }
+      });
+
+      doc.save(`Fontr_Template_${AppState.fontName}.pdf`);
+      closeModal('modalTemplate');
+      showToast('Template PDF berhasil diunduh!', 'success');
+    }
+
+    function openScanModal() {
+      document.getElementById('modalScan').classList.remove('hidden');
+    }
+
+    function processScannedSheet(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const statusEl = document.getElementById('scanStatus');
+      statusEl.classList.remove('hidden');
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          // Auto slice 7x10 grid from scanned template
+          const cols = 7;
+          const rows = 10;
+          const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*?'.split('');
+
+          const cellW = img.width / (cols + 1.2);
+          const cellH = img.height / (rows + 1.6);
+          const offsetX = cellW * 0.6;
+          const offsetY = cellH * 0.8;
+
+          let count = 0;
+          chars.forEach((ch, idx) => {
+            if (!AppState.glyphs[ch]) return;
+            const c = idx % cols;
+            const r = Math.floor(idx / cols);
+            if (r >= rows) return;
+
+            const sx = offsetX + c * cellW;
+            const sy = offsetY + r * cellH;
+
+            // Extract small slice into strokes
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = 800;
+            cropCanvas.height = 800;
+            const cCtx = cropCanvas.getContext('2d');
+            cCtx.drawImage(img, sx, sy, cellW, cellH, 0, 0, 800, 800);
+
+            const sliceData = cCtx.getImageData(0, 0, 800, 800).data;
+            const detected = [];
+            for (let y = 150; y < 650; y += 12) {
+              let run = [];
+              for (let x = 150; x < 650; x += 12) {
+                const pIdx = (y * 800 + x) * 4;
+                const brightness = (sliceData[pIdx] + sliceData[pIdx+1] + sliceData[pIdx+2]) / 3;
+                if (sliceData[pIdx+3] > 100 && brightness < 140) {
+                  run.push({ x, y, pressure: 0.6 });
+                } else if (run.length > 1) {
+                  detected.push({ tool: 'pen', size: 16, points: run });
+                  run = [];
+                }
+              }
+              if (run.length > 1) detected.push({ tool: 'pen', size: 16, points: run });
+            }
+
+            if (detected.length > 0) {
+              AppState.glyphs[ch].variants[0].strokes = detected;
+              count++;
+            }
+          });
+
+          statusEl.classList.add('hidden');
+          closeModal('modalScan');
+          saveToLocalStorage();
+          renderGlyphGrid();
+          updateHeaderBadges();
+          showToast(`Berhasil mengekstrak ${count} karakter dari lembar scan!`, 'success');
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function exportProjectJSON() {
+      const projectData = {
+        version: 1,
+        fontName: AppState.fontName,
+        metrics: {
+          unitsPerEm: AppState.unitsPerEm,
+          ascender: AppState.ascender,
+          capHeight: AppState.capHeight,
+          xHeight: AppState.xHeight,
+          descender: AppState.descender
+        },
+        glyphs: AppState.glyphs,
+        ligatures: AppState.ligatures
+      };
+
+      const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${AppState.fontName || 'FontrProject'}.fontr.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toggleDropdown('projectMenu');
+      showToast('Proyek berhasil disimpan sebagai JSON', 'success');
+    }
+
+    function importProjectJSON(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          if (data.glyphs) AppState.glyphs = data.glyphs;
+          if (data.ligatures) AppState.ligatures = data.ligatures;
+          if (data.fontName) {
+            AppState.fontName = data.fontName;
+            document.getElementById('fontFamilyName').value = data.fontName;
+          }
+
+          saveToLocalStorage();
+          renderGlyphGrid();
+          renderLigatureGrid();
+          updateHeaderBadges();
+          refreshTesterFont();
+          toggleDropdown('projectMenu');
+          showToast('Proyek berhasil dimuat!', 'success');
+        } catch (err) {
+          showToast('File proyek JSON tidak valid', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function saveToLocalStorage() {
+      try {
+        const compactData = {
+          fontName: AppState.fontName,
+          glyphs: AppState.glyphs,
+          ligatures: AppState.ligatures
+        };
+        localStorage.setItem('fontr_saved_project', JSON.stringify(compactData));
+      } catch (e) {
+        console.warn('LocalStorage quota reached, skipping cache');
+      }
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        const saved = localStorage.getItem('fontr_saved_project');
+        if (saved) {
+          const data = JSON.parse(saved);
+          if (data.glyphs) AppState.glyphs = { ...AppState.glyphs, ...data.glyphs };
+          if (data.ligatures) AppState.ligatures = data.ligatures;
+          if (data.fontName) {
+            AppState.fontName = data.fontName;
+            document.getElementById('fontFamilyName').value = data.fontName;
+          }
+        }
+      } catch (e) {}
+    }
+
+    function resetEntireProject() {
+      initGlyphDatabase();
+      localStorage.removeItem('fontr_saved_project');
+      renderGlyphGrid();
+      renderLigatureGrid();
+      updateHeaderBadges();
+      openGlyphInStudio('A');
+      toggleDropdown('projectMenu');
+      showToast('Semua karakter telah direset', 'info');
+    }
+
+    function switchMainTab(tabKey) {
+      AppState.currentTab = tabKey;
+
+      ['viewGlyphs', 'viewStudio', 'viewLigatures', 'viewTester'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+
+      const tabMap = {
+        'glyphs': { id: 'viewGlyphs', btn: 'tabBtnGlyphs' },
+        'studio': { id: 'viewStudio', btn: 'tabBtnStudio' },
+        'ligatures': { id: 'viewLigatures', btn: 'tabBtnLigatures' },
+        'tester': { id: 'viewTester', btn: 'tabBtnTester' }
+      };
+
+      document.getElementById(tabMap[tabKey].id).classList.remove('hidden');
+
+      // Update button styling
+      ['tabBtnGlyphs', 'tabBtnStudio', 'tabBtnLigatures', 'tabBtnTester'].forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        btn.className = 'px-3 py-1.5 rounded-lg hover:text-slate-900 flex items-center space-x-1.5 transition text-slate-600';
+      });
+
+      const activeBtn = document.getElementById(tabMap[tabKey].btn);
+      activeBtn.className = 'px-3 py-1.5 rounded-lg bg-white text-blue-600 shadow-xs flex items-center space-x-1.5 transition font-semibold';
+
+      if (tabKey === 'studio') {
+        setTimeout(redrawCanvas, 50);
+      } else if (tabKey === 'tester') {
+        refreshTesterFont();
+      }
+    }
+
+    function filterGlyphs(category) {
+      AppState.activeFilter = category;
+      document.querySelectorAll('.filter-pill').forEach(btn => {
+        btn.className = 'filter-pill px-3 py-1 text-xs font-medium rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200';
+      });
+      event.target.className = 'filter-pill px-3 py-1 text-xs font-medium rounded-lg bg-blue-50 text-blue-600 border border-blue-200';
+      renderGlyphGrid();
+    }
+
+    function updateHeaderBadges() {
+      const drawnCount = Object.values(AppState.glyphs).filter(g => g.variants.some(v => v.strokes.length > 0)).length;
+      const totalCount = Object.keys(AppState.glyphs).length;
+      document.getElementById('drawnGlyphBadge').innerText = `${drawnCount}/${totalCount}`;
+    }
+
+    function toggleDropdown(id) {
+      document.getElementById(id).classList.toggle('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      const icons = {
+        success: 'fa-circle-check text-emerald-500',
+        error: 'fa-circle-xmark text-rose-500',
+        warning: 'fa-triangle-exclamation text-amber-500',
+        info: 'fa-circle-info text-blue-500'
+      };
+
+      toast.className = 'pointer-events-auto flex items-center space-x-2.5 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-lg text-xs font-medium text-slate-700 transition transform duration-200 translate-y-2 opacity-0';
+      toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i><span>${msg}</span>`;
+
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 250);
+      }, 3000);
+    }
+
+    function autoGenerateSampleGlyphs() {
+      // Procedural synthetic handwriting generator for rapid demo
+      Object.values(AppState.glyphs).forEach(g => {
+        const strokes = [];
+        const cx = 400, cy = 400;
+        
+        // Simple artistic handwritten strokes based on character
+        if ('ABCDEFGHIJKLM'.includes(g.char)) {
+          strokes.push({ tool: 'pen', size: 18, points: [{x: 250, y: 580, pressure: 0.8}, {x: 400, y: 220, pressure: 0.6}, {x: 550, y: 580, pressure: 0.7}] });
+          strokes.push({ tool: 'pen', size: 16, points: [{x: 320, y: 440, pressure: 0.5}, {x: 480, y: 440, pressure: 0.5}] });
+        } else if ('abcdefghijklm'.includes(g.char)) {
+          strokes.push({ tool: 'pen', size: 16, points: [{x: 460, y: 380, pressure: 0.7}, {x: 340, y: 480, pressure: 0.6}, {x: 460, y: 580, pressure: 0.7}, {x: 460, y: 360, pressure: 0.6}, {x: 460, y: 580, pressure: 0.6}] });
+        } else {
+          strokes.push({ tool: 'pen', size: 18, points: [{x: 300, y: 300, pressure: 0.6}, {x: 500, y: 300, pressure: 0.6}, {x: 380, y: 580, pressure: 0.7}] });
+        }
+        g.variants[0].strokes = strokes;
+      });
+
+      renderGlyphGrid();
+      updateHeaderBadges();
+      redrawCanvas();
+      saveToLocalStorage();
+      showToast('Sampel demo glif berhasil dibuat otomatis!', 'success');
+    }
+
+    // Modal Add Character handlers
+    function openAddGlyphModal() {
+      document.getElementById('modalAddGlyph').classList.remove('hidden');
+      document.getElementById('inputCustomChar').focus();
+    }
+
+    function confirmAddCustomGlyph() {
+      const ch = document.getElementById('inputCustomChar').value.trim();
+      if (!ch) return;
+
+      if (!AppState.glyphs[ch]) {
+        AppState.glyphs[ch] = {
+          id: ch,
+          char: ch,
+          unicode: ch.charCodeAt(0),
+          category: 'custom',
+          name: `Custom ${ch}`,
+          advanceWidth: 600,
+          lsb: 50,
+          rsb: 50,
+          variants: [{ strokes: [] }]
+        };
+        renderGlyphGrid();
+        updateHeaderBadges();
+        saveToLocalStorage();
+        openGlyphInStudio(ch);
+      }
+      closeModal('modalAddGlyph');
+      document.getElementById('inputCustomChar').value = '';
+    }
+
+    // Modal Add Ligature handlers
+    function openAddLigatureModal() {
+      document.getElementById('modalAddLigature').classList.remove('hidden');
+      document.getElementById('inputLigatureSequence').focus();
+    }
+
+    function confirmAddLigature() {
+      const seq = document.getElementById('inputLigatureSequence').value.trim().toLowerCase();
+      if (!seq || seq.length < 2) {
+        showToast('Ligatur harus memiliki minimal 2 karakter', 'warning');
+        return;
+      }
+
+      AppState.ligatures[seq] = {
+        id: seq,
+        sequence: seq,
+        name: `Ligature ${seq}`,
+        advanceWidth: 850,
+        lsb: 50,
+        rsb: 50,
+        variants: [{ strokes: [] }]
+      };
+
+      closeModal('modalAddLigature');
+      renderLigatureGrid();
+      saveToLocalStorage();
+      openGlyphInStudio(seq);
+      document.getElementById('inputLigatureSequence').value = '';
+    }
+
+    function deleteLigature(e, id) {
+      e.stopPropagation();
+      delete AppState.ligatures[id];
+      renderLigatureGrid();
+      saveToLocalStorage();
+      showToast(`Ligatur "${id}" dihapus`, 'info');
+    }
+
+    function setupWindowEvents() {
+      // Window resize handling
+      window.addEventListener('resize', () => {
+        if (AppState.currentTab === 'studio') redrawCanvas();
+      });
+
+      // Name input sync
+      document.getElementById('fontFamilyName').addEventListener('change', (e) => {
+        AppState.fontName = e.target.value.replace(/[^a-zA-Z0-9_-]/g, '') || 'FontrCustom';
+        saveToLocalStorage();
+      });
+
+      // Close dropdowns on outside click
+      window.addEventListener('click', (e) => {
+        if (!e.target.closest('#projectMenu') && !e.target.closest('button[onclick*="projectMenu"]')) {
+          document.getElementById('projectMenu').classList.add('hidden');
+        }
+      });
+
+      // Keyboard shortcuts (Ctrl+Z, Ctrl+Y)
+      window.addEventListener('keydown', (e) => {
+        if (AppState.currentTab !== 'studio') return;
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+          e.preventDefault();
+          undoStroke();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+          e.preventDefault();
+          redoStroke();
+        }
+      });
+    }
+
+    function zoomCanvas(delta) {
+      AppState.zoom = Math.max(0.6, Math.min(2.0, AppState.zoom + delta));
+      document.getElementById('canvasZoomLabel').innerText = `${Math.round(AppState.zoom * 100)}%`;
+      document.getElementById('canvasWrapper').style.transform = `scale(${AppState.zoom})`;
+    }
+
+    function toggleGridBackground() {
+      const show = document.getElementById('toggleGrid').checked;
+      const wrap = document.getElementById('canvasWrapper');
+      if (show) wrap.classList.add('canvas-bg-grid');
+      else wrap.classList.remove('canvas-bg-grid');
+    }
+  </script>
+</body>
+</html>

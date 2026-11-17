@@ -1,0 +1,2720 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PasaDena</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Consolas', 'monospace']
+                    },
+                    colors: {
+                        cad: {
+                            bg: '#0f172a',
+                            panel: '#1e293b',
+                            border: '#334155',
+                            accent: '#3b82f6'
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        * { box-sizing: border-box; user-select: none; }
+        body { margin: 0; padding: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); }
+        .canvas-container { position: relative; width: 100%; height: 100%; overflow: hidden; }
+        canvas { display: block; outline: none; }
+        .tool-btn.active {
+            background-color: #2563eb;
+            color: #ffffff;
+            border-color: #3b82f6;
+        }
+        .tab-btn.active {
+            border-bottom: 2px solid #3b82f6;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col h-screen w-screen">
+
+    <!-- Top Header & Action Bar -->
+    <header class="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 flex items-center justify-between shrink-0 z-30">
+        <!-- Brand & Project Preset -->
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 font-bold text-base tracking-tight text-slate-900 dark:text-white">
+                <div class="w-7 h-7 rounded bg-blue-600 flex items-center justify-center text-white text-xs">
+                    <i class="fa-solid fa-compass-drafting"></i>
+                </div>
+                <span>PasaDena</span>
+            </div>
+
+            <div class="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+            <!-- Preset Selector -->
+            <div class="flex items-center gap-1.5">
+                <label for="presetSelect" class="text-xs font-medium text-slate-500 dark:text-slate-400 hidden sm:inline">Preset:</label>
+                <select id="presetSelect" onchange="App.loadPreset(this.value)" class="text-xs bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500">
+                    <option value="">-- Pilih Preset Denah --</option>
+                    <option value="kamar_2x3">Kamar 2x3 m (Skala 1:50)</option>
+                    <option value="rumah_21_60" selected>Rumah 21 m² / Tanah 60 m² (1:100)</option>
+                    <option value="gedung_50x60">Gedung 50x60 m - 2 Lantai (1:500)</option>
+                </select>
+            </div>
+
+            <!-- Topology Quick Generator -->
+            <div class="flex items-center gap-1.5">
+                <select id="topoPresetSelect" onchange="App.applyNetworkTopology(this.value); this.value='';" class="text-xs bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500">
+                    <option value="">+ Topologi Jaringan</option>
+                    <option value="star_lan">Topologi Star (LAN)</option>
+                    <option value="star_wifi">Topologi Star (WiFi)</option>
+                    <option value="bus_lan">Topologi Bus (LAN)</option>
+                    <option value="ring_lan">Topologi Ring (LAN)</option>
+                    <option value="mesh_hybrid">Topologi Mesh Kecil (Hybrid)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Center View Mode & Floor Controls -->
+        <div class="flex items-center gap-2">
+            <!-- Undo / Redo -->
+            <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded p-0.5 border border-slate-200 dark:border-slate-700">
+                <button onclick="App.undo()" title="Undo (Ctrl+Z)" class="px-2 py-1 text-xs rounded hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button onclick="App.redo()" title="Redo (Ctrl+Y)" class="px-2 py-1 text-xs rounded hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+
+            <!-- Floor Switcher -->
+            <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded p-0.5 border border-slate-200 dark:border-slate-700">
+                <span class="text-[11px] px-2 text-slate-500 dark:text-slate-400">Lantai:</span>
+                <button id="floorBtn1" onclick="App.setFloor(1)" class="px-2 py-0.5 text-xs rounded bg-blue-600 text-white font-medium">1</button>
+                <button id="floorBtn2" onclick="App.setFloor(2)" class="px-2 py-0.5 text-xs rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">2</button>
+                <button id="floorBtn3" onclick="App.setFloor(3)" class="px-2 py-0.5 text-xs rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">3</button>
+            </div>
+
+            <!-- View Modes: 2D / Dual / 3D / Wireframe -->
+            <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded p-0.5 border border-slate-200 dark:border-slate-700">
+                <button id="viewBtn2D" onclick="App.setViewMode('2d')" class="px-2.5 py-1 text-xs rounded font-medium text-slate-700 dark:text-slate-300">2D</button>
+                <button id="viewBtnDual" onclick="App.setViewMode('dual')" class="px-2.5 py-1 text-xs rounded font-medium bg-blue-600 text-white">Dual</button>
+                <button id="viewBtn3D" onclick="App.setViewMode('3d')" class="px-2.5 py-1 text-xs rounded font-medium text-slate-700 dark:text-slate-300">3D</button>
+                <button id="btnWireframe" onclick="App.toggleWireframe()" title="Mode Wireframe 3D" class="px-2 py-1 text-xs rounded text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">
+                    <i class="fa-solid fa-border-none"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Utility & Export Actions -->
+        <div class="flex items-center gap-1.5">
+            <button onclick="App.openAnalysisModal()" class="px-2.5 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span class="hidden md:inline">Analisis & Biaya</span>
+            </button>
+            <button onclick="App.openBOMModal()" class="px-2.5 py-1 text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white rounded flex items-center gap-1.5 shadow-sm" title="Bill of Materials">
+                <i class="fa-solid fa-table-list"></i>
+                <span class="hidden lg:inline">BOM</span>
+            </button>
+            <button onclick="App.openExportModal()" class="px-2.5 py-1 text-xs font-medium bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded border border-slate-300 dark:border-slate-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-file-export"></i>
+                <span class="hidden md:inline">Impor / Ekspor</span>
+            </button>
+            <button onclick="App.toggleDarkMode()" class="p-1.5 text-xs bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300" title="Tema Gelap/Terang">
+                <i id="themeIcon" class="fa-solid fa-sun"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Area -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- Left Sidebar: Discipline Tabs & Component Palette -->
+        <aside id="leftSidebar" class="w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 z-20">
+            <!-- Discipline Tabs -->
+            <div class="grid grid-cols-5 border-b border-slate-200 dark:border-slate-800 text-[11px] bg-slate-50 dark:bg-slate-950/50">
+                <button onclick="App.setDiscipline('arch')" id="tab_arch" class="tab-btn active py-2.5 flex flex-col items-center gap-1 text-slate-600 dark:text-slate-400">
+                    <i class="fa-solid fa-building text-xs"></i>
+                    <span>Ruang</span>
+                </button>
+                <button onclick="App.setDiscipline('elec')" id="tab_elec" class="tab-btn py-2.5 flex flex-col items-center gap-1 text-slate-600 dark:text-slate-400">
+                    <i class="fa-solid fa-bolt text-xs"></i>
+                    <span>Listrik</span>
+                </button>
+                <button onclick="App.setDiscipline('plumb')" id="tab_plumb" class="tab-btn py-2.5 flex flex-col items-center gap-1 text-slate-600 dark:text-slate-400">
+                    <i class="fa-solid fa-faucet-drip text-xs"></i>
+                    <span>Pipa</span>
+                </button>
+                <button onclick="App.setDiscipline('net')" id="tab_net" class="tab-btn py-2.5 flex flex-col items-center gap-1 text-slate-600 dark:text-slate-400">
+                    <i class="fa-solid fa-network-wired text-xs"></i>
+                    <span>Jaringan</span>
+                </button>
+                <button onclick="App.setDiscipline('evac')" id="tab_evac" class="tab-btn py-2.5 flex flex-col items-center gap-1 text-slate-600 dark:text-slate-400">
+                    <i class="fa-solid fa-person-running text-xs"></i>
+                    <span>Evakuasi</span>
+                </button>
+            </div>
+
+            <!-- Cursor & Drawing Mode Selector -->
+            <div class="p-2.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1 bg-slate-50/60 dark:bg-slate-900">
+                <button id="toolSelect" onclick="App.setActiveTool('select')" class="tool-btn active flex-1 py-1.5 px-2 text-xs rounded border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1.5 font-medium">
+                    <i class="fa-solid fa-arrow-pointer"></i> Pilih / Geser
+                </button>
+                <button id="toolPan" onclick="App.setActiveTool('pan')" class="tool-btn py-1.5 px-2.5 text-xs rounded border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1" title="Geser Kanvas (Space + Drag)">
+                    <i class="fa-solid fa-hand"></i>
+                </button>
+                <button onclick="App.deleteSelected()" class="py-1.5 px-2.5 text-xs rounded border border-red-300 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50" title="Hapus Objek Terpilih (Del)">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+
+            <!-- Dynamic Component Palette -->
+            <div id="paletteContainer" class="flex-1 overflow-y-auto p-3 space-y-3">
+                <!-- Populated dynamically by JS -->
+            </div>
+
+            <!-- Layer Visibility & Ghosting Control -->
+            <div class="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 space-y-2">
+                <div class="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <span>Visibilitas Layer BIM</span>
+                    <button onclick="App.resetLayers()" class="text-[11px] text-blue-500 hover:underline font-normal">Reset</button>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5 text-xs">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked onchange="App.toggleLayer('arch', this.checked)" class="rounded text-blue-600">
+                        <span>Arsitektur</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked onchange="App.toggleLayer('elec', this.checked)" class="rounded text-blue-600">
+                        <span>Kelistrikan</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked onchange="App.toggleLayer('plumb', this.checked)" class="rounded text-blue-600">
+                        <span>Perpipaan</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked onchange="App.toggleLayer('net', this.checked)" class="rounded text-blue-600">
+                        <span>Jaringan</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked onchange="App.toggleLayer('evac', this.checked)" class="rounded text-blue-600">
+                        <span>Evakuasi</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked onchange="App.toggleLayer('grid', this.checked)" class="rounded text-blue-600">
+                        <span>Grid & Label</span>
+                    </label>
+                </div>
+                <div class="pt-1 flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span>Opasitas Ruang:</span>
+                    <input type="range" min="15" max="100" value="100" oninput="App.setArchOpacity(this.value)" class="flex-1 accent-blue-600 h-1">
+                    <span id="archOpacityLabel" class="w-8 text-right font-mono">100%</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Dual/Single Viewport Area -->
+        <main id="viewportWrapper" class="flex-1 grid grid-cols-1 md:grid-cols-2 bg-slate-200 dark:bg-slate-950 relative overflow-hidden">
+            
+            <!-- 2D CAD Canvas Pane -->
+            <div id="pane2D" class="canvas-container border-r border-slate-300 dark:border-slate-800 relative">
+                <canvas id="canvas2D"></canvas>
+                <!-- Floating 2D Badge & Quick Controls -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5 pointer-events-auto">
+                    <span class="px-2 py-1 text-[11px] font-mono font-semibold bg-white/90 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 rounded shadow-sm text-slate-700 dark:text-slate-200">
+                        2D CAD VIEW
+                    </span>
+                    <button onclick="App.fitView2D()" class="px-2 py-1 text-[11px] bg-white/90 dark:bg-slate-900/90 hover:bg-blue-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded shadow-sm" title="Tengahkan & Sesuaikan Kanvas">
+                        <i class="fa-solid fa-compress"></i> Fit
+                    </button>
+                    <button onclick="App.autoGenerateEvacRoute()" class="px-2 py-1 text-[11px] bg-emerald-600/90 hover:bg-emerald-600 text-white rounded shadow-sm flex items-center gap-1" title="Hitung Rute Evakuasi Otomatis">
+                        <i class="fa-solid fa-route"></i> Auto Rute Evakuasi
+                    </button>
+                </div>
+                <!-- Polyline Drawing Helper Banner -->
+                <div id="drawingBanner" class="hidden absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-full shadow-lg flex items-center gap-2 z-20">
+                    <i class="fa-solid fa-pen-ruler"></i>
+                    <span id="drawingBannerText">Klik titik awal dan titik akhir pada kanvas. Tekan ESC atau Klik Kanan untuk selesai.</span>
+                    <button onclick="App.setActiveTool('select')" class="ml-2 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded text-[11px]">Selesai</button>
+                </div>
+            </div>
+
+            <!-- 3D BIM WebGL Pane -->
+            <div id="pane3D" class="canvas-container relative">
+                <div id="threeContainer" class="w-full h-full"></div>
+                <!-- Floating 3D Badge & Camera Presets -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5 pointer-events-auto">
+                    <span class="px-2 py-1 text-[11px] font-mono font-semibold bg-white/90 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 rounded shadow-sm text-slate-700 dark:text-slate-200">
+                        3D BIM VIEW
+                    </span>
+                    <button onclick="App.setCameraPreset('iso')" class="px-2 py-1 text-[11px] bg-white/90 dark:bg-slate-900/90 hover:bg-blue-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded shadow-sm">
+                        Isometrik
+                    </button>
+                    <button onclick="App.setCameraPreset('top')" class="px-2 py-1 text-[11px] bg-white/90 dark:bg-slate-900/90 hover:bg-blue-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded shadow-sm">
+                        Atas
+                    </button>
+                    <button onclick="App.setCameraPreset('front')" class="px-2 py-1 text-[11px] bg-white/90 dark:bg-slate-900/90 hover:bg-blue-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded shadow-sm">
+                        Depan
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Property Inspector & Area Settings -->
+        <aside id="rightSidebar" class="w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shrink-0 z-20 overflow-y-auto">
+            <!-- Selected Object Inspector -->
+            <div id="objectInspector" class="p-3.5 border-b border-slate-200 dark:border-slate-800">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Properti Komponen</h2>
+                    <span id="selectedBadge" class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">Tidak ada</span>
+                </div>
+                <div id="inspectorContent" class="text-xs text-slate-500 dark:text-slate-400 space-y-2.5">
+                    <p class="py-4 text-center italic">Klik objek pada kanvas 2D untuk mengubah ukuran, warna, material, daya listrik, atau konfigurasi IP.</p>
+                </div>
+            </div>
+
+            <!-- Area, Scale (1:1 to 1:5000), & Paper Settings -->
+            <div class="p-3.5 border-b border-slate-200 dark:border-slate-800 space-y-3">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pengaturan Area & Skala</h2>
+                
+                <!-- Scale 1:1 to 1:5000 -->
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <label class="font-medium text-slate-700 dark:text-slate-300">Skala Peta/Denah</label>
+                        <span id="scaleDisplayBadge" class="font-mono font-semibold text-blue-600 dark:text-blue-400">1 : 100</span>
+                    </div>
+                    <div class="flex gap-1.5">
+                        <select id="scalePresetSelect" onchange="App.setScale(parseInt(this.value))" class="flex-1 text-xs bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1.5">
+                            <option value="1">1 : 1 (Detail Komponen Penuh)</option>
+                            <option value="5">1 : 5 (Detail Sambungan)</option>
+                            <option value="10">1 : 10 (Interior Detail)</option>
+                            <option value="20">1 : 20 (Kamar / Furnitur)</option>
+                            <option value="50">1 : 50 (Denah Ruangan)</option>
+                            <option value="100" selected>1 : 100 (Denah Bangunan)</option>
+                            <option value="200">1 : 200 (Denah Blok Gedung)</option>
+                            <option value="500">1 : 500 (Siteplan / Masterplan)</option>
+                            <option value="1000">1 : 1.000 (Peta Lingkungan)</option>
+                            <option value="2500">1 : 2.500 (Peta Kawasan)</option>
+                            <option value="5000">1 : 5.000 (Peta Kadaster)</option>
+                        </select>
+                        <div class="flex items-center bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 text-xs">
+                            <span class="text-slate-400 mr-1">1:</span>
+                            <input id="customScaleInput" type="number" min="1" max="5000" value="100" onchange="App.setScale(parseInt(this.value))" class="w-14 bg-transparent font-mono focus:outline-none text-right">
+                        </div>
+                    </div>
+                    <input id="scaleRangeSlider" type="range" min="1" max="5000" value="100" oninput="App.setScale(parseInt(this.value))" class="w-full accent-blue-600 h-1.5">
+                </div>
+
+                <!-- Land & Building Dimensions -->
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                        <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">Lebar Tanah (m)</label>
+                        <input id="landWidthInput" type="number" min="1" max="2000" step="0.5" value="6" onchange="App.updateSiteConfig()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">Panjang Tanah (m)</label>
+                        <input id="landLengthInput" type="number" min="1" max="2000" step="0.5" value="10" onchange="App.updateSiteConfig()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">Tinggi Plafon (m)</label>
+                        <input id="wallHeightInput" type="number" min="2" max="20" step="0.1" value="3.2" onchange="App.updateSiteConfig()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">Jumlah Lantai</label>
+                        <select id="totalFloorsInput" onchange="App.updateSiteConfig()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 font-mono">
+                            <option value="1">1 Lantai</option>
+                            <option value="2" selected>2 Lantai</option>
+                            <option value="3">3 Lantai</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Summary Metrics Card -->
+                <div class="p-2.5 rounded bg-slate-100 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/70 grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                        <span class="text-slate-500 dark:text-slate-400 block">Luas Tanah:</span>
+                        <span id="metricLandArea" class="font-mono font-bold text-slate-800 dark:text-slate-100">60.0 m²</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 dark:text-slate-400 block">Luas Bangunan:</span>
+                        <span id="metricBuildingArea" class="font-mono font-bold text-blue-600 dark:text-blue-400">21.0 m²</span>
+                    </div>
+                </div>
+
+                <!-- Canvas Paper Format & Orientation -->
+                <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div>
+                        <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">Ukuran Kanvas</label>
+                        <select id="paperSizeSelect" onchange="App.updatePaperConfig()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1">
+                            <option value="A4">A4 (210 × 297 mm)</option>
+                            <option value="A3" selected>A3 (297 × 420 mm)</option>
+                            <option value="CUSTOM">Kustom / Bebas</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">Orientasi</label>
+                        <select id="paperOrientSelect" onchange="App.updatePaperConfig()" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1">
+                            <option value="landscape" selected>Landscape</option>
+                            <option value="portrait">Portrait</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Background Reference Image & Custom 2D/3D Object Import -->
+            <div class="p-3.5 space-y-3 text-xs">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Acuan Latar & Impor Aset</h2>
+                
+                <!-- Background Image Reference -->
+                <div class="space-y-1.5">
+                    <label class="block text-[11px] font-medium text-slate-600 dark:text-slate-300">Gambar Acuan Kanvas (2D Blueprint)</label>
+                    <input type="file" id="bgImageInput" accept="image/*" onchange="App.handleBgImageUpload(event)" class="block w-full text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-50 dark:file:bg-blue-950 file:text-blue-600 dark:file:text-blue-400">
+                    <div class="flex items-center gap-2 pt-1">
+                        <span class="text-[11px] text-slate-400">Opasitas:</span>
+                        <input type="range" id="bgOpacitySlider" min="0" max="100" value="45" oninput="App.setBgOpacity(this.value)" class="flex-1 accent-blue-600 h-1">
+                        <button onclick="App.clearBgImage()" class="text-[11px] text-red-500 hover:underline">Hapus</button>
+                    </div>
+                </div>
+
+                <!-- Import Custom 2D/3D Component -->
+                <div class="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
+                    <label class="block text-[11px] font-medium text-slate-600 dark:text-slate-300">Impor Komponen Kustom (3D .OBJ/.GLTF / Gambar 2D)</label>
+                    <input type="file" id="customAssetInput" accept=".obj,.gltf,.glb,image/*" onchange="App.handleCustomComponentImport(event)" class="block w-full text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-emerald-50 dark:file:bg-emerald-950 file:text-emerald-600 dark:file:text-emerald-400">
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Bottom CAD Status Bar -->
+    <footer class="h-7 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-3 flex items-center justify-between text-[11px] font-mono text-slate-500 dark:text-slate-400 shrink-0 z-30">
+        <div class="flex items-center gap-4">
+            <span id="statusCoord">X: 0.00 m | Y: 0.00 m</span>
+            <span id="statusZoom">Zoom: 100%</span>
+            <span id="statusScale">Skala: 1:100</span>
+            <label class="flex items-center gap-1 cursor-pointer font-sans">
+                <input type="checkbox" id="snapToggle" checked onchange="App.toggleSnap(this.checked)" class="rounded text-blue-600">
+                <span>Snap Grid (0.25m)</span>
+            </label>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="statusCounts">Objek: 0 | Listrik: 0 W | Jaringan: 0 Node</span>
+            <span id="statusStorage" class="text-emerald-600 dark:text-emerald-400"><i class="fa-solid fa-check-circle"></i> Tersimpan Otomatis</span>
+        </div>
+    </footer>
+
+    <!-- Modal 1: Analysis, Utility Cost Calculator & AI Prompt + JSON Generator -->
+    <div id="analysisModal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-microchip text-blue-500"></i>
+                    <h3 class="font-bold text-sm">Analisis Keamanan, Prediksi Biaya Utilitas & Prompt AI</h3>
+                </div>
+                <button onclick="App.closeModal('analysisModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+                <!-- Left Column: Cost Predictions (Electricity, Water/Gas, ISP) -->
+                <div class="space-y-4">
+                    <!-- Electrical Cost Card -->
+                    <div class="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-bolt"></i> Prediksi Biaya Listrik (Prabayar & Pascabayar)
+                            </span>
+                            <select id="elecTariffSelect" onchange="App.runFullAnalysis()" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-0.5 text-[11px]">
+                                <option value="1352">R-1 900 VA (Rp 1.352/kWh)</option>
+                                <option value="1444.7" selected>R-1 1300-2200 VA (Rp 1.444,7/kWh)</option>
+                                <option value="1699.5">R-2 / Bisnis (Rp 1.699,5/kWh)</option>
+                            </select>
+                        </div>
+                        <div id="elecAnalysisMetrics" class="grid grid-cols-2 gap-2 font-mono text-[11px]"></div>
+                    </div>
+
+                    <!-- Water & Gas Cost Card -->
+                    <div class="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-droplet"></i> Prediksi Biaya Air Bersih & Gas
+                            </span>
+                            <div class="flex items-center gap-1 text-[11px]">
+                                <span>Tarif Air/m³: Rp</span>
+                                <input id="waterTariffInput" type="number" value="7500" onchange="App.runFullAnalysis()" class="w-16 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 font-mono">
+                            </div>
+                        </div>
+                        <div id="plumbAnalysisMetrics" class="grid grid-cols-2 gap-2 font-mono text-[11px]"></div>
+                    </div>
+
+                    <!-- ISP Network Cost Card -->
+                    <div class="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-wifi"></i> Prediksi Biaya ISP (FUP Pascabayar & Kuota Prabayar)
+                            </span>
+                            <select id="ispPlanSelect" onchange="App.runFullAnalysis()" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-0.5 text-[11px]">
+                                <option value="50_325000_1200">50 Mbps (FUP 1200 GB - Rp 325rb)</option>
+                                <option value="100_425000_2000" selected>100 Mbps (FUP 2000 GB - Rp 425rb)</option>
+                                <option value="300_850000_4000">300 Mbps Dedicated (Rp 850rb)</option>
+                            </select>
+                        </div>
+                        <div id="netAnalysisMetrics" class="grid grid-cols-2 gap-2 font-mono text-[11px]"></div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Hazard Audit & AI Prompt+JSON Builder -->
+                <div class="space-y-4 flex flex-col">
+                    <!-- Automated Rule-based Hazard & Risk Findings -->
+                    <div class="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-2">
+                        <h4 class="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                            <i class="fa-solid fa-shield-halved text-emerald-500"></i>
+                            Temuan Analisis Bahaya & Risiko Otomatis
+                        </h4>
+                        <div id="hazardFindingsList" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
+                    </div>
+
+                    <!-- AI Prompt + JSON Generator -->
+                    <div class="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 flex-1 flex flex-col space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                                <i class="fa-solid fa-robot text-purple-500"></i> Prompt + JSON untuk Konsultasi AI
+                            </span>
+                            <div class="flex items-center gap-1.5">
+                                <select id="aiPromptDomain" onchange="App.generateAIPrompt()" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-0.5 text-[11px]">
+                                    <option value="all">Semua Domain (Lengkap)</option>
+                                    <option value="mep">Bahaya Kelistrikan, Air, Limbah & Gas</option>
+                                    <option value="net">Risiko Topologi Jaringan & Firewall</option>
+                                    <option value="evac">Kesiapsiagaan Bencana & Evakuasi</option>
+                                </select>
+                                <button onclick="App.copyText('aiPromptTextarea')" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] flex items-center gap-1">
+                                    <i class="fa-regular fa-copy"></i> Salin Prompt
+                                </button>
+                            </div>
+                        </div>
+                        <textarea id="aiPromptTextarea" readonly class="w-full flex-1 min-h-[160px] bg-slate-900 text-emerald-300 font-mono text-[11px] p-2.5 rounded border border-slate-700 focus:outline-none"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Bill of Materials (BOM) -->
+    <div id="bomModal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h3 class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-table-list text-amber-500"></i> Bill of Materials (Daftar Kuantitas Komponen & Jalur)
+                </h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="App.exportBOMCSV()" class="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded flex items-center gap-1">
+                        <i class="fa-solid fa-file-csv"></i> Unduh CSV
+                    </button>
+                    <button onclick="App.closeModal('bomModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                            <th class="py-2 px-2">Kategori</th>
+                            <th class="py-2 px-2">Nama Komponen / Jalur</th>
+                            <th class="py-2 px-2">Spesifikasi / Dimensi</th>
+                            <th class="py-2 px-2 text-right">Kuantitas / Panjang</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bomTableBody" class="divide-y divide-slate-200 dark:divide-slate-800 font-mono text-[11px]"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 3: Import / Export Multi-format -->
+    <div id="exportModal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h3 class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-file-export text-blue-500"></i> Impor, Simpan & Ekspor Multi-Format
+                </h3>
+                <button onclick="App.closeModal('exportModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 px-2 py-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-4 text-xs">
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <button onclick="App.exportJSON()" class="p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-blue-500 flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60">
+                        <i class="fa-solid fa-file-code text-lg text-blue-500"></i>
+                        <span class="font-semibold">Ekspor JSON</span>
+                        <span class="text-[10px] text-slate-400">Simpan Progres Proyek</span>
+                    </button>
+                    <button onclick="App.exportDXF()" class="p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-amber-500 flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60">
+                        <i class="fa-solid fa-compass-drafting text-lg text-amber-500"></i>
+                        <span class="font-semibold">Ekspor CAD (.DXF)</span>
+                        <span class="text-[10px] text-slate-400">AutoCAD / LibreCAD</span>
+                    </button>
+                    <button onclick="App.exportOBJ3D()" class="p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-purple-500 flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60">
+                        <i class="fa-solid fa-cube text-lg text-purple-500"></i>
+                        <span class="font-semibold">Ekspor 3D (.OBJ)</span>
+                        <span class="text-[10px] text-slate-400">Mesh 3D Standar</span>
+                    </button>
+                    <button onclick="App.exportPNG()" class="p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-emerald-500 flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60">
+                        <i class="fa-solid fa-image text-lg text-emerald-500"></i>
+                        <span class="font-semibold">Ekspor PNG</span>
+                        <span class="text-[10px] text-slate-400">Gambar Denah 2D/3D</span>
+                    </button>
+                    <button onclick="App.exportPDF()" class="p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-red-500 flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60">
+                        <i class="fa-solid fa-file-pdf text-lg text-red-500"></i>
+                        <span class="font-semibold">Ekspor PDF Teknis</span>
+                        <span class="text-[10px] text-slate-400">Cetak Skala Presisi</span>
+                    </button>
+                    <label class="p-3 rounded-lg border border-dashed border-blue-400 dark:border-blue-600 hover:bg-blue-50/30 dark:hover:bg-blue-950/30 flex flex-col items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-file-import text-lg text-blue-500"></i>
+                        <span class="font-semibold">Impor JSON</span>
+                        <span class="text-[10px] text-slate-400">Muat Berkas Proyek</span>
+                        <input type="file" accept=".json" onchange="App.importJSONFile(event)" class="hidden">
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toastBox" class="fixed bottom-10 right-4 px-3.5 py-2 rounded-lg bg-slate-900 text-white border border-slate-700 shadow-xl text-xs flex items-center gap-2 transition-all duration-300 opacity-0 pointer-events-none z-50">
+        <i id="toastIcon" class="fa-solid fa-circle-info text-blue-400"></i>
+        <span id="toastText">Notifikasi</span>
+    </div>
+
+    <script>
+        const CATALOG = {
+            arch: [
+                { type: 'wall', name: 'Dinding / Pagar', mode: 'line', icon: 'fa-border-all', color: '#94a3b8', thickness: 0.15, height: 3.2, material: 'bata' },
+                { type: 'floor', name: 'Tanah / Lantai Ruang', mode: 'box', icon: 'fa-vector-square', w: 3.0, l: 3.0, h: 0.1, color: '#cbd5e1', material: 'keramik' },
+                { type: 'door', name: 'Pintu / Gerbang', mode: 'item', icon: 'fa-door-open', w: 0.9, l: 0.15, h: 2.1, color: '#b45309', material: 'kayu' },
+                { type: 'window', name: 'Jendela / Ventilasi', mode: 'item', icon: 'fa-table-cells-large', w: 1.2, l: 0.15, h: 1.2, zOffset: 0.9, color: '#38bdf8', material: 'kaca' },
+                { type: 'bed', name: 'Tempat Tidur', mode: 'item', icon: 'fa-bed', w: 1.6, l: 2.0, h: 0.65, color: '#6366f1', material: 'kain' },
+                { type: 'sofa', name: 'Sofa / Kursi Tamu', mode: 'item', icon: 'fa-couch', w: 1.8, l: 0.85, h: 0.8, color: '#ec4899', material: 'kain' },
+                { type: 'desk', name: 'Meja & Kursi Kerja', mode: 'item', icon: 'fa-chair', w: 1.2, l: 0.7, h: 0.75, color: '#d97706', material: 'kayu' },
+                { type: 'cabinet', name: 'Lemari / Rak', mode: 'item', icon: 'fa-box-archive', w: 1.0, l: 0.5, h: 2.0, color: '#92400e', material: 'kayu' },
+                { type: 'car', name: 'Kendaraan (Mobil)', mode: 'item', icon: 'fa-car-side', w: 1.8, l: 4.2, h: 1.5, color: '#3b82f6', material: 'logam' },
+                { type: 'moto', name: 'Kendaraan (Motor)', mode: 'item', icon: 'fa-motorcycle', w: 0.75, l: 1.9, h: 1.1, color: '#ef4444', material: 'logam' },
+                { type: 'person', name: 'Orang (Skala Manusia)', mode: 'item', icon: 'fa-person', w: 0.5, l: 0.5, h: 1.72, color: '#f59e0b', material: 'organik' },
+                { type: 'tree', name: 'Tanaman / Pohon', mode: 'item', icon: 'fa-tree', w: 1.6, l: 1.6, h: 3.0, color: '#22c55e', material: 'organik' }
+            ],
+            elec: [
+                { type: 'wire_power', name: 'Kabel / Jalur Listrik', mode: 'line', icon: 'fa-grip-lines', color: '#ef4444', thickness: 0.04, voltage: 220 },
+                { type: 'power_source', name: 'Sumber Daya (KWh/Panel)', mode: 'item', icon: 'fa-bolt-lightning', w: 0.4, l: 0.25, h: 0.5, zOffset: 1.4, color: '#eab308', maxWatt: 2200, voltage: 220, watt: 0, hours: 24 },
+                { type: 'mcb', name: 'Sekering / MCB Proteksi', mode: 'item', icon: 'fa-toggle-on', w: 0.3, l: 0.2, h: 0.3, zOffset: 1.5, color: '#f97316', maxAmp: 10, voltage: 220, watt: 0, hours: 24 },
+                { type: 'grounding', name: 'Titik Grounding', mode: 'item', icon: 'fa-arrow-down-wide-short', w: 0.35, l: 0.35, h: 0.4, color: '#84cc16', voltage: 0, watt: 0, hours: 24 },
+                { type: 'switch', name: 'Saklar Lampu', mode: 'item', icon: 'fa-lightbulb', w: 0.25, l: 0.15, h: 0.25, zOffset: 1.3, color: '#facc15', voltage: 220, watt: 15, hours: 8 },
+                { type: 'socket', name: 'Stop Kontak', mode: 'item', icon: 'fa-plug', w: 0.25, l: 0.15, h: 0.25, zOffset: 0.4, color: '#fb923c', voltage: 220, watt: 100, hours: 4 },
+                { type: 'ac', name: 'Unit AC Split', mode: 'item', icon: 'fa-snowflake', w: 0.85, l: 0.3, h: 0.3, zOffset: 2.5, color: '#38bdf8', voltage: 220, watt: 750, hours: 8 },
+                { type: 'fridge', name: 'Kulkas / Pendingin', mode: 'item', icon: 'fa-temperature-low', w: 0.65, l: 0.65, h: 1.65, color: '#06b6d4', voltage: 220, watt: 150, hours: 24 },
+                { type: 'washer', name: 'Mesin Cuci', mode: 'item', icon: 'fa-soap', w: 0.65, l: 0.65, h: 0.9, color: '#0284c7', voltage: 220, watt: 450, hours: 1.5 },
+                { type: 'tv', name: 'Smart TV / Monitor', mode: 'item', icon: 'fa-tv', w: 1.1, l: 0.2, h: 0.65, zOffset: 1.0, color: '#a855f7', voltage: 220, watt: 110, hours: 6 }
+            ],
+            plumb: [
+                { type: 'pipe_clean', name: 'Pipa Air Bersih', mode: 'line', icon: 'fa-water', color: '#0ea5e9', thickness: 0.05, flowRate: 12 },
+                { type: 'pipe_waste', name: 'Pipa Limbah / Kotor', mode: 'line', icon: 'fa-Bacteria', color: '#64748b', thickness: 0.08, flowRate: 15 },
+                { type: 'pipe_drain', name: 'Saluran Drainase Hujan', mode: 'line', icon: 'fa-cloud-showers-heavy', color: '#3b82f6', thickness: 0.12, flowRate: 30 },
+                { type: 'pipe_gas', name: 'Pipa Jalur Gas', mode: 'line', icon: 'fa-fire-flame-simple', color: '#eab308', thickness: 0.04, flowRate: 2 },
+                { type: 'fitting', name: 'Fitting Sambungan (Tee/Elbow)', mode: 'item', icon: 'fa-circle-nodes', w: 0.25, l: 0.25, h: 0.25, color: '#0284c7', flowRate: 0, hours: 0 },
+                { type: 'faucet', name: 'Keran Air / Shower', mode: 'item', icon: 'fa-faucet', w: 0.3, l: 0.3, h: 0.9, color: '#38bdf8', flowRate: 8, hours: 1.2 },
+                { type: 'water_tank', name: 'Toren Air Bersih', mode: 'item', icon: 'fa-database', w: 1.1, l: 1.1, h: 1.4, zOffset: 3.2, color: '#0284c7', capacityL: 1050, flowRate: 0, hours: 0 },
+                { type: 'gas_tank', name: 'Tabung Gas LPG', mode: 'item', icon: 'fa-bottle-droplet', w: 0.4, l: 0.4, h: 0.65, color: '#22c55e', gasKg: 12, flowRate: 0.4, hours: 2 },
+                { type: 'septic', name: 'Septic Tank / IPAL', mode: 'item', icon: 'fa-box', w: 1.5, l: 1.2, h: 1.2, color: '#475569', flowRate: 0, hours: 0 }
+            ],
+            net: [
+                { type: 'cable_lan', name: 'Jalur Kabel LAN / Fiber', mode: 'line', icon: 'fa-ethernet', color: '#6366f1', thickness: 0.03, speedMbps: 1000 },
+                { type: 'link_wifi', name: 'Jalur Sinyal Wireless', mode: 'line', icon: 'fa-signal', color: '#a855f7', thickness: 0.02, speedMbps: 300 },
+                { type: 'modem', name: 'Modem / ONT ISP', mode: 'item', icon: 'fa-globe', w: 0.35, l: 0.25, h: 0.2, zOffset: 0.8, color: '#3b82f6', ip: '192.168.1.1', gateway: '10.0.0.1', dns: '1.1.1.1', speedMbps: 300, maxConn: 4, firewall: 'NAT + SPI Enabled', dailyGB: 2 },
+                { type: 'router', name: 'Router Core', mode: 'item', icon: 'fa-route', w: 0.4, l: 0.3, h: 0.2, zOffset: 0.8, color: '#2563eb', ip: '192.168.10.1', gateway: '192.168.1.1', dns: '8.8.8.8', speedMbps: 1000, maxConn: 8, firewall: 'ACL Strict', dailyGB: 5 },
+                { type: 'firewall_box', name: 'Hardware Firewall', mode: 'item', icon: 'fa-shield-virus', w: 0.45, l: 0.35, h: 0.25, zOffset: 1.0, color: '#dc2626', ip: '192.168.1.254', gateway: '192.168.1.1', dns: '1.1.1.1', speedMbps: 1000, maxConn: 8, firewall: 'Deny Inbound, Allow 80/443', dailyGB: 1 },
+                { type: 'switch', name: 'Network Switch', mode: 'item', icon: 'fa-server', w: 0.45, l: 0.3, h: 0.2, zOffset: 1.0, color: '#0d9488', ip: '192.168.10.2', gateway: '192.168.10.1', dns: '8.8.8.8', speedMbps: 1000, maxConn: 24, firewall: 'VLAN Trunk', dailyGB: 1 },
+                { type: 'hub', name: 'Legacy Hub (Half-Duplex)', mode: 'item', icon: 'fa-circle-dot', w: 0.35, l: 0.25, h: 0.15, zOffset: 0.8, color: '#64748b', ip: '192.168.10.3', gateway: '192.168.10.1', dns: '8.8.8.8', speedMbps: 100, maxConn: 8, firewall: 'None', dailyGB: 1 },
+                { type: 'ap', name: 'Access Point (WiFi)', mode: 'item', icon: 'fa-wifi', w: 0.3, l: 0.3, h: 0.12, zOffset: 2.8, color: '#8b5cf6', ip: '192.168.10.10', gateway: '192.168.10.1', dns: '1.1.1.1', speedMbps: 600, maxConn: 32, wifiRadius: 8, firewall: 'WPA3-Enterprise', dailyGB: 12 },
+                { type: 'server', name: 'Server Rack', mode: 'item', icon: 'fa-hard-drive', w: 0.7, l: 0.8, h: 1.9, color: '#1e293b', ip: '192.168.10.100', gateway: '192.168.10.1', dns: '1.1.1.1', speedMbps: 2500, maxConn: 64, firewall: 'Allow 22, 443', dailyGB: 25 },
+                { type: 'client', name: 'Client (PC / Laptop / CCTV)', mode: 'item', icon: 'fa-laptop', w: 0.45, l: 0.4, h: 0.35, zOffset: 0.75, color: '#0ea5e9', ip: '192.168.10.50', gateway: '192.168.10.1', dns: '8.8.8.8', speedMbps: 300, maxConn: 1, firewall: 'Client OS Firewall', dailyGB: 8 }
+            ],
+            evac: [
+                { type: 'evac_route', name: 'Jalur Rute Evakuasi', mode: 'line', icon: 'fa-shoe-prints', color: '#10b981', thickness: 0.15 },
+                { type: 'exit_door', name: 'Pintu Darurat (Exit)', mode: 'item', icon: 'fa-person-through-window', w: 1.0, l: 0.2, h: 2.1, color: '#10b981' },
+                { type: 'apar', name: 'APAR (Tabung Pemadam)', mode: 'item', icon: 'fa-fire-extinguisher', w: 0.3, l: 0.3, h: 0.6, zOffset: 1.0, color: '#ef4444', coverageRadius: 15 },
+                { type: 'hydrant', name: 'Hidran Kebakaran', mode: 'item', icon: 'fa-faucet-drip', w: 0.5, l: 0.5, h: 1.0, color: '#dc2626', coverageRadius: 30 },
+                { type: 'assembly', name: 'Titik Kumpul (Assembly Point)', mode: 'item', icon: 'fa-users-viewfinder', w: 1.5, l: 1.5, h: 2.2, color: '#16a34a' },
+                { type: 'alarm', name: 'Sirine / Alarm Bencana', mode: 'item', icon: 'fa-bell', w: 0.25, l: 0.25, h: 0.25, zOffset: 2.4, color: '#f59e0b' }
+            ]
+        };
+
+        const App = {
+            state: {
+                projectName: 'Denah PasaDena',
+                scale: 100, // 1:1 up to 1:5000
+                landWidth: 6, // meters
+                landLength: 10, // meters
+                wallHeight: 3.2, // meters
+                totalFloors: 2,
+                activeFloor: 1,
+                paperSize: 'A3',
+                paperOrient: 'landscape',
+                discipline: 'arch',
+                activeTool: 'select',
+                activeCatalogItem: null,
+                selectedId: null,
+                snapEnabled: true,
+                snapStep: 0.25, // meters
+                archOpacity: 1.0,
+                wireframe: false,
+                viewMode: 'dual',
+                layers: { arch: true, elec: true, plumb: true, net: true, evac: true, grid: true },
+                bgImage: null,
+                bgOpacity: 0.45,
+                elements: []
+            },
+            history: [],
+            historyIndex: -1,
+            canvas2D: null,
+            ctx2D: null,
+            cam2D: { x: 0, y: 0, pxPerMeter: 55 },
+            interact: {
+                isPanning: false,
+                isDraggingObj: false,
+                isDrawingLine: false,
+                lineStart: null,
+                mouseWorld: { x: 0, y: 0 },
+                dragStartMouse: { x: 0, y: 0 },
+                dragObjInitial: null
+            },
+            three: {
+                scene: null,
+                camera: null,
+                renderer: null,
+                controls: { isDown: false, button: 0, lastX: 0, lastY: 0, theta: Math.PI / 4, phi: Math.PI / 3, radius: 18, target: new THREE.Vector3(3, 0, 5) },
+                meshesGroup: null,
+                gridHelper: null
+            },
+
+            init() {
+                this.canvas2D = document.getElementById('canvas2D');
+                this.ctx2D = this.canvas2D.getContext('2d');
+                this.renderPalette();
+                this.initThreeJS();
+                this.bindEvents();
+                this.handleResize();
+
+                // Check cached state or load default Rumah 21/60 preset
+                const saved = localStorage.getItem('pasadena_project_v1');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (parsed && Array.isArray(parsed.elements) && parsed.elements.length > 0) {
+                            this.state.scale = parsed.scale || 100;
+                            this.state.landWidth = parsed.landWidth || 6;
+                            this.state.landLength = parsed.landLength || 10;
+                            this.state.wallHeight = parsed.wallHeight || 3.2;
+                            this.state.totalFloors = parsed.totalFloors || 2;
+                            this.state.elements = parsed.elements;
+                            this.syncUIControls();
+                            this.pushHistory();
+                            this.fitView2D();
+                            this.rebuild3DScene();
+                        } else {
+                            this.loadPreset('rumah_21_60');
+                        }
+                    } catch (e) {
+                        this.loadPreset('rumah_21_60');
+                    }
+                } else {
+                    this.loadPreset('rumah_21_60');
+                }
+
+                this.animate();
+            },
+
+            pushHistory() {
+                const snapshot = JSON.stringify({
+                    scale: this.state.scale,
+                    landWidth: this.state.landWidth,
+                    landLength: this.state.landLength,
+                    wallHeight: this.state.wallHeight,
+                    totalFloors: this.state.totalFloors,
+                    elements: this.state.elements
+                });
+                if (this.historyIndex >= 0 && this.history[this.historyIndex] === snapshot) return;
+                this.history = this.history.slice(0, this.historyIndex + 1);
+                this.history.push(snapshot);
+                if (this.history.length > 50) this.history.shift();
+                else this.historyIndex++;
+                this.saveToCache(snapshot);
+                this.updateMetricsAndStatus();
+            },
+
+            undo() {
+                if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                    this.restoreSnapshot(this.history[this.historyIndex]);
+                    this.showToast('Undo berhasil');
+                }
+            },
+
+            redo() {
+                if (this.historyIndex < this.history.length - 1) {
+                    this.historyIndex++;
+                    this.restoreSnapshot(this.history[this.historyIndex]);
+                    this.showToast('Redo berhasil');
+                }
+            },
+
+            restoreSnapshot(jsonStr) {
+                const data = JSON.parse(jsonStr);
+                this.state.scale = data.scale;
+                this.state.landWidth = data.landWidth;
+                this.state.landLength = data.landLength;
+                this.state.wallHeight = data.wallHeight;
+                this.state.totalFloors = data.totalFloors;
+                this.state.elements = data.elements;
+                this.syncUIControls();
+                this.renderInspector();
+                this.rebuild3DScene();
+                this.saveToCache(jsonStr);
+                this.updateMetricsAndStatus();
+            },
+
+            saveToCache(jsonStr) {
+                try {
+                    localStorage.setItem('pasadena_project_v1', jsonStr);
+                } catch (e) {
+                    console.warn('Cache storage limit reached');
+                }
+            },
+
+            loadPreset(presetKey) {
+                if (!presetKey) return;
+                this.state.selectedId = null;
+                this.state.activeFloor = 1;
+                const els = [];
+                let idCounter = 1;
+                const uid = (prefix) => `${prefix}_${idCounter++}`;
+
+                if (presetKey === 'kamar_2x3') {
+                    this.state.scale = 50;
+                    this.state.landWidth = 3;
+                    this.state.landLength = 4;
+                    this.state.wallHeight = 3.0;
+                    this.state.totalFloors = 1;
+
+                    // Floor & Walls (2x3m room centered at 0.5..2.5, 0.5..3.5)
+                    els.push({ id: uid('fl'), discipline: 'arch', type: 'floor', name: 'Lantai Kamar 2x3', mode: 'box', floor: 1, x: 1.5, y: 2.0, w: 2.0, l: 3.0, h: 0.1, rot: 0, color: '#e2e8f0', material: 'keramik' });
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Dinding Utara', mode: 'line', floor: 1, x1: 0.5, y1: 0.5, x2: 2.5, y2: 0.5, thickness: 0.15, height: 3.0, color: '#94a3b8', material: 'bata' });
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Dinding Timur', mode: 'line', floor: 1, x1: 2.5, y1: 0.5, x2: 2.5, y2: 3.5, thickness: 0.15, height: 3.0, color: '#94a3b8', material: 'bata' });
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Dinding Selatan', mode: 'line', floor: 1, x1: 2.5, y1: 3.5, x2: 0.5, y2: 3.5, thickness: 0.15, height: 3.0, color: '#94a3b8', material: 'bata' });
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Dinding Barat', mode: 'line', floor: 1, x1: 0.5, y1: 3.5, x2: 0.5, y2: 0.5, thickness: 0.15, height: 3.0, color: '#94a3b8', material: 'bata' });
+                    els.push({ id: uid('dr'), discipline: 'arch', type: 'door', name: 'Pintu Kamar', mode: 'item', floor: 1, x: 1.1, y: 3.5, w: 0.8, l: 0.15, h: 2.1, rot: 0, color: '#b45309', material: 'kayu' });
+                    els.push({ id: uid('wn'), discipline: 'arch', type: 'window', name: 'Jendela Kamar', mode: 'item', floor: 1, x: 1.5, y: 0.5, w: 1.0, l: 0.15, h: 1.2, zOffset: 0.9, rot: 0, color: '#38bdf8', material: 'kaca' });
+                    els.push({ id: uid('bd'), discipline: 'arch', type: 'bed', name: 'Kasur Single', mode: 'item', floor: 1, x: 1.1, y: 1.5, w: 1.0, l: 1.8, h: 0.6, rot: 0, color: '#6366f1', material: 'kain' });
+                    els.push({ id: uid('dk'), discipline: 'arch', type: 'desk', name: 'Meja Belajar', mode: 'item', floor: 1, x: 2.1, y: 1.2, w: 0.6, l: 1.0, h: 0.75, rot: 90, color: '#d97706', material: 'kayu' });
+
+                    // Electrical
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'mcb', name: 'Sub-Panel Kamar', mode: 'item', floor: 1, x: 0.6, y: 3.3, w: 0.25, l: 0.15, h: 0.25, zOffset: 1.5, rot: 0, color: '#f97316', maxAmp: 6, voltage: 220, watt: 0, hours: 24 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'ac', name: 'AC 0.5 PK', mode: 'item', floor: 1, x: 2.4, y: 2.2, w: 0.8, l: 0.25, h: 0.3, zOffset: 2.4, rot: 90, color: '#38bdf8', voltage: 220, watt: 380, hours: 8 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'socket', name: 'Stop Kontak Meja', mode: 'item', floor: 1, x: 2.4, y: 1.2, w: 0.2, l: 0.15, h: 0.2, zOffset: 0.4, rot: 0, color: '#fb923c', voltage: 220, watt: 120, hours: 6 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'wire_power', name: 'Jalur Listrik Kamar', mode: 'line', floor: 1, x1: 0.6, y1: 3.3, x2: 2.4, y2: 2.2, thickness: 0.03, color: '#ef4444', voltage: 220 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'wire_power', name: 'Jalur Stop Kontak', mode: 'line', floor: 1, x1: 2.4, y1: 2.2, x2: 2.4, y2: 1.2, thickness: 0.03, color: '#ef4444', voltage: 220 });
+
+                    // Network
+                    els.push({ id: uid('nt'), discipline: 'net', type: 'ap', name: 'WiFi Repeater', mode: 'item', floor: 1, x: 0.6, y: 2.8, w: 0.25, l: 0.25, h: 0.1, zOffset: 2.2, rot: 0, color: '#8b5cf6', ip: '192.168.1.2', gateway: '192.168.1.1', dns: '1.1.1.1', speedMbps: 300, maxConn: 10, wifiRadius: 5, firewall: 'WPA2', dailyGB: 6 });
+                    els.push({ id: uid('nt'), discipline: 'net', type: 'client', name: 'Laptop Kerja', mode: 'item', floor: 1, x: 2.1, y: 1.2, w: 0.35, l: 0.3, h: 0.25, zOffset: 0.75, rot: 0, color: '#0ea5e9', ip: '192.168.1.15', gateway: '192.168.1.1', dns: '1.1.1.1', speedMbps: 300, maxConn: 1, firewall: 'OS Firewall', dailyGB: 8 });
+                    els.push({ id: uid('nt'), discipline: 'net', type: 'link_wifi', name: 'Koneksi WiFi', mode: 'line', floor: 1, x1: 0.6, y1: 2.8, x2: 2.1, y2: 1.2, thickness: 0.02, color: '#a855f7', speedMbps: 300 });
+
+                    // Evacuation
+                    els.push({ id: uid('ev'), discipline: 'evac', type: 'apar', name: 'APAR Mini 1kg', mode: 'item', floor: 1, x: 0.65, y: 3.1, w: 0.25, l: 0.25, h: 0.45, zOffset: 1.0, rot: 0, color: '#ef4444', coverageRadius: 8 });
+                    els.push({ id: uid('ev'), discipline: 'evac', type: 'evac_route', name: 'Rute Keluar Kamar', mode: 'line', floor: 1, x1: 1.6, y1: 1.8, x2: 1.1, y2: 3.8, thickness: 0.12, color: '#10b981' });
+
+                } else if (presetKey === 'rumah_21_60') {
+                    this.state.scale = 100;
+                    this.state.landWidth = 6;
+                    this.state.landLength = 10;
+                    this.state.wallHeight = 3.2;
+                    this.state.totalFloors = 1;
+
+                    // Building 21 m² (3.5m x 6.0m) on 6x10m land (60 m²)
+                    els.push({ id: uid('fl'), discipline: 'arch', type: 'floor', name: 'Lantai Bangunan Utama (21 m²)', mode: 'box', floor: 1, x: 3.75, y: 5.0, w: 3.5, l: 6.0, h: 0.12, rot: 0, color: '#cbd5e1', material: 'keramik' });
+                    // Perimeter Walls of 3.5 x 6.0 house (from x=2.0..5.5, y=2.0..8.0)
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Dinding Belakang', mode: 'line', floor: 1, x1: 2.0, y1: 2.0, x2: 5.5, y2: 2.0, thickness: 0.15, height: 3.2, color: '#94a3b8', material: 'bata' });
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Dinding Kanan', mode: 'line', floor: 1, x1: 5.5, y1: 2.0, x2: 5.5, y2: 8.0, thickness: 0.15, height: 3.2, color: '#94a3b8', material: 'bata' });
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Dinding Depan', mode: 'line', floor: 1, x1: 5.5, y1: 8.0, x2: 2.0, y2: 8.0, thickness: 0.15, height: 3.2, color: '#94a3b8', material: 'bata' });
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Dinding Kiri', mode: 'line', floor: 1, x1: 2.0, y1: 8.0, x2: 2.0, y2: 2.0, thickness: 0.15, height: 3.2, color: '#94a3b8', material: 'bata' });
+                    // Interior Partition Walls (Bedroom & Bathroom)
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Sekat Kamar Tidur', mode: 'line', floor: 1, x1: 2.0, y1: 5.0, x2: 5.5, y2: 5.0, thickness: 0.12, height: 3.2, color: '#94a3b8', material: 'bata' });
+                    els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: 'Sekat Kamar Mandi', mode: 'line', floor: 1, x1: 3.8, y1: 2.0, x2: 3.8, y2: 5.0, thickness: 0.12, height: 3.2, color: '#94a3b8', material: 'bata' });
+
+                    // Doors & Windows
+                    els.push({ id: uid('dr'), discipline: 'arch', type: 'door', name: 'Pintu Utama', mode: 'item', floor: 1, x: 3.0, y: 8.0, w: 0.9, l: 0.15, h: 2.1, rot: 0, color: '#b45309', material: 'kayu' });
+                    els.push({ id: uid('dr'), discipline: 'arch', type: 'door', name: 'Pintu Kamar', mode: 'item', floor: 1, x: 2.8, y: 5.0, w: 0.8, l: 0.15, h: 2.1, rot: 0, color: '#b45309', material: 'kayu' });
+                    els.push({ id: uid('dr'), discipline: 'arch', type: 'door', name: 'Pintu KM/Dapur', mode: 'item', floor: 1, x: 4.6, y: 5.0, w: 0.75, l: 0.15, h: 2.0, rot: 0, color: '#b45309', material: 'kayu' });
+                    els.push({ id: uid('wn'), discipline: 'arch', type: 'window', name: 'Jendela Ruang Tamu', mode: 'item', floor: 1, x: 4.5, y: 8.0, w: 1.2, l: 0.15, h: 1.3, zOffset: 0.9, rot: 0, color: '#38bdf8', material: 'kaca' });
+                    els.push({ id: uid('wn'), discipline: 'arch', type: 'window', name: 'Jendela Kamar', mode: 'item', floor: 1, x: 2.0, y: 3.5, w: 1.1, l: 0.15, h: 1.2, zOffset: 0.9, rot: 90, color: '#38bdf8', material: 'kaca' });
+
+                    // Furniture & Exterior Items
+                    els.push({ id: uid('bd'), discipline: 'arch', type: 'bed', name: 'Tempat Tidur Queen', mode: 'item', floor: 1, x: 2.9, y: 3.1, w: 1.5, l: 1.9, h: 0.6, rot: 0, color: '#6366f1', material: 'kain' });
+                    els.push({ id: uid('sf'), discipline: 'arch', type: 'sofa', name: 'Sofa Ruang Tamu', mode: 'item', floor: 1, x: 4.8, y: 6.5, w: 0.8, l: 1.7, h: 0.8, rot: 0, color: '#ec4899', material: 'kain' });
+                    els.push({ id: uid('cr'), discipline: 'arch', type: 'car', name: 'Mobil Carport', mode: 'item', floor: 1, x: 1.1, y: 7.2, w: 1.7, l: 3.8, h: 1.45, rot: 0, color: '#3b82f6', material: 'logam' });
+                    els.push({ id: uid('tr'), discipline: 'arch', type: 'tree', name: 'Pohon Taman Depan', mode: 'item', floor: 1, x: 4.8, y: 9.1, w: 1.4, l: 1.4, h: 2.8, rot: 0, color: '#22c55e', material: 'organik' });
+                    els.push({ id: uid('pr'), discipline: 'arch', type: 'person', name: 'Penghuni', mode: 'item', floor: 1, x: 3.5, y: 6.6, w: 0.45, l: 0.45, h: 1.7, rot: 0, color: '#f59e0b', material: 'organik' });
+
+                    // Electrical System
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'power_source', name: 'KWh Meter PLN 1300VA', mode: 'item', floor: 1, x: 2.2, y: 8.1, w: 0.35, l: 0.2, h: 0.45, zOffset: 1.5, rot: 0, color: '#eab308', maxWatt: 1300, voltage: 220, watt: 0, hours: 24 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'grounding', name: 'Grounding Rod Utama', mode: 'item', floor: 1, x: 1.6, y: 8.2, w: 0.3, l: 0.3, h: 0.4, rot: 0, color: '#84cc16', voltage: 0, watt: 0, hours: 24 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'mcb', name: 'Box MCB Dalam', mode: 'item', floor: 1, x: 2.3, y: 7.7, w: 0.3, l: 0.2, h: 0.3, zOffset: 1.6, rot: 0, color: '#f97316', maxAmp: 6, voltage: 220, watt: 0, hours: 24 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'ac', name: 'AC Kamar 1/2 PK', mode: 'item', floor: 1, x: 2.1, y: 2.8, w: 0.8, l: 0.25, h: 0.3, zOffset: 2.5, rot: 90, color: '#38bdf8', voltage: 220, watt: 400, hours: 8 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'fridge', name: 'Kulkas 1 Pintu', mode: 'item', floor: 1, x: 5.1, y: 4.3, w: 0.6, l: 0.6, h: 1.5, rot: 0, color: '#06b6d4', voltage: 220, watt: 120, hours: 24 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'tv', name: 'TV Ruang Tamu', mode: 'item', floor: 1, x: 2.2, y: 6.5, w: 0.2, l: 1.0, h: 0.6, zOffset: 1.0, rot: 0, color: '#a855f7', voltage: 220, watt: 95, hours: 5 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'wire_power', name: 'Kabel Utama MCB', mode: 'line', floor: 1, x1: 2.2, y1: 8.1, x2: 2.3, y2: 7.7, thickness: 0.04, color: '#ef4444', voltage: 220 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'wire_power', name: 'Jalur Listrik TV & AC', mode: 'line', floor: 1, x1: 2.3, y1: 7.7, x2: 2.1, y2: 2.8, thickness: 0.03, color: '#ef4444', voltage: 220 });
+                    els.push({ id: uid('el'), discipline: 'elec', type: 'wire_power', name: 'Jalur Listrik Dapur', mode: 'line', floor: 1, x1: 2.3, y1: 7.7, x2: 5.1, y2: 4.3, thickness: 0.03, color: '#ef4444', voltage: 220 });
+
+                    // Plumbing & Gas
+                    els.push({ id: uid('pl'), discipline: 'plumb', type: 'water_tank', name: 'Toren Air 650L', mode: 'item', floor: 1, x: 4.8, y: 2.6, w: 0.9, l: 0.9, h: 1.2, zOffset: 3.2, rot: 0, color: '#0284c7', capacityL: 650, flowRate: 0, hours: 0 });
+                    els.push({ id: uid('pl'), discipline: 'plumb', type: 'faucet', name: 'Keran & Shower KM', mode: 'item', floor: 1, x: 4.2, y: 2.5, w: 0.3, l: 0.3, h: 0.9, rot: 0, color: '#38bdf8', flowRate: 9, hours: 1.5 });
+                    els.push({ id: uid('pl'), discipline: 'plumb', type: 'gas_tank', name: 'Tabung LPG 12kg', mode: 'item', floor: 1, x: 5.1, y: 3.4, w: 0.35, l: 0.35, h: 0.6, rot: 0, color: '#22c55e', gasKg: 12, flowRate: 0.35, hours: 1.8 });
+                    els.push({ id: uid('pl'), discipline: 'plumb', type: 'septic', name: 'Septic Tank Bio', mode: 'item', floor: 1, x: 4.6, y: 1.0, w: 1.2, l: 1.0, h: 1.2, rot: 0, color: '#475569', flowRate: 0, hours: 0 });
+                    els.push({ id: uid('pl'), discipline: 'plumb', type: 'pipe_clean', name: 'Pipa Air Bersih', mode: 'line', floor: 1, x1: 4.8, y1: 2.6, x2: 4.2, y2: 2.5, thickness: 0.04, color: '#0ea5e9', flowRate: 10 });
+                    els.push({ id: uid('pl'), discipline: 'plumb', type: 'pipe_waste', name: 'Pipa Air Kotor ke Septic', mode: 'line', floor: 1, x1: 4.2, y1: 2.5, x2: 4.6, y2: 1.0, thickness: 0.07, color: '#64748b', flowRate: 12 });
+
+                    // Network
+                    els.push({ id: uid('nt'), discipline: 'net', type: 'modem', name: 'Modem Fiber ONT', mode: 'item', floor: 1, x: 2.4, y: 6.0, w: 0.3, l: 0.2, h: 0.15, zOffset: 0.9, rot: 0, color: '#3b82f6', ip: '192.168.1.1', gateway: '10.10.0.1', dns: '1.1.1.1', speedMbps: 100, maxConn: 4, firewall: 'NAT Active', dailyGB: 2 });
+                    els.push({ id: uid('nt'), discipline: 'net', type: 'ap', name: 'Router WiFi Mesh', mode: 'item', floor: 1, x: 3.6, y: 5.5, w: 0.28, l: 0.28, h: 0.12, zOffset: 2.6, rot: 0, color: '#8b5cf6', ip: '192.168.1.2', gateway: '192.168.1.1', dns: '1.1.1.1', speedMbps: 300, maxConn: 16, wifiRadius: 6, firewall: 'WPA3', dailyGB: 14 });
+                    els.push({ id: uid('nt'), discipline: 'net', type: 'cable_lan', name: 'Patch Cord LAN', mode: 'line', floor: 1, x1: 2.4, y1: 6.0, x2: 3.6, y2: 5.5, thickness: 0.03, color: '#6366f1', speedMbps: 1000 });
+
+                    // Evacuation
+                    els.push({ id: uid('ev'), discipline: 'evac', type: 'apar', name: 'APAR Dry Powder 3kg', mode: 'item', floor: 1, x: 3.6, y: 7.7, w: 0.3, l: 0.3, h: 0.55, zOffset: 1.0, rot: 0, color: '#ef4444', coverageRadius: 10 });
+                    els.push({ id: uid('ev'), discipline: 'evac', type: 'assembly', name: 'Titik Kumpul Depan', mode: 'item', floor: 1, x: 3.0, y: 9.3, w: 1.0, l: 1.0, h: 2.0, rot: 0, color: '#16a34a' });
+                    els.push({ id: uid('ev'), discipline: 'evac', type: 'evac_route', name: 'Jalur Evakuasi Utama', mode: 'line', floor: 1, x1: 3.0, y1: 4.0, x2: 3.0, y2: 9.3, thickness: 0.12, color: '#10b981' });
+
+                } else if (presetKey === 'gedung_50x60') {
+                    this.state.scale = 500;
+                    this.state.landWidth = 50;
+                    this.state.landLength = 60;
+                    this.state.wallHeight = 4.0;
+                    this.state.totalFloors = 2;
+
+                    for (let fl = 1; fl <= 2; fl++) {
+                        // Main Building Floor 36x44m on 50x60m site
+                        els.push({ id: uid('fl'), discipline: 'arch', type: 'floor', name: `Plat Lantai ${fl} Gedung`, mode: 'box', floor: fl, x: 25, y: 30, w: 36, l: 44, h: 0.25, rot: 0, color: '#cbd5e1', material: 'beton' });
+                        // Perimeter Walls (x: 7..43, y: 8..52)
+                        els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: `Dinding Utara L${fl}`, mode: 'line', floor: fl, x1: 7, y1: 8, x2: 43, y2: 8, thickness: 0.25, height: 4.0, color: '#64748b', material: 'beton' });
+                        els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: `Dinding Timur L${fl}`, mode: 'line', floor: fl, x1: 43, y1: 8, x2: 43, y2: 52, thickness: 0.25, height: 4.0, color: '#64748b', material: 'beton' });
+                        els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: `Dinding Selatan L${fl}`, mode: 'line', floor: fl, x1: 43, y1: 52, x2: 7, y2: 52, thickness: 0.25, height: 4.0, color: '#64748b', material: 'beton' });
+                        els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: `Dinding Barat L${fl}`, mode: 'line', floor: fl, x1: 7, y1: 52, x2: 7, y2: 8, thickness: 0.25, height: 4.0, color: '#64748b', material: 'beton' });
+                        // Central Corridor Walls
+                        els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: `Koridor Kiri L${fl}`, mode: 'line', floor: fl, x1: 21, y1: 8, x2: 21, y2: 52, thickness: 0.2, height: 4.0, color: '#94a3b8', material: 'bata' });
+                        els.push({ id: uid('w'), discipline: 'arch', type: 'wall', name: `Koridor Kanan L${fl}`, mode: 'line', floor: fl, x1: 29, y1: 8, x2: 29, y2: 52, thickness: 0.2, height: 4.0, color: '#94a3b8', material: 'bata' });
+
+                        // Electrical & Network per floor
+                        els.push({ id: uid('el'), discipline: 'elec', type: 'power_source', name: `Panel MDP Lantai ${fl}`, mode: 'item', floor: fl, x: 22, y: 12, w: 1.2, l: 0.8, h: 1.8, zOffset: 0.5, rot: 0, color: '#eab308', maxWatt: 33000, voltage: 380, watt: 500, hours: 24 });
+                        els.push({ id: uid('el'), discipline: 'elec', type: 'ac', name: `HVAC Chiller Zona Barat L${fl}`, mode: 'item', floor: fl, x: 14, y: 25, w: 2.5, l: 1.2, h: 1.0, zOffset: 2.8, rot: 0, color: '#38bdf8', voltage: 380, watt: 4500, hours: 10 });
+                        els.push({ id: uid('el'), discipline: 'elec', type: 'ac', name: `HVAC Chiller Zona Timur L${fl}`, mode: 'item', floor: fl, x: 36, y: 25, w: 2.5, l: 1.2, h: 1.0, zOffset: 2.8, rot: 0, color: '#38bdf8', voltage: 380, watt: 4500, hours: 10 });
+                        els.push({ id: uid('el'), discipline: 'elec', type: 'wire_power', name: `Busbar Listrik L${fl}`, mode: 'line', floor: fl, x1: 22, y1: 12, x2: 14, y2: 25, thickness: 0.15, color: '#ef4444', voltage: 380 });
+                        els.push({ id: uid('el'), discipline: 'elec', type: 'wire_power', name: `Busbar Timur L${fl}`, mode: 'line', floor: fl, x1: 22, y1: 12, x2: 36, y2: 25, thickness: 0.15, color: '#ef4444', voltage: 380 });
+
+                        els.push({ id: uid('nt'), discipline: 'net', type: 'server', name: `Server Rack L${fl}`, mode: 'item', floor: fl, x: 28, y: 12, w: 1.2, l: 1.2, h: 2.0, rot: 0, color: '#1e293b', ip: `10.10.${fl}.10`, gateway: '10.10.0.1', dns: '1.1.1.1', speedMbps: 10000, maxConn: 128, firewall: 'Enterprise IDS', dailyGB: 85 });
+                        els.push({ id: uid('nt'), discipline: 'net', type: 'ap', name: `Enterprise AP Utara L${fl}`, mode: 'item', floor: fl, x: 25, y: 20, w: 0.8, l: 0.8, h: 0.3, zOffset: 3.5, rot: 0, color: '#8b5cf6', ip: `10.10.${fl}.20`, gateway: '10.10.0.1', dns: '1.1.1.1', speedMbps: 1200, maxConn: 64, wifiRadius: 18, firewall: 'WPA3-Ent', dailyGB: 40 });
+                        els.push({ id: uid('nt'), discipline: 'net', type: 'ap', name: `Enterprise AP Selatan L${fl}`, mode: 'item', floor: fl, x: 25, y: 40, w: 0.8, l: 0.8, h: 0.3, zOffset: 3.5, rot: 0, color: '#8b5cf6', ip: `10.10.${fl}.21`, gateway: '10.10.0.1', dns: '1.1.1.1', speedMbps: 1200, maxConn: 64, wifiRadius: 18, firewall: 'WPA3-Ent', dailyGB: 40 });
+                        els.push({ id: uid('nt'), discipline: 'net', type: 'cable_lan', name: `Backbone Fiber L${fl}`, mode: 'line', floor: fl, x1: 28, y1: 12, x2: 25, y2: 40, thickness: 0.1, color: '#6366f1', speedMbps: 10000 });
+
+                        // Evacuation & Fire Safety
+                        els.push({ id: uid('ev'), discipline: 'evac', type: 'exit_door', name: `Pintu Darurat Utara L${fl}`, mode: 'item', floor: fl, x: 25, y: 8, w: 2.2, l: 0.3, h: 2.4, rot: 0, color: '#10b981' });
+                        els.push({ id: uid('ev'), discipline: 'evac', type: 'exit_door', name: `Pintu Darurat Selatan L${fl}`, mode: 'item', floor: fl, x: 25, y: 52, w: 2.2, l: 0.3, h: 2.4, rot: 0, color: '#10b981' });
+                        els.push({ id: uid('ev'), discipline: 'evac', type: 'hydrant', name: `Box Hidran Dalam L${fl}`, mode: 'item', floor: fl, x: 22, y: 30, w: 1.0, l: 1.0, h: 1.4, rot: 0, color: '#dc2626', coverageRadius: 35 });
+                        els.push({ id: uid('ev'), discipline: 'evac', type: 'evac_route', name: `Jalur Evakuasi Koridor L${fl}`, mode: 'line', floor: fl, x1: 25, y1: 12, x2: 25, y2: 56, thickness: 0.4, color: '#10b981' });
+                    }
+                    // Ground floor assembly & outdoor facilities
+                    els.push({ id: uid('ev'), discipline: 'evac', type: 'assembly', name: 'Titik Kumpul Utama Gedung', mode: 'item', floor: 1, x: 25, y: 56.5, w: 3.0, l: 3.0, h: 2.5, rot: 0, color: '#16a34a' });
+                    els.push({ id: uid('pl'), discipline: 'plumb', type: 'water_tank', name: 'Ground Reservoir 10.000L', mode: 'item', floor: 1, x: 46, y: 12, w: 3.5, l: 3.5, h: 3.0, rot: 0, color: '#0284c7', capacityL: 10000, flowRate: 0, hours: 0 });
+                    els.push({ id: uid('pl'), discipline: 'plumb', type: 'septic', name: 'IPAL Komunal Gedung', mode: 'item', floor: 1, x: 46, y: 48, w: 4.0, l: 3.5, h: 2.5, rot: 0, color: '#475569', flowRate: 0, hours: 0 });
+                    els.push({ id: uid('pl'), discipline: 'plumb', type: 'pipe_drain', name: 'Saluran Drainase Utama', mode: 'line', floor: 1, x1: 46, y1: 12, x2: 46, y2: 48, thickness: 0.25, color: '#3b82f6', flowRate: 120 });
+                }
+
+                this.state.elements = els;
+                this.syncUIControls();
+                this.pushHistory();
+                this.fitView2D();
+                this.rebuild3DScene();
+                this.renderInspector();
+                this.showToast(`Preset "${presetKey}" berhasil dimuat`);
+            },
+
+            applyNetworkTopology(topoType) {
+                if (!topoType) return;
+                const fl = this.state.activeFloor;
+                const cx = this.state.landWidth / 2;
+                const cy = this.state.landLength / 2;
+                const span = Math.min(this.state.landWidth, this.state.landLength) * 0.28;
+                const uid = () => 'net_' + Math.random().toString(36).substring(2, 8);
+                const newEls = [];
+
+                if (topoType === 'star_lan' || topoType === 'star_wifi') {
+                    const isWifi = topoType === 'star_wifi';
+                    const centerType = isWifi ? 'ap' : 'switch';
+                    const centerName = isWifi ? 'Central Access Point (Star)' : 'Core Switch (Star)';
+                    newEls.push({
+                        id: uid(), discipline: 'net', type: centerType, name: centerName, mode: 'item', floor: fl,
+                        x: cx, y: cy, w: 0.4, l: 0.3, h: 0.2, zOffset: isWifi ? 2.6 : 1.0, rot: 0,
+                        color: isWifi ? '#8b5cf6' : '#0d9488', ip: '192.168.20.1', gateway: '192.168.1.1', dns: '1.1.1.1',
+                        speedMbps: 1000, maxConn: 16, wifiRadius: isWifi ? span * 1.5 : 0, firewall: 'VLAN Active', dailyGB: 5
+                    });
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (i * Math.PI) / 2 + Math.PI / 4;
+                        const nx = Number((cx + Math.cos(angle) * span).toFixed(2));
+                        const ny = Number((cy + Math.sin(angle) * span).toFixed(2));
+                        newEls.push({
+                            id: uid(), discipline: 'net', type: 'client', name: `Client Star #${i + 1}`, mode: 'item', floor: fl,
+                            x: nx, y: ny, w: 0.4, l: 0.35, h: 0.3, zOffset: 0.75, rot: 0, color: '#0ea5e9',
+                            ip: `192.168.20.${11 + i}`, gateway: '192.168.20.1', dns: '1.1.1.1', speedMbps: isWifi ? 300 : 1000, maxConn: 1, firewall: 'Client FW', dailyGB: 6
+                        });
+                        newEls.push({
+                            id: uid(), discipline: 'net', type: isWifi ? 'link_wifi' : 'cable_lan', name: isWifi ? 'Link WiFi Star' : 'Kabel UTP Star',
+                            mode: 'line', floor: fl, x1: cx, y1: cy, x2: nx, y2: ny, thickness: 0.03, color: isWifi ? '#a855f7' : '#6366f1', speedMbps: isWifi ? 300 : 1000
+                        });
+                    }
+                } else if (topoType === 'bus_lan') {
+                    const yBus = cy;
+                    const xStart = Number((cx - span).toFixed(2));
+                    const xEnd = Number((cx + span).toFixed(2));
+                    newEls.push({
+                        id: uid(), discipline: 'net', type: 'cable_lan', name: 'Backbone Coaxial/LAN Bus', mode: 'line', floor: fl,
+                        x1: xStart, y1: yBus, x2: xEnd, y2: yBus, thickness: 0.05, color: '#6366f1', speedMbps: 1000
+                    });
+                    for (let i = 0; i < 4; i++) {
+                        const px = Number((xStart + (i / 3) * (xEnd - xStart)).toFixed(2));
+                        const py = Number((yBus + (i % 2 === 0 ? -span * 0.45 : span * 0.45)).toFixed(2));
+                        newEls.push({
+                            id: uid(), discipline: 'net', type: 'client', name: `Node Bus #${i + 1}`, mode: 'item', floor: fl,
+                            x: px, y: py, w: 0.4, l: 0.35, h: 0.3, zOffset: 0.75, rot: 0, color: '#0ea5e9',
+                            ip: `192.168.30.${10 + i}`, gateway: '192.168.30.1', dns: '8.8.8.8', speedMbps: 100, maxConn: 1, firewall: 'Client FW', dailyGB: 4
+                        });
+                        newEls.push({
+                            id: uid(), discipline: 'net', type: 'cable_lan', name: `Drop Cable Bus #${i + 1}`, mode: 'line', floor: fl,
+                            x1: px, y1: yBus, x2: px, y2: py, thickness: 0.03, color: '#6366f1', speedMbps: 100
+                        });
+                    }
+                } else if (topoType === 'ring_lan') {
+                    const pts = [];
+                    for (let i = 0; i < 4; i++) {
+                        const a = (i * Math.PI) / 2;
+                        const px = Number((cx + Math.cos(a) * span).toFixed(2));
+                        const py = Number((cy + Math.sin(a) * span).toFixed(2));
+                        pts.push({ x: px, y: py });
+                        newEls.push({
+                            id: uid(), discipline: 'net', type: 'switch', name: `Switch Ring #${i + 1}`, mode: 'item', floor: fl,
+                            x: px, y: py, w: 0.4, l: 0.3, h: 0.2, zOffset: 1.0, rot: 0, color: '#0d9488',
+                            ip: `192.168.40.${1 + i}`, gateway: '192.168.40.1', dns: '1.1.1.1', speedMbps: 1000, maxConn: 8, firewall: 'STP Ring', dailyGB: 3
+                        });
+                    }
+                    for (let i = 0; i < 4; i++) {
+                        const p1 = pts[i];
+                        const p2 = pts[(i + 1) % 4];
+                        newEls.push({
+                            id: uid(), discipline: 'net', type: 'cable_lan', name: `Ring Link #${i + 1}`, mode: 'line', floor: fl,
+                            x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, thickness: 0.03, color: '#6366f1', speedMbps: 1000
+                        });
+                    }
+                } else if (topoType === 'mesh_hybrid') {
+                    const pts = [];
+                    for (let i = 0; i < 4; i++) {
+                        const a = (i * Math.PI) / 2 + Math.PI / 4;
+                        const px = Number((cx + Math.cos(a) * span * 0.85).toFixed(2));
+                        const py = Number((cy + Math.sin(a) * span * 0.85).toFixed(2));
+                        pts.push({ x: px, y: py });
+                        newEls.push({
+                            id: uid(), discipline: 'net', type: i % 2 === 0 ? 'router' : 'ap', name: `Mesh Node #${i + 1}`, mode: 'item', floor: fl,
+                            x: px, y: py, w: 0.35, l: 0.35, h: 0.2, zOffset: 1.8, rot: 0, color: '#8b5cf6',
+                            ip: `192.168.50.${1 + i}`, gateway: '192.168.50.1', dns: '1.1.1.1', speedMbps: 1000, maxConn: 16, wifiRadius: span, firewall: 'OSPF Mesh', dailyGB: 8
+                        });
+                    }
+                    for (let i = 0; i < pts.length; i++) {
+                        for (let j = i + 1; j < pts.length; j++) {
+                            const isDiag = Math.abs(i - j) === 2;
+                            newEls.push({
+                                id: uid(), discipline: 'net', type: isDiag ? 'link_wifi' : 'cable_lan',
+                                name: isDiag ? 'Wireless Mesh Backhaul' : 'LAN Mesh Interconnect',
+                                mode: 'line', floor: fl, x1: pts[i].x, y1: pts[i].y, x2: pts[j].x, y2: pts[j].y,
+                                thickness: 0.03, color: isDiag ? '#a855f7' : '#6366f1', speedMbps: isDiag ? 600 : 1000
+                            });
+                        }
+                    }
+                }
+
+                this.state.elements.push(...newEls);
+                this.setDiscipline('net');
+                this.pushHistory();
+                this.rebuild3DScene();
+                this.showToast(`Topologi ${topoType.toUpperCase()} ditambahkan ke Lantai ${fl}`);
+            },
+
+            setDiscipline(disc) {
+                this.state.discipline = disc;
+                ['arch', 'elec', 'plumb', 'net', 'evac'].forEach(d => {
+                    const btn = document.getElementById('tab_' + d);
+                    if (btn) btn.classList.toggle('active', d === disc);
+                });
+                this.renderPalette();
+            },
+
+            renderPalette() {
+                const container = document.getElementById('paletteContainer');
+                const items = CATALOG[this.state.discipline] || [];
+                container.innerHTML = items.map((item, idx) => {
+                    const isActive = this.state.activeTool === 'place' && this.state.activeCatalogItem && this.state.activeCatalogItem.type === item.type;
+                    return `
+                        <button onclick="App.selectCatalogItem('${this.state.discipline}', ${idx})"
+                            class="w-full p-2 rounded-lg border text-left transition flex items-center gap-2.5 ${isActive ? 'bg-blue-600 text-white border-blue-500 shadow-sm' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:border-blue-400 text-slate-700 dark:text-slate-200'}">
+                            <div class="w-8 h-8 rounded flex items-center justify-center shrink-0" style="background-color: ${item.color}25; color: ${isActive ? '#fff' : item.color}">
+                                <i class="fa-solid ${item.icon} text-sm"></i>
+                            </div>
+                            <div class="overflow-hidden flex-1">
+                                <div class="text-xs font-medium truncate">${item.name}</div>
+                                <div class="text-[10px] ${isActive ? 'text-blue-100' : 'text-slate-400'}">
+                                    ${item.mode === 'line' ? 'Tarik Garis / Jalur' : `Ukuran: ${item.w}×${item.l}m`}
+                                </div>
+                            </div>
+                        </button>
+                    `;
+                }).join('');
+            },
+
+            selectCatalogItem(disc, idx) {
+                const item = CATALOG[disc][idx];
+                this.state.activeTool = 'place';
+                this.state.activeCatalogItem = { ...item, discipline: disc };
+                document.getElementById('toolSelect').classList.remove('active');
+                document.getElementById('toolPan').classList.remove('active');
+                const banner = document.getElementById('drawingBanner');
+                if (item.mode === 'line') {
+                    banner.classList.remove('hidden');
+                    document.getElementById('drawingBannerText').textContent = `Mode Gambar ${item.name}: Klik titik awal lalu klik titik tujuan pada kanvas.`;
+                } else {
+                    banner.classList.remove('hidden');
+                    document.getElementById('drawingBannerText').textContent = `Mode Pasang ${item.name}: Klik pada kanvas 2D untuk meletakkan komponen.`;
+                }
+                this.renderPalette();
+            },
+
+            setActiveTool(tool) {
+                this.state.activeTool = tool;
+                this.state.activeCatalogItem = null;
+                this.interact.isDrawingLine = false;
+                this.interact.lineStart = null;
+                document.getElementById('toolSelect').classList.toggle('active', tool === 'select');
+                document.getElementById('toolPan').classList.toggle('active', tool === 'pan');
+                document.getElementById('drawingBanner').classList.add('hidden');
+                this.renderPalette();
+            },
+
+            fitView2D() {
+                if (!this.canvas2D) return;
+                const w = this.canvas2D.width || 600;
+                const h = this.canvas2D.height || 500;
+                const pad = 1.35;
+                const scaleX = w / (this.state.landWidth * pad);
+                const scaleY = h / (this.state.landLength * pad);
+                this.cam2D.pxPerMeter = Math.max(2, Math.min(250, Math.min(scaleX, scaleY)));
+                this.cam2D.x = (w - this.state.landWidth * this.cam2D.pxPerMeter) / 2;
+                this.cam2D.y = (h - this.state.landLength * this.cam2D.pxPerMeter) / 2;
+            },
+
+            worldToScreen(wx, wy) {
+                return {
+                    x: this.cam2D.x + wx * this.cam2D.pxPerMeter,
+                    y: this.cam2D.y + wy * this.cam2D.pxPerMeter
+                };
+            },
+
+            screenToWorld(sx, sy) {
+                let wx = (sx - this.cam2D.x) / this.cam2D.pxPerMeter;
+                let wy = (sy - this.cam2D.y) / this.cam2D.pxPerMeter;
+                if (this.state.snapEnabled) {
+                    const step = this.state.scale >= 500 ? 1.0 : this.state.snapStep;
+                    wx = Math.round(wx / step) * step;
+                    wy = Math.round(wy / step) * step;
+                }
+                return { x: Number(wx.toFixed(2)), y: Number(wy.toFixed(2)) };
+            },
+
+            draw2D() {
+                const ctx = this.ctx2D;
+                const W = this.canvas2D.width;
+                const H = this.canvas2D.height;
+                const isDark = document.documentElement.classList.contains('dark');
+
+                ctx.clearRect(0, 0, W, H);
+                ctx.fillStyle = isDark ? '#0b1120' : '#f1f5f9';
+                ctx.fillRect(0, 0, W, H);
+
+                const p0 = this.worldToScreen(0, 0);
+                const pLand = this.worldToScreen(this.state.landWidth, this.state.landLength);
+                const landWpx = pLand.x - p0.x;
+                const landHpx = pLand.y - p0.y;
+
+                // Paper Boundary Indicator (A4/A3 scaled according to 1:X)
+                if (this.state.paperSize !== 'CUSTOM') {
+                    const paperMM = this.state.paperSize === 'A3' ? { w: 420, h: 297 } : { w: 297, h: 210 };
+                    const pwMM = this.state.paperOrient === 'landscape' ? paperMM.w : paperMM.h;
+                    const phMM = this.state.paperOrient === 'landscape' ? paperMM.h : paperMM.w;
+                    const realWidthMeters = (pwMM * this.state.scale) / 1000;
+                    const realHeightMeters = (phMM * this.state.scale) / 1000;
+                    const paperPxW = realWidthMeters * this.cam2D.pxPerMeter;
+                    const paperPxH = realHeightMeters * this.cam2D.pxPerMeter;
+
+                    ctx.save();
+                    ctx.strokeStyle = isDark ? 'rgba(59, 130, 246, 0.35)' : 'rgba(37, 99, 235, 0.4)';
+                    ctx.setLineDash([6, 4]);
+                    ctx.lineWidth = 1.2;
+                    ctx.strokeRect(p0.x - (paperPxW - landWpx) / 2, p0.y - (paperPxH - landHpx) / 2, paperPxW, paperPxH);
+                    ctx.fillStyle = isDark ? 'rgba(148, 163, 184, 0.6)' : 'rgba(71, 85, 105, 0.7)';
+                    ctx.font = '10px "JetBrains Mono", monospace';
+                    ctx.fillText(`Batas Cetak ${this.state.paperSize} (${this.state.paperOrient.toUpperCase()}) @ Skala 1:${this.state.scale}`, p0.x - (paperPxW - landWpx) / 2 + 6, p0.y - (paperPxH - landHpx) / 2 - 5);
+                    ctx.restore();
+                }
+
+                // Land Plot Fill
+                ctx.fillStyle = isDark ? '#131c31' : '#ffffff';
+                ctx.fillRect(p0.x, p0.y, landWpx, landHpx);
+
+                // Background Blueprint Reference Image
+                if (this.state.bgImage) {
+                    ctx.save();
+                    ctx.globalAlpha = this.state.bgOpacity;
+                    ctx.drawImage(this.state.bgImage, p0.x, p0.y, landWpx, landHpx);
+                    ctx.restore();
+                }
+
+                // Grid Lines & Rulers
+                if (this.state.layers.grid) {
+                    const gridStep = this.state.scale >= 1000 ? 10 : (this.state.scale >= 200 ? 5 : 1);
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)';
+                    ctx.fillStyle = isDark ? '#64748b' : '#94a3b8';
+                    ctx.font = '10px "JetBrains Mono", monospace';
+
+                    for (let gx = 0; gx <= this.state.landWidth; gx += gridStep) {
+                        const sx = this.worldToScreen(gx, 0).x;
+                        ctx.beginPath();
+                        ctx.moveTo(sx, p0.y);
+                        ctx.lineTo(sx, pLand.y);
+                        ctx.stroke();
+                        if (this.cam2D.pxPerMeter * gridStep > 24) {
+                            ctx.fillText(`${gx}m`, sx + 2, p0.y - 4);
+                        }
+                    }
+                    for (let gy = 0; gy <= this.state.landLength; gy += gridStep) {
+                        const sy = this.worldToScreen(0, gy).y;
+                        ctx.beginPath();
+                        ctx.moveTo(p0.x, sy);
+                        ctx.lineTo(pLand.x, sy);
+                        ctx.stroke();
+                        if (this.cam2D.pxPerMeter * gridStep > 24) {
+                            ctx.fillText(`${gy}m`, p0.x - 28, sy + 3);
+                        }
+                    }
+                }
+
+                // Land Boundary Outline
+                ctx.strokeStyle = isDark ? '#475569' : '#64748b';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(p0.x, p0.y, landWpx, landHpx);
+
+                // Filter elements for active floor & visible layers
+                const floorElements = this.state.elements.filter(el => el.floor === this.state.activeFloor && this.state.layers[el.discipline]);
+
+                // 1. Draw Box/Floor Elements first
+                floorElements.filter(el => el.mode === 'box').forEach(el => {
+                    this.drawElement2D(ctx, el, isDark);
+                });
+
+                // 2. Draw Line Elements (Walls, Cables, Pipes, LAN, Evacuation Routes)
+                floorElements.filter(el => el.mode === 'line').forEach(el => {
+                    this.drawElement2D(ctx, el, isDark);
+                });
+
+                // 3. Draw Point/Box Items (Doors, Windows, Furniture, Devices, APAR)
+                floorElements.filter(el => el.mode === 'item').forEach(el => {
+                    this.drawElement2D(ctx, el, isDark);
+                });
+
+                // Active Line Drawing Preview
+                if (this.interact.isDrawingLine && this.interact.lineStart && this.state.activeCatalogItem) {
+                    const s = this.worldToScreen(this.interact.lineStart.x, this.interact.lineStart.y);
+                    const e = this.worldToScreen(this.interact.mouseWorld.x, this.interact.mouseWorld.y);
+                    ctx.save();
+                    ctx.strokeStyle = this.state.activeCatalogItem.color || '#3b82f6';
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(s.x, s.y);
+                    ctx.lineTo(e.x, e.y);
+                    ctx.stroke();
+
+                    const dist = Math.hypot(this.interact.mouseWorld.x - this.interact.lineStart.x, this.interact.mouseWorld.y - this.interact.lineStart.y).toFixed(2);
+                    ctx.fillStyle = '#2563eb';
+                    ctx.font = 'bold 11px "JetBrains Mono", monospace';
+                    ctx.fillText(`${dist} m`, (s.x + e.x) / 2 + 8, (s.y + e.y) / 2 - 8);
+                    ctx.restore();
+                }
+            },
+
+            drawElement2D(ctx, el, isDark) {
+                const isSelected = el.id === this.state.selectedId;
+                ctx.save();
+                if (el.discipline === 'arch') {
+                    ctx.globalAlpha = this.state.archOpacity;
+                }
+
+                if (el.mode === 'box') {
+                    const tl = this.worldToScreen(el.x - el.w / 2, el.y - el.l / 2);
+                    const wPx = el.w * this.cam2D.pxPerMeter;
+                    const lPx = el.l * this.cam2D.pxPerMeter;
+                    ctx.fillStyle = el.color + '44';
+                    ctx.strokeStyle = isSelected ? '#3b82f6' : el.color;
+                    ctx.lineWidth = isSelected ? 2.5 : 1.5;
+                    ctx.fillRect(tl.x, tl.y, wPx, lPx);
+                    ctx.strokeRect(tl.x, tl.y, wPx, lPx);
+                    if (this.state.layers.grid && wPx > 45) {
+                        ctx.fillStyle = isDark ? '#cbd5e1' : '#334155';
+                        ctx.font = '10px Inter, sans-serif';
+                        ctx.fillText(`${el.name} (${(el.w * el.l).toFixed(1)}m²)`, tl.x + 6, tl.y + 14);
+                    }
+                } else if (el.mode === 'line') {
+                    const p1 = this.worldToScreen(el.x1, el.y1);
+                    const p2 = this.worldToScreen(el.x2, el.y2);
+                    const thickPx = Math.max(el.type === 'wall' ? 5 : 2.5, (el.thickness || 0.1) * this.cam2D.pxPerMeter);
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = isSelected ? '#3b82f6' : el.color;
+                    ctx.lineWidth = thickPx;
+                    ctx.lineCap = 'round';
+                    if (el.type === 'link_wifi') ctx.setLineDash([4, 4]);
+                    else if (el.type === 'evac_route') ctx.setLineDash([8, 4]);
+                    else if (el.type === 'pipe_waste') ctx.setLineDash([6, 3]);
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Direction arrow for evacuation route or flow
+                    if (el.type === 'evac_route' || el.discipline === 'plumb') {
+                        const midX = (p1.x + p2.x) / 2;
+                        const midY = (p1.y + p2.y) / 2;
+                        const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                        ctx.save();
+                        ctx.translate(midX, midY);
+                        ctx.rotate(angle);
+                        ctx.fillStyle = el.color;
+                        ctx.beginPath();
+                        ctx.moveTo(6, 0);
+                        ctx.lineTo(-5, -4);
+                        ctx.lineTo(-5, 4);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.restore();
+                    }
+
+                    // Endpoints when selected
+                    if (isSelected) {
+                        ctx.fillStyle = '#2563eb';
+                        ctx.beginPath();
+                        ctx.arc(p1.x, p1.y, 4, 0, Math.PI * 2);
+                        ctx.arc(p2.x, p2.y, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else if (el.mode === 'item') {
+                    const c = this.worldToScreen(el.x, el.y);
+                    const wPx = Math.max(14, (el.w || 0.4) * this.cam2D.pxPerMeter);
+                    const lPx = Math.max(14, (el.l || 0.4) * this.cam2D.pxPerMeter);
+
+                    // Coverage Radius for WiFi AP, APAR, or Hydrant
+                    if (el.wifiRadius || el.coverageRadius) {
+                        const radM = el.wifiRadius || el.coverageRadius;
+                        const radPx = radM * this.cam2D.pxPerMeter;
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(c.x, c.y, radPx, 0, Math.PI * 2);
+                        ctx.fillStyle = el.color + '12';
+                        ctx.strokeStyle = el.color + '55';
+                        ctx.setLineDash([4, 4]);
+                        ctx.lineWidth = 1;
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+
+                    ctx.save();
+                    ctx.translate(c.x, c.y);
+                    ctx.rotate(((el.rot || 0) * Math.PI) / 180);
+
+                    // Custom 2D Image Asset if present
+                    if (el.customImgObj) {
+                        ctx.drawImage(el.customImgObj, -wPx / 2, -lPx / 2, wPx, lPx);
+                    } else if (el.type === 'door' || el.type === 'exit_door') {
+                        // CAD Door Swing Arc
+                        ctx.fillStyle = el.color;
+                        ctx.fillRect(-wPx / 2, -lPx / 2, wPx, lPx);
+                        ctx.strokeStyle = el.color;
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.arc(-wPx / 2, 0, wPx, 0, Math.PI / 2);
+                        ctx.stroke();
+                    } else {
+                        ctx.fillStyle = el.color + 'cc';
+                        ctx.strokeStyle = isSelected ? '#2563eb' : (isDark ? '#ffffff88' : '#0f172a88');
+                        ctx.lineWidth = isSelected ? 2.5 : 1.2;
+                        ctx.beginPath();
+                        ctx.roundRect(-wPx / 2, -lPx / 2, wPx, lPx, 3);
+                        ctx.fill();
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+
+                    // Label
+                    if (this.state.layers.grid) {
+                        ctx.fillStyle = isDark ? '#e2e8f0' : '#1e293b';
+                        ctx.font = '500 10px Inter, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(el.name, c.x, c.y + lPx / 2 + 11);
+                        if (el.ip) {
+                            ctx.fillStyle = '#38bdf8';
+                            ctx.font = '9px "JetBrains Mono", monospace';
+                            ctx.fillText(el.ip, c.x, c.y + lPx / 2 + 21);
+                        } else if (el.watt > 0) {
+                            ctx.fillStyle = '#facc15';
+                            ctx.font = '9px "JetBrains Mono", monospace';
+                            ctx.fillText(`${el.watt}W`, c.x, c.y + lPx / 2 + 21);
+                        }
+                    }
+                }
+                ctx.restore();
+            },
+
+            initThreeJS() {
+                const container = document.getElementById('threeContainer');
+                const w = container.clientWidth || 600;
+                const h = container.clientHeight || 500;
+
+                this.three.scene = new THREE.Scene();
+                this.three.scene.background = new THREE.Color(0x0b1120);
+
+                this.three.camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 5000);
+                this.three.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+                this.three.renderer.setSize(w, h);
+                this.three.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.three.renderer.shadowMap.enabled = true;
+                container.innerHTML = '';
+                container.appendChild(this.three.renderer.domElement);
+
+                // Lighting
+                const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+                this.three.scene.add(ambient);
+
+                const dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
+                dirLight.position.set(25, 45, 30);
+                dirLight.castShadow = true;
+                this.three.scene.add(dirLight);
+
+                this.three.meshesGroup = new THREE.Group();
+                this.three.scene.add(this.three.meshesGroup);
+
+                this.updateCamera3D();
+            },
+
+            updateCamera3D() {
+                const c = this.three.controls;
+                const x = c.target.x + c.radius * Math.sin(c.phi) * Math.cos(c.theta);
+                const y = c.target.y + c.radius * Math.cos(c.phi);
+                const z = c.target.z + c.radius * Math.sin(c.phi) * Math.sin(c.theta);
+                this.three.camera.position.set(x, Math.max(0.5, y), z);
+                this.three.camera.lookAt(c.target);
+            },
+
+            setCameraPreset(preset) {
+                const cx = this.state.landWidth / 2;
+                const cz = this.state.landLength / 2;
+                const maxDim = Math.max(this.state.landWidth, this.state.landLength);
+                this.three.controls.target.set(cx, 0, cz);
+                this.three.controls.radius = maxDim * 1.45;
+
+                if (preset === 'iso') {
+                    this.three.controls.theta = Math.PI / 4;
+                    this.three.controls.phi = Math.PI / 3;
+                } else if (preset === 'top') {
+                    this.three.controls.theta = Math.PI / 2;
+                    this.three.controls.phi = 0.05;
+                } else if (preset === 'front') {
+                    this.three.controls.theta = Math.PI / 2;
+                    this.three.controls.phi = Math.PI / 2.2;
+                }
+                this.updateCamera3D();
+            },
+
+            rebuild3DScene() {
+                if (!this.three.meshesGroup) return;
+                while (this.three.meshesGroup.children.length > 0) {
+                    const obj = this.three.meshesGroup.children[0];
+                    this.three.meshesGroup.remove(obj);
+                }
+
+                const isDark = document.documentElement.classList.contains('dark');
+                this.three.scene.background = new THREE.Color(isDark ? 0x0b1120 : 0xe2e8f0);
+
+                // Land Base Plane
+                const landGeo = new THREE.BoxGeometry(this.state.landWidth, 0.08, this.state.landLength);
+                const landMat = new THREE.MeshLambertMaterial({ color: isDark ? 0x1e293b : 0xd1fae5, wireframe: this.state.wireframe });
+                const landMesh = new THREE.Mesh(landGeo, landMat);
+                landMesh.position.set(this.state.landWidth / 2, -0.04, this.state.landLength / 2);
+                this.three.meshesGroup.add(landMesh);
+
+                // Grid Helper
+                if (this.state.layers.grid) {
+                    const maxDim = Math.max(this.state.landWidth, this.state.landLength);
+                    const divisions = Math.min(50, Math.round(maxDim));
+                    const grid = new THREE.GridHelper(maxDim, divisions, 0x3b82f6, isDark ? 0x334155 : 0x94a3b8);
+                    grid.position.set(this.state.landWidth / 2, 0.01, this.state.landLength / 2);
+                    this.three.meshesGroup.add(grid);
+                }
+
+                // Render visible floors up to activeFloor
+                const visibleEls = this.state.elements.filter(el => el.floor <= this.state.activeFloor && this.state.layers[el.discipline]);
+
+                visibleEls.forEach(el => {
+                    const floorY = (el.floor - 1) * this.state.wallHeight;
+                    const isArch = el.discipline === 'arch';
+                    const matOpacity = isArch ? this.state.archOpacity : 1.0;
+
+                    if (el.mode === 'box') {
+                        const geo = new THREE.BoxGeometry(el.w, el.h || 0.12, el.l);
+                        const mat = new THREE.MeshLambertMaterial({
+                            color: el.color || '#cbd5e1',
+                            transparent: matOpacity < 1,
+                            opacity: matOpacity,
+                            wireframe: this.state.wireframe
+                        });
+                        const mesh = new THREE.Mesh(geo, mat);
+                        mesh.position.set(el.x, floorY + (el.h || 0.12) / 2, el.y);
+                        this.three.meshesGroup.add(mesh);
+
+                    } else if (el.mode === 'line') {
+                        const dx = el.x2 - el.x1;
+                        const dy = el.y2 - el.y1;
+                        const len = Math.hypot(dx, dy);
+                        if (len < 0.05) return;
+                        const angle = Math.atan2(dy, dx);
+                        const midX = (el.x1 + el.x2) / 2;
+                        const midZ = (el.y1 + el.y2) / 2;
+
+                        if (el.type === 'wall') {
+                            const h = el.height || this.state.wallHeight;
+                            const thick = el.thickness || 0.15;
+                            const geo = new THREE.BoxGeometry(len, h, thick);
+                            const mat = new THREE.MeshLambertMaterial({
+                                color: el.color || '#94a3b8',
+                                transparent: matOpacity < 1,
+                                opacity: matOpacity,
+                                wireframe: this.state.wireframe
+                            });
+                            const mesh = new THREE.Mesh(geo, mat);
+                            mesh.position.set(midX, floorY + h / 2, midZ);
+                            mesh.rotation.y = -angle;
+                            this.three.meshesGroup.add(mesh);
+                        } else {
+                            // 3D Cable, Pipe, LAN, or Evacuation Path Tube
+                            const radius = Math.max(0.03, (el.thickness || 0.05) / 2);
+                            const elev = el.discipline === 'elec' ? 2.6 : (el.discipline === 'net' ? 2.4 : 0.08);
+                            const geo = new THREE.CylinderGeometry(radius, radius, len, 8);
+                            geo.rotateZ(Math.PI / 2);
+                            const mat = new THREE.MeshLambertMaterial({ color: el.color || '#3b82f6', wireframe: this.state.wireframe });
+                            const mesh = new THREE.Mesh(geo, mat);
+                            mesh.position.set(midX, floorY + elev, midZ);
+                            mesh.rotation.y = -angle;
+                            this.three.meshesGroup.add(mesh);
+                        }
+
+                    } else if (el.mode === 'item') {
+                        const w = el.w || 0.5;
+                        const l = el.l || 0.5;
+                        const h = el.h || 0.5;
+                        const zOff = el.zOffset || 0;
+                        const itemGroup = new THREE.Group();
+
+                        if (el.type === 'tree') {
+                            const trunk = new THREE.Mesh(
+                                new THREE.CylinderGeometry(w * 0.12, w * 0.16, h * 0.4, 8),
+                                new THREE.MeshLambertMaterial({ color: 0x78350f, wireframe: this.state.wireframe })
+                            );
+                            trunk.position.y = (h * 0.4) / 2;
+                            const crown = new THREE.Mesh(
+                                new THREE.SphereGeometry(w * 0.5, 10, 10),
+                                new THREE.MeshLambertMaterial({ color: el.color, wireframe: this.state.wireframe })
+                            );
+                            crown.position.y = h * 0.65;
+                            itemGroup.add(trunk, crown);
+                        } else if (el.type === 'person') {
+                            const body = new THREE.Mesh(
+                                new THREE.CylinderGeometry(w * 0.35, w * 0.25, h * 0.72, 8),
+                                new THREE.MeshLambertMaterial({ color: el.color, wireframe: this.state.wireframe })
+                            );
+                            body.position.y = (h * 0.72) / 2;
+                            const head = new THREE.Mesh(
+                                new THREE.SphereGeometry(w * 0.28, 8, 8),
+                                new THREE.MeshLambertMaterial({ color: 0xfde047, wireframe: this.state.wireframe })
+                            );
+                            head.position.y = h * 0.85;
+                            itemGroup.add(body, head);
+                        } else if (el.type === 'water_tank' || el.type === 'gas_tank' || el.type === 'apar') {
+                            const cyl = new THREE.Mesh(
+                                new THREE.CylinderGeometry(w / 2, w / 2, h, 14),
+                                new THREE.MeshLambertMaterial({ color: el.color, wireframe: this.state.wireframe })
+                            );
+                            cyl.position.y = h / 2;
+                            itemGroup.add(cyl);
+                        } else {
+                            const isGlass = el.type === 'window';
+                            const box = new THREE.Mesh(
+                                new THREE.BoxGeometry(w, h, l),
+                                new THREE.MeshLambertMaterial({
+                                    color: el.color || '#3b82f6',
+                                    transparent: isGlass || matOpacity < 1,
+                                    opacity: isGlass ? 0.55 : matOpacity,
+                                    wireframe: this.state.wireframe
+                                })
+                            );
+                            box.position.y = h / 2;
+                            itemGroup.add(box);
+                        }
+
+                        itemGroup.position.set(el.x, floorY + zOff, el.y);
+                        itemGroup.rotation.y = -((el.rot || 0) * Math.PI) / 180;
+                        this.three.meshesGroup.add(itemGroup);
+                    }
+                });
+            },
+
+            bindEvents() {
+                window.addEventListener('resize', () => this.handleResize());
+
+                // Keyboard Shortcuts
+                window.addEventListener('keydown', (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+                    if (e.key === 'Escape') {
+                        this.setActiveTool('select');
+                    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                        this.deleteSelected();
+                    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                        e.preventDefault();
+                        this.undo();
+                    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                        e.preventDefault();
+                        this.redo();
+                    }
+                });
+
+                // 2D Canvas Events
+                const c2d = this.canvas2D;
+                c2d.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    if (this.interact.isDrawingLine) {
+                        this.interact.isDrawingLine = false;
+                        this.interact.lineStart = null;
+                    } else {
+                        this.setActiveTool('select');
+                    }
+                });
+
+                c2d.addEventListener('mousedown', (e) => {
+                    const rect = c2d.getBoundingClientRect();
+                    const sx = e.clientX - rect.left;
+                    const sy = e.clientY - rect.top;
+                    const world = this.screenToWorld(sx, sy);
+                    this.interact.mouseWorld = world;
+
+                    if (e.button === 1 || this.state.activeTool === 'pan') {
+                        this.interact.isPanning = true;
+                        this.interact.dragStartMouse = { x: sx - this.cam2D.x, y: sy - this.cam2D.y };
+                        return;
+                    }
+
+                    if (e.button === 0 && this.state.activeTool === 'place' && this.state.activeCatalogItem) {
+                        const cat = this.state.activeCatalogItem;
+                        if (cat.mode === 'line') {
+                            if (!this.interact.isDrawingLine) {
+                                this.interact.isDrawingLine = true;
+                                this.interact.lineStart = { x: world.x, y: world.y };
+                            } else {
+                                if (Math.hypot(world.x - this.interact.lineStart.x, world.y - this.interact.lineStart.y) > 0.05) {
+                                    const newEl = {
+                                        ...cat,
+                                        id: cat.type + '_' + Date.now().toString(36),
+                                        floor: this.state.activeFloor,
+                                        x1: this.interact.lineStart.x,
+                                        y1: this.interact.lineStart.y,
+                                        x2: world.x,
+                                        y2: world.y
+                                    };
+                                    this.state.elements.push(newEl);
+                                    this.state.selectedId = newEl.id;
+                                    this.interact.lineStart = { x: world.x, y: world.y };
+                                    this.pushHistory();
+                                    this.rebuild3DScene();
+                                    this.renderInspector();
+                                }
+                            }
+                        } else {
+                            const newEl = {
+                                ...cat,
+                                id: cat.type + '_' + Date.now().toString(36),
+                                floor: this.state.activeFloor,
+                                x: world.x,
+                                y: world.y,
+                                rot: 0
+                            };
+                            this.state.elements.push(newEl);
+                            this.state.selectedId = newEl.id;
+                            this.pushHistory();
+                            this.rebuild3DScene();
+                            this.renderInspector();
+                        }
+                        return;
+                    }
+
+                    // Select / Drag existing object
+                    if (e.button === 0 && this.state.activeTool === 'select') {
+                        const hit = this.hitTest2D(world.x, world.y);
+                        if (hit) {
+                            this.state.selectedId = hit.id;
+                            this.interact.isDraggingObj = true;
+                            this.interact.dragStartMouse = { x: world.x, y: world.y };
+                            this.interact.dragObjInitial = JSON.parse(JSON.stringify(hit));
+                            this.renderInspector();
+                        } else {
+                            this.state.selectedId = null;
+                            this.interact.isPanning = true;
+                            this.interact.dragStartMouse = { x: sx - this.cam2D.x, y: sy - this.cam2D.y };
+                            this.renderInspector();
+                        }
+                    }
+                });
+
+                c2d.addEventListener('mousemove', (e) => {
+                    const rect = c2d.getBoundingClientRect();
+                    const sx = e.clientX - rect.left;
+                    const sy = e.clientY - rect.top;
+                    const world = this.screenToWorld(sx, sy);
+                    this.interact.mouseWorld = world;
+                    document.getElementById('statusCoord').textContent = `X: ${world.x.toFixed(2)} m | Y: ${world.y.toFixed(2)} m`;
+
+                    if (this.interact.isPanning) {
+                        this.cam2D.x = sx - this.interact.dragStartMouse.x;
+                        this.cam2D.y = sy - this.interact.dragStartMouse.y;
+                        return;
+                    }
+
+                    if (this.interact.isDraggingObj && this.state.selectedId) {
+                        const el = this.state.elements.find(item => item.id === this.state.selectedId);
+                        if (!el) return;
+                        const dx = world.x - this.interact.dragStartMouse.x;
+                        const dy = world.y - this.interact.dragStartMouse.y;
+                        if (el.mode === 'line') {
+                            el.x1 = Number((this.interact.dragObjInitial.x1 + dx).toFixed(2));
+                            el.y1 = Number((this.interact.dragObjInitial.y1 + dy).toFixed(2));
+                            el.x2 = Number((this.interact.dragObjInitial.x2 + dx).toFixed(2));
+                            el.y2 = Number((this.interact.dragObjInitial.y2 + dy).toFixed(2));
+                        } else {
+                            el.x = Number((this.interact.dragObjInitial.x + dx).toFixed(2));
+                            el.y = Number((this.interact.dragObjInitial.y + dy).toFixed(2));
+                        }
+                        this.rebuild3DScene();
+                    }
+                });
+
+                window.addEventListener('mouseup', () => {
+                    if (this.interact.isDraggingObj) {
+                        this.interact.isDraggingObj = false;
+                        this.pushHistory();
+                        this.renderInspector();
+                    }
+                    this.interact.isPanning = false;
+                });
+
+                c2d.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const rect = c2d.getBoundingClientRect();
+                    const sx = e.clientX - rect.left;
+                    const sy = e.clientY - rect.top;
+                    const wx = (sx - this.cam2D.x) / this.cam2D.pxPerMeter;
+                    const wy = (sy - this.cam2D.y) / this.cam2D.pxPerMeter;
+
+                    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+                    this.cam2D.pxPerMeter = Math.max(1.5, Math.min(400, this.cam2D.pxPerMeter * factor));
+                    this.cam2D.x = sx - wx * this.cam2D.pxPerMeter;
+                    this.cam2D.y = sy - wy * this.cam2D.pxPerMeter;
+                    document.getElementById('statusZoom').textContent = `Zoom: ${Math.round((this.cam2D.pxPerMeter / 55) * 100)}%`;
+                }, { passive: false });
+
+                // 3D Viewport Orbit & Pan Controls
+                const c3d = document.getElementById('threeContainer');
+                c3d.addEventListener('contextmenu', e => e.preventDefault());
+                c3d.addEventListener('mousedown', (e) => {
+                    this.three.controls.isDown = true;
+                    this.three.controls.button = e.button;
+                    this.three.controls.lastX = e.clientX;
+                    this.three.controls.lastY = e.clientY;
+                });
+                window.addEventListener('mousemove', (e) => {
+                    if (!this.three.controls.isDown) return;
+                    const dx = e.clientX - this.three.controls.lastX;
+                    const dy = e.clientY - this.three.controls.lastY;
+                    this.three.controls.lastX = e.clientX;
+                    this.three.controls.lastY = e.clientY;
+
+                    if (this.three.controls.button === 0) {
+                        this.three.controls.theta += dx * 0.008;
+                        this.three.controls.phi = Math.max(0.1, Math.min(Math.PI / 2.05, this.three.controls.phi - dy * 0.008));
+                    } else {
+                        const panSpeed = this.three.controls.radius * 0.0015;
+                        this.three.controls.target.x -= dx * panSpeed;
+                        this.three.controls.target.z -= dy * panSpeed;
+                    }
+                    this.updateCamera3D();
+                });
+                window.addEventListener('mouseup', () => {
+                    this.three.controls.isDown = false;
+                });
+                c3d.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const factor = e.deltaY < 0 ? 0.9 : 1.1;
+                    this.three.controls.radius = Math.max(2, Math.min(2500, this.three.controls.radius * factor));
+                    this.updateCamera3D();
+                }, { passive: false });
+            },
+
+            hitTest2D(wx, wy) {
+                const floorEls = this.state.elements.filter(el => el.floor === this.state.activeFloor && this.state.layers[el.discipline]);
+                // Check items first
+                for (let i = floorEls.length - 1; i >= 0; i--) {
+                    const el = floorEls[i];
+                    if (el.mode === 'item') {
+                        const hw = Math.max(0.25, (el.w || 0.4) / 2);
+                        const hl = Math.max(0.25, (el.l || 0.4) / 2);
+                        if (Math.abs(wx - el.x) <= hw && Math.abs(wy - el.y) <= hl) return el;
+                    }
+                }
+                // Check lines
+                for (let i = floorEls.length - 1; i >= 0; i--) {
+                    const el = floorEls[i];
+                    if (el.mode === 'line') {
+                        const dist = this.pointToSegmentDist(wx, wy, el.x1, el.y1, el.x2, el.y2);
+                        if (dist <= Math.max(0.25, (el.thickness || 0.15))) return el;
+                    }
+                }
+                // Check boxes/floors
+                for (let i = floorEls.length - 1; i >= 0; i--) {
+                    const el = floorEls[i];
+                    if (el.mode === 'box') {
+                        if (Math.abs(wx - el.x) <= el.w / 2 && Math.abs(wy - el.y) <= el.l / 2) return el;
+                    }
+                }
+                return null;
+            },
+
+            pointToSegmentDist(px, py, x1, y1, x2, y2) {
+                const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+                if (l2 === 0) return Math.hypot(px - x1, py - y1);
+                let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+                t = Math.max(0, Math.min(1, t));
+                return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+            },
+
+            renderInspector() {
+                const container = document.getElementById('inspectorContent');
+                const badge = document.getElementById('selectedBadge');
+                const el = this.state.elements.find(item => item.id === this.state.selectedId);
+
+                if (!el) {
+                    badge.textContent = 'Tidak ada';
+                    container.innerHTML = `<p class="py-4 text-center italic">Klik objek pada kanvas 2D untuk mengubah ukuran, warna, material, daya listrik, atau konfigurasi IP.</p>`;
+                    return;
+                }
+
+                badge.textContent = el.type.toUpperCase();
+                let html = `
+                    <div class="space-y-2">
+                        <div>
+                            <label class="block text-[11px] text-slate-400">Nama Label</label>
+                            <input type="text" value="${el.name}" onchange="App.updateSelectedProp('name', this.value)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-800 dark:text-slate-100">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-slate-400">Warna</label>
+                                <input type="color" value="${el.color || '#3b82f6'}" onchange="App.updateSelectedProp('color', this.value)" class="w-full h-7 rounded cursor-pointer bg-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-400">Material / Pola</label>
+                                <select onchange="App.updateSelectedProp('material', this.value)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-slate-800 dark:text-slate-100">
+                                    <option value="bata" ${el.material === 'bata' ? 'selected' : ''}>Bata / Plester</option>
+                                    <option value="beton" ${el.material === 'beton' ? 'selected' : ''}>Beton Bertulang</option>
+                                    <option value="keramik" ${el.material === 'keramik' ? 'selected' : ''}>Keramik / Granit</option>
+                                    <option value="kayu" ${el.material === 'kayu' ? 'selected' : ''}>Kayu Solid</option>
+                                    <option value="kaca" ${el.material === 'kaca' ? 'selected' : ''}>Kaca Tempered</option>
+                                    <option value="logam" ${el.material === 'logam' ? 'selected' : ''}>Baja / Aluminium</option>
+                                </select>
+                            </div>
+                        </div>
+                `;
+
+                if (el.mode === 'item' || el.mode === 'box') {
+                    html += `
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <div>
+                                <label class="block text-[10px] text-slate-400">Lebar (m)</label>
+                                <input type="number" step="0.1" value="${el.w}" onchange="App.updateSelectedProp('w', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400">Panjang (m)</label>
+                                <input type="number" step="0.1" value="${el.l}" onchange="App.updateSelectedProp('l', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400">Rotasi (°)</label>
+                                <input type="number" step="15" value="${el.rot || 0}" onchange="App.updateSelectedProp('rot', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                        </div>
+                    `;
+                } else if (el.mode === 'line') {
+                    const len = Math.hypot(el.x2 - el.x1, el.y2 - el.y1).toFixed(2);
+                    html += `
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-400">Panjang Jalur</label>
+                                <input type="text" readonly value="${len} m" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 font-mono text-slate-400">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400">Tebal (m)</label>
+                                <input type="number" step="0.02" value="${el.thickness || 0.15}" onchange="App.updateSelectedProp('thickness', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Electrical specific properties
+                if (el.discipline === 'elec' && el.mode === 'item') {
+                    html += `
+                        <div class="pt-2 border-t border-slate-200 dark:border-slate-800 grid grid-cols-3 gap-1.5">
+                            <div>
+                                <label class="block text-[10px] text-amber-500">Tegangan (V)</label>
+                                <input type="number" value="${el.voltage || 220}" onchange="App.updateSelectedProp('voltage', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-amber-500">Daya (Watt)</label>
+                                <input type="number" value="${el.watt || 0}" onchange="App.updateSelectedProp('watt', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-amber-500">Jam / Hari</label>
+                                <input type="number" step="0.5" value="${el.hours || 0}" onchange="App.updateSelectedProp('hours', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Plumbing specific properties
+                if (el.discipline === 'plumb') {
+                    html += `
+                        <div class="pt-2 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-cyan-500">Debit Aliran (L/mnt)</label>
+                                <input type="number" step="0.5" value="${el.flowRate || 0}" onchange="App.updateSelectedProp('flowRate', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-cyan-500">Pemakaian (Jam/Hari)</label>
+                                <input type="number" step="0.2" value="${el.hours || 1}" onchange="App.updateSelectedProp('hours', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Network specific properties
+                if (el.discipline === 'net' && el.mode === 'item') {
+                    html += `
+                        <div class="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <div>
+                                    <label class="block text-[10px] text-indigo-400">IP Address</label>
+                                    <input type="text" value="${el.ip || '192.168.1.10'}" onchange="App.updateSelectedProp('ip', this.value)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-indigo-400">Gateway</label>
+                                    <input type="text" value="${el.gateway || '192.168.1.1'}" onchange="App.updateSelectedProp('gateway', this.value)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-indigo-400">Kecepatan (Mbps)</label>
+                                    <input type="number" value="${el.speedMbps || 1000}" onchange="App.updateSelectedProp('speedMbps', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-indigo-400">Konsumsi Data (GB/hr)</label>
+                                    <input type="number" value="${el.dailyGB || 5}" onchange="App.updateSelectedProp('dailyGB', parseFloat(this.value))" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-indigo-400">Setelan Firewall Dasar</label>
+                                <input type="text" value="${el.firewall || 'Allow Established'}" onchange="App.updateSelectedProp('firewall', this.value)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-slate-800 dark:text-slate-100">
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `</div>`;
+                container.innerHTML = html;
+            },
+
+            updateSelectedProp(prop, val) {
+                const el = this.state.elements.find(item => item.id === this.state.selectedId);
+                if (!el) return;
+                el[prop] = val;
+                this.pushHistory();
+                this.rebuild3DScene();
+            },
+
+            deleteSelected() {
+                if (!this.state.selectedId) return;
+                this.state.elements = this.state.elements.filter(el => el.id !== this.state.selectedId);
+                this.state.selectedId = null;
+                this.pushHistory();
+                this.rebuild3DScene();
+                this.renderInspector();
+                this.showToast('Komponen dihapus');
+            },
+
+            setScale(scaleVal) {
+                const clamped = Math.max(1, Math.min(5000, scaleVal || 100));
+                this.state.scale = clamped;
+                document.getElementById('scaleDisplayBadge').textContent = `1 : ${clamped.toLocaleString('id-ID')}`;
+                document.getElementById('customScaleInput').value = clamped;
+                document.getElementById('scaleRangeSlider').value = clamped;
+                document.getElementById('statusScale').textContent = `Skala: 1:${clamped.toLocaleString('id-ID')}`;
+                const presetEl = document.getElementById('scalePresetSelect');
+                if ([1, 5, 10, 20, 50, 100, 200, 500, 1000, 2500, 5000].includes(clamped)) {
+                    presetEl.value = String(clamped);
+                }
+            },
+
+            updateSiteConfig() {
+                this.state.landWidth = Math.max(1, parseFloat(document.getElementById('landWidthInput').value) || 6);
+                this.state.landLength = Math.max(1, parseFloat(document.getElementById('landLengthInput').value) || 10);
+                this.state.wallHeight = Math.max(2, parseFloat(document.getElementById('wallHeightInput').value) || 3.2);
+                this.state.totalFloors = parseInt(document.getElementById('totalFloorsInput').value) || 1;
+                this.pushHistory();
+                this.fitView2D();
+                this.rebuild3DScene();
+            },
+
+            updatePaperConfig() {
+                this.state.paperSize = document.getElementById('paperSizeSelect').value;
+                this.state.paperOrient = document.getElementById('paperOrientSelect').value;
+            },
+
+            setFloor(fl) {
+                this.state.activeFloor = fl;
+                [1, 2, 3].forEach(n => {
+                    const btn = document.getElementById('floorBtn' + n);
+                    if (btn) {
+                        btn.className = n === fl
+                            ? 'px-2 py-0.5 text-xs rounded bg-blue-600 text-white font-medium'
+                            : 'px-2 py-0.5 text-xs rounded text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700';
+                    }
+                });
+                this.rebuild3DScene();
+                this.showToast(`Aktif: Lantai ${fl}`);
+            },
+
+            setViewMode(mode) {
+                this.state.viewMode = mode;
+                const p2d = document.getElementById('pane2D');
+                const p3d = document.getElementById('pane3D');
+                const wrapper = document.getElementById('viewportWrapper');
+
+                ['2D', 'Dual', '3D'].forEach(m => {
+                    const btn = document.getElementById('viewBtn' + m);
+                    if (btn) {
+                        const active = m.toLowerCase() === mode;
+                        btn.className = active
+                            ? 'px-2.5 py-1 text-xs rounded font-medium bg-blue-600 text-white'
+                            : 'px-2.5 py-1 text-xs rounded font-medium text-slate-700 dark:text-slate-300';
+                    }
+                });
+
+                if (mode === '2d') {
+                    p2d.classList.remove('hidden');
+                    p3d.classList.add('hidden');
+                    wrapper.className = 'flex-1 grid grid-cols-1 bg-slate-200 dark:bg-slate-950 relative overflow-hidden';
+                } else if (mode === '3d') {
+                    p2d.classList.add('hidden');
+                    p3d.classList.remove('hidden');
+                    wrapper.className = 'flex-1 grid grid-cols-1 bg-slate-200 dark:bg-slate-950 relative overflow-hidden';
+                } else {
+                    p2d.classList.remove('hidden');
+                    p3d.classList.remove('hidden');
+                    wrapper.className = 'flex-1 grid grid-cols-1 md:grid-cols-2 bg-slate-200 dark:bg-slate-950 relative overflow-hidden';
+                }
+                this.handleResize();
+            },
+
+            toggleWireframe() {
+                this.state.wireframe = !this.state.wireframe;
+                document.getElementById('btnWireframe').classList.toggle('bg-blue-600', this.state.wireframe);
+                document.getElementById('btnWireframe').classList.toggle('text-white', this.state.wireframe);
+                this.rebuild3DScene();
+            },
+
+            toggleLayer(layer, val) {
+                this.state.layers[layer] = val;
+                this.rebuild3DScene();
+            },
+
+            resetLayers() {
+                Object.keys(this.state.layers).forEach(k => this.state.layers[k] = true);
+                this.state.archOpacity = 1.0;
+                document.getElementById('archOpacityLabel').textContent = '100%';
+                this.rebuild3DScene();
+            },
+
+            setArchOpacity(val) {
+                this.state.archOpacity = parseInt(val) / 100;
+                document.getElementById('archOpacityLabel').textContent = val + '%';
+                this.rebuild3DScene();
+            },
+
+            toggleSnap(val) {
+                this.state.snapEnabled = val;
+            },
+
+            syncUIControls() {
+                this.setScale(this.state.scale);
+                document.getElementById('landWidthInput').value = this.state.landWidth;
+                document.getElementById('landLengthInput').value = this.state.landLength;
+                document.getElementById('wallHeightInput').value = this.state.wallHeight;
+                document.getElementById('totalFloorsInput').value = this.state.totalFloors;
+                this.updateMetricsAndStatus();
+            },
+
+            updateMetricsAndStatus() {
+                const landArea = this.state.landWidth * this.state.landLength;
+                let buildArea = 0;
+                let totalWatt = 0;
+                let netNodes = 0;
+
+                this.state.elements.forEach(el => {
+                    if (el.type === 'floor') buildArea += (el.w * el.l);
+                    if (el.discipline === 'elec' && el.watt) totalWatt += el.watt;
+                    if (el.discipline === 'net' && el.mode === 'item') netNodes++;
+                });
+
+                document.getElementById('metricLandArea').textContent = `${landArea.toFixed(1)} m²`;
+                document.getElementById('metricBuildingArea').textContent = `${buildArea.toFixed(1)} m²`;
+                document.getElementById('statusCounts').textContent = `Objek: ${this.state.elements.length} | Listrik: ${totalWatt} W | Jaringan: ${netNodes} Node`;
+            },
+
+            autoGenerateEvacRoute() {
+                const fl = this.state.activeFloor;
+                const floorEls = this.state.elements.filter(e => e.floor === fl);
+                const exits = floorEls.filter(e => e.type === 'exit_door' || e.type === 'assembly' || e.type === 'door');
+                if (exits.length === 0) {
+                    this.showToast('Tambahkan minimal 1 Pintu atau Titik Kumpul terlebih dahulu');
+                    return;
+                }
+                const target = exits[0];
+                const startX = Number((this.state.landWidth / 2).toFixed(2));
+                const startY = Number((this.state.landLength / 2).toFixed(2));
+                this.state.elements.push({
+                    id: 'evac_auto_' + Date.now().toString(36),
+                    discipline: 'evac',
+                    type: 'evac_route',
+                    name: 'Rute Evakuasi Terpendek',
+                    mode: 'line',
+                    floor: fl,
+                    x1: startX,
+                    y1: startY,
+                    x2: target.x,
+                    y2: target.y,
+                    thickness: 0.14,
+                    color: '#10b981'
+                });
+                this.pushHistory();
+                this.rebuild3DScene();
+                this.showToast(`Rute evakuasi dibuat menuju ${target.name}`);
+            },
+
+            handleBgImageUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.state.bgImage = img;
+                        this.showToast('Gambar acuan latar berhasil dimuat');
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            setBgOpacity(val) {
+                this.state.bgOpacity = parseInt(val) / 100;
+            },
+
+            clearBgImage() {
+                this.state.bgImage = null;
+                document.getElementById('bgImageInput').value = '';
+            },
+
+            handleCustomComponentImport(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const ext = file.name.split('.').pop().toLowerCase();
+                const cx = Number((this.state.landWidth / 2).toFixed(2));
+                const cy = Number((this.state.landLength / 2).toFixed(2));
+
+                if (['png', 'jpg', 'jpeg', 'svg', 'webp'].includes(ext)) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const newEl = {
+                                id: 'custom2d_' + Date.now().toString(36),
+                                discipline: this.state.discipline,
+                                type: 'custom_2d',
+                                name: file.name.replace(/\.[^/.]+$/, ''),
+                                mode: 'item',
+                                floor: this.state.activeFloor,
+                                x: cx,
+                                y: cy,
+                                w: 1.5,
+                                l: 1.5,
+                                h: 0.2,
+                                rot: 0,
+                                color: '#3b82f6',
+                                customImgObj: img
+                            };
+                            this.state.elements.push(newEl);
+                            this.state.selectedId = newEl.id;
+                            this.pushHistory();
+                            this.rebuild3DScene();
+                            this.renderInspector();
+                            this.showToast(`Gambar komponen "${file.name}" diimpor sesuai skala`);
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    // 3D Object (.obj / .gltf / .glb) imported as scaled bounding component
+                    const newEl = {
+                        id: 'custom3d_' + Date.now().toString(36),
+                        discipline: this.state.discipline,
+                        type: 'custom_3d',
+                        name: file.name.replace(/\.[^/.]+$/, ''),
+                        mode: 'item',
+                        floor: this.state.activeFloor,
+                        x: cx,
+                        y: cy,
+                        w: 1.2,
+                        l: 1.2,
+                        h: 1.4,
+                        rot: 0,
+                        color: '#10b981',
+                        material: 'logam'
+                    };
+                    this.state.elements.push(newEl);
+                    this.state.selectedId = newEl.id;
+                    this.pushHistory();
+                    this.rebuild3DScene();
+                    this.renderInspector();
+                    this.showToast(`Objek 3D "${file.name}" berhasil ditambahkan ke denah`);
+                }
+            },
+
+            openAnalysisModal() {
+                document.getElementById('analysisModal').classList.remove('hidden');
+                this.runFullAnalysis();
+            },
+
+            runFullAnalysis() {
+                const els = this.state.elements;
+                // 1. Electrical Analysis & Cost Prediction
+                const tariff = parseFloat(document.getElementById('elecTariffSelect').value) || 1444.7;
+                let totalPeakWatt = 0;
+                let dailyWh = 0;
+                let maxPanelCapacity = 0;
+                let hasGrounding = false;
+                const elecItems = els.filter(e => e.discipline === 'elec' && e.mode === 'item');
+
+                elecItems.forEach(e => {
+                    if (e.type === 'power_source') maxPanelCapacity += (e.maxWatt || 1300);
+                    if (e.type === 'grounding') hasGrounding = true;
+                    const w = e.watt || 0;
+                    const h = e.hours || 0;
+                    totalPeakWatt += w;
+                    dailyWh += (w * h);
+                });
+                const monthlyKWh = (dailyWh * 30) / 1000;
+                const monthlyCostPostpaid = monthlyKWh * tariff * 1.05; // +5% PPJ
+                const tokenCostPrepaid = monthlyKWh * tariff * 1.08; // +PPJ & admin token
+
+                document.getElementById('elecAnalysisMetrics').innerHTML = `
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Beban Puncak / Kapasitas:</span>
+                        <span class="font-bold ${totalPeakWatt > maxPanelCapacity && maxPanelCapacity > 0 ? 'text-red-500' : 'text-emerald-500'}">${totalPeakWatt} W / ${maxPanelCapacity || 1300} VA</span>
+                    </div>
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Konsumsi Energi Bulanan:</span>
+                        <span class="font-bold">${monthlyKWh.toFixed(1)} kWh / bln</span>
+                    </div>
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Estimasi Pascabayar:</span>
+                        <span class="font-bold text-amber-500">Rp ${Math.round(monthlyCostPostpaid).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Estimasi Token Prabayar:</span>
+                        <span class="font-bold text-amber-500">Rp ${Math.round(tokenCostPrepaid).toLocaleString('id-ID')}</span>
+                    </div>
+                `;
+
+                // 2. Water & Gas Analysis
+                const waterTariff = parseFloat(document.getElementById('waterTariffInput').value) || 7500;
+                let dailyWaterLiters = 0;
+                let dailyGasKg = 0;
+                els.filter(e => e.discipline === 'plumb' && e.mode === 'item').forEach(e => {
+                    if (e.type === 'faucet') dailyWaterLiters += (e.flowRate || 8) * 60 * (e.hours || 1);
+                    if (e.type === 'gas_tank') dailyGasKg += (e.flowRate || 0.3) * (e.hours || 1.5);
+                });
+                const monthlyWaterM3 = (dailyWaterLiters * 30) / 1000;
+                const monthlyWaterCost = monthlyWaterM3 * waterTariff + 15000;
+                const monthlyGasKg = dailyGasKg * 30;
+                const monthlyGasCost = monthlyGasKg * 18500; // Rp 18.500/kg LPG
+
+                document.getElementById('plumbAnalysisMetrics').innerHTML = `
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Debit Air Bersih Bulanan:</span>
+                        <span class="font-bold">${monthlyWaterM3.toFixed(1)} m³ (${Math.round(dailyWaterLiters)} L/hr)</span>
+                    </div>
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Biaya Air PDAM Bulanan:</span>
+                        <span class="font-bold text-cyan-500">Rp ${Math.round(monthlyWaterCost).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Konsumsi Gas Bulanan:</span>
+                        <span class="font-bold">${monthlyGasKg.toFixed(1)} kg LPG / bln</span>
+                    </div>
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Estimasi Biaya Gas:</span>
+                        <span class="font-bold text-cyan-500">Rp ${Math.round(monthlyGasCost).toLocaleString('id-ID')}</span>
+                    </div>
+                `;
+
+                // 3. ISP Network Cost Analysis
+                const ispVal = document.getElementById('ispPlanSelect').value.split('_');
+                const planSpeed = parseFloat(ispVal[0]);
+                const planBaseCost = parseFloat(ispVal[1]);
+                const planFUP = parseFloat(ispVal[2]);
+
+                let dailyGB = 0;
+                const netItems = els.filter(e => e.discipline === 'net' && e.mode === 'item');
+                netItems.forEach(e => dailyGB += (e.dailyGB || 4));
+                const monthlyGB = dailyGB * 30;
+                const fupExceeded = monthlyGB > planFUP;
+                const prepaidQuotaCost = monthlyGB * 1650; // Rp 1.650 / GB kuota prabayar
+
+                document.getElementById('netAnalysisMetrics').innerHTML = `
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Total Trafik Data:</span>
+                        <span class="font-bold">${monthlyGB} GB / bln (${dailyGB} GB/hr)</span>
+                    </div>
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">Status FUP (${planFUP} GB):</span>
+                        <span class="font-bold ${fupExceeded ? 'text-red-500' : 'text-emerald-500'}">${fupExceeded ? 'Melebihi FUP (Throttled)' : 'Aman Di Bawah FUP'}</span>
+                    </div>
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">ISP Pascabayar (+PPN 11%):</span>
+                        <span class="font-bold text-indigo-400">Rp ${Math.round(planBaseCost * 1.11).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div class="p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        <span class="text-slate-400 block">ISP Prabayar (Berbasis Kuota):</span>
+                        <span class="font-bold text-indigo-400">Rp ${Math.round(prepaidQuotaCost).toLocaleString('id-ID')}</span>
+                    </div>
+                `;
+
+                // 4. Multi-Domain Automated Hazard & Risk Findings
+                const findings = [];
+                // Electrical Hazards
+                if (maxPanelCapacity > 0 && totalPeakWatt > maxPanelCapacity) {
+                    findings.push({ level: 'danger', domain: 'Kelistrikan', msg: `Overload Beban Puncak (${totalPeakWatt} W) melebihi kapasitas sumber daya (${maxPanelCapacity} VA). Risiko trip MCB atau panas berlebih pada penghantar.` });
+                } else {
+                    findings.push({ level: 'ok', domain: 'Kelistrikan', msg: `Beban puncak listrik (${totalPeakWatt} W) masih di bawah batas kapasitas sumber daya.` });
+                }
+                if (!hasGrounding) {
+                    findings.push({ level: 'warn', domain: 'Kelistrikan', msg: 'Tidak ditemukan titik Grounding pada denah. Risiko arus bocor pada perangkat elektronik berdaya tinggi.' });
+                }
+
+                // Proximity Check: Socket/Power near Water Faucet (< 0.8m)
+                const faucets = els.filter(e => e.type === 'faucet');
+                const sockets = els.filter(e => e.type === 'socket' || e.type === 'power_source');
+                faucets.forEach(f => {
+                    sockets.forEach(s => {
+                        if (f.floor === s.floor && Math.hypot(f.x - s.x, f.y - s.y) < 0.85) {
+                            findings.push({ level: 'danger', domain: 'Kelistrikan & Air', msg: `Bahaya Hidro-Elektrik: "${s.name}" berjarak ${Math.hypot(f.x - s.x, f.y - s.y).toFixed(2)}m dari "${f.name}" (< 0.85m).` });
+                        }
+                    });
+                });
+
+                // Ecological / Plumbing Check: Clean water tank near Septic tank (< 4m)
+                const septics = els.filter(e => e.type === 'septic');
+                const tanks = els.filter(e => e.type === 'water_tank');
+                septics.forEach(sp => {
+                    tanks.forEach(tk => {
+                        const d = Math.hypot(sp.x - tk.x, sp.y - tk.y);
+                        if (d < 4.0) {
+                            findings.push({ level: 'warn', domain: 'Ekologis & Limbah', msg: `Jarak "${sp.name}" ke "${tk.name}" hanya ${d.toFixed(1)}m. Disarankan minimal 10m dari sumber air tanah untuk mencegah kontaminasi bakteri E. coli.` });
+                        }
+                    });
+                });
+
+                // Network Risk Check: IP Conflict, Hub bottleneck, Ring/Mesh Loop
+                const ipMap = {};
+                netItems.forEach(n => {
+                    if (n.ip) {
+                        if (ipMap[n.ip]) {
+                            findings.push({ level: 'danger', domain: 'Jaringan', msg: `IP Address Conflict (${n.ip}) antara "${ipMap[n.ip]}" dan "${n.name}".` });
+                        }
+                        ipMap[n.ip] = n.name;
+                    }
+                    if (n.type === 'hub') {
+                        findings.push({ level: 'warn', domain: 'Jaringan', msg: `Penggunaan "${n.name}" (Half-Duplex) memicu Collision Domain & Bottleneck. Ganti dengan Switch Gigabit.` });
+                    }
+                });
+                const netLines = els.filter(e => e.discipline === 'net' && e.mode === 'line');
+                if (netLines.length >= netItems.length && netItems.length >= 3) {
+                    findings.push({ level: 'warn', domain: 'Jaringan', msg: `Terdeteksi siklus tertutup (${netLines.length} link untuk ${netItems.length} node). Pastikan Spanning Tree Protocol (STP) aktif agar tidak terjadi Broadcast Storm / Looping.` });
+                }
+
+                // Evacuation & Disaster Preparedness Check
+                const apars = els.filter(e => e.type === 'apar' || e.type === 'hydrant');
+                const assemblies = els.filter(e => e.type === 'assembly');
+                if (apars.length === 0) {
+                    findings.push({ level: 'danger', domain: 'Evakuasi', msg: 'Belum ada APAR atau Hidran pada denah untuk penanganan dini kebakaran.' });
+                }
+                if (assemblies.length === 0) {
+                    findings.push({ level: 'warn', domain: 'Evakuasi', msg: 'Belum ada Titik Kumpul (Assembly Point) di area terbuka.' });
+                } else {
+                    findings.push({ level: 'ok', domain: 'Evakuasi', msg: `Tersedia ${apars.length} unit proteksi kebakaran aktif dan ${assemblies.length} Titik Kumpul evakuasi.` });
+                }
+
+                document.getElementById('hazardFindingsList').innerHTML = findings.map(f => {
+                    const badgeColor = f.level === 'danger' ? 'bg-red-500/20 text-red-400 border-red-500/40' : (f.level === 'warn' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40');
+                    const icon = f.level === 'danger' ? 'fa-triangle-exclamation' : (f.level === 'warn' ? 'fa-circle-exclamation' : 'fa-circle-check');
+                    return `
+                        <div class="p-2 rounded border ${badgeColor} flex items-start gap-2 text-[11px]">
+                            <i class="fa-solid ${icon} mt-0.5"></i>
+                            <div><strong>[${f.domain}]</strong> ${f.msg}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                this.generateAIPrompt();
+            },
+
+            generateAIPrompt() {
+                const domain = document.getElementById('aiPromptDomain').value;
+                const filteredEls = this.state.elements.filter(e => {
+                    if (domain === 'all') return true;
+                    if (domain === 'mep') return e.discipline === 'elec' || e.discipline === 'plumb' || e.discipline === 'arch';
+                    if (domain === 'net') return e.discipline === 'net' || e.discipline === 'arch';
+                    if (domain === 'evac') return e.discipline === 'evac' || e.discipline === 'arch';
+                    return true;
+                }).map(e => {
+                    const clean = { ...e };
+                    delete clean.customImgObj;
+                    return clean;
+                });
+
+                const payload = {
+                    meta: {
+                        app: 'PasaDena CAD/BIM',
+                        scale: `1:${this.state.scale}`,
+                        landDimensionsMeters: { width: this.state.landWidth, length: this.state.landLength, areaM2: this.state.landWidth * this.state.landLength },
+                        totalFloors: this.state.totalFloors,
+                        wallHeightMeters: this.state.wallHeight
+                    },
+                    elements: filteredEls
+                };
+
+                let instruction = 'Lakukan audit teknis komprehensif terhadap denah bangunan berikut (Arsitektur, Kelistrikan, Perpipaan/Limbah/Gas, Topologi Jaringan, dan Evakuasi Bencana). Berikan analisis bahaya, potensi kegagalan sistem, efisiensi biaya bulanan, dan rekomendasi perbaikan tata letak berdasarkan koordinat JSON di bawah ini:';
+                if (domain === 'mep') {
+                    instruction = 'Analisis potensi bahaya kelistrikan (overload, short circuit, grounding), hidrologis (tekanan pipa, kebocoran), ekologis (jarak limbah/septic tank terhadap air bersih), dan keamanan tabung/jalur gas berdasarkan data JSON denah berikut:';
+                } else if (domain === 'net') {
+                    instruction = 'Analisis risiko topologi jaringan (looping, collision domain, bottlenecking, single point of failure, konflik IP, cakupan WiFi, dan aturan firewall) berdasarkan data JSON denah berikut:';
+                } else if (domain === 'evac') {
+                    instruction = 'Evaluasi kesiapsiagaan bencana dan keselamatan jiwa (jangkauan APAR/Hidran, aksesibilitas pintu darurat, kelancaran rute evakuasi menuju titik kumpul) berdasarkan data JSON denah berikut:';
+                }
+
+                document.getElementById('aiPromptTextarea').value = `${instruction}\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``;
+            },
+
+            openBOMModal() {
+                document.getElementById('bomModal').classList.remove('hidden');
+                const groups = {};
+                this.state.elements.forEach(el => {
+                    const key = `${el.discipline}_${el.type}_${el.name}`;
+                    if (!groups[key]) {
+                        groups[key] = {
+                            discipline: el.discipline.toUpperCase(),
+                            name: el.name,
+                            mode: el.mode,
+                            spec: el.mode === 'line' ? `Tebal: ${el.thickness || 0.1}m` : `${el.w || 0}×${el.l || 0}m (${el.material || 'Standar'})`,
+                            count: 0,
+                            lengthM: 0
+                        };
+                    }
+                    groups[key].count++;
+                    if (el.mode === 'line') {
+                        groups[key].lengthM += Math.hypot(el.x2 - el.x1, el.y2 - el.y1);
+                    }
+                });
+
+                const rows = Object.values(groups);
+                document.getElementById('bomTableBody').innerHTML = rows.map(r => `
+                    <tr>
+                        <td class="py-1.5 px-2 font-semibold text-blue-500">${r.discipline}</td>
+                        <td class="py-1.5 px-2">${r.name}</td>
+                        <td class="py-1.5 px-2 text-slate-400">${r.spec}</td>
+                        <td class="py-1.5 px-2 text-right font-bold">${r.mode === 'line' ? `${r.lengthM.toFixed(2)} m (${r.count} segmen)` : `${r.count} unit`}</td>
+                    </tr>
+                `).join('');
+            },
+
+            exportBOMCSV() {
+                let csv = 'Kategori,Nama Komponen,Mode,Kuantitas,Panjang Total (m)\n';
+                this.state.elements.forEach(el => {
+                    const len = el.mode === 'line' ? Math.hypot(el.x2 - el.x1, el.y2 - el.y1).toFixed(2) : '0';
+                    csv += `"${el.discipline.toUpperCase()}","${el.name}","${el.mode}",1,${len}\n`;
+                });
+                this.downloadBlob(csv, 'PasaDena_BOM.csv', 'text/csv');
+            },
+
+            openExportModal() {
+                document.getElementById('exportModal').classList.remove('hidden');
+            },
+
+            closeModal(id) {
+                document.getElementById(id).classList.add('hidden');
+            },
+
+            exportJSON() {
+                const cleanEls = this.state.elements.map(e => {
+                    const c = { ...e };
+                    delete c.customImgObj;
+                    return c;
+                });
+                const data = JSON.stringify({ ...this.state, elements: cleanEls, bgImage: null }, null, 2);
+                this.downloadBlob(data, 'PasaDena_Proyek.json', 'application/json');
+                this.showToast('Berkas JSON berhasil diekspor');
+            },
+
+            importJSONFile(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const parsed = JSON.parse(e.target.result);
+                        if (parsed && Array.isArray(parsed.elements)) {
+                            this.state.scale = parsed.scale || 100;
+                            this.state.landWidth = parsed.landWidth || 6;
+                            this.state.landLength = parsed.landLength || 10;
+                            this.state.wallHeight = parsed.wallHeight || 3.2;
+                            this.state.totalFloors = parsed.totalFloors || 2;
+                            this.state.elements = parsed.elements;
+                            this.syncUIControls();
+                            this.pushHistory();
+                            this.fitView2D();
+                            this.rebuild3DScene();
+                            this.closeModal('exportModal');
+                            this.showToast('Proyek JSON berhasil dimuat');
+                        }
+                    } catch (err) {
+                        this.showToast('Format JSON tidak valid');
+                    }
+                };
+                reader.readAsText(file);
+            },
+
+            exportDXF() {
+                // Standard AutoCAD ASCII DXF generator
+                let dxf = '0\nSECTION\n2\nENTITIES\n';
+                this.state.elements.forEach(el => {
+                    const layer = el.discipline.toUpperCase();
+                    if (el.mode === 'line') {
+                        dxf += `0\nLINE\n8\n${layer}\n10\n${el.x1}\n20\n${el.y1}\n30\n0.0\n11\n${el.x2}\n21\n${el.y2}\n31\n0.0\n`;
+                    } else {
+                        const hw = (el.w || 0.5) / 2;
+                        const hl = (el.l || 0.5) / 2;
+                        const x1 = el.x - hw, y1 = el.y - hl;
+                        const x2 = el.x + hw, y2 = el.y + hl;
+                        dxf += `0\nLINE\n8\n${layer}\n10\n${x1}\n20\n${y1}\n30\n0.0\n11\n${x2}\n21\n${y1}\n31\n0.0\n`;
+                        dxf += `0\nLINE\n8\n${layer}\n10\n${x2}\n20\n${y1}\n30\n0.0\n11\n${x2}\n21\n${y2}\n31\n0.0\n`;
+                        dxf += `0\nLINE\n8\n${layer}\n10\n${x2}\n20\n${y2}\n30\n0.0\n11\n${x1}\n21\n${y2}\n31\n0.0\n`;
+                        dxf += `0\nLINE\n8\n${layer}\n10\n${x1}\n20\n${y2}\n30\n0.0\n11\n${x1}\n21\n${y1}\n31\n0.0\n`;
+                    }
+                });
+                dxf += '0\nENDSEC\n0\nEOF\n';
+                this.downloadBlob(dxf, 'PasaDena_CAD.dxf', 'application/dxf');
+                this.showToast('Berkas CAD (.DXF) berhasil diekspor');
+            },
+
+            exportOBJ3D() {
+                let obj = '# PasaDena 3D BIM Export\n';
+                let vOffset = 1;
+                this.three.meshesGroup.traverse((child) => {
+                    if (child.isMesh && child.geometry) {
+                        const geom = child.geometry.clone();
+                        geom.applyMatrix4(child.matrixWorld);
+                        const pos = geom.attributes.position;
+                        if (pos) {
+                            for (let i = 0; i < pos.count; i++) {
+                                obj += `v ${pos.getX(i).toFixed(4)} ${pos.getY(i).toFixed(4)} ${pos.getZ(i).toFixed(4)}\n`;
+                            }
+                            const index = geom.index;
+                            if (index) {
+                                for (let i = 0; i < index.count; i += 3) {
+                                    obj += `f ${index.getX(i) + vOffset} ${index.getX(i + 1) + vOffset} ${index.getX(i + 2) + vOffset}\n`;
+                                }
+                            }
+                            vOffset += pos.count;
+                        }
+                    }
+                });
+                this.downloadBlob(obj, 'PasaDena_Model3D.obj', 'text/plain');
+                this.showToast('Objek 3D (.OBJ) berhasil diekspor');
+            },
+
+            exportPNG() {
+                const targetCanvas = this.state.viewMode === '3d' ? this.three.renderer.domElement : this.canvas2D;
+                const url = targetCanvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'PasaDena_Denah.png';
+                a.click();
+                this.showToast('Gambar PNG berhasil diunduh');
+            },
+
+            exportPDF() {
+                const { jsPDF } = window.jspdf;
+                const orient = this.state.paperOrient === 'landscape' ? 'l' : 'p';
+                const format = this.state.paperSize === 'A3' ? 'a3' : 'a4';
+                const doc = new jsPDF(orient, 'mm', format);
+                const pageW = doc.internal.pageSize.getWidth();
+                const pageH = doc.internal.pageSize.getHeight();
+
+                const imgData = this.canvas2D.toDataURL('image/png');
+                doc.addImage(imgData, 'PNG', 10, 15, pageW - 20, pageH - 35);
+
+                // Technical Title Block (Kop Gambar)
+                doc.setDrawColor(40, 40, 40);
+                doc.rect(10, 10, pageW - 20, pageH - 20);
+                doc.setFontSize(10);
+                doc.text(`PasaDena - Denah Teknis | Skala 1:${this.state.scale} | Luas Tanah: ${this.state.landWidth}x${this.state.landLength}m | Lantai ${this.state.activeFloor}`, 14, pageH - 13);
+                doc.save('PasaDena_Denah_Teknis.pdf');
+                this.showToast('Dokumen PDF Teknis berhasil diekspor');
+            },
+
+            downloadBlob(content, filename, mimeType) {
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            },
+
+            copyText(elementId) {
+                const el = document.getElementById(elementId);
+                if (!el) return;
+                el.select();
+                document.execCommand('copy');
+                this.showToast('Prompt + JSON berhasil disalin ke Clipboard');
+            },
+
+            toggleDarkMode() {
+                const html = document.documentElement;
+                html.classList.toggle('dark');
+                const isDark = html.classList.contains('dark');
+                document.getElementById('themeIcon').className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+                this.rebuild3DScene();
+            },
+
+            showToast(msg) {
+                const box = document.getElementById('toastBox');
+                document.getElementById('toastText').textContent = msg;
+                box.classList.remove('opacity-0', 'pointer-events-none');
+                clearTimeout(this._toastTimer);
+                this._toastTimer = setTimeout(() => {
+                    box.classList.add('opacity-0', 'pointer-events-none');
+                }, 2600);
+            },
+
+            handleResize() {
+                const p2d = document.getElementById('pane2D');
+                if (p2d && !p2d.classList.contains('hidden')) {
+                    this.canvas2D.width = p2d.clientWidth;
+                    this.canvas2D.height = p2d.clientHeight;
+                }
+                const c3d = document.getElementById('threeContainer');
+                if (c3d && this.three.renderer && this.three.camera) {
+                    const w = c3d.clientWidth;
+                    const h = c3d.clientHeight;
+                    if (w > 0 && h > 0) {
+                        this.three.camera.aspect = w / h;
+                        this.three.camera.updateProjectionMatrix();
+                        this.three.renderer.setSize(w, h);
+                    }
+                }
+            },
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                if (this.state.viewMode !== '3d') {
+                    this.draw2D();
+                }
+                if (this.state.viewMode !== '2d' && this.three.renderer && this.three.scene && this.three.camera) {
+                    this.three.renderer.render(this.three.scene, this.three.camera);
+                }
+            }
+        };
+
+        window.onload = function () {
+            App.init();
+        };
+    </script>
+</body>
+</html>

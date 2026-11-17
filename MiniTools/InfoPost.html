@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InfoPost</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- SortableJS for Drag and Drop -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+  
+  <!-- html-to-image for High-Res PNG/JPEG Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+
+  <!-- Google Fonts for Editorial & Classic Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,400&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;600&family=Lora:ital,wght@0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cream: {
+              50: '#FDFBF7',
+              100: '#F7F3EB',
+              200: '#EFE7DA',
+              300: '#E2D5C3',
+              400: '#CFC0A8',
+              500: '#B09E83',
+              600: '#8A775E',
+              700: '#645440',
+              800: '#463A2C',
+              900: '#2A2218'
+            },
+            warmink: '#22201D',
+            charcoal: '#332F2A'
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            serif: ['Lora', 'Georgia', 'serif'],
+            display: ['Fraunces', 'serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+            classic: ['"Instrument Serif"', 'serif']
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F7F3EB;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #D8CEBE;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #B09E83;
+    }
+
+    /* Print styles for high precision vector PDF */
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+      #canvas-wrapper, #canvas-wrapper * {
+        visibility: visible !important;
+      }
+      #canvas-wrapper {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        transform: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+      }
+      #poster-canvas {
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .no-print, .canvas-handle, .safe-zone-guide, .selection-ring {
+        display: none !important;
+      }
+      @page {
+        size: auto;
+        margin: 0mm;
+      }
+    }
+
+    /* Canvas Dimension standards (96 DPI screen preview, scaled) */
+    .size-a4-portrait  { width: 794px; min-height: 1123px; }
+    .size-a4-landscape { width: 1123px; min-height: 794px; }
+    .size-a3-portrait  { width: 1123px; min-height: 1587px; }
+    .size-a3-landscape { width: 1587px; min-height: 1123px; }
+
+    /* Card item hover & active states */
+    .canvas-item {
+      position: relative;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    .canvas-item:hover {
+      outline: 1px dashed #B09E83;
+    }
+    .canvas-item.active-item {
+      outline: 2px solid #8A775E;
+      box-shadow: 0 4px 12px rgba(138, 119, 94, 0.12);
+    }
+
+    /* Safe zone overlay */
+    .show-guides .safe-zone-guide {
+      display: block;
+    }
+    .safe-zone-guide {
+      display: none;
+      pointer-events: none;
+      position: absolute;
+      inset: 28px;
+      border: 1px dashed rgba(180, 140, 100, 0.45);
+      z-index: 40;
+    }
+  </style>
+</head>
+
+<body class="bg-cream-100 text-warmink font-sans min-h-screen flex flex-col antialiased selection:bg-cream-300">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white border-b border-cream-200 px-4 py-2.5 flex items-center justify-between shadow-sm z-30 sticky top-0 no-print">
+    <div class="flex items-center space-x-3">
+      <div class="h-9 w-9 rounded-lg bg-cream-800 text-cream-50 flex items-center justify-center font-display font-bold text-lg shadow-sm">
+        iP
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-base font-bold text-warmink tracking-tight font-display">InfoPost</h1>
+        </div>
+        <p class="text-xs text-cream-600 hidden sm:block">Pembuat poster tabel edukasi & infografis berstruktur rapi</p>
+      </div>
+    </div>
+
+    <!-- Quick Canvas Tools -->
+    <div class="flex items-center space-x-2">
+      <!-- Undo / Redo -->
+      <div class="flex items-center bg-cream-50 border border-cream-200 rounded-md p-0.5">
+        <button id="btn-undo" onclick="handleUndo()" title="Urungkan (Undo)" class="p-1.5 text-cream-700 hover:text-warmink hover:bg-cream-200 rounded transition disabled:opacity-30">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 0 1 5 5v2m0 0l-4-4m4 4l4-4M3 10l4-4m-4 4l4 4"/></svg>
+        </button>
+        <button id="btn-redo" onclick="handleRedo()" title="Ulangi (Redo)" class="p-1.5 text-cream-700 hover:text-warmink hover:bg-cream-200 rounded transition disabled:opacity-30">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a5 5 0 0 0-5 5v2m0 0l4-4m-4 4l-4-4m21 0l-4-4m4 4l-4 4"/></svg>
+        </button>
+      </div>
+
+      <!-- Format selector -->
+      <div class="flex items-center space-x-1.5 bg-cream-50 border border-cream-200 px-2.5 py-1 rounded-md text-xs">
+        <span class="text-cream-600 font-medium">Ukuran:</span>
+        <select id="canvas-paper-format" onchange="changeCanvasFormat(this.value)" class="bg-transparent font-semibold text-warmink focus:outline-none cursor-pointer">
+          <option value="a4-portrait">A4 Vertikal (210×297 mm)</option>
+          <option value="a4-landscape">A4 Horizontal (297×210 mm)</option>
+          <option value="a3-portrait">A3 Vertikal (297×420 mm)</option>
+          <option value="a3-landscape">A3 Horizontal (420×297 mm)</option>
+        </select>
+      </div>
+
+      <!-- Zoom controller -->
+      <div class="hidden md:flex items-center space-x-1 bg-cream-50 border border-cream-200 px-2 py-1 rounded-md text-xs text-cream-700">
+        <button onclick="adjustZoom(-0.1)" class="px-1 font-bold hover:text-warmink">-</button>
+        <span id="zoom-label" class="w-12 text-center font-mono font-medium">85%</span>
+        <button onclick="adjustZoom(0.1)" class="px-1 font-bold hover:text-warmink">+</button>
+        <button onclick="setFitZoom()" class="text-[11px] ml-1 text-cream-600 hover:text-warmink underline">Pas Layar</button>
+      </div>
+
+      <!-- Export Actions Dropdown -->
+      <div class="relative inline-block text-left" id="export-dropdown-wrapper">
+        <button onclick="toggleExportMenu()" class="flex items-center space-x-1.5 bg-cream-800 hover:bg-cream-900 text-cream-50 px-3 py-1.5 rounded-md text-xs font-semibold shadow-sm transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          <span>Ekspor Poster</span>
+          <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+
+        <div id="export-menu" class="hidden absolute right-0 mt-1 w-52 bg-white rounded-lg shadow-lg border border-cream-200 py-1.5 z-50 text-xs">
+          <button onclick="exportHighResImage('png')" class="w-full text-left px-3.5 py-2 hover:bg-cream-100 flex items-center space-x-2 text-warmink">
+            <span class="font-bold text-cream-700">PNG</span>
+            <span>Gambar Kualitas Tinggi (HD)</span>
+          </button>
+          <button onclick="exportHighResImage('jpeg')" class="w-full text-left px-3.5 py-2 hover:bg-cream-100 flex items-center space-x-2 text-warmink">
+            <span class="font-bold text-cream-700">JPG</span>
+            <span>Gambar Terkompresi (Web)</span>
+          </button>
+          <button onclick="triggerPrintPDF()" class="w-full text-left px-3.5 py-2 hover:bg-cream-100 flex items-center space-x-2 text-warmink border-t border-cream-100">
+            <span class="font-bold text-cream-700">PDF</span>
+            <span>Cetak Vektor / Simpan PDF</span>
+          </button>
+          <button onclick="exportProjectJSON()" class="w-full text-left px-3.5 py-2 hover:bg-cream-100 flex items-center space-x-2 text-warmink border-t border-cream-100">
+            <svg class="w-3.5 h-3.5 text-cream-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            <span>Simpan Cadangan (JSON)</span>
+          </button>
+          <button onclick="copyIllustratorPrompt()" class="w-full text-left px-3.5 py-2 hover:bg-cream-100 flex items-center space-x-2 text-warmink">
+            <svg class="w-3.5 h-3.5 text-cream-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+            <span>Salin Ringkasan Konten (AI)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- Left Navigation & Sidebar Panel -->
+    <aside class="w-80 bg-white border-r border-cream-200 flex flex-col h-[calc(100vh-53px)] shrink-0 z-20 no-print">
+      
+      <!-- Tab Headers -->
+      <div class="flex border-b border-cream-200 bg-cream-50/60 p-1">
+        <button onclick="switchTab('elements')" id="tab-btn-elements" class="flex-1 py-1.5 text-xs font-semibold rounded-md transition text-cream-900 bg-white shadow-xs">
+          Komponen
+        </button>
+        <button onclick="switchTab('templates')" id="tab-btn-templates" class="flex-1 py-1.5 text-xs font-semibold rounded-md transition text-cream-600 hover:text-cream-900">
+          Template
+        </button>
+        <button onclick="switchTab('canvas-opt')" id="tab-btn-canvas-opt" class="flex-1 py-1.5 text-xs font-semibold rounded-md transition text-cream-600 hover:text-cream-900">
+          Tata Halaman
+        </button>
+      </div>
+
+      <!-- Tab 1: Elements Insertion Palette -->
+      <div id="tab-elements" class="flex-1 overflow-y-auto p-4 space-y-4">
+        <div>
+          <h3 class="text-[11px] font-bold uppercase tracking-wider text-cream-600 mb-2">Sisipkan Elemen Poster</h3>
+          <div class="grid grid-cols-2 gap-2">
+            
+            <!-- Header Block -->
+            <button onclick="addHeaderBlock()" class="flex flex-col items-center justify-center p-3 rounded-lg border border-cream-200 bg-cream-50/40 hover:bg-cream-100 hover:border-cream-300 transition text-center group">
+              <span class="w-8 h-8 rounded bg-cream-200 text-cream-800 flex items-center justify-center mb-1.5 group-hover:scale-105 transition font-serif font-bold text-sm">H</span>
+              <span class="text-xs font-semibold text-warmink">Judul Header</span>
+              <span class="text-[10px] text-cream-600">Kepala poster & pita</span>
+            </button>
+
+            <!-- Text Box -->
+            <button onclick="addTextBlock()" class="flex flex-col items-center justify-center p-3 rounded-lg border border-cream-200 bg-cream-50/40 hover:bg-cream-100 hover:border-cream-300 transition text-center group">
+              <span class="w-8 h-8 rounded bg-cream-200 text-cream-800 flex items-center justify-center mb-1.5 group-hover:scale-105 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+              </span>
+              <span class="text-xs font-semibold text-warmink">Kotak Teks</span>
+              <span class="text-[10px] text-cream-600">Paragraf & penjelas</span>
+            </button>
+
+            <!-- Illustration & Image Upload -->
+            <button onclick="triggerImageUpload()" class="flex flex-col items-center justify-center p-3 rounded-lg border border-cream-200 bg-cream-50/40 hover:bg-cream-100 hover:border-cream-300 transition text-center group">
+              <span class="w-8 h-8 rounded bg-cream-200 text-cream-800 flex items-center justify-center mb-1.5 group-hover:scale-105 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </span>
+              <span class="text-xs font-semibold text-warmink">Ilustrasi / Foto</span>
+              <span class="text-[10px] text-cream-600">Unggah berkas lokal</span>
+            </button>
+            <input type="file" id="local-image-input" accept="image/*" class="hidden" onchange="handleImageFileSelected(this)">
+            <input type="file" id="replace-image-input" accept="image/*" class="hidden" onchange="handleReplaceImageSelected(this)">
+
+            <!-- Table Block -->
+            <button onclick="addTableBlock()" class="flex flex-col items-center justify-center p-3 rounded-lg border border-cream-200 bg-cream-50/40 hover:bg-cream-100 hover:border-cream-300 transition text-center group">
+              <span class="w-8 h-8 rounded bg-cream-200 text-cream-800 flex items-center justify-center mb-1.5 group-hover:scale-105 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </span>
+              <span class="text-xs font-semibold text-warmink">Tabel Data</span>
+              <span class="text-[10px] text-cream-600">Kisi matriks baris</span>
+            </button>
+
+            <!-- Timeline Block -->
+            <button onclick="addTimelineBlock()" class="flex flex-col items-center justify-center p-3 rounded-lg border border-cream-200 bg-cream-50/40 hover:bg-cream-100 hover:border-cream-300 transition text-center group">
+              <span class="w-8 h-8 rounded bg-cream-200 text-cream-800 flex items-center justify-center mb-1.5 group-hover:scale-105 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </span>
+              <span class="text-xs font-semibold text-warmink">Linimasa / Alur</span>
+              <span class="text-[10px] text-cream-600">Urutan berperingkat</span>
+            </button>
+
+            <!-- Footer Block -->
+            <button onclick="addFooterBlock()" class="flex flex-col items-center justify-center p-3 rounded-lg border border-cream-200 bg-cream-50/40 hover:bg-cream-100 hover:border-cream-300 transition text-center group">
+              <span class="w-8 h-8 rounded bg-cream-200 text-cream-800 flex items-center justify-center mb-1.5 group-hover:scale-105 transition font-mono font-bold text-xs">FT</span>
+              <span class="text-xs font-semibold text-warmink">Catatan Kaki</span>
+              <span class="text-[10px] text-cream-600">Sumber & slogan bawah</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="border-t border-cream-200 pt-3">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-[11px] font-bold uppercase tracking-wider text-cream-600">Pustaka Ikon Simpel</h3>
+            <span class="text-[10px] text-cream-500">Klik untuk menyisipkan</span>
+          </div>
+          <div class="grid grid-cols-5 gap-1.5 p-2 bg-cream-50/70 border border-cream-200 rounded-lg max-h-36 overflow-y-auto" id="quick-icons-grid">
+            <!-- Dynamically populated with clean SVG icons -->
+          </div>
+        </div>
+
+        <!-- Target Insertion Destination -->
+        <div class="border-t border-cream-200 pt-3 text-xs">
+          <label class="block text-[11px] font-bold text-cream-700 uppercase tracking-wider mb-1.5">Target Penempatan Elemen:</label>
+          <select id="target-placement-select" class="w-full bg-cream-50 border border-cream-200 rounded p-1.5 text-xs text-warmink">
+            <option value="auto">Otomatis (Kolom Utama)</option>
+            <option value="header-zone">Zona Atas (Header)</option>
+            <option value="main-zone">Zona Isi (Kolom)</option>
+            <option value="footer-zone">Zona Bawah (Footer)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="tab-templates" class="hidden flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="text-xs text-cream-700 leading-relaxed bg-cream-50 p-2.5 rounded border border-cream-200 mb-2">
+          <strong>Template Edukasi Siap Pakai:</strong> Dirancang dengan disiplin tipografi dinding sekolah, bebas ornamen berlebih.
+        </div>
+
+        <!-- Template 1: Perkalian 1-10 -->
+        <div class="p-3 border border-cream-200 rounded-lg hover:border-cream-400 bg-white transition flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-warmink">Tabel Perkalian Dasar (1–10)</h4>
+              <span class="text-[10px] bg-cream-200 px-1 rounded text-cream-800 font-mono">10 Kolom</span>
+            </div>
+            <p class="text-[11px] text-cream-600 mt-1">Struktur tabel modular 10 kolom dengan header kartu angka klasik untuk dinding belajar.</p>
+          </div>
+          <button onclick="loadTemplate('multiplication')" class="mt-2.5 w-full py-1.5 bg-cream-100 hover:bg-cream-200 text-cream-800 font-semibold rounded text-xs transition">
+            Terapkan Template Ini
+          </button>
+        </div>
+
+        <!-- Template 2: Abjad A-Z -->
+        <div class="p-3 border border-cream-200 rounded-lg hover:border-cream-400 bg-white transition flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-warmink">Tabel Abjad & Fonik (A–Z)</h4>
+              <span class="text-[10px] bg-cream-200 px-1 rounded text-cream-800 font-mono">26 Kartu</span>
+            </div>
+            <p class="text-[11px] text-cream-600 mt-1">Grid huruf kapital, huruf kecil, dan kata percontohan dengan bingkai kartu bersih.</p>
+          </div>
+          <button onclick="loadTemplate('alphabet')" class="mt-2.5 w-full py-1.5 bg-cream-100 hover:bg-cream-200 text-cream-800 font-semibold rounded text-xs transition">
+            Terapkan Template Ini
+          </button>
+        </div>
+
+        <!-- Template 3: Kisi Gambar 4x4 -->
+        <div class="p-3 border border-cream-200 rounded-lg hover:border-cream-400 bg-white transition flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-warmink">Tabel Ilustrasi Grid 4×4</h4>
+              <span class="text-[10px] bg-cream-200 px-1 rounded text-cream-800 font-mono">16 Slot</span>
+            </div>
+            <p class="text-[11px] text-cream-600 mt-1">16 kotak gambar berbingkai rapi untuk ensiklopedia flora, fauna, atau alat kerja.</p>
+          </div>
+          <button onclick="loadTemplate('grid4x4')" class="mt-2.5 w-full py-1.5 bg-cream-100 hover:bg-cream-200 text-cream-800 font-semibold rounded text-xs transition">
+            Terapkan Template Ini
+          </button>
+        </div>
+
+        <!-- Template 4: Poster ILM / Layanan Masyarakat -->
+        <div class="p-3 border border-cream-200 rounded-lg hover:border-cream-400 bg-white transition flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-warmink">Poster Layanan Masyarakat (ILM)</h4>
+              <span class="text-[10px] bg-cream-200 px-1 rounded text-cream-800 font-mono">3 Pilar</span>
+            </div>
+            <p class="text-[11px] text-cream-600 mt-1">Pesan lugas, 3 kolom langkah aksi warga, dan kotak himbauan resmi di bagian bawah.</p>
+          </div>
+          <button onclick="loadTemplate('ilm')" class="mt-2.5 w-full py-1.5 bg-cream-100 hover:bg-cream-200 text-cream-800 font-semibold rounded text-xs transition">
+            Terapkan Template Ini
+          </button>
+        </div>
+      </div>
+
+      <div id="tab-canvas-opt" class="hidden flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        
+        <!-- Column Segments -->
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-cream-700 mb-1.5">
+            Segmen Kolom Isi (1 s.d. 6 Kolom)
+          </label>
+          <div class="grid grid-cols-6 gap-1 bg-cream-50 p-1 border border-cream-200 rounded-md text-center">
+            <button onclick="setGridColumns(1)" id="btn-col-1" class="py-1 rounded font-bold hover:bg-cream-200 text-warmink">1</button>
+            <button onclick="setGridColumns(2)" id="btn-col-2" class="py-1 rounded font-bold hover:bg-cream-200 text-warmink">2</button>
+            <button onclick="setGridColumns(3)" id="btn-col-3" class="py-1 rounded font-bold hover:bg-cream-200 text-warmink bg-cream-800 text-cream-50">3</button>
+            <button onclick="setGridColumns(4)" id="btn-col-4" class="py-1 rounded font-bold hover:bg-cream-200 text-warmink">4</button>
+            <button onclick="setGridColumns(5)" id="btn-col-5" class="py-1 rounded font-bold hover:bg-cream-200 text-warmink">5</button>
+            <button onclick="setGridColumns(6)" id="btn-col-6" class="py-1 rounded font-bold hover:bg-cream-200 text-warmink">6</button>
+          </div>
+          <div class="mt-2 flex items-center justify-between">
+            <span class="text-cream-600">Garis Pembatas Antar Kolom:</span>
+            <input type="checkbox" id="chk-column-divider" onchange="toggleColumnDivider(this.checked)" class="rounded text-cream-800 focus:ring-0">
+          </div>
+        </div>
+
+        <!-- Spacing & Gap Controls -->
+        <div class="border-t border-cream-200 pt-3">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-cream-700 mb-1.5">
+            Jarak Antar Segmen & Kolom
+          </label>
+          <div class="space-y-2.5">
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="text-cream-600">Jarak Antar Kolom (Gap):</span>
+                <span id="label-col-gap" class="font-mono font-semibold text-warmink">20px</span>
+              </div>
+              <input type="range" id="input-col-gap" min="4" max="48" step="2" value="20" oninput="setColumnGap(this.value)" class="w-full accent-cream-800 cursor-pointer">
+            </div>
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="text-cream-600">Jarak Vertikal Antar Zona (Seksi):</span>
+                <span id="label-zone-spacing" class="font-mono font-semibold text-warmink">20px</span>
+              </div>
+              <input type="range" id="input-zone-spacing" min="8" max="48" step="2" value="20" oninput="setZoneSpacing(this.value)" class="w-full accent-cream-800 cursor-pointer">
+            </div>
+          </div>
+        </div>
+
+        <!-- Canvas Background Color -->
+        <div class="border-t border-cream-200 pt-3">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-cream-700 mb-1.5">Warna Kertas / Latar Belakang</label>
+          <div class="grid grid-cols-5 gap-1.5 mb-2">
+            <button onclick="setCanvasBg('#FFFFFF')" class="h-6 rounded border border-cream-300 bg-white" title="Putih Murni"></button>
+            <button onclick="setCanvasBg('#FDFBF7')" class="h-6 rounded border border-cream-300 bg-[#FDFBF7]" title="Kertas Putih Hangat"></button>
+            <button onclick="setCanvasBg('#F5EFEB')" class="h-6 rounded border border-cream-300 bg-[#F5EFEB]" title="Krem Halus"></button>
+            <button onclick="setCanvasBg('#EFE8DC')" class="h-6 rounded border border-cream-300 bg-[#EFE8DC]" title="Koran Antik"></button>
+            <button onclick="setCanvasBg('#262422')" class="h-6 rounded border border-cream-300 bg-[#262422]" title="Papan Tulis Tua"></button>
+          </div>
+          <div class="flex items-center space-x-2">
+            <span class="text-cream-600">Warna Kustom:</span>
+            <input type="color" id="canvas-bg-picker" value="#FDFBF7" onchange="setCanvasBg(this.value)" class="w-7 h-7 p-0 border border-cream-300 rounded cursor-pointer">
+          </div>
+        </div>
+
+        <!-- Canvas Border Style -->
+        <div class="border-t border-cream-200 pt-3">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-cream-700 mb-1.5">Bingkai Garis Tepi Halaman</label>
+          <select id="canvas-border-style" onchange="changeCanvasBorder(this.value)" class="w-full bg-cream-50 border border-cream-200 rounded p-1.5 text-xs text-warmink">
+            <option value="none">Tanpa Bingkai Luar</option>
+            <option value="single">Garis Tunggal Rapi (1px Solid)</option>
+            <option value="double" selected>Garis Ganda Poster Klasik (Double Frame)</option>
+            <option value="dashed">Garis Putus-Putus Teknis (Dashed)</option>
+            <option value="heavy">Bingkai Solid Tegas (3px Solid)</option>
+          </select>
+        </div>
+
+        <!-- Safe Margin Guide Toggle -->
+        <div class="border-t border-cream-200 pt-3 flex items-center justify-between">
+          <div>
+            <span class="font-semibold text-warmink block">Batas Aman Cetak (10mm)</span>
+            <span class="text-[10px] text-cream-500">Garis bantu area aman potong</span>
+          </div>
+          <input type="checkbox" id="chk-safe-guide" onchange="toggleSafeGuides(this.checked)" checked class="rounded text-cream-800 focus:ring-0">
+        </div>
+
+        <!-- Storage & Reset -->
+        <div class="border-t border-cream-200 pt-4 space-y-2">
+          <button onclick="resetCanvasConfirm()" class="w-full py-1.5 border border-red-200 text-red-700 hover:bg-red-50 rounded text-xs transition font-semibold">
+            Kosongkan Kanvas
+          </button>
+          <input type="file" id="json-file-input" accept=".json" class="hidden" onchange="handleJSONFileImport(this)">
+          <button onclick="document.getElementById('json-file-input').click()" class="w-full py-1.5 border border-cream-300 bg-cream-50 hover:bg-cream-100 text-cream-800 rounded text-xs transition font-semibold">
+            Buka Berkas InfoPost (JSON)
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick status indicator at bottom of sidebar -->
+      <div class="p-2.5 border-t border-cream-200 bg-cream-50/80 text-[10px] text-cream-600 flex items-center justify-between">
+        <span id="save-status">Tersimpan otomatis</span>
+        <span class="font-mono" id="item-count-label">0 Elemen</span>
+      </div>
+    </aside>
+
+    <main class="flex-1 bg-cream-200/60 overflow-auto p-4 md:p-8 flex justify-center items-start relative select-none" id="workspace-main">
+      
+      <!-- Transform Canvas Wrapper for scaling -->
+      <div id="canvas-wrapper" class="origin-top transition-transform duration-75 relative">
+        
+        <!-- The Actual Poster Canvas -->
+        <div id="poster-canvas" class="size-a4-portrait bg-cream-50 text-warmink relative shadow-xl transition-all duration-150 p-8 sm:p-10 flex flex-col justify-between" style="border: 4px double #332F2A;">
+          
+          <!-- Visual Safe Print Margin Overlay -->
+          <div class="safe-zone-guide"></div>
+
+          <!-- Poster Header Zone -->
+          <div id="zone-header" class="mb-5 space-y-3 min-h-[40px]">
+            <!-- Header items dropped here -->
+          </div>
+
+          <!-- Poster Main Segment Grid (Columns 1 to 6) -->
+          <div id="zone-main" class="flex-1 grid grid-cols-3 gap-5 items-start min-h-[200px]">
+            <!-- Content items dropped here -->
+          </div>
+
+          <!-- Poster Footer Zone -->
+          <div id="zone-footer" class="mt-6 pt-3 border-t border-cream-300 min-h-[30px] space-y-2">
+            <!-- Footer items dropped here -->
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <aside id="inspector-panel" class="w-72 bg-white border-l border-cream-200 flex flex-col h-[calc(100vh-53px)] shrink-0 z-20 no-print transition-all">
+      <div class="p-3 border-b border-cream-200 bg-cream-50 flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-warmink" id="inspector-title">Inspektor Elemen</span>
+        <button onclick="deselectActiveItem()" class="text-xs text-cream-500 hover:text-warmink">Tutup ×</button>
+      </div>
+
+      <div id="inspector-body" class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        <p class="text-cream-600 text-center py-8">Pilih salah satu elemen di poster untuk menyesuaikan teks, bingkai, atau gayanya.</p>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- Custom Alert/Confirm Modal (Never use window.alert) -->
+  <div id="app-modal" class="fixed inset-0 bg-black/40 backdrop-blur-xs hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl border border-cream-200 max-w-sm w-full p-4 space-y-3">
+      <h3 class="font-bold text-sm text-warmink font-display" id="modal-title">Konfirmasi</h3>
+      <p class="text-xs text-cream-700 leading-relaxed" id="modal-message">Pesan peringatan</p>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button id="modal-btn-cancel" class="px-3 py-1.5 rounded text-xs font-semibold text-cream-700 hover:bg-cream-100 transition">Batal</button>
+        <button id="modal-btn-confirm" class="px-3 py-1.5 rounded text-xs font-semibold bg-cream-800 text-cream-50 hover:bg-cream-900 transition">Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* Application State */
+    const state = {
+      zoom: 0.85,
+      paperFormat: 'a4-portrait',
+      columns: 3,
+      columnGap: 20,
+      zoneSpacing: 20,
+      hasColumnDivider: false,
+      borderStyle: 'double',
+      backgroundColor: '#FDFBF7',
+      showSafeGuide: true,
+      activeItemId: null,
+      history: [],
+      historyIndex: -1,
+      maxHistory: 35,
+      isApplyingHistory: false
+    };
+
+    /* Standard educational iconography library in SVG strings */
+    const ICON_COLLECTION = [
+      { name: 'Buku', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>' },
+      { name: 'Pena', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>' },
+      { name: 'Bintang', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>' },
+      { name: 'Lampu', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"></path></svg>' },
+      { name: 'Daun', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>' },
+      { name: 'Jam', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' },
+      { name: 'Perisai', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>' },
+      { name: 'Ceklis', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>' },
+      { name: 'Peringatan', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>' },
+      { name: 'Panah Kanan', svg: '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>' }
+    ];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initQuickIcons();
+      setupSortableZones();
+      applyZoom();
+      setupKeyboardShortcuts();
+      
+      // Load saved work or launch default educational starter
+      const saved = localStorage.getItem('infopost_backup');
+      if (saved) {
+        try {
+          loadProjectFromData(JSON.parse(saved), false);
+          showToast('Memulihkan sesi pengerjaan sebelumnya');
+        } catch (e) {
+          loadTemplate('multiplication');
+        }
+      } else {
+        loadTemplate('multiplication');
+      }
+
+      // Track clicks outside items to deselect
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.canvas-item') && 
+            !e.target.closest('#inspector-panel') && 
+            !e.target.closest('aside') &&
+            !e.target.closest('#export-menu') &&
+            !e.target.closest('#app-modal')) {
+          deselectActiveItem();
+        }
+      });
+    });
+
+    let sortableInstances = [];
+    function setupSortableZones() {
+      // Clear existing instances
+      sortableInstances.forEach(inst => inst.destroy());
+      sortableInstances = [];
+
+      const zones = ['zone-header', 'zone-main', 'zone-footer'];
+      zones.forEach(zoneId => {
+        const el = document.getElementById(zoneId);
+        if (el) {
+          const inst = new Sortable(el, {
+            group: 'infopost-elements',
+            animation: 150,
+            ghostClass: 'opacity-40',
+            handle: '.canvas-handle',
+            onEnd: () => {
+              recordHistory('Ubah urutan elemen');
+              updateItemCountBadge();
+            }
+          });
+          sortableInstances.push(inst);
+        }
+      });
+    }
+
+    function switchTab(tabId) {
+      ['elements', 'templates', 'canvas-opt'].forEach(id => {
+        const btn = document.getElementById(`tab-btn-${id}`);
+        const view = document.getElementById(`tab-${id}`);
+        if (id === tabId) {
+          btn.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md transition text-cream-900 bg-white shadow-xs';
+          view.classList.remove('hidden');
+        } else {
+          btn.className = 'flex-1 py-1.5 text-xs font-semibold rounded-md transition text-cream-600 hover:text-cream-900';
+          view.classList.add('hidden');
+        }
+      });
+    }
+
+    function adjustZoom(delta) {
+      state.zoom = Math.min(1.5, Math.max(0.4, Number((state.zoom + delta).toFixed(2))));
+      applyZoom();
+    }
+
+    function setFitZoom() {
+      const container = document.getElementById('workspace-main');
+      const canvas = document.getElementById('poster-canvas');
+      if (!container || !canvas) return;
+      const pad = 60;
+      const targetW = container.clientWidth - pad;
+      const currentW = canvas.offsetWidth;
+      state.zoom = Math.min(1.0, Math.max(0.45, Number((targetW / currentW).toFixed(2))));
+      applyZoom();
+    }
+
+    function applyZoom() {
+      const wrapper = document.getElementById('canvas-wrapper');
+      const label = document.getElementById('zoom-label');
+      if (wrapper) wrapper.style.transform = `scale(${state.zoom})`;
+      if (label) label.textContent = `${Math.round(state.zoom * 100)}%`;
+    }
+
+    function initQuickIcons() {
+      const grid = document.getElementById('quick-icons-grid');
+      grid.innerHTML = '';
+      ICON_COLLECTION.forEach((ic, index) => {
+        const btn = document.createElement('button');
+        btn.className = 'h-9 flex items-center justify-center p-1.5 rounded hover:bg-cream-200/80 text-warmink transition border border-cream-200/50 bg-white';
+        btn.title = ic.name;
+        btn.innerHTML = ic.svg;
+        btn.onclick = () => insertIconElement(index);
+        grid.appendChild(btn);
+      });
+    }
+
+    function getTargetZone() {
+      const select = document.getElementById('target-placement-select').value;
+      if (select === 'header-zone') return document.getElementById('zone-header');
+      if (select === 'footer-zone') return document.getElementById('zone-footer');
+      return document.getElementById('zone-main');
+    }
+
+    function generateUniqueId() {
+      return 'item-' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function createBaseItemElement(id, type) {
+      const el = document.createElement('div');
+      el.id = id;
+      el.dataset.type = type;
+      el.className = 'canvas-item bg-white/90 border border-cream-300 rounded p-3 select-text group/item';
+      
+      // Control handle banner (drag & delete)
+      const handle = document.createElement('div');
+      handle.className = 'canvas-handle no-print absolute -top-3.5 right-2 hidden group-hover/item:flex items-center space-x-1 bg-cream-800 text-cream-50 rounded px-1.5 py-0.5 text-[10px] shadow z-30 cursor-grab';
+      handle.innerHTML = `
+        <span class="font-mono tracking-tighter">⠿ Geser</span>
+        <button onclick="event.stopPropagation(); deleteItem('${id}')" class="ml-1 text-red-200 hover:text-white" title="Hapus">✕</button>
+      `;
+      el.appendChild(handle);
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectItem(id);
+      });
+
+      return el;
+    }
+
+    function addHeaderBlock(data = {}) {
+      const id = generateUniqueId();
+      const el = createBaseItemElement(id, 'header');
+      el.classList.add('bg-transparent', 'border-none', 'text-center', 'w-full');
+      
+      const title = data.title || 'JUDUL UTAMA POSTER';
+      const subtitle = data.subtitle || 'Keterangan lengkap atau petunjuk pembelajaran';
+      const kicker = data.kicker || 'INFOGRAFIS & PANDUAN RINGKAS';
+
+      const content = document.createElement('div');
+      content.className = 'header-content border-b-2 border-warmink/80 pb-2.5';
+      content.innerHTML = `
+        <div class="header-kicker text-[11px] font-mono tracking-widest font-semibold uppercase text-cream-700" contenteditable="true" onblur="handleTextEdit()">${kicker}</div>
+        <h2 class="header-title font-display text-2xl sm:text-3xl font-bold tracking-tight text-warmink my-1 uppercase" contenteditable="true" onblur="handleTextEdit()">${title}</h2>
+        <div class="header-sub text-xs sm:text-sm font-serif italic text-cream-700" contenteditable="true" onblur="handleTextEdit()">${subtitle}</div>
+      `;
+      el.appendChild(content);
+
+      const target = data.forceZone || (document.getElementById('zone-header').children.length === 0 ? document.getElementById('zone-header') : getTargetZone());
+      target.appendChild(el);
+      selectItem(id);
+      recordHistory('Tambah Header');
+      updateItemCountBadge();
+    }
+
+    function addTextBlock(data = {}) {
+      const id = generateUniqueId();
+      const el = createBaseItemElement(id, 'text');
+      
+      const title = data.title || 'Poin Pembahasan';
+      const body = data.body || 'Tuliskan uraian informasi secara ringkas, lugas, dan teratur di sini. Setiap baris menjelaskan fakta yang mudah dipahami.';
+
+      const content = document.createElement('div');
+      content.innerHTML = `
+        <h3 class="box-title font-bold text-sm text-warmink border-b border-cream-200 pb-1 mb-1.5" contenteditable="true" onblur="handleTextEdit()">${title}</h3>
+        <div class="box-body text-xs text-warmink/90 leading-relaxed font-sans" contenteditable="true" onblur="handleTextEdit()">${body}</div>
+      `;
+      el.appendChild(content);
+
+      getTargetZone().appendChild(el);
+      selectItem(id);
+      recordHistory('Tambah Kotak Teks');
+      updateItemCountBadge();
+    }
+
+    function addTableBlock(data = {}) {
+      const id = generateUniqueId();
+      const el = createBaseItemElement(id, 'table');
+      
+      const rows = data.rows || 3;
+      const cols = data.cols || 3;
+      const title = data.title || 'Tabel Data Ringkas';
+
+      const content = document.createElement('div');
+      content.className = 'table-wrapper overflow-x-auto';
+      
+      let tableHtml = `
+        <div class="text-xs font-bold text-warmink mb-1.5 font-display flex items-center justify-between">
+          <span contenteditable="true" onblur="handleTextEdit()">${title}</span>
+        </div>
+        <table class="w-full text-xs border-collapse border border-cream-300 bg-white">
+          <thead>
+            <tr class="bg-cream-100 border-b border-cream-300">
+      `;
+      for (let c = 1; c <= cols; c++) {
+        tableHtml += `<th class="border border-cream-300 p-1.5 font-semibold text-left text-cream-900" contenteditable="true" onblur="handleTextEdit()">Kolom ${c}</th>`;
+      }
+      tableHtml += `</tr></thead><tbody>`;
+      for (let r = 1; r <= rows; r++) {
+        tableHtml += `<tr class="${r % 2 === 0 ? 'bg-cream-50/50' : ''}">`;
+        for (let c = 1; c <= cols; c++) {
+          tableHtml += `<td class="border border-cream-300 p-1.5 text-warmink" contenteditable="true" onblur="handleTextEdit()">Data ${r},${c}</td>`;
+        }
+        tableHtml += `</tr>`;
+      }
+      tableHtml += `</tbody></table>`;
+      
+      content.innerHTML = tableHtml;
+      el.appendChild(content);
+
+      getTargetZone().appendChild(el);
+      selectItem(id);
+      recordHistory('Tambah Tabel');
+      updateItemCountBadge();
+    }
+
+    function addTimelineBlock(data = {}) {
+      const id = generateUniqueId();
+      const el = createBaseItemElement(id, 'timeline');
+
+      const title = data.title || 'Alur / Linimasa Proses';
+      const steps = data.steps || [
+        { num: '1', title: 'Tahap Awal', desc: 'Identifikasi kebutuhan dasar dan data.' },
+        { num: '2', title: 'Penyusunan', desc: 'Pengelompokan elemen ke format kisi poster.' },
+        { num: '3', title: 'Selesai', desc: 'Cetak fisik atau bagikan sebagai panduan.' }
+      ];
+
+      const content = document.createElement('div');
+      let stepsHtml = `
+        <h4 class="font-bold text-xs text-warmink mb-2 pb-1 border-b border-cream-200" contenteditable="true" onblur="handleTextEdit()">${title}</h4>
+        <div class="timeline-steps space-y-2 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-cream-300">
+      `;
+
+      steps.forEach(st => {
+        stepsHtml += `
+          <div class="timeline-step flex items-start space-x-2.5 relative pl-1">
+            <span class="w-5 h-5 rounded-full bg-cream-800 text-cream-50 flex items-center justify-center font-mono font-bold text-[10px] shrink-0 z-10" contenteditable="true">${st.num}</span>
+            <div class="flex-1">
+              <span class="font-semibold text-xs text-warmink block" contenteditable="true" onblur="handleTextEdit()">${st.title}</span>
+              <p class="text-[11px] text-cream-700 leading-tight" contenteditable="true" onblur="handleTextEdit()">${st.desc}</p>
+            </div>
+          </div>
+        `;
+      });
+      stepsHtml += `</div>`;
+      content.innerHTML = stepsHtml;
+      el.appendChild(content);
+
+      getTargetZone().appendChild(el);
+      selectItem(id);
+      recordHistory('Tambah Linimasa');
+      updateItemCountBadge();
+    }
+
+    function addFooterBlock(data = {}) {
+      const id = generateUniqueId();
+      const el = createBaseItemElement(id, 'footer');
+      el.classList.add('bg-transparent', 'border-none', 'w-full');
+
+      const note = data.note || 'Sumber Data: Balai Pustaka & Kurikulum Edukasi 2026';
+      const slogan = data.slogan || 'Disusun dengan InfoPost — Rapi, Lugas, dan Edukatif';
+
+      const content = document.createElement('div');
+      content.className = 'flex flex-col sm:flex-row items-center justify-between text-[11px] text-cream-700 border-t border-cream-300 pt-2 font-mono';
+      content.innerHTML = `
+        <div class="footer-note" contenteditable="true" onblur="handleTextEdit()">${note}</div>
+        <div class="footer-slogan mt-1 sm:mt-0 font-semibold uppercase tracking-wider text-[10px]" contenteditable="true" onblur="handleTextEdit()">${slogan}</div>
+      `;
+      el.appendChild(content);
+
+      document.getElementById('zone-footer').appendChild(el);
+      selectItem(id);
+      recordHistory('Tambah Catatan Kaki');
+      updateItemCountBadge();
+    }
+
+    function insertIconElement(iconIndex) {
+      const ic = ICON_COLLECTION[iconIndex] || ICON_COLLECTION[0];
+      const id = generateUniqueId();
+      const el = createBaseItemElement(id, 'icon');
+      el.classList.add('text-center', 'p-2');
+
+      const content = document.createElement('div');
+      content.className = 'flex flex-col items-center justify-center space-y-1';
+      content.innerHTML = `
+        <div class="icon-svg-holder text-cream-800 p-2 bg-cream-100 rounded-full inline-block">
+          ${ic.svg}
+        </div>
+        <div class="icon-caption text-[11px] font-semibold text-warmink" contenteditable="true" onblur="handleTextEdit()">${ic.name}</div>
+      `;
+      el.appendChild(content);
+
+      getTargetZone().appendChild(el);
+      selectItem(id);
+      recordHistory('Tambah Ikon');
+      updateItemCountBadge();
+    }
+
+    function triggerImageUpload() {
+      document.getElementById('local-image-input').click();
+    }
+
+    let imageToReplaceId = null;
+
+    function triggerReplaceImage(id) {
+      imageToReplaceId = id;
+      const input = document.getElementById('replace-image-input');
+      if (input) {
+        input.value = '';
+        input.click();
+      }
+    }
+
+    function handleReplaceImageSelected(input) {
+      if (!input.files || !input.files[0] || !imageToReplaceId) return;
+      const file = input.files[0];
+      const targetEl = document.getElementById(imageToReplaceId);
+      if (!targetEl) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = targetEl.querySelector('.image-element');
+        if (img) {
+          img.src = e.target.result;
+          recordHistory('Ganti Gambar');
+          showToast(`Gambar berhasil diperbarui`);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleImageFileSelected(input) {
+      if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          addImageBlock({
+            src: e.target.result,
+            caption: file.name.replace(/\.[^/.]+$/, "")
+          });
+          input.value = '';
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function addImageBlock(data = {}) {
+      const id = generateUniqueId();
+      const el = createBaseItemElement(id, 'image');
+      
+      const src = data.src || 'https://placehold.co/400x300/F5EFEB/332F2A?text=Ilustrasi+Lokal';
+      const caption = data.caption || 'Keterangan ilustrasi gambar';
+      const scale = data.scale || 100;
+      const rotation = data.rotation || 0;
+
+      el.dataset.scale = scale;
+      el.dataset.rotation = rotation;
+
+      const content = document.createElement('div');
+      content.className = 'flex flex-col items-center text-center';
+      content.innerHTML = `
+        <div class="image-frame overflow-hidden rounded border border-cream-200 bg-cream-50 flex items-center justify-center w-full" style="max-height: 240px;">
+          <img src="${src}" alt="Ilustrasi" class="image-element max-w-full h-auto object-contain transition-transform" style="transform: scale(${scale/100}) rotate(${rotation}deg);">
+        </div>
+        <div class="image-caption text-xs italic text-cream-700 mt-1.5" contenteditable="true" onblur="handleTextEdit()">${caption}</div>
+      `;
+      el.appendChild(content);
+
+      getTargetZone().appendChild(el);
+      selectItem(id);
+      recordHistory('Tambah Gambar');
+      updateItemCountBadge();
+    }
+
+    function selectItem(id) {
+      if (state.activeItemId) {
+        const prev = document.getElementById(state.activeItemId);
+        if (prev) prev.classList.remove('active-item');
+      }
+      state.activeItemId = id;
+      const cur = document.getElementById(id);
+      if (!cur) return;
+      cur.classList.add('active-item');
+
+      renderInspector(cur);
+    }
+
+    function deselectActiveItem() {
+      if (state.activeItemId) {
+        const prev = document.getElementById(state.activeItemId);
+        if (prev) prev.classList.remove('active-item');
+        state.activeItemId = null;
+      }
+      const body = document.getElementById('inspector-body');
+      body.innerHTML = `<p class="text-cream-600 text-center py-8">Pilih salah satu elemen di poster untuk menyesuaikan teks, bingkai, atau gayanya.</p>`;
+      document.getElementById('inspector-title').textContent = 'Inspektor Elemen';
+    }
+
+    function deleteItem(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.remove();
+        deselectActiveItem();
+        recordHistory('Hapus Elemen');
+        updateItemCountBadge();
+        showToast('Elemen dihapus');
+      }
+    }
+
+    function renderInspector(el) {
+      const body = document.getElementById('inspector-body');
+      const type = el.dataset.type || 'elemen';
+      document.getElementById('inspector-title').textContent = `Format: ${type.toUpperCase()}`;
+      
+      let html = `
+        <div class="space-y-4">
+          <!-- Quick Actions: Move & Delete -->
+          <div class="flex items-center justify-between bg-cream-50 p-2 rounded border border-cream-200">
+            <span class="font-semibold text-cream-800">Tindakan:</span>
+            <div class="flex items-center space-x-1">
+              <button onclick="moveItem('${el.id}', -1)" title="Pindah Ke Atas" class="px-2 py-1 bg-white border border-cream-300 rounded hover:bg-cream-100">↑</button>
+              <button onclick="moveItem('${el.id}', 1)" title="Pindah Ke Bawah" class="px-2 py-1 bg-white border border-cream-300 rounded hover:bg-cream-100">↓</button>
+              <button onclick="duplicateItem('${el.id}')" title="Duplikasi Elemen" class="px-2 py-1 bg-white border border-cream-300 rounded hover:bg-cream-100">⧉</button>
+              <button onclick="deleteItem('${el.id}')" title="Hapus" class="px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">✕</button>
+            </div>
+          </div>
+
+          <!-- Rich Text Formatting Bar -->
+          <div class="border border-cream-200 rounded-lg p-2.5 bg-white space-y-2">
+            <label class="block text-[10px] font-bold uppercase text-cream-600">Tipografi Teks</label>
+            <div class="flex flex-wrap gap-1">
+              <button onclick="execFormat('bold')" class="px-2 py-1 bg-cream-100 hover:bg-cream-200 rounded font-bold" title="Tebal (Bold)">B</button>
+              <button onclick="execFormat('italic')" class="px-2 py-1 bg-cream-100 hover:bg-cream-200 rounded italic" title="Miring (Italic)">I</button>
+              <button onclick="execFormat('underline')" class="px-2 py-1 bg-cream-100 hover:bg-cream-200 rounded underline" title="Garis Bawah (Underline)">U</button>
+              <button onclick="execFormat('justifyLeft')" class="px-2 py-1 bg-cream-100 hover:bg-cream-200 rounded" title="Rata Kiri">⫷</button>
+              <button onclick="execFormat('justifyCenter')" class="px-2 py-1 bg-cream-100 hover:bg-cream-200 rounded" title="Rata Tengah">≡</button>
+              <button onclick="execFormat('justifyRight')" class="px-2 py-1 bg-cream-100 hover:bg-cream-200 rounded" title="Rata Kanan">⫸</button>
+            </div>
+
+            <!-- Font Family Selection -->
+            <div class="mt-2">
+              <label class="block text-[10px] text-cream-600 mb-1">Gaya Font:</label>
+              <select onchange="applyElementFontFamily('${el.id}', this.value)" class="w-full bg-cream-50 border border-cream-200 rounded p-1 text-xs text-warmink">
+                <option value="font-sans">Modern Sans (Plus Jakarta Sans)</option>
+                <option value="font-serif">Serif Edukasi (Lora)</option>
+                <option value="font-display">Display Judul (Fraunces)</option>
+                <option value="font-mono">Monospace Data (JetBrains Mono)</option>
+                <option value="font-classic">Klasik Tradisional (Instrument Serif)</option>
+              </select>
+            </div>
+
+            <!-- Text Color -->
+            <div class="flex items-center justify-between mt-2">
+              <span class="text-cream-600">Warna Teks:</span>
+              <input type="color" onchange="execFormatColor(this.value)" value="#22201D" class="w-6 h-6 border border-cream-300 rounded cursor-pointer p-0">
+            </div>
+          </div>
+      `;
+
+      // Type-specific controls: Table
+      if (type === 'table') {
+        html += `
+          <div class="border border-cream-200 rounded-lg p-2.5 bg-white space-y-2">
+            <label class="block text-[10px] font-bold uppercase text-cream-600">Pengaturan Baris & Kolom Tabel</label>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button onclick="tableAddRow('${el.id}')" class="py-1 px-2 bg-cream-100 hover:bg-cream-200 rounded text-warmink font-medium">+ Baris</button>
+              <button onclick="tableRemoveRow('${el.id}')" class="py-1 px-2 bg-cream-100 hover:bg-cream-200 rounded text-warmink font-medium">- Baris</button>
+              <button onclick="tableAddCol('${el.id}')" class="py-1 px-2 bg-cream-100 hover:bg-cream-200 rounded text-warmink font-medium">+ Kolom</button>
+              <button onclick="tableRemoveCol('${el.id}')" class="py-1 px-2 bg-cream-100 hover:bg-cream-200 rounded text-warmink font-medium">- Kolom</button>
+            </div>
+          </div>
+        `;
+      }
+
+      // Type-specific controls: Image
+      if (type === 'image') {
+        const curScale = el.dataset.scale || 100;
+        const curRot = el.dataset.rotation || 0;
+        html += `
+          <div class="border border-cream-200 rounded-lg p-2.5 bg-white space-y-3">
+            <label class="block text-[10px] font-bold uppercase text-cream-600">Pengaturan Gambar</label>
+            
+            <!-- Replace image button -->
+            <button onclick="triggerReplaceImage('${el.id}')" class="w-full py-1.5 bg-cream-100 hover:bg-cream-200 text-warmink border border-cream-300 rounded font-semibold flex items-center justify-center space-x-1.5 transition text-xs">
+              <svg class="w-3.5 h-3.5 text-cream-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <span>Ganti Foto / Ilustrasi Ini</span>
+            </button>
+
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span>Skala Ukuran:</span>
+                <span id="scale-val-label">${curScale}%</span>
+              </div>
+              <input type="range" min="30" max="150" value="${curScale}" oninput="updateImageTransform('${el.id}', this.value, null)" class="w-full accent-cream-800">
+            </div>
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span>Rotasi:</span>
+                <span id="rot-val-label">${curRot}°</span>
+              </div>
+              <input type="range" min="-180" max="180" value="${curRot}" oninput="updateImageTransform('${el.id}', null, this.value)" class="w-full accent-cream-800">
+            </div>
+          </div>
+        `;
+      }
+
+      // Card Appearance (Background & Border)
+      html += `
+        <div class="border border-cream-200 rounded-lg p-2.5 bg-white space-y-2">
+          <label class="block text-[10px] font-bold uppercase text-cream-600">Wadah Kartu</label>
+          <div class="flex items-center justify-between">
+            <span class="text-cream-600">Latar Kartu:</span>
+            <select onchange="applyItemCardBg('${el.id}', this.value)" class="bg-cream-50 border border-cream-200 rounded p-1 text-xs">
+              <option value="bg-white/90">Putih Bersih</option>
+              <option value="bg-cream-100/90">Krem Halus</option>
+              <option value="bg-cream-200/60">Kertas Antik</option>
+              <option value="bg-transparent">Transparan</option>
+            </select>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-cream-600">Garis Batas:</span>
+            <select onchange="applyItemCardBorder('${el.id}', this.value)" class="bg-cream-50 border border-cream-200 rounded p-1 text-xs">
+              <option value="border border-cream-300">Garis Tipis Rapi</option>
+              <option value="border-2 border-warmink">Tegas Tebal</option>
+              <option value="border border-dashed border-cream-400">Putus-putus</option>
+              <option value="border-none">Tanpa Garis</option>
+            </select>
+          </div>
+        </div>
+      </div>`;
+
+      body.innerHTML = html;
+    }
+
+    function execFormat(cmd) {
+      document.execCommand(cmd, false, null);
+      recordHistory(`Format: ${cmd}`);
+    }
+
+    function execFormatColor(color) {
+      document.execCommand('foreColor', false, color);
+      recordHistory('Ubah Warna Teks');
+    }
+
+    function applyElementFontFamily(id, fontClass) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('font-sans', 'font-serif', 'font-display', 'font-mono', 'font-classic');
+      el.classList.add(fontClass);
+      recordHistory('Ubah Font');
+    }
+
+    function applyItemCardBg(id, bgClass) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('bg-white/90', 'bg-cream-100/90', 'bg-cream-200/60', 'bg-transparent');
+      el.classList.add(bgClass);
+      recordHistory('Ubah Latar Kartu');
+    }
+
+    function applyItemCardBorder(id, borderClass) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('border', 'border-cream-300', 'border-2', 'border-warmink', 'border-dashed', 'border-cream-400', 'border-none');
+      borderClass.split(' ').forEach(c => el.classList.add(c));
+      recordHistory('Ubah Garis Kartu');
+    }
+
+    function updateImageTransform(id, scale, rotation) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const img = el.querySelector('.image-element');
+      if (!img) return;
+
+      if (scale !== null) el.dataset.scale = scale;
+      if (rotation !== null) el.dataset.rotation = rotation;
+
+      const s = el.dataset.scale || 100;
+      const r = el.dataset.rotation || 0;
+
+      img.style.transform = `scale(${s / 100}) rotate(${r}deg)`;
+      
+      const sLabel = document.getElementById('scale-val-label');
+      const rLabel = document.getElementById('rot-val-label');
+      if (sLabel) sLabel.textContent = `${s}%`;
+      if (rLabel) rLabel.textContent = `${r}°`;
+    }
+
+    function tableAddRow(id) {
+      const el = document.getElementById(id);
+      const tbody = el.querySelector('tbody');
+      const thead = el.querySelector('thead tr');
+      if (!tbody || !thead) return;
+
+      const colCount = thead.children.length;
+      const tr = document.createElement('tr');
+      for (let i = 0; i < colCount; i++) {
+        const td = document.createElement('td');
+        td.className = 'border border-cream-300 p-1.5 text-warmink';
+        td.contentEditable = "true";
+        td.innerText = '-';
+        td.onblur = handleTextEdit;
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+      recordHistory('Tambah Baris Tabel');
+    }
+
+    function tableRemoveRow(id) {
+      const el = document.getElementById(id);
+      const tbody = el.querySelector('tbody');
+      if (tbody && tbody.children.length > 1) {
+        tbody.lastElementChild.remove();
+        recordHistory('Hapus Baris Tabel');
+      }
+    }
+
+    function tableAddCol(id) {
+      const el = document.getElementById(id);
+      const thead = el.querySelector('thead tr');
+      const tbody = el.querySelector('tbody');
+      if (!thead || !tbody) return;
+
+      const newColIdx = thead.children.length + 1;
+      const th = document.createElement('th');
+      th.className = 'border border-cream-300 p-1.5 font-semibold text-left text-cream-900';
+      th.contentEditable = "true";
+      th.innerText = `Kolom ${newColIdx}`;
+      th.onblur = handleTextEdit;
+      thead.appendChild(th);
+
+      Array.from(tbody.children).forEach(tr => {
+        const td = document.createElement('td');
+        td.className = 'border border-cream-300 p-1.5 text-warmink';
+        td.contentEditable = "true";
+        td.innerText = '-';
+        td.onblur = handleTextEdit;
+        tr.appendChild(td);
+      });
+      recordHistory('Tambah Kolom Tabel');
+    }
+
+    function tableRemoveCol(id) {
+      const el = document.getElementById(id);
+      const thead = el.querySelector('thead tr');
+      const tbody = el.querySelector('tbody');
+      if (thead && thead.children.length > 1) {
+        thead.lastElementChild.remove();
+        Array.from(tbody.children).forEach(tr => {
+          if (tr.children.length > 1) tr.lastElementChild.remove();
+        });
+        recordHistory('Hapus Kolom Tabel');
+      }
+    }
+
+    function moveItem(id, dir) {
+      const el = document.getElementById(id);
+      if (!el || !el.parentElement) return;
+      if (dir === -1 && el.previousElementSibling) {
+        el.parentElement.insertBefore(el, el.previousElementSibling);
+        recordHistory('Geser Ke Atas');
+      } else if (dir === 1 && el.nextElementSibling) {
+        el.parentElement.insertBefore(el.nextElementSibling, el);
+        recordHistory('Geser Ke Bawah');
+      }
+    }
+
+    function duplicateItem(id) {
+      const el = document.getElementById(id);
+      if (!el || !el.parentElement) return;
+      const clone = el.cloneNode(true);
+      const newId = generateUniqueId();
+      clone.id = newId;
+      clone.classList.remove('active-item');
+      
+      // Update delete button in cloned handle
+      const delBtn = clone.querySelector('button[title="Hapus"]');
+      if (delBtn) delBtn.setAttribute('onclick', `event.stopPropagation(); deleteItem('${newId}')`);
+
+      clone.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectItem(newId);
+      });
+
+      el.parentElement.insertBefore(clone, el.nextElementSibling);
+      selectItem(newId);
+      recordHistory('Duplikasi Elemen');
+      updateItemCountBadge();
+    }
+
+    function handleTextEdit() {
+      recordHistory('Edit Teks');
+    }
+
+    function changeCanvasFormat(format) {
+      state.paperFormat = format;
+      const canvas = document.getElementById('poster-canvas');
+      canvas.classList.remove('size-a4-portrait', 'size-a4-landscape', 'size-a3-portrait', 'size-a3-landscape');
+      canvas.classList.add(`size-${format}`);
+      recordHistory(`Ubah Ukuran: ${format}`);
+      setFitZoom();
+    }
+
+    function setGridColumns(colCount) {
+      state.columns = colCount;
+      for (let i = 1; i <= 6; i++) {
+        const btn = document.getElementById(`btn-col-${i}`);
+        if (i === colCount) {
+          btn.className = 'py-1 rounded font-bold bg-cream-800 text-cream-50';
+        } else {
+          btn.className = 'py-1 rounded font-bold hover:bg-cream-200 text-warmink';
+        }
+      }
+
+      const main = document.getElementById('zone-main');
+      main.classList.remove('grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4', 'grid-cols-5', 'grid-cols-6');
+      main.classList.add(`grid-cols-${colCount}`);
+      recordHistory(`Ubah Segmen Kolom: ${colCount}`);
+    }
+
+    function setColumnGap(gapValue) {
+      state.columnGap = parseInt(gapValue, 10) || 20;
+      const main = document.getElementById('zone-main');
+      if (main) {
+        main.style.gap = `${state.columnGap}px`;
+      }
+      const label = document.getElementById('label-col-gap');
+      if (label) label.textContent = `${state.columnGap}px`;
+      const slider = document.getElementById('input-col-gap');
+      if (slider && slider.value != state.columnGap) slider.value = state.columnGap;
+      recordHistory(`Ubah Jarak Kolom: ${state.columnGap}px`);
+    }
+
+    function setZoneSpacing(spacingValue) {
+      state.zoneSpacing = parseInt(spacingValue, 10) || 20;
+      const header = document.getElementById('zone-header');
+      const footer = document.getElementById('zone-footer');
+      if (header) header.style.marginBottom = `${state.zoneSpacing}px`;
+      if (footer) footer.style.marginTop = `${state.zoneSpacing}px`;
+      
+      const label = document.getElementById('label-zone-spacing');
+      if (label) label.textContent = `${state.zoneSpacing}px`;
+      const slider = document.getElementById('input-zone-spacing');
+      if (slider && slider.value != state.zoneSpacing) slider.value = state.zoneSpacing;
+      recordHistory(`Ubah Jarak Zona: ${state.zoneSpacing}px`);
+    }
+
+    function toggleColumnDivider(enabled) {
+      state.hasColumnDivider = enabled;
+      const main = document.getElementById('zone-main');
+      if (enabled) {
+        main.classList.add('divide-x', 'divide-cream-300');
+      } else {
+        main.classList.remove('divide-x', 'divide-cream-300');
+      }
+      recordHistory('Toggle Garis Kolom');
+    }
+
+    function setCanvasBg(color) {
+      state.backgroundColor = color;
+      const canvas = document.getElementById('poster-canvas');
+      canvas.style.backgroundColor = color;
+      
+      // Auto adjust text theme for dark chalkboard
+      if (color === '#262422') {
+        canvas.classList.add('text-cream-50');
+        canvas.classList.remove('text-warmink');
+      } else {
+        canvas.classList.add('text-warmink');
+        canvas.classList.remove('text-cream-50');
+      }
+      recordHistory('Ubah Latar Belakang');
+    }
+
+    function changeCanvasBorder(style) {
+      state.borderStyle = style;
+      const canvas = document.getElementById('poster-canvas');
+      switch (style) {
+        case 'none':
+          canvas.style.border = 'none';
+          break;
+        case 'single':
+          canvas.style.border = '1px solid #332F2A';
+          break;
+        case 'double':
+          canvas.style.border = '4px double #332F2A';
+          break;
+        case 'dashed':
+          canvas.style.border = '2px dashed #8A775E';
+          break;
+        case 'heavy':
+          canvas.style.border = '3px solid #22201D';
+          break;
+      }
+      recordHistory(`Ubah Bingkai: ${style}`);
+    }
+
+    function toggleSafeGuides(visible) {
+      state.showSafeGuide = visible;
+      const guides = document.querySelector('.safe-zone-guide');
+      if (guides) {
+        guides.style.display = visible ? 'block' : 'none';
+      }
+    }
+
+    function updateItemCountBadge() {
+      const count = document.querySelectorAll('.canvas-item').length;
+      document.getElementById('item-count-label').textContent = `${count} Elemen`;
+    }
+
+    function recordHistory(actionDesc = '') {
+      if (state.isApplyingHistory) return;
+
+      const snapshot = serializeCanvas();
+      
+      // Trim forward history if we were in the middle of undo stack
+      if (state.historyIndex < state.history.length - 1) {
+        state.history = state.history.slice(0, state.historyIndex + 1);
+      }
+
+      state.history.push(snapshot);
+      if (state.history.length > state.maxHistory) {
+        state.history.shift();
+      } else {
+        state.historyIndex++;
+      }
+
+      updateUndoRedoButtons();
+      saveToLocalStorage();
+    }
+
+    function handleUndo() {
+      if (state.historyIndex > 0) {
+        state.historyIndex--;
+        applyHistorySnapshot(state.history[state.historyIndex]);
+      }
+    }
+
+    function handleRedo() {
+      if (state.historyIndex < state.history.length - 1) {
+        state.historyIndex++;
+        applyHistorySnapshot(state.history[state.historyIndex]);
+      }
+    }
+
+    function updateUndoRedoButtons() {
+      const btnUndo = document.getElementById('btn-undo');
+      const btnRedo = document.getElementById('btn-redo');
+      if (btnUndo) btnUndo.disabled = state.historyIndex <= 0;
+      if (btnRedo) btnRedo.disabled = state.historyIndex >= state.history.length - 1;
+    }
+
+    function serializeCanvas() {
+      return {
+        paperFormat: state.paperFormat,
+        columns: state.columns,
+        columnGap: state.columnGap,
+        zoneSpacing: state.zoneSpacing,
+        hasColumnDivider: state.hasColumnDivider,
+        borderStyle: state.borderStyle,
+        backgroundColor: state.backgroundColor,
+        headerHtml: document.getElementById('zone-header').innerHTML,
+        mainHtml: document.getElementById('zone-main').innerHTML,
+        footerHtml: document.getElementById('zone-footer').innerHTML
+      };
+    }
+
+    function applyHistorySnapshot(snap) {
+      if (!snap) return;
+      state.isApplyingHistory = true;
+
+      // Apply settings
+      state.paperFormat = snap.paperFormat;
+      document.getElementById('canvas-paper-format').value = snap.paperFormat;
+      changeCanvasFormat(snap.paperFormat);
+
+      state.columns = snap.columns;
+      setGridColumns(snap.columns);
+
+      if (snap.columnGap !== undefined) {
+        setColumnGap(snap.columnGap);
+      } else {
+        setColumnGap(20);
+      }
+
+      if (snap.zoneSpacing !== undefined) {
+        setZoneSpacing(snap.zoneSpacing);
+      } else {
+        setZoneSpacing(20);
+      }
+
+      state.hasColumnDivider = snap.hasColumnDivider;
+      document.getElementById('chk-column-divider').checked = snap.hasColumnDivider;
+      toggleColumnDivider(snap.hasColumnDivider);
+
+      state.borderStyle = snap.borderStyle;
+      document.getElementById('canvas-border-style').value = snap.borderStyle;
+      changeCanvasBorder(snap.borderStyle);
+
+      setCanvasBg(snap.backgroundColor);
+
+      // Restore DOM
+      document.getElementById('zone-header').innerHTML = snap.headerHtml;
+      document.getElementById('zone-main').innerHTML = snap.mainHtml;
+      document.getElementById('zone-footer').innerHTML = snap.footerHtml;
+
+      // Re-attach event listeners on canvas items
+      reattachCanvasListeners();
+      setupSortableZones();
+      updateUndoRedoButtons();
+      updateItemCountBadge();
+      deselectActiveItem();
+
+      state.isApplyingHistory = false;
+    }
+
+    function reattachCanvasListeners() {
+      document.querySelectorAll('.canvas-item').forEach(el => {
+        el.onclick = (e) => {
+          e.stopPropagation();
+          selectItem(el.id);
+        };
+      });
+    }
+
+    function saveToLocalStorage() {
+      const data = serializeCanvas();
+      localStorage.setItem('infopost_backup', JSON.stringify(data));
+      const status = document.getElementById('save-status');
+      if (status) {
+        status.textContent = 'Tersimpan otomatis';
+        status.classList.remove('text-amber-600');
+      }
+    }
+
+    function loadTemplate(type) {
+      clearAllZones();
+
+      if (type === 'multiplication') {
+        // Classic 1-10 Multiplication Table Wall Chart
+        changeCanvasFormat('a4-portrait');
+        setGridColumns(5);
+        setCanvasBg('#FDFBF7');
+        changeCanvasBorder('double');
+        
+        addHeaderBlock({
+          kicker: 'TABEL DINDING BELAJAR MATEMATIKA DASAR',
+          title: 'TABEL PERKALIAN 1 SAMPAI 10',
+          subtitle: 'Kuasai dasar perkalian dengan memahami kelipatan angka berurutan'
+        });
+
+        for (let num = 1; num <= 10; num++) {
+          const cardId = generateUniqueId();
+          const card = createBaseItemElement(cardId, 'text');
+          card.className += ' bg-white border border-cream-300 rounded p-2 text-center';
+
+          let rowsText = '';
+          for (let m = 1; m <= 10; m++) {
+            rowsText += `<div class="flex justify-between py-0.5 border-b border-cream-100 font-mono text-[11px]">
+              <span>${num} × ${m}</span>
+              <span class="font-bold text-warmink">${num * m}</span>
+            </div>`;
+          }
+
+          card.innerHTML += `
+            <div class="font-display font-bold text-sm bg-cream-800 text-cream-50 py-0.5 rounded mb-1.5 uppercase">Angka ${num}</div>
+            <div class="space-y-0.5">${rowsText}</div>
+          `;
+          document.getElementById('zone-main').appendChild(card);
+        }
+
+        addFooterBlock({
+          note: 'Tips Menghafal: Perkalian adalah penjumlahan berulang dari angka yang sama.',
+          slogan: 'InfoPost Lembar Edukasi Siswa'
+        });
+
+      } else if (type === 'alphabet') {
+        // Alphabet A-Z Phonics Chart
+        changeCanvasFormat('a4-portrait');
+        setGridColumns(4);
+        setCanvasBg('#FAF7F0');
+        changeCanvasBorder('double');
+
+        addHeaderBlock({
+          kicker: 'LEMBAR PENGENALAN ABJAD BAHASA INDONESIA',
+          title: 'BAGAN ABJAD & KATA DASAR',
+          subtitle: 'Belajar membaca, menulis, dan melafalkan huruf A hingga Z'
+        });
+
+        const samples = [
+          ['A', 'Apel'], ['B', 'Buku'], ['C', 'Ceri'], ['D', 'Daun'],
+          ['E', 'Elang'], ['F', 'Foto'], ['G', 'Gajah'], ['H', 'Hujan'],
+          ['I', 'Ikan'], ['J', 'Jeruk'], ['K', 'Kucing'], ['L', 'Lampu'],
+          ['M', 'Melon'], ['N', 'Nanas'], ['O', 'Obor'], ['P', 'Pena'],
+          ['Q', 'Qari'], ['R', 'Rusa'], ['S', 'Sepatu'], ['T', 'Topi'],
+          ['U', 'Udang'], ['V', 'Vas'], ['W', 'Wortel'], ['X', 'Xilofon']
+        ];
+
+        samples.forEach(([letter, word]) => {
+          const cardId = generateUniqueId();
+          const card = createBaseItemElement(cardId, 'text');
+          card.className += ' bg-white border border-cream-300 rounded p-2 text-center';
+          card.innerHTML += `
+            <div class="font-serif font-bold text-2xl text-cream-900 border-b border-cream-200 pb-0.5">${letter} ${letter.toLowerCase()}</div>
+            <div class="text-xs font-semibold text-warmink mt-1">${word}</div>
+          `;
+          document.getElementById('zone-main').appendChild(card);
+        });
+
+        addFooterBlock({
+          note: 'Panduan Guru / Orang Tua: Ajak siswa mengeja huruf besar dan huruf kecil secara bergantian.',
+          slogan: 'InfoPost Seri Pengenalan Fonik'
+        });
+
+      } else if (type === 'grid4x4') {
+        // 4x4 Illustration Matrix
+        changeCanvasFormat('a4-portrait');
+        setGridColumns(4);
+        setCanvasBg('#FFFFFF');
+        changeCanvasBorder('single');
+
+        addHeaderBlock({
+          kicker: 'ENSIKLOPEDIA RINGKAS BERGAMBAR',
+          title: 'KATALOG SPESIMEN & OBJEK KAJIAN',
+          subtitle: 'Pengamatan terstruktur 16 kategori penting'
+        });
+
+        for (let i = 1; i <= 16; i++) {
+          const id = generateUniqueId();
+          const el = createBaseItemElement(id, 'text');
+          el.className += ' bg-cream-50/70 border border-cream-300 rounded p-2 text-center';
+          el.innerHTML += `
+            <div class="h-16 bg-cream-200/50 border border-dashed border-cream-300 rounded flex items-center justify-center text-cream-500 font-mono text-[10px]">
+              Foto 0${i}
+            </div>
+            <div class="font-bold text-xs text-warmink mt-1.5" contenteditable="true">Subjek ${i}</div>
+            <div class="text-[10px] text-cream-600 italic" contenteditable="true">Keterangan taksonomi atau fungsi</div>
+          `;
+          document.getElementById('zone-main').appendChild(el);
+        }
+
+        addFooterBlock({
+          note: 'Dokumentasi Visual Lapangan • Tahun Ajaran 2026',
+          slogan: 'InfoPost Struktur Kisi 4x4'
+        });
+
+      } else if (type === 'ilm') {
+        // Public Service Announcement (ILM)
+        changeCanvasFormat('a4-portrait');
+        setGridColumns(3);
+        setCanvasBg('#FDFBF7');
+        changeCanvasBorder('double');
+
+        addHeaderBlock({
+          kicker: 'HIMBAUAN KESEHATAN LINGKUNGAN WARGA',
+          title: 'GERAKAN KONSUMSI AIR BERSIH',
+          subtitle: 'Tiga langkah mutlak keluarga sehat untuk menjaga daya tahan tubuh'
+        });
+
+        const pillars = [
+          { step: '01', title: 'Rebus Mendidih', desc: 'Pastikan air minum dimasak hingga titik didih 100°C selama minimal 3 menit untuk membasmi mikroorganisme berbahaya.' },
+          { step: '02', title: 'Wadah Tertutup', desc: 'Simpan air masak dalam gentong atau teko tertutup rapat, terlindung dari debu ruangan dan serangga rumah.' },
+          { step: '03', title: 'Konsumsi Rutin', desc: 'Penuhi kebutuhan cairan tubuh minimal 2 liter (8 gelas) sehari untuk orang dewasa guna kelancaran metabolisme.' }
+        ];
+
+        pillars.forEach(p => {
+          const id = generateUniqueId();
+          const el = createBaseItemElement(id, 'text');
+          el.className += ' bg-white border border-cream-300 rounded p-3 text-left';
+          el.innerHTML += `
+            <span class="font-mono font-bold text-lg text-cream-700 block mb-1">${p.step}</span>
+            <h3 class="font-bold text-sm text-warmink pb-1 border-b border-cream-200 mb-1.5">${p.title}</h3>
+            <p class="text-xs text-cream-800 leading-relaxed font-sans">${p.desc}</p>
+          `;
+          document.getElementById('zone-main').appendChild(el);
+        });
+
+        addTimelineBlock({
+          title: 'Jadwal Kontrol Penampungan Air Mingguan',
+          steps: [
+            { num: 'Sen', title: 'Kuras Tandon', desc: 'Bersihkan dinding bak penampung dari lumut.' },
+            { num: 'Kam', title: 'Cek Tutup', desc: 'Pastikan kran dan ventilasi penyaring tidak bocor.' },
+            { num: 'Sab', title: 'Uji Rasa & Bau', desc: 'Pastikan air tetap bening dan tidak berbau asing.' }
+          ]
+        });
+
+        addFooterBlock({
+          note: 'Diterbitkan untuk Program Lingkungan Sehat Rukun Warga Mandiri',
+          slogan: 'InfoPost Poster Layanan Masyarakat'
+        });
+      }
+
+      setupSortableZones();
+      reattachCanvasListeners();
+      recordHistory(`Buka Template: ${type}`);
+      showToast('Template berhasil dimuat');
+    }
+
+    function clearAllZones() {
+      document.getElementById('zone-header').innerHTML = '';
+      document.getElementById('zone-main').innerHTML = '';
+      document.getElementById('zone-footer').innerHTML = '';
+      deselectActiveItem();
+      updateItemCountBadge();
+    }
+
+    function toggleExportMenu() {
+      const menu = document.getElementById('export-menu');
+      menu.classList.toggle('hidden');
+    }
+
+    // Close dropdown when clicked elsewhere
+    document.addEventListener('click', (e) => {
+      const wrapper = document.getElementById('export-dropdown-wrapper');
+      if (!wrapper.contains(e.target)) {
+        document.getElementById('export-menu').classList.add('hidden');
+      }
+    });
+
+    async function exportHighResImage(format) {
+      document.getElementById('export-menu').classList.add('hidden');
+      showToast('Menyiapkan ekspor gambar resolusi tinggi...');
+
+      const canvas = document.getElementById('poster-canvas');
+      const guides = document.querySelector('.safe-zone-guide');
+      const prevGuideDisplay = guides ? guides.style.display : '';
+      if (guides) guides.style.display = 'none';
+
+      // Temporarily remove outlines & handles
+      deselectActiveItem();
+
+      try {
+        const options = {
+          pixelRatio: 2.5, // 2.5x density provides crisp print/web rendering
+          backgroundColor: state.backgroundColor,
+          filter: (node) => {
+            return !node.classList || !node.classList.contains('no-print');
+          }
+        };
+
+        let dataUrl;
+        if (format === 'png') {
+          dataUrl = await htmlToImage.toPng(canvas, options);
+        } else {
+          dataUrl = await htmlToImage.toJpeg(canvas, { ...options, quality: 0.95 });
+        }
+
+        const link = document.createElement('a');
+        link.download = `InfoPost_${state.paperFormat}_${Date.now()}.${format}`;
+        link.href = dataUrl;
+        link.click();
+        showToast(`Poster berhasil diunduh sebagai ${format.toUpperCase()}`);
+      } catch (err) {
+        showToast('Gagal memproses gambar: ' + err.message);
+      } finally {
+        if (guides) guides.style.display = prevGuideDisplay;
+      }
+    }
+
+    function triggerPrintPDF() {
+      document.getElementById('export-menu').classList.add('hidden');
+      deselectActiveItem();
+      showToast('Membuka dialog cetak PDF browser...');
+      setTimeout(() => {
+        window.print();
+      }, 300);
+    }
+
+    function exportProjectJSON() {
+      document.getElementById('export-menu').classList.add('hidden');
+      const data = serializeCanvas();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `InfoPost_Proyek_${Date.now()}.json`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast('Cadangan konfigurasi JSON disimpan');
+    }
+
+    function handleJSONFileImport(input) {
+      if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const data = JSON.parse(e.target.result);
+            loadProjectFromData(data, true);
+            showToast('Berkas poster JSON berhasil dimuat');
+          } catch (err) {
+            showToast('Format berkas JSON tidak valid');
+          }
+          input.value = '';
+        };
+        reader.readAsText(file);
+      }
+    }
+
+    function loadProjectFromData(data, record = true) {
+      if (!data) return;
+      applyHistorySnapshot(data);
+      if (record) recordHistory('Impor Berkas JSON');
+    }
+
+    function copyIllustratorPrompt() {
+      document.getElementById('export-menu').classList.add('hidden');
+
+      // Extract titles and texts to create a markdown structured prompt
+      let md = `# SPESIFIKASI INFOGRAFIS & POSTER (REFERENSI DESAIN)\n\n`;
+      md += `- Format Fisik: ${state.paperFormat.toUpperCase()}\n`;
+      md += `- Pembagian Kolom: ${state.columns} Kolom Berjejer\n`;
+      md += `- Gaya Bingkai: ${state.borderStyle}\n\n`;
+
+      const headers = document.querySelectorAll('#zone-header .canvas-item');
+      if (headers.length > 0) {
+        md += `## A. KEPALA POSTER (HEADER)\n`;
+        headers.forEach(h => {
+          md += `${h.innerText.trim()}\n`;
+        });
+        md += `\n`;
+      }
+
+      const mainItems = document.querySelectorAll('#zone-main .canvas-item');
+      if (mainItems.length > 0) {
+        md += `## B. KONTEN & STRUKTUR TABEL KISI\n`;
+        mainItems.forEach((m, idx) => {
+          md += `### Bagian ${idx + 1} [Tipe: ${m.dataset.type || 'Blok'}]\n`;
+          md += `${m.innerText.trim()}\n\n`;
+        });
+      }
+
+      const footers = document.querySelectorAll('#zone-footer .canvas-item');
+      if (footers.length > 0) {
+        md += `## C. CATATAN KAKI & FOOTER\n`;
+        footers.forEach(f => {
+          md += `${f.innerText.trim()}\n`;
+        });
+      }
+
+      // Copy text to clipboard via textarea fallback
+      const textArea = document.createElement('textarea');
+      textArea.value = md;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Ringkasan prompt poster disalin ke papan klip!');
+      } catch (err) {
+        showToast('Gagal menyalin teks');
+      }
+      document.body.removeChild(textArea);
+    }
+
+    function showToast(message) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'bg-cream-900 text-cream-50 px-3.5 py-2 rounded-md shadow-md text-xs border border-cream-700 transition-all duration-200 transform translate-y-2 opacity-0 flex items-center space-x-2';
+      toast.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-cream-300"></span>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+      
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 250);
+      }, 2600);
+    }
+
+    function resetCanvasConfirm() {
+      openModal(
+        'Kosongkan Kanvas?',
+        'Seluruh elemen poster akan dihapus. Anda dapat menggunakan tombol Undo jika tidak sengaja mengosongkan.',
+        () => {
+          clearAllZones();
+          recordHistory('Kosongkan Kanvas');
+          showToast('Kanvas telah dikosongkan');
+        }
+      );
+    }
+
+    function openModal(title, msg, onConfirm) {
+      const modal = document.getElementById('app-modal');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-message').textContent = msg;
+      
+      const btnConfirm = document.getElementById('modal-btn-confirm');
+      const btnCancel = document.getElementById('modal-btn-cancel');
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        btnConfirm.onclick = null;
+        btnCancel.onclick = null;
+      };
+
+      btnConfirm.onclick = () => {
+        cleanup();
+        if (onConfirm) onConfirm();
+      };
+
+      btnCancel.onclick = () => {
+        cleanup();
+      };
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function setupKeyboardShortcuts() {
+      window.addEventListener('keydown', (e) => {
+        // Ctrl+Z or Cmd+Z for Undo
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+          if (!isEditingText(document.activeElement)) {
+            e.preventDefault();
+            handleUndo();
+          }
+        }
+        // Ctrl+Y or Ctrl+Shift+Z for Redo
+        if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
+            ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
+          if (!isEditingText(document.activeElement)) {
+            e.preventDefault();
+            handleRedo();
+          }
+        }
+        // Delete key for active element
+        if (e.key === 'Delete' && state.activeItemId) {
+          if (!isEditingText(document.activeElement)) {
+            deleteItem(state.activeItemId);
+          }
+        }
+      });
+    }
+
+    function isEditingText(el) {
+      return el && (el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+    }
+  </script>
+</body>
+</html>

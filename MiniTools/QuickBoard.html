@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickBoard</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts & Icons -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            overflow-x: hidden;
+        }
+
+        /* Animasi Running Text */
+        .marquee-container {
+            overflow: hidden;
+            white-space: nowrap;
+            position: relative;
+        }
+        
+        .marquee-content {
+            display: inline-block;
+            animation: marquee linear infinite; /* Durasi diatur via JS */
+            padding-left: 100%;
+        }
+
+        @keyframes marquee {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-100%, 0); }
+        }
+
+        /* Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Print Style */
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+
+        /* Fullscreen Text Mode */
+        #infoboard-preview.fullscreen-mode {
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            border-radius: 0;
+            margin: 0;
+        }
+        
+        #infoboard-preview.fullscreen-mode .exit-fullscreen-btn {
+            display: flex; /* Show exit button in fullscreen */
+        }
+    </style>
+    <!-- Lucide Icons (Simple SVG Icons) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Navbar / Tab Controller -->
+    <nav class="bg-white shadow-md z-40 sticky top-0 px-4 py-3">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center space-x-2 mb-3 md:mb-0">
+                <div class="bg-blue-600 p-2 rounded-lg">
+                    <i data-lucide="layout-dashboard" class="text-white w-6 h-6"></i>
+                </div>
+                <h1 class="text-2xl font-extrabold text-gray-800 tracking-tight">QuickBoard</h1>
+            </div>
+
+            <!-- Main Navigation Tabs -->
+            <div class="flex bg-gray-100 p-1 rounded-xl space-x-1 overflow-x-auto max-w-full">
+                <button onclick="switchTab('scoreboard')" id="tab-scoreboard" class="nav-tab px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 transition-all bg-white text-blue-600 shadow-sm">
+                    <i data-lucide="trophy" class="w-4 h-4"></i>
+                    <span>Skor</span>
+                </button>
+                <button onclick="switchTab('queue')" id="tab-queue" class="nav-tab px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 transition-all text-gray-500 hover:text-gray-700">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    <span>Antrean</span>
+                </button>
+                <button onclick="switchTab('infoboard')" id="tab-infoboard" class="nav-tab px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 transition-all text-gray-500 hover:text-gray-700">
+                    <i data-lucide="megaphone" class="w-4 h-4"></i>
+                    <span>Info Board</span>
+                </button>
+            </div>
+
+            <div class="flex items-center space-x-2 mt-3 md:mt-0">
+                <button onclick="toggleFullScreen()" class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition" title="Layar Penuh (Aplikasi)">
+                    <i data-lucide="maximize" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow p-4 md:p-6 max-w-6xl mx-auto w-full">
+
+        <!-- ======================= SECTION 1: SCOREBOARD ======================= -->
+        <section id="view-scoreboard" class="view-section animate-fade-in block">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Stopwatch Panel -->
+                <div class="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row justify-between items-center">
+                    <div class="flex flex-col items-center md:items-start mb-4 md:mb-0">
+                        <h2 class="text-gray-500 text-sm font-bold uppercase tracking-wide">Stopwatch</h2>
+                        <div id="stopwatch-display" class="text-5xl font-mono font-bold text-gray-800 tabular-nums">00:00:00</div>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button id="start-stop-btn" class="flex items-center space-x-2 px-6 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-green-500/30 transition-all active:scale-95">
+                            <i data-lucide="play" class="w-5 h-5"></i>
+                            <span id="start-stop-text">Mulai</span>
+                        </button>
+                        <button id="reset-stopwatch-btn" class="p-3 rounded-xl text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all active:scale-95">
+                            <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mode Selection -->
+                <div class="lg:col-span-3 flex justify-center space-x-2">
+                    <button class="mode-btn px-4 py-1.5 text-sm font-semibold rounded-full bg-blue-600 text-white shadow-md transition-all" data-mode="reguler">Reguler</button>
+                    <button class="mode-btn px-4 py-1.5 text-sm font-semibold rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-all" data-mode="tenis">Tenis</button>
+                    <button class="mode-btn px-4 py-1.5 text-sm font-semibold rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-all" data-mode="ronde">Ronde</button>
+                </div>
+
+                <!-- Team 1 -->
+                <div class="bg-white rounded-3xl shadow-lg border-t-8 border-blue-500 p-6 flex flex-col items-center relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-10">
+                        <i data-lucide="shield" class="w-24 h-24 text-blue-500"></i>
+                    </div>
+                    <input type="text" id="team-1-name" value="TIM HOME" class="z-10 text-center text-xl font-bold bg-transparent border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-none text-gray-700 w-full mb-2">
+                    
+                    <div id="ronde-score-1" class="hidden text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full mb-2">Ronde: 0</div>
+
+                    <div id="score-1" class="z-10 text-8xl md:text-9xl font-extrabold text-blue-600 mb-6 tabular-nums tracking-tighter cursor-pointer select-none transition-transform active:scale-95" onclick="incrementScore('team1')">0</div>
+                    
+                    <div class="z-10 flex space-x-4">
+                        <button class="minus-btn w-12 h-12 rounded-full bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-colors" data-team="1">
+                            <i data-lucide="minus" class="w-6 h-6"></i>
+                        </button>
+                        <button class="plus-btn w-12 h-12 rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-blue-500/40 flex items-center justify-center transition-all active:scale-90" data-team="1">
+                            <i data-lucide="plus" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- VS / Controls -->
+                <div class="flex flex-col justify-center items-center space-y-4">
+                    <div class="text-4xl font-black text-gray-300 italic">VS</div>
+                    
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 w-full">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase text-center mb-3">Kontrol Game</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="flip-btn" class="flex flex-col items-center justify-center p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 transition">
+                                <i data-lucide="arrow-left-right" class="w-5 h-5 mb-1"></i>
+                                <span class="text-xs font-semibold">Tukar Posisi</span>
+                            </button>
+                            <button id="reset-game-btn" class="flex flex-col items-center justify-center p-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition">
+                                <i data-lucide="trash-2" class="w-5 h-5 mb-1"></i>
+                                <span class="text-xs font-semibold">Reset Skor</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Team 2 -->
+                <div class="bg-white rounded-3xl shadow-lg border-t-8 border-red-500 p-6 flex flex-col items-center relative overflow-hidden">
+                     <div class="absolute top-0 right-0 p-4 opacity-10">
+                        <i data-lucide="swords" class="w-24 h-24 text-red-500"></i>
+                    </div>
+                    <input type="text" id="team-2-name" value="TIM AWAY" class="z-10 text-center text-xl font-bold bg-transparent border-b border-transparent hover:border-red-300 focus:border-red-500 focus:outline-none text-gray-700 w-full mb-2">
+                    
+                    <div id="ronde-score-2" class="hidden text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full mb-2">Ronde: 0</div>
+
+                    <div id="score-2" class="z-10 text-8xl md:text-9xl font-extrabold text-red-600 mb-6 tabular-nums tracking-tighter cursor-pointer select-none transition-transform active:scale-95" onclick="incrementScore('team2')">0</div>
+                    
+                    <div class="z-10 flex space-x-4">
+                        <button class="minus-btn w-12 h-12 rounded-full bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-colors" data-team="2">
+                            <i data-lucide="minus" class="w-6 h-6"></i>
+                        </button>
+                        <button class="plus-btn w-12 h-12 rounded-full bg-red-600 text-white hover:bg-red-700 shadow-lg hover:shadow-red-500/40 flex items-center justify-center transition-all active:scale-90" data-team="2">
+                            <i data-lucide="plus" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ======================= SECTION 2: QUEUE (ANTREAN) ======================= -->
+        <section id="view-queue" class="view-section hidden">
+            <!-- Header Controls -->
+            <div class="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+                <div class="flex-1 w-full md:w-auto">
+                    <button onclick="addQueuePrompt()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        Tambah Antrean
+                    </button>
+                </div>
+                <div class="flex-1 w-full md:w-auto">
+                    <button onclick="resetAllQueuesPrompt()" class="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-6 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+                        <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                        Reset Semua
+                    </button>
+                </div>
+            </div>
+
+            <!-- Queue List Grid -->
+            <div id="queue-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Javascript will populate this -->
+            </div>
+        </section>
+
+        <!-- ======================= SECTION 3: INFO BOARD (TEXT) ======================= -->
+        <section id="view-infoboard" class="view-section hidden">
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden relative">
+                
+                <!-- Preview Area -->
+                <div id="infoboard-preview" class="bg-black h-64 md:h-96 flex items-center justify-center overflow-hidden relative group">
+                    <div id="infoboard-content" class="text-white text-center font-bold px-4 whitespace-pre-wrap leading-tight" style="font-size: 80px;">
+                        Selamat Datang
+                    </div>
+                    
+                    <!-- Tombol Keluar Fullscreen (Hanya muncul saat fullscreen) -->
+                    <button onclick="toggleTextOnlyFullScreen()" class="exit-fullscreen-btn hidden absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full backdrop-blur-sm transition z-50">
+                        <i data-lucide="x" class="w-8 h-8"></i>
+                    </button>
+                </div>
+
+                <!-- Controls -->
+                <div class="p-6 bg-gray-50 border-t border-gray-200">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <i data-lucide="settings" class="w-5 h-5"></i> Pengaturan Teks
+                        </h3>
+                        <button onclick="toggleTextOnlyFullScreen()" class="mt-2 md:mt-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow flex items-center gap-2">
+                            <i data-lucide="maximize-2" class="w-4 h-4"></i> Layar Penuh (Teks Saja)
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                        <!-- Input Teks -->
+                        <div class="md:col-span-8">
+                            <label class="block text-sm font-medium text-gray-600 mb-1">Isi Teks (Tekan Enter untuk baris baru)</label>
+                            <textarea id="text-input" rows="3" class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-sans" oninput="updateInfoBoard()">Selamat Datang</textarea>
+                        </div>
+
+                        <!-- Panel Kanan -->
+                        <div class="md:col-span-4 space-y-4">
+                            <!-- Mode -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Mode Tampilan</label>
+                                <div class="flex bg-white rounded-lg border p-1 shadow-sm">
+                                    <button onclick="setInfoMode('static')" id="mode-static-btn" class="flex-1 py-2 px-3 rounded-md text-sm font-medium bg-blue-100 text-blue-700 transition">Diam</button>
+                                    <button onclick="setInfoMode('running')" id="mode-running-btn" class="flex-1 py-2 px-3 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 transition">Berjalan</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Ukuran Teks -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1 flex justify-between">
+                                    <span>Ukuran Teks</span>
+                                    <span id="font-size-val" class="text-xs text-gray-400">80px</span>
+                                </label>
+                                <input type="range" id="font-size-range" min="20" max="300" value="80" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" oninput="updateFontSize(this.value)">
+                            </div>
+
+                             <!-- Kecepatan -->
+                             <div id="speed-control" class="hidden">
+                                <label class="block text-sm font-medium text-gray-600 mb-1 flex justify-between">
+                                    <span>Kecepatan (Detik)</span>
+                                    <span id="speed-val" class="text-xs text-gray-400">15s</span>
+                                </label>
+                                <input type="range" id="speed-range" min="5" max="60" value="15" step="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500" oninput="updateSpeed(this.value)">
+                                <p class="text-xs text-gray-400 mt-1">*Semakin kecil semakin cepat</p>
+                            </div>
+
+                            <!-- Warna -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Warna Latar</label>
+                                <div class="flex space-x-2">
+                                    <button onclick="setInfoColor('black')" class="w-8 h-8 rounded-full bg-black border-2 border-gray-300 focus:ring-2 ring-offset-2 ring-black"></button>
+                                    <button onclick="setInfoColor('blue')" class="w-8 h-8 rounded-full bg-blue-600 border-2 border-transparent focus:ring-2 ring-offset-2 ring-blue-600"></button>
+                                    <button onclick="setInfoColor('red')" class="w-8 h-8 rounded-full bg-red-600 border-2 border-transparent focus:ring-2 ring-offset-2 ring-red-600"></button>
+                                    <button onclick="setInfoColor('green')" class="w-8 h-8 rounded-full bg-green-600 border-2 border-transparent focus:ring-2 ring-offset-2 ring-green-600"></button>
+                                    <button onclick="setInfoColor('white')" class="w-8 h-8 rounded-full bg-white border-2 border-gray-300 focus:ring-2 ring-offset-2 ring-gray-400"></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Global Footer -->
+    <footer class="text-center p-4 text-gray-400 text-sm">
+        QuickBoard &copy; 2024 - Solusi Layar Digital Sederhana
+    </footer>
+
+    <!-- Global Modal -->
+    <div id="global-modal" class="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50 transition-opacity">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm transform transition-all scale-100">
+            <h3 id="modal-title" class="text-xl font-bold mb-3 text-gray-800">Judul</h3>
+            <div id="modal-content" class="mb-6 text-gray-600"></div>
+            <div id="modal-actions" class="flex justify-end space-x-3"></div>
+        </div>
+    </div>
+
+    <!-- Hidden Print Area -->
+    <div id="print-area" class="hidden"></div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // --- TAB MANAGEMENT ---
+        function switchTab(tabId) {
+            // Hide all sections
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            // Show selected section
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            
+            // Update Tab Styles
+            document.querySelectorAll('.nav-tab').forEach(el => {
+                el.classList.remove('bg-white', 'text-blue-600', 'shadow-sm');
+                el.classList.add('text-gray-500', 'hover:text-gray-700');
+            });
+            const activeTab = document.getElementById(`tab-${tabId}`);
+            activeTab.classList.remove('text-gray-500', 'hover:text-gray-700');
+            activeTab.classList.add('bg-white', 'text-blue-600', 'shadow-sm');
+        }
+
+        // --- GLOBAL FULLSCREEN ---
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // --- GLOBAL MODAL SYSTEM ---
+        function showModal(title, messageHtml, actions) {
+            const modal = document.getElementById('global-modal');
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-content').innerHTML = messageHtml;
+            
+            const actionsContainer = document.getElementById('modal-actions');
+            actionsContainer.innerHTML = '';
+
+            actions.forEach(action => {
+                const button = document.createElement('button');
+                button.textContent = action.text;
+                button.className = `py-2 px-4 rounded-xl font-semibold transition duration-150 ${action.style}`;
+                button.onclick = () => {
+                    modal.classList.add('hidden');
+                    if (action.action) action.action();
+                };
+                actionsContainer.appendChild(button);
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        function showPrompt(title, message, defaultValue, onConfirm) {
+            const inputId = 'modal-input-field';
+            const html = `<p class="mb-2">${message}</p><input type="text" id="${inputId}" value="${defaultValue}" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none">`;
+            
+            showModal(title, html, [
+                { text: 'Batal', style: 'bg-gray-100 hover:bg-gray-200 text-gray-700', action: () => {} },
+                { text: 'Simpan', style: 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg', action: () => {
+                    const val = document.getElementById(inputId).value.trim();
+                    if(val) onConfirm(val);
+                }}
+            ]);
+            setTimeout(() => document.getElementById(inputId).focus(), 100);
+        }
+
+        // =========================================================================
+        // LOGIC: SCOREBOARD
+        // =========================================================================
+        let scores = { team1: 0, team2: 0 };
+        let rondeScores = { team1: 0, team2: 0 };
+        let currentMode = 'reguler';
+        const tennisScores = ['0', '15', '30', '40'];
+        let stopwatch = { isRunning: false, startTime: 0, elapsedTime: 0, interval: null };
+
+        const score1El = document.getElementById('score-1');
+        const score2El = document.getElementById('score-2');
+        const rondeEl1 = document.getElementById('ronde-score-1');
+        const rondeEl2 = document.getElementById('ronde-score-2');
+
+        function updateScoreDisplay() {
+            if (currentMode === 'reguler' || currentMode === 'ronde') {
+                score1El.textContent = scores.team1;
+                score2El.textContent = scores.team2;
+            } else if (currentMode === 'tenis') {
+                const s1 = scores.team1;
+                const s2 = scores.team2;
+                if (s1 >= 4 && s1 === s2) { score1El.textContent = 'Deuce'; score2El.textContent = 'Deuce'; }
+                else if (s1 >= 4 && s1 === s2 + 1) { score1El.textContent = 'Adv'; score2El.textContent = ''; }
+                else if (s2 >= 4 && s2 === s1 + 1) { score1El.textContent = ''; score2El.textContent = 'Adv'; }
+                else {
+                    score1El.textContent = tennisScores[s1] || s1;
+                    score2El.textContent = tennisScores[s2] || s2;
+                }
+            }
+            rondeEl1.textContent = `Ronde: ${rondeScores.team1}`;
+            rondeEl2.textContent = `Ronde: ${rondeScores.team2}`;
+        }
+
+        function incrementScore(team) {
+            const other = team === 'team1' ? 'team2' : 'team1';
+            
+            if (currentMode === 'ronde' && scores[team] >= 20 && Math.abs(scores.team1 - scores.team2) >= 1) {
+                scores[team]++;
+                if (Math.abs(scores.team1 - scores.team2) >= 2) {
+                    rondeScores[team]++;
+                    resetScores(false); // Reset points, keep rounds
+                    showModal('Ronde Selesai!', `${document.getElementById(team+'-name').value} memenangkan ronde!`, [{text:'Lanjut', style:'bg-blue-600 text-white', action:()=>{}}]);
+                }
+            } else if (currentMode === 'tenis') {
+                scores[team]++;
+                const s1 = scores[team];
+                const s2 = scores[other];
+                if (s1 >= 4 && s1 >= s2 + 2) {
+                    rondeScores[team]++;
+                    showModal('Game Point!', `${document.getElementById(team+'-name').value} menang game!`, [{text:'OK', style:'bg-blue-600 text-white', action:()=>resetScores(false)}]);
+                }
+            } else {
+                scores[team]++;
+            }
+            updateScoreDisplay();
+        }
+
+        function resetScores(resetRounds = true) {
+            scores.team1 = 0;
+            scores.team2 = 0;
+            if (resetRounds) {
+                rondeScores.team1 = 0;
+                rondeScores.team2 = 0;
+            }
+            updateScoreDisplay();
+        }
+
+        // Button Listeners Scoreboard
+        document.querySelectorAll('.plus-btn').forEach(btn => btn.onclick = () => incrementScore('team' + btn.dataset.team));
+        document.querySelectorAll('.minus-btn').forEach(btn => btn.onclick = () => {
+            const t = 'team' + btn.dataset.team;
+            if(scores[t] > 0) scores[t]--;
+            updateScoreDisplay();
+        });
+        
+        document.getElementById('flip-btn').onclick = () => {
+            // Swap scores & names
+            [scores.team1, scores.team2] = [scores.team2, scores.team1];
+            [rondeScores.team1, rondeScores.team2] = [rondeScores.team2, rondeScores.team1];
+            const name1 = document.getElementById('team-1-name');
+            const name2 = document.getElementById('team-2-name');
+            const tempName = name1.value; name1.value = name2.value; name2.value = tempName;
+            updateScoreDisplay();
+        };
+
+        document.getElementById('reset-game-btn').onclick = () => {
+            showModal('Reset Skor?', 'Yakin ingin mereset skor menjadi 0?', [
+                {text:'Batal', style:'bg-gray-100 text-gray-700'},
+                {text:'Ya, Reset', style:'bg-red-600 text-white', action: ()=>resetScores(true)}
+            ]);
+        };
+
+        // Mode Switching
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                currentMode = e.target.dataset.mode;
+                document.querySelectorAll('.mode-btn').forEach(b => {
+                    b.classList.remove('bg-blue-600', 'text-white');
+                    b.classList.add('bg-gray-200', 'text-gray-600');
+                });
+                e.target.classList.remove('bg-gray-200', 'text-gray-600');
+                e.target.classList.add('bg-blue-600', 'text-white');
+
+                // Toggle Round display
+                if (currentMode === 'ronde' || currentMode === 'tenis') {
+                    rondeEl1.classList.remove('hidden');
+                    rondeEl2.classList.remove('hidden');
+                } else {
+                    rondeEl1.classList.add('hidden');
+                    rondeEl2.classList.add('hidden');
+                }
+                resetScores(true);
+            };
+        });
+
+        // Stopwatch Logic
+        function updateStopwatch() {
+            const totalElapsed = stopwatch.elapsedTime + (stopwatch.isRunning ? (Date.now() - stopwatch.startTime) : 0);
+            let totalSeconds = Math.floor(totalElapsed / 1000);
+            let h = Math.floor(totalSeconds / 3600);
+            totalSeconds %= 3600;
+            let m = Math.floor(totalSeconds / 60);
+            let s = totalSeconds % 60;
+            document.getElementById('stopwatch-display').textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        document.getElementById('start-stop-btn').onclick = () => {
+            const btn = document.getElementById('start-stop-btn');
+            const icon = btn.querySelector('i');
+            const text = document.getElementById('start-stop-text');
+            
+            if (stopwatch.isRunning) {
+                clearInterval(stopwatch.interval);
+                stopwatch.isRunning = false;
+                stopwatch.elapsedTime += Date.now() - stopwatch.startTime;
+                btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                icon.setAttribute('data-lucide', 'play');
+                text.textContent = 'Lanjut';
+            } else {
+                stopwatch.isRunning = true;
+                stopwatch.startTime = Date.now();
+                stopwatch.interval = setInterval(updateStopwatch, 1000);
+                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                icon.setAttribute('data-lucide', 'pause');
+                text.textContent = 'Jeda';
+            }
+            lucide.createIcons();
+        };
+
+        document.getElementById('reset-stopwatch-btn').onclick = () => {
+            clearInterval(stopwatch.interval);
+            stopwatch = { isRunning: false, startTime: 0, elapsedTime: 0, interval: null };
+            updateStopwatch();
+            const btn = document.getElementById('start-stop-btn');
+            btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+            btn.classList.add('bg-green-600', 'hover:bg-green-700');
+            document.getElementById('start-stop-text').textContent = 'Mulai';
+            lucide.createIcons();
+        };
+
+        // =========================================================================
+        // LOGIC: QUEUE (ANTREAN)
+        // =========================================================================
+        const STORAGE_KEY = 'quickboard_queues';
+        let queues = [];
+
+        function loadQueues() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                queues = data ? JSON.parse(data) : [
+                    { id: 1, name: 'Umum', currentNumber: 1 },
+                    { id: 2, name: 'Prioritas', currentNumber: 1 }
+                ];
+                renderQueues();
+            } catch (e) { queues = []; }
+        }
+
+        function saveQueues() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(queues));
+        }
+
+        function renderQueues() {
+            const container = document.getElementById('queue-list');
+            container.innerHTML = '';
+            queues.forEach(q => {
+                const div = document.createElement('div');
+                div.className = 'bg-white rounded-2xl shadow-sm border-l-8 border-indigo-500 p-6 relative group transition hover:shadow-md';
+                div.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-xl font-bold text-gray-700 cursor-text border-b border-transparent hover:border-gray-300" onclick="editQueueName(${q.id}, this)">${q.name}</h3>
+                        <button onclick="deleteQueue(${q.id})" class="text-gray-300 hover:text-red-500 transition opacity-0 group-hover:opacity-100"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <div class="text-6xl font-extrabold text-indigo-600 mb-4 tabular-nums">${String(q.currentNumber).padStart(3,'0')}</div>
+                    <button onclick="takeQueue(${q.id})" class="w-full py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 active:scale-95 transition shadow-lg shadow-indigo-500/30">Panggil / Lanjut</button>
+                `;
+                container.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        function addQueuePrompt() {
+            showPrompt('Antrean Baru', 'Nama Antrean:', 'Poli Umum', (val) => {
+                queues.push({ id: Date.now(), name: val, currentNumber: 1 });
+                saveQueues(); renderQueues();
+            });
+        }
+
+        function resetAllQueuesPrompt() {
+            showModal('Reset Semua Antrean?', 'Aksi ini akan menghapus semua antrean dan kembali ke awal.', [
+                {text:'Batal', style:'bg-gray-100'},
+                {text:'Reset Total', style:'bg-red-600 text-white', action:() => {
+                    localStorage.removeItem(STORAGE_KEY);
+                    loadQueues();
+                }}
+            ]);
+        }
+
+        function takeQueue(id) {
+            const q = queues.find(x => x.id === id);
+            if(q) {
+                showModal('Panggilan', `<div class="text-center"><p class="text-gray-500 mb-2">Antrean ${q.name}</p><div class="text-8xl font-black text-indigo-600">${String(q.currentNumber).padStart(3,'0')}</div></div>`, 
+                    [{text:'Tutup', style:'bg-indigo-600 text-white'}]
+                );
+                q.currentNumber++;
+                saveQueues(); renderQueues();
+            }
+        }
+
+        function deleteQueue(id) {
+            showModal('Hapus?', 'Hapus antrean ini?', [
+                {text:'Batal', style:'bg-gray-100'},
+                {text:'Hapus', style:'bg-red-600 text-white', action:() => {
+                    queues = queues.filter(q => q.id !== id);
+                    saveQueues(); renderQueues();
+                }}
+            ]);
+        }
+
+        function editQueueName(id, el) {
+            const newName = prompt("Ubah nama antrean:", el.textContent);
+            if(newName) {
+                const q = queues.find(x => x.id === id);
+                if(q) { q.name = newName; saveQueues(); renderQueues(); }
+            }
+        }
+
+        // =========================================================================
+        // LOGIC: INFO BOARD
+        // =========================================================================
+        let currentInfoMode = 'static';
+
+        function updateInfoBoard() {
+            const text = document.getElementById('text-input').value;
+            const contentEl = document.getElementById('infoboard-content');
+            
+            // Handle line breaks
+            if(currentInfoMode === 'running') {
+                contentEl.textContent = text.replace(/\n/g, ' - '); // Ganti enter dengan strip untuk running text
+            } else {
+                contentEl.textContent = text;
+            }
+        }
+        
+        function updateFontSize(val) {
+            document.getElementById('font-size-val').textContent = val + 'px';
+            document.getElementById('infoboard-content').style.fontSize = val + 'px';
+        }
+
+        function updateSpeed(val) {
+            document.getElementById('speed-val').textContent = val + 's';
+            document.getElementById('infoboard-content').style.animationDuration = val + 's';
+        }
+
+        function setInfoMode(mode) {
+            currentInfoMode = mode;
+            const content = document.getElementById('infoboard-content');
+            const container = document.getElementById('infoboard-preview');
+            const btnStatic = document.getElementById('mode-static-btn');
+            const btnRun = document.getElementById('mode-running-btn');
+            const speedControl = document.getElementById('speed-control');
+
+            if (mode === 'running') {
+                container.classList.add('marquee-container');
+                content.classList.add('marquee-content');
+                content.style.textAlign = 'left';
+                content.style.whiteSpace = 'nowrap';
+                
+                speedControl.classList.remove('hidden');
+                
+                btnRun.classList.replace('text-gray-600', 'bg-blue-100');
+                btnRun.classList.replace('hover:bg-gray-100', 'text-blue-700');
+                btnStatic.classList.replace('bg-blue-100', 'text-gray-600');
+                btnStatic.classList.replace('text-blue-700', 'hover:bg-gray-100');
+            } else {
+                container.classList.remove('marquee-container');
+                content.classList.remove('marquee-content');
+                content.style.textAlign = 'center';
+                content.style.whiteSpace = 'pre-wrap'; // Enable multiline
+                
+                speedControl.classList.add('hidden');
+                
+                btnStatic.classList.replace('text-gray-600', 'bg-blue-100');
+                btnStatic.classList.replace('hover:bg-gray-100', 'text-blue-700');
+                btnRun.classList.replace('bg-blue-100', 'text-gray-600');
+                btnRun.classList.replace('text-blue-700', 'hover:bg-gray-100');
+            }
+            updateInfoBoard(); // Re-process text (remove/add newlines)
+        }
+
+        function setInfoColor(color) {
+            const container = document.getElementById('infoboard-preview');
+            const content = document.getElementById('infoboard-content');
+            
+            // Remove all possible bg classes
+            container.classList.remove('bg-black', 'bg-blue-600', 'bg-red-600', 'bg-green-600', 'bg-white');
+            content.classList.remove('text-white', 'text-black');
+            
+            let bgClass = 'bg-black';
+            let textClass = 'text-white';
+            
+            if(color === 'blue') bgClass = 'bg-blue-600';
+            else if(color === 'red') bgClass = 'bg-red-600';
+            else if(color === 'green') bgClass = 'bg-green-600';
+            else if(color === 'white') {
+                bgClass = 'bg-white';
+                textClass = 'text-black';
+            }
+            
+            container.classList.add(bgClass);
+            content.classList.add(textClass);
+        }
+
+        function toggleTextOnlyFullScreen() {
+            const preview = document.getElementById('infoboard-preview');
+            preview.classList.toggle('fullscreen-mode');
+            
+            // Helper to escape with keyboard
+            if (preview.classList.contains('fullscreen-mode')) {
+                document.addEventListener('keydown', handleEscKey);
+            } else {
+                document.removeEventListener('keydown', handleEscKey);
+            }
+        }
+
+        function handleEscKey(e) {
+            if (e.key === 'Escape') {
+                const preview = document.getElementById('infoboard-preview');
+                if (preview.classList.contains('fullscreen-mode')) {
+                    toggleTextOnlyFullScreen();
+                }
+            }
+        }
+
+        // --- INIT ---
+        window.onload = () => {
+            loadQueues();
+            updateScoreDisplay();
+            updateInfoBoard();
+            updateFontSize(80); // Init size
+            updateSpeed(15); // Init speed
+        };
+
+    </script>
+</body>
+</html>

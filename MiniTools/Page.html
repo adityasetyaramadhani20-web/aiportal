@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page</title>
+
+    <!-- Tailwind CSS (For Builder UI) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        mono: {
+                            50: '#fafafa',
+                            100: '#f4f4f5',
+                            200: '#e4e4e7',
+                            300: '#d4d4d8',
+                            400: '#a1a1aa',
+                            500: '#71717a',
+                            600: '#52525b',
+                            700: '#3f3f46',
+                            800: '#27272a',
+                            900: '#18181b',
+                            950: '#09090b'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- External Helper Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #09090b;
+            color: #f4f4f5;
+        }
+
+        /* Custom Monochrome Scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #18181b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 2px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #71717a;
+        }
+
+        /* Responsive Canvas Viewport Dimensions */
+        .viewport-desktop {
+            width: 100%;
+            max-width: 1120px;
+        }
+        .viewport-tablet {
+            width: 768px;
+            max-width: 100%;
+        }
+        .viewport-mobile {
+            width: 375px;
+            max-width: 100%;
+        }
+
+        /* Canvas Target Editable Styling */
+        [contenteditable="true"]:focus {
+            outline: 2px solid #ffffff;
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        /* Print Media Styles for Direct Vector PDF Export */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #page-preview-canvas, #page-preview-canvas * {
+                visibility: visible;
+            }
+            #page-preview-canvas {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-mono-950 text-mono-100 antialiased">
+
+    <!-- TOP NAVIGATION BAR (MONOCHROME STUDIO) -->
+    <header class="no-print h-14 border-b border-mono-800 bg-mono-900 px-4 flex items-center justify-between z-30 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-mono-100 text-mono-950 font-black text-sm px-2.5 py-1 tracking-widest uppercase rounded">
+                PAGE
+            </div>
+            <div class="h-4 w-px bg-mono-800"></div>
+            <input type="text" id="header-page-title-input" onchange="updatePageMetadata()" class="bg-transparent text-xs font-bold text-mono-100 border-b border-transparent hover:border-mono-600 focus:border-mono-100 focus:outline-none px-1 py-0.5 w-48 md:w-64 transition" placeholder="Judul Laman Laporan...">
+        </div>
+
+        <!-- Viewport Switcher -->
+        <div class="hidden md:flex items-center bg-mono-950 p-1 rounded border border-mono-800 gap-1 text-xs">
+            <button onclick="setViewport('desktop')" id="vp-btn-desktop" class="px-2.5 py-1 rounded bg-mono-800 text-mono-100 font-medium transition flex items-center gap-1.5" title="Tampilan Desktop">
+                <i class="fa-solid fa-desktop"></i> Desktop
+            </button>
+            <button onclick="setViewport('tablet')" id="vp-btn-tablet" class="px-2.5 py-1 rounded text-mono-400 hover:text-mono-100 font-medium transition flex items-center gap-1.5" title="Tampilan Tablet (768px)">
+                <i class="fa-solid fa-tablet-screen-button"></i> Tablet
+            </button>
+            <button onclick="setViewport('mobile')" id="vp-btn-mobile" class="px-2.5 py-1 rounded text-mono-400 hover:text-mono-100 font-medium transition flex items-center gap-1.5" title="Tampilan Ponsel (375px)">
+                <i class="fa-solid fa-mobile-screen-button"></i> Mobile
+            </button>
+        </div>
+
+        <!-- Action Tools -->
+        <div class="flex items-center gap-2">
+            <!-- Undo / Redo -->
+            <button onclick="undo()" id="btn-undo" class="p-1.5 text-mono-400 hover:text-mono-100 disabled:opacity-30 transition" title="Urungkan (Undo)">
+                <i class="fa-solid fa-rotate-left"></i>
+            </button>
+            <button onclick="redo()" id="btn-redo" class="p-1.5 text-mono-400 hover:text-mono-100 disabled:opacity-30 transition" title="Ulangi (Redo)">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+
+            <div class="h-4 w-px bg-mono-800 mx-1"></div>
+
+            <!-- Inspect Code -->
+            <button onclick="openSourceModal()" class="px-2.5 py-1.5 text-xs font-medium text-mono-300 hover:text-mono-100 bg-mono-800 hover:bg-mono-700 border border-mono-700 rounded transition flex items-center gap-1.5">
+                <i class="fa-solid fa-code"></i> <span class="hidden sm:inline">HTML Source</span>
+            </button>
+
+            <!-- Save / Load JSON Config -->
+            <button onclick="exportJSONConfig()" class="px-2.5 py-1.5 text-xs font-medium text-mono-300 hover:text-mono-100 bg-mono-800 hover:bg-mono-700 border border-mono-700 rounded transition flex items-center gap-1.5" title="Simpan Konfigurasi JSON">
+                <i class="fa-solid fa-download"></i> <span class="hidden sm:inline">Simpan Config</span>
+            </button>
+            <label class="px-2.5 py-1.5 text-xs font-medium text-mono-300 hover:text-mono-100 bg-mono-800 hover:bg-mono-700 border border-mono-700 rounded transition cursor-pointer flex items-center gap-1.5" title="Muat Konfigurasi JSON">
+                <i class="fa-solid fa-upload"></i> <span class="hidden sm:inline">Impor Config</span>
+                <input type="file" id="input-json-config" accept=".json" onchange="importJSONConfig(event)" class="hidden">
+            </label>
+
+            <!-- Export Page Modal Trigger -->
+            <button onclick="openExportModal()" class="px-3 py-1.5 text-xs font-bold text-mono-950 bg-mono-100 hover:bg-mono-200 rounded transition flex items-center gap-1.5">
+                <i class="fa-solid fa-file-export"></i> Ekspor Laman
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE CONTAINER -->
+    <div class="no-print flex-1 flex overflow-hidden">
+
+        <!-- LEFT SIDEBAR / BUILDER CONTROL PANEL -->
+        <aside class="w-80 md:w-96 bg-mono-900 border-r border-mono-800 flex flex-col shrink-0 overflow-hidden">
+            
+            <!-- Sidebar Navigation Tabs -->
+            <div class="flex border-b border-mono-800 bg-mono-950 text-xs font-medium">
+                <button onclick="switchSidebarTab('layout')" id="stab-btn-layout" class="flex-1 py-3 text-center text-mono-100 border-b-2 border-mono-100 font-bold uppercase transition">
+                    <i class="fa-solid fa-layer-group mb-1 block"></i> Seksi & Lay
+                </button>
+                <button onclick="switchSidebarTab('blocks')" id="stab-btn-blocks" class="flex-1 py-3 text-center text-mono-400 hover:text-mono-200 border-b-2 border-transparent uppercase transition">
+                    <i class="fa-solid fa-cube mb-1 block"></i> Tambah Blok
+                </button>
+                <button onclick="switchSidebarTab('style')" id="stab-btn-style" class="flex-1 py-3 text-center text-mono-400 hover:text-mono-200 border-b-2 border-transparent uppercase transition">
+                    <i class="fa-solid fa-sliders mb-1 block"></i> Pengaturan
+                </button>
+            </div>
+
+            <!-- SIDEBAR TAB CONTENTS -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-5">
+
+                <!-- TAB 1: SECTION & LAYOUT STRUCTURE -->
+                <div id="stab-content-layout" class="space-y-4">
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-mono-400 mb-1">Pilihan Template Laman</h3>
+                        <p class="text-[11px] text-mono-500 mb-2">Gunakan susunan cepat untuk memulai laman.</p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="loadTemplate('landing')" class="p-2 bg-mono-950 border border-mono-800 hover:border-mono-400 rounded text-left transition">
+                                <div class="text-xs font-bold text-mono-200">Landing Page</div>
+                                <div class="text-[10px] text-mono-500">Hero & fitur produk</div>
+                            </button>
+                            <button onclick="loadTemplate('corporate')" class="p-2 bg-mono-950 border border-mono-800 hover:border-mono-400 rounded text-left transition">
+                                <div class="text-xs font-bold text-mono-200">Corporate</div>
+                                <div class="text-[10px] text-mono-500">Laporan & tabel data</div>
+                            </button>
+                            <button onclick="loadTemplate('gallery')" class="p-2 bg-mono-950 border border-mono-800 hover:border-mono-400 rounded text-left transition">
+                                <div class="text-xs font-bold text-mono-200">Gallery</div>
+                                <div class="text-[10px] text-mono-500">Grid portofolio foto</div>
+                            </button>
+                            <button onclick="loadTemplate('links')" class="p-2 bg-mono-950 border border-mono-800 hover:border-mono-400 rounded text-left transition">
+                                <div class="text-xs font-bold text-mono-200">Links Hub</div>
+                                <div class="text-[10px] text-mono-500">Kumpulan tautan medsos</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <hr class="border-mono-800">
+
+                    <!-- Add New Section Form -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-mono-400 mb-2">Tambah Seksi Baru</h3>
+                        <label class="block text-[11px] text-mono-400 mb-1">Pilih Layout Kolom Seksi:</label>
+                        <div class="grid grid-cols-3 gap-1.5 mb-3">
+                            <button onclick="addNewSection('1')" class="p-2 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded text-center text-xs font-bold">1 Kolom</button>
+                            <button onclick="addNewSection('2')" class="p-2 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded text-center text-xs font-bold">2 Kolom</button>
+                            <button onclick="addNewSection('3')" class="p-2 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded text-center text-xs font-bold">3 Kolom</button>
+                            <button onclick="addNewSection('1:2')" class="p-2 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded text-center text-xs font-bold">1 : 2</button>
+                            <button onclick="addNewSection('2:1')" class="p-2 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded text-center text-xs font-bold">2 : 1</button>
+                        </div>
+                    </div>
+
+                    <!-- Existing Sections Tree/List -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-mono-400 mb-2">Struktur Seksi Saat Ini</h3>
+                        <div id="sections-tree-container" class="space-y-2">
+                            <!-- Injected Dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: ADD BLOCK CONTENT -->
+                <div id="stab-content-blocks" class="space-y-4 hidden">
+                    <p class="text-xs text-mono-400">Pilih komponen untuk ditambahkan ke seksi / kolom aktif:</p>
+                    
+                    <div class="space-y-2">
+                        <!-- Heading Block -->
+                        <button onclick="addBlockToActiveColumn('heading')" class="w-full p-2.5 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded flex items-center justify-between text-left transition group">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-heading text-mono-400 group-hover:text-mono-100"></i>
+                                <div>
+                                    <div class="text-xs font-bold text-mono-200">Judul Header</div>
+                                    <div class="text-[10px] text-mono-500">Teks judul H1, H2, H3</div>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-plus text-xs text-mono-500"></i>
+                        </button>
+
+                        <!-- Rich Text Block -->
+                        <button onclick="addBlockToActiveColumn('text')" class="w-full p-2.5 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded flex items-center justify-between text-left transition group">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-paragraph text-mono-400 group-hover:text-mono-100"></i>
+                                <div>
+                                    <div class="text-xs font-bold text-mono-200">Teks / Paragraf RTF</div>
+                                    <div class="text-[10px] text-mono-500">Blok teks format bebas RTF</div>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-plus text-xs text-mono-500"></i>
+                        </button>
+
+                        <!-- Image Block -->
+                        <button onclick="addBlockToActiveColumn('image')" class="w-full p-2.5 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded flex items-center justify-between text-left transition group">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-image text-mono-400 group-hover:text-mono-100"></i>
+                                <div>
+                                    <div class="text-xs font-bold text-mono-200">Gambar & Visual</div>
+                                    <div class="text-[10px] text-mono-500">Upload, crop, rotasi, & rasio</div>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-plus text-xs text-mono-500"></i>
+                        </button>
+
+                        <!-- Chart Block -->
+                        <button onclick="addBlockToActiveColumn('chart')" class="w-full p-2.5 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded flex items-center justify-between text-left transition group">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-chart-column text-mono-400 group-hover:text-mono-100"></i>
+                                <div>
+                                    <div class="text-xs font-bold text-mono-200">Grafik Data Interaktif</div>
+                                    <div class="text-[10px] text-mono-500">Diagram Batang, Garis, Pie</div>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-plus text-xs text-mono-500"></i>
+                        </button>
+
+                        <!-- Table Block -->
+                        <button onclick="addBlockToActiveColumn('table')" class="w-full p-2.5 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded flex items-center justify-between text-left transition group">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-table text-mono-400 group-hover:text-mono-100"></i>
+                                <div>
+                                    <div class="text-xs font-bold text-mono-200">Tabel Data & Matrix</div>
+                                    <div class="text-[10px] text-mono-500">Matrix kustom / impor CSV</div>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-plus text-xs text-mono-500"></i>
+                        </button>
+
+                        <!-- Button Group Block -->
+                        <button onclick="addBlockToActiveColumn('buttons')" class="w-full p-2.5 bg-mono-950 border border-mono-800 hover:border-mono-300 rounded flex items-center justify-between text-left transition group">
+                            <div class="flex items-center gap-2.5">
+                                <i class="fa-solid fa-square-parking text-mono-400 group-hover:text-mono-100"></i>
+                                <div>
+                                    <div class="text-xs font-bold text-mono-200">Grup Tombol / Link</div>
+                                    <div class="text-[10px] text-mono-500">Tombol URL & aksi</div>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-plus text-xs text-mono-500"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB 3: PAGE STYLES & CONFIG -->
+                <div id="stab-content-style" class="space-y-4 hidden">
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-mono-400 mb-2">Mode CSS Laman Ekspor</h3>
+                        <select id="cfg-css-mode" onchange="updatePageMetadata()" class="w-full bg-mono-950 border border-mono-800 text-xs text-mono-100 p-2 rounded focus:outline-none focus:border-mono-400">
+                            <option value="vanilla">Vanilla CSS (Offline Compatible - 0 CDN Dependencies)</option>
+                            <option value="tailwind">Tailwind CSS (Online CDN)</option>
+                        </select>
+                        <p class="text-[10px] text-mono-500 mt-1">Vanilla CSS menyertakan stylesheet internal ringan untuk akses 100% offline.</p>
+                    </div>
+
+                    <hr class="border-mono-800">
+
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-mono-400 mb-2">Metadata Header & SEO</h3>
+                        <div class="space-y-2 text-xs">
+                            <div>
+                                <label class="block text-mono-400 mb-1">Judul Header Organisasi</label>
+                                <input type="text" id="cfg-header-org" oninput="updatePageMetadata()" class="w-full bg-mono-950 border border-mono-800 text-mono-100 p-2 rounded focus:outline-none focus:border-mono-400" placeholder="Contoh: Kementrian / Perusahaan X">
+                            </div>
+                            <div>
+                                <label class="block text-mono-400 mb-1">Sub-Judul / Tagline Laman</label>
+                                <input type="text" id="cfg-header-sub" oninput="updatePageMetadata()" class="w-full bg-mono-950 border border-mono-800 text-mono-100 p-2 rounded focus:outline-none focus:border-mono-400" placeholder="Contoh: Laporan Tahunan Kinerja 2026">
+                            </div>
+                            <div>
+                                <label class="block text-mono-400 mb-1">Deskripsi Meta SEO</label>
+                                <textarea id="cfg-seo-desc" oninput="updatePageMetadata()" rows="2" class="w-full bg-mono-950 border border-mono-800 text-mono-100 p-2 rounded focus:outline-none focus:border-mono-400" placeholder="Deskripsi singkat laman..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-mono-800">
+
+                    <div>
+                        <button onclick="clearAllData()" class="w-full p-2 bg-mono-950 border border-red-900/50 hover:bg-red-950 text-red-400 font-bold text-xs rounded transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-trash-can"></i> Reset Laman Bersih
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- CENTER CANVAS WORKSPACE -->
+        <main class="flex-1 bg-mono-950 p-4 md:p-8 flex flex-col items-center justify-start overflow-y-auto relative">
+            
+            <!-- RTF INLINE FLOATING TOOLBAR -->
+            <div id="rtf-toolbar" class="fixed top-16 z-40 bg-mono-900 border border-mono-700 shadow-2xl rounded p-1.5 flex items-center gap-1.5 text-xs text-mono-200 hidden transition-all">
+                <button type="button" onmousedown="event.preventDefault(); execRTFCommand('bold');" class="p-1.5 hover:bg-mono-800 rounded font-bold w-7 text-center" title="Tebal (Bold)">B</button>
+                <button type="button" onmousedown="event.preventDefault(); execRTFCommand('italic');" class="p-1.5 hover:bg-mono-800 rounded italic w-7 text-center" title="Miring (Italic)">I</button>
+                <button type="button" onmousedown="event.preventDefault(); execRTFCommand('underline');" class="p-1.5 hover:bg-mono-800 rounded underline w-7 text-center" title="Garis Bawah (Underline)">U</button>
+                <div class="h-4 w-px bg-mono-800"></div>
+                <button type="button" onmousedown="event.preventDefault(); execRTFCommand('justifyLeft');" class="p-1.5 hover:bg-mono-800 rounded" title="Rata Kiri"><i class="fa-solid fa-align-left"></i></button>
+                <button type="button" onmousedown="event.preventDefault(); execRTFCommand('justifyCenter');" class="p-1.5 hover:bg-mono-800 rounded" title="Rata Tengah"><i class="fa-solid fa-align-center"></i></button>
+                <button type="button" onmousedown="event.preventDefault(); execRTFCommand('justifyRight');" class="p-1.5 hover:bg-mono-800 rounded" title="Rata Kanan"><i class="fa-solid fa-align-right"></i></button>
+                <div class="h-4 w-px bg-mono-800"></div>
+                <input type="color" onchange="execRTFCommand('foreColor', this.value)" class="w-6 h-6 bg-transparent border-0 cursor-pointer" title="Warna Teks">
+            </div>
+
+            <!-- LIVE CANVAS STAGE (RESPONSIVE VIEWPORT WRAPPER) -->
+            <div id="page-preview-viewport" class="viewport-desktop transition-all duration-300 mb-12">
+                <div id="page-preview-canvas" class="bg-white text-mono-950 shadow-2xl min-h-[850px] p-6 md:p-12 space-y-6 rounded transition-all">
+                    <!-- Dynamic Sections and Blocks Rendered Here -->
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- MODAL 1: EDIT BLOCK SETTINGS -->
+    <div id="modal-edit-block" class="fixed inset-0 bg-mono-950/80 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-mono-900 text-mono-100 border border-mono-800 shadow-2xl rounded-lg w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-mono-800 pb-3">
+                <h3 class="font-bold text-sm uppercase tracking-wider text-mono-200" id="modal-edit-title">Pengaturan Blok</h3>
+                <button onclick="closeEditModal()" class="text-mono-400 hover:text-mono-100 font-bold">&times;</button>
+            </div>
+
+            <!-- Dynamic Settings Fields Container -->
+            <div id="modal-edit-fields" class="space-y-4 text-xs"></div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-mono-800">
+                <button onclick="closeEditModal()" class="px-4 py-2 bg-mono-800 hover:bg-mono-700 text-mono-200 font-bold rounded text-xs">Tutup</button>
+                <button onclick="saveBlockEdits()" class="px-4 py-2 bg-mono-100 hover:bg-mono-200 text-mono-950 font-bold rounded text-xs">Simpan Perubahan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: EXPORT OPTIONS -->
+    <div id="modal-export" class="fixed inset-0 bg-mono-950/80 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-mono-900 text-mono-100 border border-mono-800 shadow-2xl rounded-lg w-full max-w-md p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-mono-800 pb-3">
+                <h3 class="font-bold text-sm uppercase tracking-wider text-mono-200">Ekspor Laman HTML5</h3>
+                <button onclick="closeExportModal()" class="text-mono-400 hover:text-mono-100 font-bold">&times;</button>
+            </div>
+
+            <p class="text-xs text-mono-400">Pilih format berkas keluaran laman yang disesuaikan:</p>
+
+            <div class="space-y-2">
+                <!-- Single HTML -->
+                <button onclick="exportSingleHTML()" class="w-full p-3 bg-mono-950 border border-mono-800 hover:border-mono-200 rounded text-left transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-code text-xl text-mono-100"></i>
+                    <div>
+                        <div class="font-bold text-xs text-mono-100 uppercase">Single HTML (.html)</div>
+                        <div class="text-[10px] text-mono-400">Satu file HTML mandiri dengan gambar tersemat Base64</div>
+                    </div>
+                </button>
+
+                <!-- ZIP Package -->
+                <button onclick="exportZIPPackage()" class="w-full p-3 bg-mono-950 border border-mono-800 hover:border-mono-200 rounded text-left transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-archive text-xl text-mono-100"></i>
+                    <div>
+                        <div class="font-bold text-xs text-mono-100 uppercase">Paket ZIP (.zip)</div>
+                        <div class="text-[10px] text-mono-400">Terpisah file index.html, style.css, & folder aset gambar</div>
+                    </div>
+                </button>
+
+                <!-- PDF Print -->
+                <button onclick="exportPDF()" class="w-full p-3 bg-mono-950 border border-mono-800 hover:border-mono-200 rounded text-left transition flex items-center gap-3">
+                    <i class="fa-solid fa-file-pdf text-xl text-mono-100"></i>
+                    <div>
+                        <div class="font-bold text-xs text-mono-100 uppercase">Cetak PDF Vektor (.pdf)</div>
+                        <div class="text-[10px] text-mono-400">Dokumen PDF resolusi tajam via browser print</div>
+                    </div>
+                </button>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button onclick="closeExportModal()" class="px-4 py-2 bg-mono-800 hover:bg-mono-700 text-mono-200 font-bold rounded text-xs uppercase">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: HTML SOURCE INSPECTOR -->
+    <div id="modal-source" class="fixed inset-0 bg-mono-950/80 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-mono-900 text-mono-100 border border-mono-800 shadow-2xl rounded-lg w-full max-w-3xl p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-mono-800 pb-3">
+                <h3 class="font-bold text-sm uppercase tracking-wider text-mono-200">Inspeksi Kode HTML Mentah</h3>
+                <button onclick="closeSourceModal()" class="text-mono-400 hover:text-mono-100 font-bold">&times;</button>
+            </div>
+
+            <textarea id="source-code-textarea" readonly class="w-full h-80 bg-mono-950 text-mono-300 font-mono text-xs p-3 border border-mono-800 rounded focus:outline-none"></textarea>
+
+            <div class="flex justify-between items-center pt-2">
+                <button onclick="copySourceToClipboard()" class="px-4 py-2 bg-mono-800 hover:bg-mono-700 text-mono-100 font-bold rounded text-xs flex items-center gap-1.5">
+                    <i class="fa-solid fa-copy"></i> Salin Kode
+                </button>
+                <button onclick="closeSourceModal()" class="px-4 py-2 bg-mono-100 text-mono-950 font-bold rounded text-xs">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // GLOBAL APP STATE MANAGEMENT
+        const state = {
+            metadata: {
+                pageTitle: "Dokumentasi & Laporan Resmi Laman",
+                orgHeader: "ORGANISASI / PUSAT INFORMASI",
+                subTitle: "Ringkasan Eksekutif & Capaian Kinerja Laman",
+                cssMode: "vanilla", // 'vanilla' or 'tailwind'
+                seoDescription: "Laman informasi resmi yang dibuat menggunakan PAGE Builder HTML5."
+            },
+            sections: [],
+            activeSectionId: null,
+            activeColumnIndex: 0,
+            activeBlockIdForEdit: null,
+            viewport: "desktop",
+            historyStack: [],
+            historyIndex: -1
+        };
+
+        let chartInstancesMap = {};
+
+        // INITIALIZATION ON LOAD
+        window.onload = function() {
+            loadCacheData();
+            if (state.sections.length === 0) {
+                loadTemplate('landing');
+            } else {
+                renderAll();
+            }
+            setupRTFListeners();
+        };
+
+        function pushState() {
+            if (state.historyIndex < state.historyStack.length - 1) {
+                state.historyStack = state.historyStack.slice(0, state.historyIndex + 1);
+            }
+            state.historyStack.push(JSON.stringify({
+                metadata: state.metadata,
+                sections: state.sections
+            }));
+            if (state.historyStack.length > 30) state.historyStack.shift();
+            state.historyIndex = state.historyStack.length - 1;
+            updateUndoRedoButtons();
+            saveToCache();
+        }
+
+        function undo() {
+            if (state.historyIndex > 0) {
+                state.historyIndex--;
+                const snapshot = JSON.parse(state.historyStack[state.historyIndex]);
+                state.metadata = snapshot.metadata;
+                state.sections = snapshot.sections;
+                renderAll();
+                updateUndoRedoButtons();
+            }
+        }
+
+        function redo() {
+            if (state.historyIndex < state.historyStack.length - 1) {
+                state.historyIndex++;
+                const snapshot = JSON.parse(state.historyStack[state.historyIndex]);
+                state.metadata = snapshot.metadata;
+                state.sections = snapshot.sections;
+                renderAll();
+                updateUndoRedoButtons();
+            }
+        }
+
+        function updateUndoRedoButtons() {
+            document.getElementById('btn-undo').disabled = state.historyIndex <= 0;
+            document.getElementById('btn-redo').disabled = state.historyIndex >= state.historyStack.length - 1;
+        }
+
+        function saveToCache() {
+            try {
+                localStorage.setItem('PAGE_BUILDER_STATE', JSON.stringify({
+                    metadata: state.metadata,
+                    sections: state.sections
+                }));
+            } catch (e) {
+                console.warn("Storage quota exceeded or error caching state.");
+            }
+        }
+
+        function loadCacheData() {
+            const cached = localStorage.getItem('PAGE_BUILDER_STATE');
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed.metadata) state.metadata = parsed.metadata;
+                    if (parsed.sections) state.sections = parsed.sections;
+                } catch (e) {}
+            }
+        }
+
+        function clearAllData() {
+            if (confirm("Apakah Anda yakin ingin mereset seluruh isi laman?")) {
+                localStorage.removeItem('PAGE_BUILDER_STATE');
+                state.sections = [];
+                state.historyStack = [];
+                state.historyIndex = -1;
+                addNewSection('1');
+            }
+        }
+
+        function addNewSection(layoutType) {
+            let colCount = 1;
+            if (layoutType === '2' || layoutType === '1:2' || layoutType === '2:1') colCount = 2;
+            if (layoutType === '3') colCount = 3;
+
+            const newSec = {
+                id: 'sec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                layout: layoutType,
+                columns: Array.from({ length: colCount }, () => [])
+            };
+
+            state.sections.push(newSec);
+            state.activeSectionId = newSec.id;
+            state.activeColumnIndex = 0;
+            pushState();
+            renderAll();
+        }
+
+        function deleteSection(secId) {
+            if (state.sections.length <= 1) return;
+            state.sections = state.sections.filter(s => s.id !== secId);
+            if (state.activeSectionId === secId) {
+                state.activeSectionId = state.sections[0].id;
+            }
+            pushState();
+            renderAll();
+        }
+
+        function moveSection(secId, direction) {
+            const idx = state.sections.findIndex(s => s.id === secId);
+            if (idx < 0) return;
+            if (direction === 'up' && idx > 0) {
+                const temp = state.sections[idx];
+                state.sections[idx] = state.sections[idx - 1];
+                state.sections[idx - 1] = temp;
+            } else if (direction === 'down' && idx < state.sections.length - 1) {
+                const temp = state.sections[idx];
+                state.sections[idx] = state.sections[idx + 1];
+                state.sections[idx + 1] = temp;
+            }
+            pushState();
+            renderAll();
+        }
+
+        function setActiveColumn(secId, colIdx) {
+            state.activeSectionId = secId;
+            state.activeColumnIndex = colIdx;
+            renderSidebarSectionsTree();
+        }
+
+        function loadTemplate(tplName) {
+            state.sections = [];
+            if (tplName === 'landing') {
+                state.sections = [
+                    {
+                        id: 'sec_hero',
+                        layout: '1',
+                        columns: [[
+                            { id: 'blk_h1', type: 'heading', text: 'Membangun Masa Depan Digital Mandiri', level: 'h1', align: 'center', color: '#09090b', fontSize: '32px' },
+                            { id: 'blk_t1', type: 'text', content: 'Solusi lengkap pembuat laman modern berbasis HTML5 tanpa ketergantungan server. Cepat, fleksibel, dan serba guna.', align: 'center' },
+                            { id: 'blk_b1', type: 'buttons', align: 'center', items: [{ label: 'Pelajari Selengkapnya', url: '#', style: 'solid' }, { label: 'Dokumentasi', url: '#', style: 'outline' }] }
+                        ]]
+                    },
+                    {
+                        id: 'sec_features',
+                        layout: '3',
+                        columns: [
+                            [{ id: 'blk_f1_h', type: 'heading', text: 'Desain Offline', level: 'h3', align: 'left', color: '#09090b', fontSize: '18px' }, { id: 'blk_f1_t', type: 'text', content: 'Mendukung keluaran Vanilla CSS untuk dijalankan 100% tanpa jaringan internet.', align: 'left' }],
+                            [{ id: 'blk_f2_h', type: 'heading', text: 'Format Lengkap', level: 'h3', align: 'left', color: '#09090b', fontSize: '18px' }, { id: 'blk_f2_t', type: 'text', content: 'Dukungan ekspor Single HTML dengan gambar terkompresi Base64 atau paket ZIP.', align: 'left' }],
+                            [{ id: 'blk_f3_h', type: 'heading', text: 'Responsi Presisi', level: 'h3', align: 'left', color: '#09090b', fontSize: '18px' }, { id: 'blk_f3_t', type: 'text', content: 'Layar dapat diuji langsung dalam mode Desktop, Tablet, dan Smartphone.', align: 'left' }]
+                        ]
+                    }
+                ];
+            } else if (tplName === 'corporate') {
+                state.sections = [
+                    {
+                        id: 'sec_corp_1',
+                        layout: '1:2',
+                        columns: [
+                            [{ id: 'blk_c1', type: 'heading', text: 'Ringkasan Capaian Triwulan II', level: 'h2', align: 'left', color: '#09090b', fontSize: '24px' }, { id: 'blk_c2', type: 'text', content: 'Laporan visualisasi performa indikator kinerja utama organisasi periode berjalan.', align: 'left' }],
+                            [{ id: 'blk_chart1', type: 'chart', chartTitle: 'Perkembangan Target vs Realisasi', chartType: 'bar', chartCsv: 'Kategori, Target, Realisasi\nJan, 120, 140\nFeb, 150, 160\nMar, 180, 210' }]
+                        ]
+                    },
+                    {
+                        id: 'sec_corp_tbl',
+                        layout: '1',
+                        columns: [[
+                            { id: 'blk_tbl1', type: 'table', tableData: [['Unit Kerja', 'Penanggung Jawab', 'Status'], ['Divisi TI', 'Ahmad S.', 'Selesai'], ['Divisi SDM', 'Budi R.', 'Proses']] }
+                        ]]
+                    }
+                ];
+            } else if (tplName === 'gallery') {
+                state.sections = [
+                    {
+                        id: 'sec_gal',
+                        layout: '3',
+                        columns: [
+                            [{ id: 'blk_img1', type: 'image', url: 'https://placehold.co/600x400/18181b/ffffff?text=Portofolio+1', caption: 'Dokumentasi Kegiatan A', rotation: 0, aspect: 'free' }],
+                            [{ id: 'blk_img2', type: 'image', url: 'https://placehold.co/600x400/27272a/ffffff?text=Portofolio+2', caption: 'Dokumentasi Kegiatan B', rotation: 0, aspect: 'free' }],
+                            [{ id: 'blk_img3', type: 'image', url: 'https://placehold.co/600x400/3f3f46/ffffff?text=Portofolio+3', caption: 'Dokumentasi Kegiatan C', rotation: 0, aspect: 'free' }]
+                        ]
+                    }
+                ];
+            } else if (tplName === 'links') {
+                state.sections = [
+                    {
+                        id: 'sec_links',
+                        layout: '1',
+                        columns: [[
+                            { id: 'blk_lh', type: 'heading', text: 'Portal Informasi Terpadu', level: 'h1', align: 'center', color: '#09090b', fontSize: '28px' },
+                            { id: 'blk_lt', type: 'text', content: 'Akses cepat ke seluruh layanan dan tautan penting resmi.', align: 'center' },
+                            { id: 'blk_lb', type: 'buttons', align: 'center', items: [
+                                { label: '🌐 Website Utama Resmi', url: '#', style: 'solid' },
+                                { label: '📄 Dokumen Laporan Publik', url: '#', style: 'outline' },
+                                { label: '📞 Kontak Layanan Pengaduan', url: '#', style: 'outline' }
+                            ] }
+                        ]]
+                    }
+                ];
+            }
+            state.activeSectionId = state.sections[0].id;
+            state.activeColumnIndex = 0;
+            pushState();
+            renderAll();
+        }
+
+        function addBlockToActiveColumn(blockType) {
+            let targetSec = state.sections.find(s => s.id === state.activeSectionId);
+            if (!targetSec) {
+                if (state.sections.length === 0) addNewSection('1');
+                targetSec = state.sections[0];
+            }
+
+            let colIdx = state.activeColumnIndex;
+            if (colIdx >= targetSec.columns.length) colIdx = 0;
+
+            const blockId = 'blk_' + Date.now();
+            let newBlock = { id: blockId, type: blockType };
+
+            if (blockType === 'heading') {
+                newBlock.text = 'Judul Header Baru';
+                newBlock.level = 'h2';
+                newBlock.align = 'left';
+                newBlock.color = '#09090b';
+                newBlock.fontSize = '24px';
+            } else if (blockType === 'text') {
+                newBlock.content = 'Masukkan isi paragraf teks di sini. Format teks tebal, miring, dan warna dapat disesuaikan langsung.';
+                newBlock.align = 'left';
+            } else if (blockType === 'image') {
+                newBlock.url = 'https://placehold.co/800x450/18181b/ffffff?text=Gambar+PAGE';
+                newBlock.caption = 'Keterangan Gambar';
+                newBlock.rotation = 0;
+                newBlock.aspect = 'free';
+            } else if (blockType === 'chart') {
+                newBlock.chartTitle = 'Statistik Data';
+                newBlock.chartType = 'bar';
+                newBlock.chartCsv = 'Item, Nilai\nAlpha, 45\nBeta, 78\nGamma, 62';
+            } else if (blockType === 'table') {
+                newBlock.tableData = [
+                    ['Kolom 1', 'Kolom 2', 'Kolom 3'],
+                    ['Data A1', 'Data B1', 'Data C1'],
+                    ['Data A2', 'Data B2', 'Data C2']
+                ];
+            } else if (blockType === 'buttons') {
+                newBlock.align = 'left';
+                newBlock.items = [
+                    { label: 'Tombol Aksi Utama', url: '#', style: 'solid' }
+                ];
+            }
+
+            targetSec.columns[colIdx].push(newBlock);
+            pushState();
+            renderAll();
+        }
+
+        function deleteBlock(secId, colIdx, blockId) {
+            const sec = state.sections.find(s => s.id === secId);
+            if (!sec) return;
+            sec.columns[colIdx] = sec.columns[colIdx].filter(b => b.id !== blockId);
+            pushState();
+            renderAll();
+        }
+
+        function moveBlock(secId, colIdx, blockIdx, direction) {
+            const sec = state.sections.find(s => s.id === secId);
+            if (!sec) return;
+            const col = sec.columns[colIdx];
+            if (direction === 'up' && blockIdx > 0) {
+                const temp = col[blockIdx];
+                col[blockIdx] = col[blockIdx - 1];
+                col[blockIdx - 1] = temp;
+            } else if (direction === 'down' && blockIdx < col.length - 1) {
+                const temp = col[blockIdx];
+                col[blockIdx] = col[blockIdx + 1];
+                col[blockIdx + 1] = temp;
+            }
+            pushState();
+            renderAll();
+        }
+
+        function setupRTFListeners() {
+            document.addEventListener('selectionchange', () => {
+                const sel = window.getSelection();
+                const toolbar = document.getElementById('rtf-toolbar');
+                if (!sel.isCollapsed && sel.rangeCount > 0) {
+                    const range = sel.getRangeAt(0);
+                    const container = range.commonAncestorContainer.parentElement;
+                    if (container && container.closest('[contenteditable="true"]')) {
+                        const rect = range.getBoundingClientRect();
+                        toolbar.style.left = `${Math.max(10, rect.left)}px`;
+                        toolbar.style.top = `${Math.max(10, rect.top - 45)}px`;
+                        toolbar.classList.remove('hidden');
+                        return;
+                    }
+                }
+                toolbar.classList.add('hidden');
+            });
+        }
+
+        function execRTFCommand(cmd, value = null) {
+            document.execCommand(cmd, false, value);
+        }
+
+        function syncContentEditable(secId, colIdx, blockId, fieldName, el) {
+            const sec = state.sections.find(s => s.id === secId);
+            if (!sec) return;
+            const block = sec.columns[colIdx].find(b => b.id === blockId);
+            if (!block) return;
+
+            if (fieldName === 'text' || fieldName === 'content') {
+                block[fieldName] = el.innerHTML;
+            }
+            saveToCache();
+        }
+
+        function openEditBlockModal(secId, colIdx, blockId) {
+            const sec = state.sections.find(s => s.id === secId);
+            if (!sec) return;
+            const block = sec.columns[colIdx].find(b => b.id === blockId);
+            if (!block) return;
+
+            state.activeBlockIdForEdit = { secId, colIdx, blockId };
+            const container = document.getElementById('modal-edit-fields');
+            document.getElementById('modal-edit-title').innerText = `Edit Blok ${block.type.toUpperCase()}`;
+            container.innerHTML = '';
+
+            if (block.type === 'heading') {
+                container.innerHTML = `
+                    <div>
+                        <label class="block text-mono-400 mb-1">Teks Judul</label>
+                        <input type="text" id="mfield-text" value="${block.text || ''}" class="w-full bg-mono-950 border border-mono-800 p-2 rounded text-mono-100">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-mono-400 mb-1">Tingkat Header</label>
+                            <select id="mfield-level" class="w-full bg-mono-950 border border-mono-800 p-2 rounded text-mono-100">
+                                <option value="h1" ${block.level==='h1'?'selected':''}>H1 (Besar)</option>
+                                <option value="h2" ${block.level==='h2'?'selected':''}>H2 (Sedang)</option>
+                                <option value="h3" ${block.level==='h3'?'selected':''}>H3 (Kecil)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-mono-400 mb-1">Posisi Teks</label>
+                            <select id="mfield-align" class="w-full bg-mono-950 border border-mono-800 p-2 rounded text-mono-100">
+                                <option value="left" ${block.align==='left'?'selected':''}>Kiri</option>
+                                <option value="center" ${block.align==='center'?'selected':''}>Tengah</option>
+                                <option value="right" ${block.align==='right'?'selected':''}>Kanan</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+            } else if (block.type === 'image') {
+                container.innerHTML = `
+                    <div>
+                        <label class="block text-mono-400 mb-1">Unggah Gambar Baru</label>
+                        <input type="file" accept="image/*" onchange="handleImageFileUpload(event)" class="w-full text-xs text-mono-400 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-mono-800 file:text-mono-200 hover:file:bg-mono-700">
+                    </div>
+                    <div>
+                        <label class="block text-mono-400 mb-1">Atau URL Gambar External</label>
+                        <input type="text" id="mfield-url" value="${block.url || ''}" class="w-full bg-mono-950 border border-mono-800 p-2 rounded text-mono-100">
+                    </div>
+                    <div>
+                        <label class="block text-mono-400 mb-1">Keterangan Foto (Caption)</label>
+                        <input type="text" id="mfield-caption" value="${block.caption || ''}" class="w-full bg-mono-950 border border-mono-800 p-2 rounded text-mono-100">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-mono-400 mb-1">Rotasi Gambar</label>
+                            <select id="mfield-rotation" class="w-full bg-mono-950 border border-mono-800 p-2 rounded text-mono-100">
+                                <option value="0" ${block.rotation===0?'selected':''}>0° Normal</option>
+                                <option value="90" ${block.rotation===90?'selected':''}>90° Kanan</option>
+                                <option value="180" ${block.rotation===180?'selected':''}>180° Terbalik</option>
+                                <option value="270" ${block.rotation===270?'selected':''}>270° Kiri</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-mono-400 mb-1">Potong / Rasio (Crop)</label>
+                            <select id="mfield-aspect" class="w-full bg-mono-950 border border-mono-800 p-2 rounded text-mono-100">
+                                <option value="free" ${block.aspect==='free'?'selected':''}>Bebas / Asli</option>
+                                <option value="16:9" ${block.aspect==='16:9'?'selected':''}>16:9 Landscape</option>
+                                <option value="4:3" ${block.aspect==='4:3'?'selected':''}>4:3 Standard</option>
+                                <option value="1:1" ${block.aspect==='1:1'?'selected':''}>1:1 Persegi</option>
+                                <option value="circle" ${block.aspect==='circle'?'selected':''}>Lingkaran</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+            } else if (block.type === 'chart') {
+                container.innerHTML = `
+                    <div>
+                        <label class="block text-mono-400 mb-1">Judul Grafik</label>
+                        <input type="text" id="mfield-chartTitle" value="${block.chartTitle || ''}" class="w-full bg-mono-950 border border-mono-800 p-2 rounded text-mono-100">
+                    </div>
+                    <div>
+                        <label class="block text-mono-400 mb-1">Tipe Grafik</label>
+                        <select id="mfield-chartType" class="w-full bg-mono-950 border border-mono-800 p-2 rounded text-mono-100">
+                            <option value="bar" ${block.chartType==='bar'?'selected':''}>Batang (Bar)</option>
+                            <option value="line" ${block.chartType==='line'?'selected':''}>Garis (Line)</option>
+                            <option value="pie" ${block.chartType==='pie'?'selected':''}>Pie / Doughnut</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-mono-400 mb-1">Data CSV (Label, Nilai1, Nilai2...)</label>
+                        <textarea id="mfield-chartCsv" rows="4" class="w-full bg-mono-950 border border-mono-800 p-2 font-mono text-xs rounded text-mono-100">${block.chartCsv || ''}</textarea>
+                    </div>
+                `;
+            } else if (block.type === 'table') {
+                container.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <label class="text-mono-400">Impor Data File CSV</label>
+                        <input type="file" accept=".csv" onchange="handleCSVTableUpload(event)" class="text-xs text-mono-400 file:py-1 file:px-2 file:rounded file:border-0 file:bg-mono-800 file:text-mono-200">
+                    </div>
+                    <div>
+                        <label class="block text-mono-400 mb-1">Atau Isi Matrix Raw CSV (Baris dipisah ENTER, Kolom dipisah koma)</label>
+                        <textarea id="mfield-tableCsv" rows="5" class="w-full bg-mono-950 border border-mono-800 p-2 font-mono text-xs rounded text-mono-100">${matrixToCSV(block.tableData)}</textarea>
+                    </div>
+                `;
+            } else if (block.type === 'buttons') {
+                let itemsHTML = '';
+                (block.items || []).forEach((item, idx) => {
+                    itemsHTML += `
+                        <div class="p-2 border border-mono-800 bg-mono-950 rounded space-y-1 mb-2">
+                            <div class="grid grid-cols-2 gap-1">
+                                <input type="text" value="${item.label}" onchange="updateBtnItem(${idx}, 'label', this.value)" placeholder="Label Tombol" class="bg-mono-900 border border-mono-700 p-1 rounded text-mono-100">
+                                <input type="text" value="${item.url}" onchange="updateBtnItem(${idx}, 'url', this.value)" placeholder="URL Target (#)" class="bg-mono-900 border border-mono-700 p-1 rounded text-mono-100">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <select onchange="updateBtnItem(${idx}, 'style', this.value)" class="bg-mono-900 border border-mono-700 p-1 rounded text-mono-100">
+                                    <option value="solid" ${item.style==='solid'?'selected':''}>Gaya Hitam Solid</option>
+                                    <option value="outline" ${item.style==='outline'?'selected':''}>Gaya Garis Outline</option>
+                                </select>
+                                <button onclick="removeBtnItem(${idx})" class="text-red-400 font-bold hover:underline">Hapus</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-mono-400">Daftar Tombol Akses</label>
+                        <button onclick="addBtnItem()" class="text-xs bg-mono-800 hover:bg-mono-700 text-mono-100 px-2 py-1 rounded font-bold">+ Tambah Tombol</button>
+                    </div>
+                    <div id="btn-items-container">${itemsHTML}</div>
+                `;
+            }
+
+            document.getElementById('modal-edit-block').classList.remove('hidden');
+        }
+
+        function saveBlockEdits() {
+            if (!state.activeBlockIdForEdit) return;
+            const { secId, colIdx, blockId } = state.activeBlockIdForEdit;
+            const sec = state.sections.find(s => s.id === secId);
+            if (!sec) return;
+            const block = sec.columns[colIdx].find(b => b.id === blockId);
+            if (!block) return;
+
+            if (block.type === 'heading') {
+                block.text = document.getElementById('mfield-text').value;
+                block.level = document.getElementById('mfield-level').value;
+                block.align = document.getElementById('mfield-align').value;
+            } else if (block.type === 'image') {
+                block.url = document.getElementById('mfield-url').value;
+                block.caption = document.getElementById('mfield-caption').value;
+                block.rotation = parseInt(document.getElementById('mfield-rotation').value) || 0;
+                block.aspect = document.getElementById('mfield-aspect').value;
+            } else if (block.type === 'chart') {
+                block.chartTitle = document.getElementById('mfield-chartTitle').value;
+                block.chartType = document.getElementById('mfield-chartType').value;
+                block.chartCsv = document.getElementById('mfield-chartCsv').value;
+            } else if (block.type === 'table') {
+                const rawCsv = document.getElementById('mfield-tableCsv').value;
+                block.tableData = csvToMatrix(rawCsv);
+            }
+
+            closeEditModal();
+            pushState();
+            renderAll();
+        }
+
+        function handleImageFileUpload(evt) {
+            const file = evt.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 1200;
+
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+                    document.getElementById('mfield-url').value = compressedBase64;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleCSVTableUpload(evt) {
+            const file = evt.target.files[0];
+            if (!file) return;
+            Papa.parse(file, {
+                complete: function(results) {
+                    if (results.data && results.data.length > 0) {
+                        document.getElementById('mfield-tableCsv').value = matrixToCSV(results.data);
+                    }
+                }
+            });
+        }
+
+        function addBtnItem() {
+            const { secId, colIdx, blockId } = state.activeBlockIdForEdit;
+            const block = state.sections.find(s => s.id === secId).columns[colIdx].find(b => b.id === blockId);
+            if (!block.items) block.items = [];
+            block.items.push({ label: 'Tombol Baru', url: '#', style: 'solid' });
+            openEditBlockModal(secId, colIdx, blockId);
+        }
+
+        function updateBtnItem(idx, key, val) {
+            const { secId, colIdx, blockId } = state.activeBlockIdForEdit;
+            const block = state.sections.find(s => s.id === secId).columns[colIdx].find(b => b.id === blockId);
+            if (block.items[idx]) block.items[idx][key] = val;
+        }
+
+        function removeBtnItem(idx) {
+            const { secId, colIdx, blockId } = state.activeBlockIdForEdit;
+            const block = state.sections.find(s => s.id === secId).columns[colIdx].find(b => b.id === blockId);
+            block.items.splice(idx, 1);
+            openEditBlockModal(secId, colIdx, blockId);
+        }
+
+        function closeEditModal() {
+            document.getElementById('modal-edit-block').classList.add('hidden');
+        }
+
+        function matrixToCSV(matrix) {
+            if (!matrix || !Array.isArray(matrix)) return '';
+            return matrix.map(row => row.join(', ')).join('\n');
+        }
+
+        function csvToMatrix(csv) {
+            if (!csv) return [];
+            return csv.trim().split('\n').map(row => row.split(',').map(cell => cell.trim()));
+        }
+
+        function renderAll() {
+            renderSidebarSectionsTree();
+            renderHeaderMetadataInputs();
+            renderCanvas();
+        }
+
+        function renderHeaderMetadataInputs() {
+            document.getElementById('header-page-title-input').value = state.metadata.pageTitle || '';
+            document.getElementById('cfg-css-mode').value = state.metadata.cssMode || 'vanilla';
+            document.getElementById('cfg-header-org').value = state.metadata.orgHeader || '';
+            document.getElementById('cfg-header-sub').value = state.metadata.subTitle || '';
+            document.getElementById('cfg-seo-desc').value = state.metadata.seoDescription || '';
+        }
+
+        function updatePageMetadata() {
+            state.metadata.pageTitle = document.getElementById('header-page-title-input').value;
+            state.metadata.cssMode = document.getElementById('cfg-css-mode').value;
+            state.metadata.orgHeader = document.getElementById('cfg-header-org').value;
+            state.metadata.subTitle = document.getElementById('cfg-header-sub').value;
+            state.metadata.seoDescription = document.getElementById('cfg-seo-desc').value;
+            saveToCache();
+            renderCanvas();
+        }
+
+        function renderSidebarSectionsTree() {
+            const container = document.getElementById('sections-tree-container');
+            container.innerHTML = '';
+
+            state.sections.forEach((sec, sIdx) => {
+                const isSelectedSec = sec.id === state.activeSectionId;
+                const secBox = document.createElement('div');
+                secBox.className = `p-3 rounded border transition ${isSelectedSec ? 'bg-mono-800 border-mono-400' : 'bg-mono-950 border-mono-800 hover:border-mono-700'}`;
+                
+                let colsBtnHTML = '';
+                sec.columns.forEach((col, cIdx) => {
+                    const isSelectedCol = isSelectedSec && cIdx === state.activeColumnIndex;
+                    colsBtnHTML += `
+                        <button onclick="setActiveColumn('${sec.id}', ${cIdx})" class="px-2 py-1 text-[10px] font-bold rounded border ${isSelectedCol ? 'bg-mono-100 text-mono-950 border-mono-100' : 'bg-mono-900 text-mono-400 border-mono-800 hover:text-mono-200'}">
+                            Kolom ${cIdx + 1} (${col.length})
+                        </button>
+                    `;
+                });
+
+                secBox.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase text-mono-200">Seksi #${sIdx + 1} (${sec.layout})</span>
+                        <div class="flex items-center gap-1 text-mono-400">
+                            <button onclick="moveSection('${sec.id}', 'up')" class="p-1 hover:text-mono-100" title="Naikkan"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                            <button onclick="moveSection('${sec.id}', 'down')" class="p-1 hover:text-mono-100" title="Turunkan"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                            <button onclick="deleteSection('${sec.id}')" class="p-1 hover:text-red-400" title="Hapus"><i class="fa-solid fa-trash text-xs"></i></button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5">${colsBtnHTML}</div>
+                `;
+                container.appendChild(secBox);
+            });
+        }
+
+        function renderCanvas() {
+            const canvas = document.getElementById('page-preview-canvas');
+            
+            // Clean active chart instances
+            Object.keys(chartInstancesMap).forEach(id => {
+                if (chartInstancesMap[id]) chartInstancesMap[id].destroy();
+            });
+            chartInstancesMap = {};
+
+            let html = `
+                <!-- BRANDING HEADER BANNER -->
+                <header class="border-b-2 border-mono-950 pb-4 mb-6">
+                    <div class="text-[11px] font-black tracking-widest text-mono-600 uppercase mb-1">${state.metadata.orgHeader || 'ORGANISASI'}</div>
+                    <h1 class="text-2xl md:text-4xl font-extrabold text-mono-950 tracking-tight leading-tight">${state.metadata.pageTitle || 'Judul Laman Utama'}</h1>
+                    ${state.metadata.subTitle ? `<p class="text-sm font-medium text-mono-600 mt-1">${state.metadata.subTitle}</p>` : ''}
+                </header>
+            `;
+
+            state.sections.forEach((sec) => {
+                let gridClass = 'grid grid-cols-1 gap-6 mb-8';
+                if (sec.layout === '2') gridClass = 'grid grid-cols-1 md:grid-cols-2 gap-6 mb-8';
+                if (sec.layout === '3') gridClass = 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8';
+                if (sec.layout === '1:2') gridClass = 'grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6 mb-8';
+                if (sec.layout === '2:1') gridClass = 'grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 mb-8';
+
+                html += `<div class="${gridClass}">`;
+
+                sec.columns.forEach((col, cIdx) => {
+                    const isSelectedCol = sec.id === state.activeSectionId && cIdx === state.activeColumnIndex;
+                    html += `<div onclick="setActiveColumn('${sec.id}', ${cIdx})" class="space-y-4 p-2 rounded relative transition ${isSelectedCol ? 'ring-2 ring-mono-400 bg-mono-50/50' : 'hover:bg-mono-50/30'}">`;
+
+                    col.forEach((block, bIdx) => {
+                        html += renderBlockHTML(sec.id, cIdx, bIdx, block);
+                    });
+
+                    if (col.length === 0) {
+                        html += `
+                            <div class="border-2 border-dashed border-mono-300 rounded p-6 text-center text-xs font-bold text-mono-400">
+                                Kolom Kosong — Klik Tambah Blok
+                            </div>
+                        `;
+                    }
+
+                    html += `</div>`;
+                });
+
+                html += `</div>`;
+            });
+
+            // PAGE FOOTER BRANDING
+            html += `
+                <footer class="pt-8 border-t border-mono-200 text-center text-xs font-medium text-mono-500">
+                    Laman Resmi dipublikasikan melalui <b>${state.metadata.orgHeader || 'PAGE Builder'}</b>
+                </footer>
+            `;
+
+            canvas.innerHTML = html;
+
+            // Render Charts after DOM injection
+            state.sections.forEach(sec => {
+                sec.columns.forEach(col => {
+                    col.forEach(block => {
+                        if (block.type === 'chart') {
+                            renderChartBlock(block);
+                        }
+                    });
+                });
+            });
+        }
+
+        function renderBlockHTML(secId, colIdx, blockIdx, block) {
+            let innerContent = '';
+
+            if (block.type === 'heading') {
+                const tag = block.level || 'h2';
+                const sizeClass = tag === 'h1' ? 'text-3xl' : tag === 'h2' ? 'text-xl' : 'text-lg';
+                innerContent = `
+                    <${tag} contenteditable="true" onblur="syncContentEditable('${secId}', ${colIdx}, '${block.id}', 'text', this)" class="${sizeClass} font-extrabold text-mono-950 tracking-tight text-${block.align}">
+                        ${block.text}
+                    </${tag}>
+                `;
+            } else if (block.type === 'text') {
+                innerContent = `
+                    <div contenteditable="true" onblur="syncContentEditable('${secId}', ${colIdx}, '${block.id}', 'content', this)" class="text-sm font-normal text-mono-800 leading-relaxed text-${block.align}">
+                        ${block.content}
+                    </div>
+                `;
+            } else if (block.type === 'image') {
+                let imgStyle = `transform: rotate(${block.rotation || 0}deg);`;
+                let aspectClass = 'w-full h-auto object-cover';
+                if (block.aspect === '16:9') aspectClass = 'w-full aspect-video object-cover';
+                if (block.aspect === '4:3') aspectClass = 'w-full aspect-[4/3] object-cover';
+                if (block.aspect === '1:1') aspectClass = 'w-full aspect-square object-cover';
+                if (block.aspect === 'circle') aspectClass = 'w-48 h-48 rounded-full mx-auto object-cover';
+
+                innerContent = `
+                    <div class="space-y-1 text-center">
+                        <div class="overflow-hidden rounded border border-mono-200 inline-block w-full">
+                            <img src="${block.url}" style="${imgStyle}" class="${aspectClass}" alt="Image">
+                        </div>
+                        ${block.caption ? `<p class="text-xs text-mono-500 italic">${block.caption}</p>` : ''}
+                    </div>
+                `;
+            } else if (block.type === 'chart') {
+                innerContent = `
+                    <div class="border border-mono-200 rounded p-4 bg-mono-50/50 space-y-2">
+                        <div class="text-xs font-bold text-mono-950 uppercase">${block.chartTitle || 'Grafik'}</div>
+                        <div class="h-56 relative">
+                            <canvas id="chart_canvas_${block.id}"></canvas>
+                        </div>
+                    </div>
+                `;
+            } else if (block.type === 'table') {
+                let tableRows = '';
+                (block.tableData || []).forEach((row, rIdx) => {
+                    tableRows += `<tr class="${rIdx === 0 ? 'bg-mono-950 text-mono-50 font-bold' : 'border-b border-mono-200 text-mono-800'}">`;
+                    row.forEach(cell => {
+                        tableRows += `<td class="p-2 border border-mono-300 text-xs">${cell}</td>`;
+                    });
+                    tableRows += `</tr>`;
+                });
+                innerContent = `
+                    <div class="overflow-x-auto border border-mono-300 rounded">
+                        <table class="w-full text-left border-collapse">${tableRows}</table>
+                    </div>
+                `;
+            } else if (block.type === 'buttons') {
+                let btnsHTML = '';
+                (block.items || []).forEach(btn => {
+                    const btnClass = btn.style === 'solid' ? 'bg-mono-950 text-mono-50 hover:bg-mono-800' : 'border-2 border-mono-950 text-mono-950 hover:bg-mono-100';
+                    btnsHTML += `<a href="${btn.url}" class="px-4 py-2 text-xs font-bold rounded ${btnClass} inline-block transition">${btn.label}</a>`;
+                });
+                innerContent = `<div class="flex flex-wrap gap-2 justify-${block.align}">${btnsHTML}</div>`;
+            }
+
+            return `
+                <div class="group relative border border-transparent hover:border-mono-300 p-2 rounded transition">
+                    <!-- Action Overlay Bar -->
+                    <div class="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-mono-900 text-mono-100 rounded px-1.5 py-0.5 text-[10px] flex items-center gap-1 z-20 transition shadow">
+                        <button onclick="openEditBlockModal('${secId}', ${colIdx}, '${block.id}')" class="hover:text-mono-300"><i class="fa-solid fa-pen"></i> Edit</button>
+                        <span>|</span>
+                        <button onclick="moveBlock('${secId}', ${colIdx}, ${blockIdx}, 'up')" class="hover:text-mono-300"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button onclick="moveBlock('${secId}', ${colIdx}, ${blockIdx}, 'down')" class="hover:text-mono-300"><i class="fa-solid fa-arrow-down"></i></button>
+                        <span>|</span>
+                        <button onclick="deleteBlock('${secId}', ${colIdx}, '${block.id}')" class="hover:text-red-400"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+
+                    ${innerContent}
+                </div>
+            `;
+        }
+
+        function renderChartBlock(block) {
+            const ctx = document.getElementById(`chart_canvas_${block.id}`);
+            if (!ctx) return;
+
+            const matrix = csvToMatrix(block.chartCsv || 'Item, Nilai\nA, 10\nB, 20');
+            if (matrix.length < 2) return;
+
+            const labels = matrix.slice(1).map(r => r[0]);
+            const values = matrix.slice(1).map(r => parseFloat(r[1]) || 0);
+
+            chartInstancesMap[block.id] = new Chart(ctx, {
+                type: block.chartType || 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: matrix[0][1] || 'Nilai',
+                        data: values,
+                        backgroundColor: block.chartType === 'pie' ? ['#09090b', '#3f3f46', '#71717a', '#a1a1aa', '#d4d4d8'] : '#09090b',
+                        borderColor: '#09090b',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: block.chartType === 'pie', position: 'bottom' }
+                    },
+                    scales: block.chartType !== 'pie' ? {
+                        y: { beginAtZero: true }
+                    } : {}
+                }
+            });
+        }
+
+        function setViewport(mode) {
+            state.viewport = mode;
+            const container = document.getElementById('page-preview-viewport');
+            container.className = `viewport-${mode} transition-all duration-300 mb-12`;
+
+            ['desktop', 'tablet', 'mobile'].forEach(m => {
+                const btn = document.getElementById(`vp-btn-${m}`);
+                if (m === mode) {
+                    btn.className = "px-2.5 py-1 rounded bg-mono-800 text-mono-100 font-medium transition flex items-center gap-1.5";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded text-mono-400 hover:text-mono-100 font-medium transition flex items-center gap-1.5";
+                }
+            });
+        }
+
+        function switchSidebarTab(tabName) {
+            ['layout', 'blocks', 'style'].forEach(t => {
+                const btn = document.getElementById(`stab-btn-${t}`);
+                const content = document.getElementById(`stab-content-${t}`);
+                if (t === tabName) {
+                    btn.className = "flex-1 py-3 text-center text-mono-100 border-b-2 border-mono-100 font-bold uppercase transition";
+                    content.classList.remove('hidden');
+                } else {
+                    btn.className = "flex-1 py-3 text-center text-mono-400 hover:text-mono-200 border-b-2 border-transparent uppercase transition";
+                    content.classList.add('hidden');
+                }
+            });
+        }
+
+        function openExportModal() {
+            document.getElementById('modal-export').classList.remove('hidden');
+        }
+
+        function closeExportModal() {
+            document.getElementById('modal-export').classList.add('hidden');
+        }
+
+        function openSourceModal() {
+            document.getElementById('source-code-textarea').value = generateStandaloneHTML('single');
+            document.getElementById('modal-source').classList.remove('hidden');
+        }
+
+        function closeSourceModal() {
+            document.getElementById('modal-source').classList.add('hidden');
+        }
+
+        function copySourceToClipboard() {
+            const textarea = document.getElementById('source-code-textarea');
+            textarea.select();
+            document.execCommand('copy');
+            alert("Kode HTML Laman berhasil disalin ke clipboard!");
+        }
+
+        function generateStandaloneHTML(mode = 'single') {
+            const isTailwind = state.metadata.cssMode === 'tailwind';
+            const canvasHTML = document.getElementById('page-preview-canvas').innerHTML;
+
+            const vanillaCSS = `
+                body { font-family: 'Inter', system-ui, sans-serif; background-color: #ffffff; color: #09090b; margin: 0; padding: 20px; }
+                .grid { display: grid; gap: 24px; }
+                .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+                @media (min-width: 768px) {
+                    .md\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                    .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+                    .md\\:grid-cols-\\[1fr_2fr\\] { grid-template-columns: 1fr 2fr; }
+                    .md\\:grid-cols-\\[2fr_1fr\\] { grid-template-columns: 2fr 1fr; }
+                }
+                .text-center { text-align: center; }
+                .text-left { text-align: left; }
+                .text-right { text-align: right; }
+                .font-extrabold { font-weight: 800; }
+                .font-bold { font-weight: 700; }
+                .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+                .text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
+                .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+                .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+                .text-xs { font-size: 0.75rem; line-height: 1rem; }
+                .border-b-2 { border-bottom-width: 2px; }
+                .border-t { border-top-width: 1px; }
+                .border { border-width: 1px; border-style: solid; border-color: #e4e4e7; }
+                .rounded { border-radius: 4px; }
+                .p-4 { padding: 16px; }
+                .py-2 { padding-top: 8px; padding-bottom: 8px; }
+                .px-4 { padding-left: 16px; padding-right: 16px; }
+                .bg-mono-950 { background-color: #09090b; }
+                .text-mono-50 { color: #fafafa; }
+                .text-mono-950 { color: #09090b; }
+                .inline-block { display: inline-block; }
+                .w-full { width: 100%; }
+                .max-w-5xl { max-width: 1024px; margin: 0 auto; }
+            `;
+
+            return `<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${state.metadata.pageTitle || 'Laman PAGE'}</title>
+    <meta name="description" content="${state.metadata.seoDescription || ''}">
+    ${isTailwind ? '<script src="https://cdn.tailwindcss.com"><\/script>' : (mode === 'zip' ? '<link rel="stylesheet" href="style.css">' : `<style>${vanillaCSS}</style>`)}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"><\/script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-white text-mono-950 antialiased p-4 md:p-12">
+    <div class="max-w-5xl mx-auto space-y-6">
+        ${canvasHTML}
+    </div>
+</body>
+</html>`;
+        }
+
+        function exportSingleHTML() {
+            const htmlContent = generateStandaloneHTML('single');
+            downloadFile(htmlContent, 'Laman_Page_Single.html', 'text/html');
+            closeExportModal();
+        }
+
+        function exportZIPPackage() {
+            const zip = new JSZip();
+            const htmlContent = generateStandaloneHTML('zip');
+            
+            zip.file("index.html", htmlContent);
+            if (state.metadata.cssMode !== 'tailwind') {
+                zip.file("style.css", "/* PAGE Vanilla Stylesheet */\nbody { font-family: 'Inter', sans-serif; }");
+            }
+
+            zip.generateAsync({ type: "blob" }).then(function(content) {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(content);
+                a.download = "Laman_PAGE_Package.zip";
+                a.click();
+            });
+            closeExportModal();
+        }
+
+        function exportPDF() {
+            closeExportModal();
+            window.print();
+        }
+
+        function exportJSONConfig() {
+            const jsonStr = JSON.stringify({
+                metadata: state.metadata,
+                sections: state.sections
+            }, null, 2);
+            downloadFile(jsonStr, 'Page_Builder_Config.json', 'application/json');
+        }
+
+        function importJSONConfig(evt) {
+            const file = evt.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed.sections) {
+                        state.metadata = parsed.metadata || state.metadata;
+                        state.sections = parsed.sections;
+                        pushState();
+                        renderAll();
+                        alert("Konfigurasi Laman berhasil dimuat!");
+                    }
+                } catch (err) {
+                    alert("File JSON tidak valid.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function downloadFile(content, fileName, contentType) {
+            const a = document.createElement("a");
+            const file = new Blob([content], { type: contentType });
+            a.href = URL.createObjectURL(file);
+            a.download = fileName;
+            a.click();
+        }
+    </script>
+</body>
+</html>

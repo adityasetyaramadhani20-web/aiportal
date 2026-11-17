@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harmoni</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #f8fafc; /* Slate 50 */
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 999px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #38bdf8; /* Sky 400 */
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -4px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+            transition: transform 0.1s;
+        }
+        input[type=range]:hover::-webkit-slider-thumb {
+            transform: scale(1.2);
+        }
+        
+        /* Range progress fill hack for webkit */
+        .range-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .range-progress {
+            position: absolute;
+            height: 6px;
+            background: #38bdf8;
+            border-radius: 999px;
+            pointer-events: none;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0%;
+        }
+
+        /* Glassmorphism utilities */
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .spin-slow {
+            animation: spin 8s linear infinite;
+        }
+        .spin-paused {
+            animation-play-state: paused;
+        }
+        
+        /* Toast Animation */
+        @keyframes slideInUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        .toast-enter { animation: slideInUp 0.3s ease-out forwards; }
+        .toast-exit { animation: fadeOut 0.3s ease-in forwards; }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col relative selection:bg-sky-500 selection:text-white">
+
+    <header class="glass z-10 px-6 py-4 flex justify-between items-center shadow-md">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
+                <i class="ph-fill ph-play-circle text-white text-xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-indigo-400">Harmoni</h1>
+        </div>
+        
+        <div class="flex items-center gap-2">
+            <!-- Menu MultiPlay & MixPlay Baru -->
+            <div class="flex items-center gap-2 mr-2 sm:mr-4 border-r border-slate-700 pr-4">
+                <button id="openMultiPlayBtn" class="flex items-center gap-2 text-sm text-sky-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-sky-900/50 hover:bg-sky-500/20" title="MultiPlay">
+                    <i class="ph ph-squares-four text-lg"></i><span class="hidden md:inline font-medium">MultiPlay</span>
+                </button>
+                <button id="openMixPlayBtn" class="flex items-center gap-2 text-sm text-indigo-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-indigo-900/50 hover:bg-indigo-500/20" title="MixPlay">
+                    <i class="ph ph-sliders text-lg"></i><span class="hidden md:inline font-medium">MixPlay</span>
+                </button>
+            </div>
+
+            <!-- Tombol Bersihkan Playlist -->
+            <button id="clearCacheBtn" class="flex items-center gap-2 text-sm text-slate-400 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800/50">
+                <i class="ph ph-trash"></i>
+                <span class="hidden sm:inline">Bersihkan Playlist</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+        
+        <!-- Background decorative blur -->
+        <div class="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-sky-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+        <div class="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+
+        <section class="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 lg:p-12 z-10 h-1/2 lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800/50">
+            
+            <!-- Media Display Area -->
+            <div class="relative w-full max-w-sm sm:max-w-md aspect-square sm:aspect-video mb-8 flex items-center justify-center rounded-2xl overflow-hidden group border border-slate-700/50 bg-slate-900/50 shadow-2xl shadow-black/50">
+                
+                <!-- Audio Album Art -->
+                <div id="albumArtContainer" class="relative w-48 h-48 sm:w-64 sm:h-64 transition-all duration-500">
+                    <div id="albumArt" class="w-full h-full rounded-full shadow-2xl shadow-black/50 border-4 border-slate-800 flex items-center justify-center overflow-hidden transition-all duration-500 bg-slate-800 spin-paused spin-slow">
+                        <i class="ph-fill ph-vinyl-record text-slate-600 text-6xl"></i>
+                    </div>
+                    <div class="absolute inset-0 rounded-full shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] pointer-events-none"></div>
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-slate-900 rounded-full border-2 border-slate-700 z-10"></div>
+                </div>
+
+                <!-- Video Player -->
+                <video id="mediaPlayer" class="w-full h-full object-contain hidden bg-black" playsinline></video>
+
+                <!-- Fullscreen Button -->
+                <button id="fullscreenBtn" class="absolute bottom-3 right-3 bg-slate-900/80 hover:bg-sky-500 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all hidden z-20" title="Layar Penuh">
+                    <i class="ph ph-corners-out text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Track Info -->
+            <div class="text-center w-full max-w-md mb-8">
+                <h2 id="trackTitle" class="text-2xl sm:text-3xl font-bold text-white truncate drop-shadow-md">Belum Ada Media</h2>
+                <p id="trackArtist" class="text-slate-400 mt-2 text-sm sm:text-base truncate">Pilih atau jatuhkan file media</p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full max-w-md mb-6">
+                <div class="range-container w-full h-6">
+                    <div id="progressFill" class="range-progress"></div>
+                    <input type="range" id="seekSlider" min="0" max="100" value="0" step="0.1" disabled>
+                </div>
+                <div class="flex justify-between text-xs font-medium text-slate-400 mt-2">
+                    <span id="currentTimeDisplay">00:00</span>
+                    <span id="totalTimeDisplay">00:00</span>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex flex-col items-center w-full max-w-md gap-4">
+                <div class="flex items-center justify-center gap-4 sm:gap-6 w-full">
+                    <!-- Shuffle -->
+                    <button id="shuffleBtn" class="text-slate-400 hover:text-sky-400 transition-colors p-2 rounded-full" title="Acak (Shuffle)">
+                        <i class="ph ph-shuffle text-xl"></i>
+                    </button>
+                    
+                    <!-- Skip Backward 10s -->
+                    <button id="skipBackBtn" class="text-slate-300 hover:text-white transition-colors p-2" title="Mundur 10 detik">
+                        <i class="ph-fill ph-clock-counter-clockwise text-2xl"></i>
+                    </button>
+
+                    <!-- Previous -->
+                    <button id="prevBtn" class="text-white hover:text-sky-400 transition-colors p-2" title="Sebelumnya">
+                        <i class="ph-fill ph-skip-back text-3xl"></i>
+                    </button>
+
+                    <!-- Play/Pause -->
+                    <button id="playBtn" class="w-16 h-16 rounded-full bg-sky-500 hover:bg-sky-400 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i id="playIcon" class="ph-fill ph-play text-2xl ml-1"></i>
+                    </button>
+
+                    <!-- Next -->
+                    <button id="nextBtn" class="text-white hover:text-sky-400 transition-colors p-2" title="Selanjutnya">
+                        <i class="ph-fill ph-skip-forward text-3xl"></i>
+                    </button>
+
+                    <!-- Skip Forward 10s -->
+                    <button id="skipForwardBtn" class="text-slate-300 hover:text-white transition-colors p-2" title="Maju 10 detik">
+                        <i class="ph-fill ph-clock-clockwise text-2xl"></i>
+                    </button>
+
+                    <!-- Loop -->
+                    <button id="loopBtn" class="text-slate-400 hover:text-sky-400 transition-colors p-2 rounded-full relative" title="Ulangi (Loop)">
+                        <i id="loopIcon" class="ph ph-repeat text-xl"></i>
+                        <span id="loopIndicator" class="absolute bottom-0 right-1 text-[10px] font-bold text-sky-400 hidden">1</span>
+                    </button>
+                </div>
+
+                <!-- Playback Speed -->
+                <div class="flex items-center gap-2 bg-slate-800/50 rounded-full px-4 py-1.5 border border-slate-700/50">
+                    <i class="ph ph-gauge text-slate-400 text-sm"></i>
+                    <select id="speedSelect" class="bg-transparent text-sm text-slate-300 outline-none cursor-pointer appearance-none text-center pr-2">
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>1.0x Normal</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2.0x</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <section class="w-full lg:w-1/2 h-1/2 lg:h-full flex flex-col z-10 bg-slate-900/30">
+            
+            <!-- Upload / Dropzone Area -->
+            <div id="dropZone" class="m-4 lg:m-6 p-6 border-2 border-dashed border-slate-600 rounded-2xl flex flex-col items-center justify-center text-center bg-slate-800/20 hover:bg-slate-800/40 hover:border-sky-500 transition-all cursor-pointer group">
+                <input type="file" id="fileInput" multiple accept="audio/*,video/*" class="hidden">
+                <div class="w-12 h-12 rounded-full bg-slate-700 group-hover:bg-sky-500/20 flex items-center justify-center mb-3 transition-colors">
+                    <i class="ph ph-cloud-arrow-up text-2xl text-slate-400 group-hover:text-sky-400 transition-colors"></i>
+                </div>
+                <h3 class="text-slate-200 font-medium mb-1">Klik atau Tarik file media ke sini</h3>
+                <p class="text-slate-400 text-xs">Mendukung Audio (MP3, WAV) & Video (MP4, WebM)</p>
+            </div>
+
+            <!-- Playlist Header -->
+            <div class="px-4 lg:px-6 py-2 flex justify-between items-center border-b border-slate-800">
+                <h3 class="font-semibold text-slate-200 flex items-center gap-2">
+                    <i class="ph-fill ph-list-dashes text-sky-400"></i> Playlist
+                    <span id="playlistCount" class="text-xs bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">0</span>
+                </h3>
+            </div>
+
+            <!-- Playlist Items -->
+            <div id="playlistContainer" class="flex-1 overflow-y-auto p-2 lg:p-4 space-y-1">
+                <!-- Empty State -->
+                <div id="emptyPlaylist" class="h-full flex flex-col items-center justify-center text-slate-500 space-y-3">
+                    <i class="ph ph-play-circle text-4xl opacity-50"></i>
+                    <p class="text-sm">Playlist kosong. Tambahkan media untuk mulai.</p>
+                </div>
+                <!-- Track items will be generated here by JS -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal MultiPlay -->
+    <div id="multiPlayModal" class="fixed inset-0 bg-slate-900/95 z-[60] hidden flex-col transition-opacity">
+        <div class="p-4 flex justify-between items-center bg-slate-800 border-b border-slate-700 shadow-lg">
+            <h2 class="text-xl font-bold text-sky-400 flex items-center gap-2"><i class="ph-fill ph-squares-four"></i> MultiPlay Mode</h2>
+            <div class="flex items-center gap-4">
+                <select id="multiGridSelect" class="bg-slate-700 text-white rounded-lg px-3 py-1.5 outline-none text-sm border border-slate-600">
+                    <option value="2">2 Layar</option>
+                    <option value="4" selected>4 Layar</option>
+                    <option value="9">9 Layar</option>
+                    <option value="16">16 Layar</option>
+                </select>
+                <button id="closeMultiPlayBtn" class="text-slate-400 hover:text-red-400 transition-colors p-1 bg-slate-700/50 rounded hover:bg-red-400/20"><i class="ph ph-x text-2xl"></i></button>
+            </div>
+        </div>
+        <!-- Area Grid diperbarui agar dapat digulir dan barisnya dinamis -->
+        <div id="multiPlayGrid" class="flex-1 p-4 grid gap-3 overflow-y-auto" style="grid-auto-rows: minmax(350px, 1fr);"></div>
+    </div>
+
+    <!-- Modal MixPlay -->
+    <div id="mixPlayModal" class="fixed inset-0 bg-slate-900/95 z-[60] hidden flex-col overflow-y-auto transition-opacity">
+        <div class="p-4 flex justify-between items-center bg-slate-800 border-b border-slate-700 shadow-lg">
+            <h2 class="text-xl font-bold text-indigo-400 flex items-center gap-2"><i class="ph-fill ph-sliders"></i> MixPlay (DJ Mode)</h2>
+            <button id="closeMixPlayBtn" class="text-slate-400 hover:text-red-400 transition-colors p-1 bg-slate-700/50 rounded hover:bg-red-400/20"><i class="ph ph-x text-2xl"></i></button>
+        </div>
+        <div class="flex-1 p-4 lg:p-6 flex flex-col gap-6 max-w-7xl mx-auto w-full">
+            
+            <!-- Decks Container -->
+            <div class="flex flex-col lg:flex-row gap-6">
+                <!-- Deck A -->
+                <div class="flex-1 bg-slate-800/60 p-4 rounded-2xl border border-slate-700 shadow-xl">
+                    <h3 class="font-bold text-slate-300 mb-3 flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-sky-400"></div> Deck A</h3>
+                    <input type="file" id="deckAFile" accept="audio/*,video/*" class="w-full text-sm text-slate-400 mb-3 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sky-500/10 file:text-sky-400 hover:file:bg-sky-500/20 cursor-pointer">
+                    <video id="deckAVideo" controls class="w-full aspect-video bg-black rounded-xl border border-slate-700 object-contain shadow-inner"></video>
+                </div>
+                
+                <!-- Center Control -->
+                <div class="flex flex-row lg:flex-col justify-center items-center gap-4 lg:gap-6 bg-slate-800/80 p-4 lg:p-6 rounded-2xl border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                    <button id="syncPlayBtn" class="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-600 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white flex items-center justify-center shadow-lg transition-transform active:scale-95" title="Mainkan/Jeda Kedua Deck Bersamaan">
+                        <i class="ph-fill ph-play text-2xl ml-1" id="syncPlayIcon"></i>
+                    </button>
+                    <label class="flex items-center gap-2 text-sm font-medium text-slate-300 cursor-pointer hover:text-white transition-colors bg-slate-900/50 px-4 py-2 rounded-full">
+                        <input type="checkbox" id="syncSeekToggle" class="accent-indigo-500 w-4 h-4">
+                        <span>Sinkronkan Waktu</span>
+                    </label>
+                </div>
+
+                <!-- Deck B -->
+                <div class="flex-1 bg-slate-800/60 p-4 rounded-2xl border border-slate-700 shadow-xl">
+                    <h3 class="font-bold text-slate-300 mb-3 flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-indigo-400"></div> Deck B</h3>
+                    <input type="file" id="deckBFile" accept="audio/*,video/*" class="w-full text-sm text-slate-400 mb-3 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-500/10 file:text-indigo-400 hover:file:bg-indigo-500/20 cursor-pointer">
+                    <video id="deckBVideo" controls class="w-full aspect-video bg-black rounded-xl border border-slate-700 object-contain shadow-inner"></video>
+                </div>
+            </div>
+
+            <!-- Soundboard -->
+            <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700 shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-200 flex items-center gap-2"><i class="ph-fill ph-grid-nine text-indigo-400"></i> SFX Soundboard</h3>
+                    <span class="text-xs text-slate-500">Klik Kanan untuk menghapus suara</span>
+                </div>
+                <div id="sfxContainer" class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-[70] flex flex-col gap-2"></div>
+
+    <script>
+        // DOM Elements - Player Utama
+        const audio = document.getElementById('mediaPlayer'); 
+        
+        // UI Player Utama
+        const playBtn = document.getElementById('playBtn');
+        const playIcon = document.getElementById('playIcon');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const skipBackBtn = document.getElementById('skipBackBtn');
+        const skipForwardBtn = document.getElementById('skipForwardBtn');
+        const shuffleBtn = document.getElementById('shuffleBtn');
+        const loopBtn = document.getElementById('loopBtn');
+        const loopIcon = document.getElementById('loopIcon');
+        const loopIndicator = document.getElementById('loopIndicator');
+        const speedSelect = document.getElementById('speedSelect');
+        const seekSlider = document.getElementById('seekSlider');
+        const progressFill = document.getElementById('progressFill');
+        const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+        const totalTimeDisplay = document.getElementById('totalTimeDisplay');
+        const trackTitle = document.getElementById('trackTitle');
+        const trackArtist = document.getElementById('trackArtist');
+        const albumArt = document.getElementById('albumArt');
+        const albumArtContainer = document.getElementById('albumArtContainer');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        
+        // UI Playlist & Files
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const playlistContainer = document.getElementById('playlistContainer');
+        const emptyPlaylist = document.getElementById('emptyPlaylist');
+        const playlistCount = document.getElementById('playlistCount');
+        const clearCacheBtn = document.getElementById('clearCacheBtn');
+        const toastContainer = document.getElementById('toastContainer');
+
+        // State Variables
+        let playlist = []; // Array of { id, file (Blob), name, url }
+        let currentTrackIndex = -1;
+        let isPlaying = false;
+        let isShuffle = false;
+        let loopMode = 0; // 0: no loop, 1: loop playlist, 2: loop one track
+        let shuffledIndices = [];
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const colors = {
+                info: 'bg-slate-800 border-slate-700 text-white',
+                success: 'bg-emerald-900/90 border-emerald-700 text-emerald-100',
+                error: 'bg-red-900/90 border-red-700 text-red-100'
+            };
+            const icons = {
+                info: 'ph-info',
+                success: 'ph-check-circle',
+                error: 'ph-warning-circle'
+            };
+
+            toast.className = `toast-enter flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg shadow-black/20 backdrop-blur-sm ${colors[type]} max-w-xs`;
+            toast.innerHTML = `
+                <i class="ph-fill ${icons[type]} text-xl"></i>
+                <span class="text-sm font-medium">${message}</span>
+            `;
+            
+            toastContainer.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.replace('toast-enter', 'toast-exit');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        const DB_NAME = 'HarmoniDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'tracks';
+        let db;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onerror = (event) => {
+                    console.error("IndexedDB error:", event.target.error);
+                    showToast("Gagal memuat Playlist database.", "error");
+                    reject(event.target.error);
+                };
+
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    resolve(db);
+                };
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
+            });
+        }
+
+        async function saveTrackToDB(trackData) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                
+                // Jangan simpan URL Blob sementara, hanya simpan File/Blob dan metadata
+                const dataToSave = {
+                    id: trackData.id,
+                    name: trackData.name,
+                    file: trackData.file 
+                };
+
+                const request = store.put(dataToSave);
+                request.onsuccess = () => resolve();
+                request.onerror = (e) => {
+                    if (e.target.error.name === 'QuotaExceededError') {
+                        showToast("Penyimpanan penuh. Bersihkan Playlist.", "error");
+                    }
+                    reject(e.target.error);
+                };
+            });
+        }
+
+        async function loadTracksFromDB() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+
+                request.onsuccess = (event) => {
+                    const tracks = event.target.result;
+                    resolve(tracks);
+                };
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function deleteTrackFromDB(id) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.delete(id);
+                request.onsuccess = () => resolve();
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function clearAllTracksDB() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.clear();
+                request.onsuccess = () => resolve();
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        function parseFileName(filename) {
+            // Hapus ekstensi
+            let name = filename.replace(/\.[^/.]+$/, "");
+            // Pisahkan berdasarkan strip jika ada
+            let parts = name.split('-');
+            let artist = "Artis Tidak Diketahui";
+            let title = name;
+
+            if (parts.length > 1) {
+                artist = parts[0].trim();
+                title = parts.slice(1).join('-').trim();
+            }
+            return { title, artist };
+        }
+
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        async function handleFiles(files) {
+            if (files.length === 0) return;
+            
+            showToast(`Memproses ${files.length} file...`, 'info');
+            let addedCount = 0;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (!file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
+                    showToast(`File ${file.name} bukan format media valid.`, 'error');
+                    continue;
+                }
+
+                const trackId = generateId();
+                const trackData = {
+                    id: trackId,
+                    name: file.name,
+                    file: file,
+                    url: URL.createObjectURL(file) // Buat object URL untuk pemutaran langsung
+                };
+
+                try {
+                    await saveTrackToDB(trackData);
+                    playlist.push(trackData);
+                    addedCount++;
+                } catch (error) {
+                    console.error("Gagal menyimpan lagu:", error);
+                }
+            }
+
+            if (addedCount > 0) {
+                showToast(`${addedCount} media ditambahkan ke playlist.`, 'success');
+                updateShuffleIndices();
+                renderPlaylist();
+                if (currentTrackIndex === -1 && playlist.length > 0) {
+                    loadTrack(0);
+                }
+            }
+        }
+
+        // Event Listener Dropzone
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-sky-500', 'bg-slate-800/60');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-sky-500', 'bg-slate-800/60');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-sky-500', 'bg-slate-800/60');
+            if (e.dataTransfer.files) {
+                handleFiles(e.dataTransfer.files);
+            }
+        });
+
+        function renderPlaylist() {
+            playlistContainer.innerHTML = '';
+            playlistCount.textContent = playlist.length;
+
+            if (playlist.length === 0) {
+                playlistContainer.appendChild(emptyPlaylist);
+                emptyPlaylist.style.display = 'flex';
+                playBtn.disabled = true;
+                return;
+            }
+
+            emptyPlaylist.style.display = 'none';
+            playBtn.disabled = false;
+
+            playlist.forEach((track, index) => {
+                const { title, artist } = parseFileName(track.name);
+                const isActive = index === currentTrackIndex;
+                const isVideo = track.file.type.startsWith('video/');
+                
+                const item = document.createElement('div');
+                item.className = `group flex items-center justify-between p-3 rounded-xl transition-all cursor-pointer border border-transparent ${
+                    isActive ? 'bg-sky-500/10 border-sky-500/30' : 'hover:bg-slate-800/50'
+                }`;
+                
+                item.innerHTML = `
+                    <div class="flex items-center gap-4 overflow-hidden w-full" onclick="playSpecificTrack(${index})">
+                        <div class="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center relative overflow-hidden ${isActive ? 'bg-sky-500 text-white' : 'bg-slate-700 text-slate-400 group-hover:bg-slate-600'} transition-colors">
+                            ${isActive && isPlaying ? 
+                                `<i class="ph-fill ${isVideo ? 'ph-video-camera' : 'ph-waves'} animate-pulse text-xl"></i>` : 
+                                `<i class="ph-fill ${isVideo ? 'ph-video-camera' : 'ph-music-notes'} text-xl"></i>`
+                            }
+                        </div>
+                        <div class="flex flex-col overflow-hidden w-full">
+                            <span class="font-medium text-sm truncate ${isActive ? 'text-sky-400' : 'text-slate-200'}">${title}</span>
+                            <span class="text-xs text-slate-500 truncate">${artist}</span>
+                        </div>
+                    </div>
+                    <button onclick="removeTrack(${index}, event)" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-full opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" title="Hapus">
+                        <i class="ph ph-x"></i>
+                    </button>
+                `;
+                playlistContainer.appendChild(item);
+            });
+        }
+
+        function generateGradientForTrack(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const hue1 = hash % 360;
+            const hue2 = (hash + 60) % 360;
+            return `linear-gradient(135deg, hsl(${hue1}, 70%, 50%), hsl(${hue2}, 80%, 30%))`;
+        }
+
+        function loadTrack(index) {
+            if (index < 0 || index >= playlist.length) return;
+            
+            currentTrackIndex = index;
+            const track = playlist[currentTrackIndex];
+            const isVideo = track.file.type.startsWith('video/');
+            
+            // Set sumber audio
+            audio.src = track.url;
+            audio.playbackRate = parseFloat(speedSelect.value);
+            
+            // Update UI Informasi
+            const { title, artist } = parseFileName(track.name);
+            trackTitle.textContent = title;
+            trackArtist.textContent = artist;
+            
+            // Handle Tampilan Video vs Audio
+            if (isVideo) {
+                albumArtContainer.classList.add('hidden');
+                audio.classList.remove('hidden');
+                fullscreenBtn.classList.remove('hidden');
+            } else {
+                audio.classList.add('hidden');
+                fullscreenBtn.classList.add('hidden');
+                albumArtContainer.classList.remove('hidden');
+                // Update sampul album untuk audio
+                albumArt.style.background = generateGradientForTrack(track.name);
+                albumArt.innerHTML = '<i class="ph-fill ph-vinyl-record text-white/20 text-6xl"></i>';
+            }
+            
+            seekSlider.disabled = false;
+            seekSlider.value = 0;
+            progressFill.style.width = '0%';
+            currentTimeDisplay.textContent = '00:00';
+            
+            renderPlaylist(); // Render ulang untuk menyorot yang sedang aktif
+        }
+
+        function playSpecificTrack(index) {
+            loadTrack(index);
+            playAudio();
+        }
+
+        function togglePlay() {
+            if (playlist.length === 0) return;
+            if (currentTrackIndex === -1) loadTrack(0);
+            
+            if (audio.paused) {
+                playAudio();
+            } else {
+                pauseAudio();
+            }
+        }
+
+        function playAudio() {
+            audio.play().then(() => {
+                isPlaying = true;
+                playIcon.classList.replace('ph-play', 'ph-pause');
+                albumArt.classList.remove('spin-paused');
+                renderPlaylist(); // Update animasi ikon
+            }).catch(e => {
+                console.error("Playback error:", e);
+                showToast("Gagal memutar media.", "error");
+            });
+        }
+
+        function pauseAudio() {
+            audio.pause();
+            isPlaying = false;
+            playIcon.classList.replace('ph-pause', 'ph-play');
+            albumArt.classList.add('spin-paused');
+            renderPlaylist(); // Update animasi ikon
+        }
+
+        async function removeTrack(index, event) {
+            event.stopPropagation(); // Mencegah trigger playSpecificTrack
+            
+            const track = playlist[index];
+            
+            // Hapus dari DB
+            try {
+                await deleteTrackFromDB(track.id);
+            } catch(e) {
+                console.error("Error menghapus dari DB");
+            }
+
+            // Hapus URL untuk membebaskan memori
+            URL.revokeObjectURL(track.url);
+            
+            // Hapus dari array
+            playlist.splice(index, 1);
+            updateShuffleIndices();
+
+            // Logika jika media yang dihapus sedang diputar
+            if (currentTrackIndex === index) {
+                pauseAudio();
+                if (playlist.length > 0) {
+                    let nextIdx = index >= playlist.length ? 0 : index;
+                    loadTrack(nextIdx);
+                    // Jangan langsung putar, hanya dimuat
+                } else {
+                    // Kondisi playlist kosong
+                    currentTrackIndex = -1;
+                    audio.src = '';
+                    trackTitle.textContent = "Belum Ada Media";
+                    trackArtist.textContent = "Pilih atau jatuhkan file media";
+                    
+                    // Reset ke UI audio
+                    audio.classList.add('hidden');
+                    fullscreenBtn.classList.add('hidden');
+                    albumArtContainer.classList.remove('hidden');
+                    albumArt.style.background = '';
+                    albumArt.innerHTML = '<i class="ph-fill ph-vinyl-record text-slate-600 text-6xl"></i>';
+                    
+                    seekSlider.disabled = true;
+                    seekSlider.value = 0;
+                    progressFill.style.width = '0%';
+                    currentTimeDisplay.textContent = '00:00';
+                    totalTimeDisplay.textContent = '00:00';
+                }
+            } else if (currentTrackIndex > index) {
+                // Sesuaikan indeks jika item sebelumnya dihapus
+                currentTrackIndex--;
+            }
+
+            renderPlaylist();
+        }
+
+        function updateShuffleIndices() {
+            shuffledIndices = Array.from({length: playlist.length}, (_, i) => i);
+            // Fisher-Yates shuffle
+            for (let i = shuffledIndices.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
+            }
+        }
+
+        function getNextIndex() {
+            if (playlist.length === 0) return -1;
+            
+            if (isShuffle) {
+                let currentPos = shuffledIndices.indexOf(currentTrackIndex);
+                if (currentPos === -1 || currentPos === shuffledIndices.length - 1) {
+                    // Reshuffle jika di akhir
+                    if(loopMode !== 1 && currentPos === shuffledIndices.length - 1) return -1; // berhenti jika tidak loop
+                    updateShuffleIndices();
+                    return shuffledIndices[0];
+                }
+                return shuffledIndices[currentPos + 1];
+            } else {
+                if (currentTrackIndex >= playlist.length - 1) {
+                    return loopMode === 1 ? 0 : -1;
+                }
+                return currentTrackIndex + 1;
+            }
+        }
+
+        function getPrevIndex() {
+            if (playlist.length === 0) return -1;
+            
+            // Jika audio sudah diputar >3 detik, ulang dari awal track ini
+            if (audio.currentTime > 3) {
+                return currentTrackIndex;
+            }
+
+            if (isShuffle) {
+                let currentPos = shuffledIndices.indexOf(currentTrackIndex);
+                if (currentPos <= 0) {
+                    return loopMode === 1 ? shuffledIndices[shuffledIndices.length - 1] : 0;
+                }
+                return shuffledIndices[currentPos - 1];
+            } else {
+                if (currentTrackIndex <= 0) {
+                    return loopMode === 1 ? playlist.length - 1 : 0;
+                }
+                return currentTrackIndex - 1;
+            }
+        }
+
+        function nextTrack() {
+            const nextIdx = getNextIndex();
+            if (nextIdx !== -1) {
+                loadTrack(nextIdx);
+                playAudio();
+            } else {
+                pauseAudio();
+                if(playlist.length > 0) {
+                    loadTrack(0); // Reset ke awal
+                }
+            }
+        }
+
+        function prevTrack() {
+            const prevIdx = getPrevIndex();
+            if (prevIdx !== -1) {
+                if (prevIdx === currentTrackIndex && audio.currentTime > 3) {
+                    audio.currentTime = 0; // Hanya mengulang dari awal
+                    playAudio();
+                } else {
+                    loadTrack(prevIdx);
+                    playAudio();
+                }
+            }
+        }
+
+        function toggleShuffle() {
+            isShuffle = !isShuffle;
+            shuffleBtn.classList.toggle('text-sky-400', isShuffle);
+            shuffleBtn.classList.toggle('text-slate-400', !isShuffle);
+            if (isShuffle) {
+                updateShuffleIndices();
+                showToast("Mode Acak Aktif");
+            } else {
+                showToast("Mode Acak Nonaktif");
+            }
+        }
+
+        function toggleLoop() {
+            loopMode = (loopMode + 1) % 3;
+            if (loopMode === 0) {
+                // Mati
+                loopBtn.classList.remove('text-sky-400');
+                loopBtn.classList.add('text-slate-400');
+                loopIcon.classList.replace('ph-repeat-once', 'ph-repeat');
+                loopIndicator.classList.add('hidden');
+                audio.loop = false;
+                showToast("Ulangi Nonaktif");
+            } else if (loopMode === 1) {
+                // Ulangi Semua
+                loopBtn.classList.remove('text-slate-400');
+                loopBtn.classList.add('text-sky-400');
+                loopIcon.classList.replace('ph-repeat-once', 'ph-repeat');
+                loopIndicator.classList.add('hidden');
+                audio.loop = false;
+                showToast("Ulangi Semua");
+            } else {
+                // Ulangi Satu
+                loopIcon.classList.replace('ph-repeat', 'ph-repeat-once');
+                loopIndicator.classList.remove('hidden');
+                audio.loop = true; // Browser yang menangani pengulangan
+                showToast("Ulangi Satu Lagu");
+            }
+        }
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "00:00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        audio.addEventListener('timeupdate', () => {
+            if (!audio.duration) return;
+            const progressPercent = (audio.currentTime / audio.duration) * 100;
+            seekSlider.value = progressPercent;
+            progressFill.style.width = `${progressPercent}%`;
+            currentTimeDisplay.textContent = formatTime(audio.currentTime);
+        });
+
+        audio.addEventListener('loadedmetadata', () => {
+            totalTimeDisplay.textContent = formatTime(audio.duration);
+            seekSlider.disabled = false;
+        });
+
+        seekSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            progressFill.style.width = `${val}%`;
+            if (audio.duration) {
+                currentTimeDisplay.textContent = formatTime((val / 100) * audio.duration);
+            }
+        });
+
+        seekSlider.addEventListener('change', (e) => {
+            if (audio.duration) {
+                audio.currentTime = (e.target.value / 100) * audio.duration;
+            }
+        });
+
+        audio.addEventListener('ended', () => {
+            // Jika loop bernilai true (Ulangi Satu), browser otomatis memutar ulang, event 'ended' bisa saja menyala tapi kita serahkan pada Fungsi Next
+            if (!audio.loop) {
+                nextTrack();
+            }
+        });
+
+        playBtn.addEventListener('click', togglePlay);
+        nextBtn.addEventListener('click', nextTrack);
+        prevBtn.addEventListener('click', prevTrack);
+        shuffleBtn.addEventListener('click', toggleShuffle);
+        loopBtn.addEventListener('click', toggleLoop);
+        
+        skipBackBtn.addEventListener('click', () => {
+            audio.currentTime = Math.max(0, audio.currentTime - 10);
+        });
+        skipForwardBtn.addEventListener('click', () => {
+            audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
+        });
+
+        speedSelect.addEventListener('change', (e) => {
+            audio.playbackRate = parseFloat(e.target.value);
+            showToast(`Kecepatan: ${e.target.options[e.target.selectedIndex].text}`);
+        });
+
+        // Fitur Layar Penuh untuk Video
+        fullscreenBtn.addEventListener('click', () => {
+            if (audio.requestFullscreen) {
+                audio.requestFullscreen();
+            } else if (audio.webkitRequestFullscreen) { /* Safari */
+                audio.webkitRequestFullscreen();
+            } else if (audio.msRequestFullscreen) { /* IE11 */
+                audio.msRequestFullscreen();
+            }
+        });
+
+        clearCacheBtn.addEventListener('click', async () => {
+            if(confirm("Apakah Anda yakin ingin menghapus semua media dari Playlist? Media yang sedang diputar akan berhenti.")) {
+                try {
+                    pauseAudio();
+                    playlist.forEach(t => URL.revokeObjectURL(t.url));
+                    playlist = [];
+                    currentTrackIndex = -1;
+                    await clearAllTracksDB();
+                    renderPlaylist();
+                    
+                    // Reset UI sepenuhnya
+                    audio.src = '';
+                    trackTitle.textContent = "Belum Ada Media";
+                    trackArtist.textContent = "Pilih atau jatuhkan file media";
+                    
+                    // Reset ke UI audio
+                    audio.classList.add('hidden');
+                    fullscreenBtn.classList.add('hidden');
+                    albumArtContainer.classList.remove('hidden');
+                    albumArt.style.background = '';
+                    albumArt.innerHTML = '<i class="ph-fill ph-vinyl-record text-slate-600 text-6xl"></i>';
+                    
+                    seekSlider.disabled = true;
+                    seekSlider.value = 0;
+                    progressFill.style.width = '0%';
+                    currentTimeDisplay.textContent = '00:00';
+                    totalTimeDisplay.textContent = '00:00';
+                    
+                    showToast("Playlist berhasil dibersihkan", "success");
+                } catch(e) {
+                    showToast("Gagal membersihkan Playlist", "error");
+                }
+            }
+        });
+
+        // Pintasan Keyboard
+        document.addEventListener('keydown', (e) => {
+            // Hindari intervensi saat mengetik di input box (meskipun tidak ada di app ini)
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePlay();
+            } else if (e.code === 'ArrowRight') {
+                e.preventDefault();
+                audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
+            } else if (e.code === 'ArrowLeft') {
+                e.preventDefault();
+                audio.currentTime = Math.max(0, audio.currentTime - 10);
+            }
+        });
+
+
+        // --- LOGIKA MODAL MULTIPLAY & MIXPLAY ---
+
+        // Elemen MultiPlay
+        const multiPlayModal = document.getElementById('multiPlayModal');
+        const multiGridSelect = document.getElementById('multiGridSelect');
+        const multiPlayGrid = document.getElementById('multiPlayGrid');
+
+        // Render Layar Grid MultiPlay
+        function renderMultiPlayGrid(count) {
+            multiPlayGrid.innerHTML = '';
+            
+            // Perubahan: Menambahkan overflow-y-auto untuk scroll 
+            multiPlayGrid.className = 'flex-1 p-4 grid gap-3 overflow-y-auto';
+            
+            // Perubahan: Menghapus batas baris (grid-rows) yang kaku dan membiarkan grid menambah baris otomatis
+            if(count == 2) {
+                multiPlayGrid.classList.add('grid-cols-1', 'md:grid-cols-2');
+            }
+            else if(count == 4) {
+                multiPlayGrid.classList.add('grid-cols-1', 'sm:grid-cols-2');
+            }
+            else if(count == 9) {
+                multiPlayGrid.classList.add('grid-cols-2', 'md:grid-cols-3');
+            }
+            else if(count == 16) {
+                multiPlayGrid.classList.add('grid-cols-2', 'sm:grid-cols-3', 'md:grid-cols-4');
+            }
+
+            for(let i=0; i<count; i++) {
+                const slot = document.createElement('div');
+                // Perubahan: Memberikan batas min-height yang cukup agar video tidak gepeng/mengecil jika layarnya padat
+                slot.className = 'relative bg-black rounded-xl border border-slate-700 flex flex-col overflow-hidden group shadow-lg min-h-[300px]';
+                
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'video/*,audio/*';
+                fileInput.className = 'absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10';
+                
+                const placeholder = document.createElement('div');
+                placeholder.className = 'absolute inset-0 flex flex-col items-center justify-center text-slate-500 group-hover:text-sky-400 group-hover:bg-slate-800/50 pointer-events-none transition-all z-0';
+                placeholder.innerHTML = `<i class="ph ph-plus-circle text-4xl mb-2 drop-shadow-md"></i><span class="text-xs font-medium bg-slate-900/80 px-2 py-1 rounded">Klik/Tarik Media</span>`;
+
+                const video = document.createElement('video');
+                video.className = 'w-full h-full object-contain z-20 hidden relative bg-black';
+                video.controls = true;
+                video.loop = true; // Auto-loop cocok untuk riset/multitasking
+
+                fileInput.addEventListener('change', (e) => {
+                    if(e.target.files[0]) {
+                        video.src = URL.createObjectURL(e.target.files[0]);
+                        video.classList.remove('hidden');
+                        placeholder.classList.add('hidden');
+                        fileInput.classList.add('hidden'); // Sembunyikan input file agar kontrol video dapat ditekan
+                        video.play();
+                    }
+                });
+
+                // Klik ganda untuk mengganti file
+                video.addEventListener('dblclick', () => fileInput.click());
+
+                slot.appendChild(placeholder);
+                slot.appendChild(video);
+                slot.appendChild(fileInput);
+                multiPlayGrid.appendChild(slot);
+            }
+        }
+
+        multiGridSelect.addEventListener('change', (e) => renderMultiPlayGrid(e.target.value));
+        renderMultiPlayGrid(4); // Standar: 4 Layar
+
+        // Elemen MixPlay
+        const mixPlayModal = document.getElementById('mixPlayModal');
+        const deckAVideo = document.getElementById('deckAVideo');
+        const deckBVideo = document.getElementById('deckBVideo');
+        const syncPlayBtn = document.getElementById('syncPlayBtn');
+        const syncPlayIcon = document.getElementById('syncPlayIcon');
+        const syncSeekToggle = document.getElementById('syncSeekToggle');
+
+        // Fitur Sync Play/Pause untuk Deck A & B
+        syncPlayBtn.addEventListener('click', () => {
+            if(deckAVideo.paused || deckBVideo.paused) {
+                if(deckAVideo.src) deckAVideo.play();
+                if(deckBVideo.src) deckBVideo.play();
+                syncPlayIcon.classList.replace('ph-play', 'ph-pause');
+            } else {
+                deckAVideo.pause();
+                deckBVideo.pause();
+                syncPlayIcon.classList.replace('ph-pause', 'ph-play');
+            }
+        });
+
+        document.getElementById('deckAFile').addEventListener('change', (e) => {
+            if(e.target.files[0]) {
+                deckAVideo.src = URL.createObjectURL(e.target.files[0]);
+                syncPlayIcon.classList.replace('ph-pause', 'ph-play');
+            }
+        });
+        document.getElementById('deckBFile').addEventListener('change', (e) => {
+            if(e.target.files[0]) {
+                deckBVideo.src = URL.createObjectURL(e.target.files[0]);
+                syncPlayIcon.classList.replace('ph-pause', 'ph-play');
+            }
+        });
+
+        // Fitur Sinkronisasi Waktu (Deck A menjadi Acuan)
+        deckAVideo.addEventListener('seeked', () => {
+            if(syncSeekToggle.checked && deckBVideo.src) {
+                deckBVideo.currentTime = deckAVideo.currentTime;
+            }
+        });
+
+        // Inisialisasi 9 Tombol Soundboard
+        const sfxContainer = document.getElementById('sfxContainer');
+        for(let i=1; i<=9; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'aspect-square bg-slate-700/50 hover:bg-slate-600 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-400 transition-all border border-slate-600 overflow-hidden relative shadow-md group';
+            btn.innerHTML = `<i class="ph-fill ph-upload-simple text-2xl group-hover:-translate-y-1 transition-transform"></i><span class="text-[10px] font-bold uppercase tracking-wider">SFX ${i}</span>`;
+            
+            const sfxInput = document.createElement('input');
+            sfxInput.type = 'file';
+            sfxInput.accept = 'audio/*';
+            sfxInput.className = 'hidden';
+            
+            const audioObj = new Audio();
+            let loaded = false;
+
+            btn.addEventListener('click', () => {
+                if(!loaded) sfxInput.click();
+                else {
+                    audioObj.currentTime = 0;
+                    audioObj.play();
+                    btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-400', 'scale-95');
+                    setTimeout(() => btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-400', 'scale-95'), 200);
+                }
+            });
+
+            sfxInput.addEventListener('change', (e) => {
+                if(e.target.files[0]) {
+                    audioObj.src = URL.createObjectURL(e.target.files[0]);
+                    loaded = true;
+                    btn.innerHTML = `<i class="ph-fill ph-music-notes text-2xl text-indigo-400 drop-shadow"></i><span class="text-[10px] font-bold text-white truncate w-full px-2 text-center" title="${e.target.files[0].name}">${e.target.files[0].name}</span>`;
+                    btn.classList.replace('bg-slate-700/50', 'bg-slate-800');
+                }
+            });
+
+            // Klik Kanan untuk mengatur ulang SFX
+            btn.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if(loaded) {
+                    loaded = false;
+                    audioObj.src = '';
+                    sfxInput.value = '';
+                    btn.innerHTML = `<i class="ph-fill ph-upload-simple text-2xl group-hover:-translate-y-1 transition-transform"></i><span class="text-[10px] font-bold uppercase tracking-wider">SFX ${i}</span>`;
+                    btn.classList.replace('bg-slate-800', 'bg-slate-700/50');
+                }
+            });
+
+            btn.appendChild(sfxInput);
+            sfxContainer.appendChild(btn);
+        }
+
+        // Buka/Tutup Modals
+        document.getElementById('openMultiPlayBtn').addEventListener('click', () => {
+            pauseAudio(); // Matikan lagu utama
+            multiPlayModal.classList.remove('hidden');
+            multiPlayModal.classList.add('flex');
+        });
+        
+        document.getElementById('closeMultiPlayBtn').addEventListener('click', () => {
+            multiPlayModal.classList.add('hidden');
+            multiPlayModal.classList.remove('flex');
+            // Jeda semua video yang sedang diputar di multiplay
+            document.querySelectorAll('#multiPlayGrid video').forEach(v => v.pause()); 
+        });
+
+        document.getElementById('openMixPlayBtn').addEventListener('click', () => {
+            pauseAudio(); // Matikan lagu utama
+            mixPlayModal.classList.remove('hidden');
+            mixPlayModal.classList.add('flex');
+        });
+        
+        document.getElementById('closeMixPlayBtn').addEventListener('click', () => {
+            mixPlayModal.classList.add('hidden');
+            mixPlayModal.classList.remove('flex');
+            deckAVideo.pause();
+            deckBVideo.pause();
+            syncPlayIcon.classList.replace('ph-pause', 'ph-play');
+        });
+
+        // --- Inisialisasi Aplikasi Utama ---
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await initDB();
+                const cachedTracks = await loadTracksFromDB();
+                
+                if (cachedTracks && cachedTracks.length > 0) {
+                    showToast(`Memuat ${cachedTracks.length} media dari memori cache...`, 'info');
+                    
+                    // Buat ulang ObjectURLs untuk data di database
+                    playlist = cachedTracks.map(t => ({
+                        id: t.id,
+                        name: t.name,
+                        file: t.file,
+                        url: URL.createObjectURL(t.file)
+                    }));
+                    
+                    updateShuffleIndices();
+                    renderPlaylist();
+                    loadTrack(0);
+                } else {
+                    renderPlaylist();
+                }
+            } catch(e) {
+                console.error("Kesalahan saat memuat:", e);
+                showToast("Aplikasi siap. Silakan tambahkan media Anda.", "info");
+                renderPlaylist();
+            }
+        });
+
+    </script>
+</body>
+</html>

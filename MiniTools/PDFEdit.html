@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDFEdit</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Libraries -->
+    <!-- PDF Lib untuk manipulasi struktur PDF -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- PDF.js untuk rendering preview -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <!-- FileSaver untuk download file -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- JSZip untuk fitur Split & PDF to Image -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c' }
+                    }
+                }
+            }
+        }
+        // Worker PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    </script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        .tool-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .tool-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .drag-area.active { border-color: #ef4444; background-color: #fef2f2; }
+        .page-thumb { transition: all 0.2s; }
+        .page-thumb:hover { transform: scale(1.02); }
+        .loader {
+            width: 48px; height: 48px;
+            border: 5px solid #FFF;
+            border-bottom-color: #ef4444;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Animasi sederhana */
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+    <!-- Navbar -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2 cursor-pointer" onclick="showHome()">
+                <i class="fa-solid fa-file-pdf text-3xl text-red-600"></i>
+                <div>
+                    <h1 class="text-xl font-bold leading-none text-slate-800">PDFEdit</h1>
+                    <p class="text-xs text-slate-500">Editor PDF</p>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed top-24 right-5 transform translate-x-full transition-transform duration-300 z-[60] bg-white border-l-4 p-4 rounded shadow-xl max-w-sm flex items-start gap-3">
+        <div id="toast-icon" class="mt-1"></div>
+        <div>
+            <h4 id="toast-title" class="font-bold text-sm"></h4>
+            <p id="toast-msg" class="text-sm text-slate-600"></p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        
+        <!-- DASHBOARD (Home) -->
+        <div id="view-home" class="animate-fade-in">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-3 text-slate-800">Edit File PDF Anda</h2>
+                <p class="text-slate-500 max-w-2xl mx-auto">File Anda diedit di browser secara lokal dengan Javascript dan tidak diunggah ke server manapun. Cocok untuk dokumen sensitif.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-4">
+                <!-- Merge -->
+                <button onclick="selectTool('merge')" class="tool-card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-left group hover:border-red-100">
+                    <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl mb-4 group-hover:bg-red-600 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Gabung PDF</h3>
+                    <p class="text-sm text-slate-400">Satukan banyak file PDF menjadi satu dokumen.</p>
+                </button>
+
+                <!-- Split -->
+                <button onclick="selectTool('split')" class="tool-card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-left group hover:border-blue-100">
+                    <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-scissors"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Pisah PDF</h3>
+                    <p class="text-sm text-slate-400">Pecah PDF per halaman atau ambil rentang tertentu.</p>
+                </button>
+
+                <!-- Organize -->
+                <button onclick="selectTool('organize')" class="tool-card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-left group hover:border-amber-100">
+                    <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl mb-4 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-border-all"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Atur Halaman</h3>
+                    <p class="text-sm text-slate-400">Hapus, putar, atau geser urutan halaman visual.</p>
+                </button>
+
+                 <!-- Watermark -->
+                 <button onclick="selectTool('watermark')" class="tool-card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-left group hover:border-purple-100">
+                    <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl mb-4 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-stamp"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Tanda Air</h3>
+                    <p class="text-sm text-slate-400">Tambahkan teks watermark ke halaman PDF.</p>
+                </button>
+
+                <!-- Img to PDF -->
+                <button onclick="selectTool('img2pdf')" class="tool-card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-left group hover:border-pink-100">
+                    <div class="w-12 h-12 rounded-xl bg-pink-50 text-pink-600 flex items-center justify-center text-xl mb-4 group-hover:bg-pink-600 group-hover:text-white transition-colors">
+                        <i class="fa-regular fa-image"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Gambar ke PDF</h3>
+                    <p class="text-sm text-slate-400">Ubah JPG/PNG menjadi PDF dengan cepat.</p>
+                </button>
+
+                <!-- PDF to Img -->
+                <button onclick="selectTool('pdf2img')" class="tool-card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-left group hover:border-indigo-100">
+                    <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        <i class="fa-regular fa-images"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">PDF ke Gambar</h3>
+                    <p class="text-sm text-slate-400">Ekspor halaman PDF menjadi JPG atau PNG.</p>
+                </button>
+
+                <!-- Extract Text -->
+                <button onclick="selectTool('extract')" class="tool-card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-left group hover:border-emerald-100">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-align-left"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Ambil Teks</h3>
+                    <p class="text-sm text-slate-400">Salin isi tulisan dari PDF ke file Text (.txt).</p>
+                </button>
+
+                <!-- Protect -->
+                <button onclick="selectTool('protect')" class="tool-card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-left group hover:border-gray-100">
+                    <div class="w-12 h-12 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center text-xl mb-4 group-hover:bg-gray-700 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Proteksi PDF</h3>
+                    <p class="text-sm text-slate-400">Tambahkan password untuk membuka file.</p>
+                </button>
+
+                 <!-- Metadata -->
+                 <button onclick="selectTool('metadata')" class="tool-card bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-left group hover:border-cyan-100">
+                    <div class="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center text-xl mb-4 group-hover:bg-cyan-600 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-tags"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-1">Edit Metadata</h3>
+                    <p class="text-sm text-slate-400">Ubah Judul, Penulis, dan properti file lainnya.</p>
+                </button>
+            </div>
+        </div>
+
+        <!-- TOOL WORKSPACE -->
+        <div id="view-tool" class="hidden bg-white rounded-2xl shadow-lg border border-slate-200 min-h-[600px] flex flex-col overflow-hidden">
+            <!-- Toolbar Header -->
+            <div class="bg-slate-50 border-b px-6 py-4 flex justify-between items-center">
+                <button onclick="showHome()" class="text-slate-500 hover:text-red-600 font-medium flex items-center gap-2 transition">
+                    <i class="fa-solid fa-arrow-left"></i> Kembali
+                </button>
+                <h2 id="tool-title" class="font-bold text-xl text-slate-700">Nama Alat</h2>
+                <div class="w-20"></div> <!-- Spacer -->
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="flex-grow p-6 md:p-10 flex flex-col items-center overflow-y-auto bg-slate-50/50">
+                
+                <!-- STEP 1: UPLOAD -->
+                <div id="step-upload" class="w-full max-w-2xl text-center">
+                    <div id="drop-zone" class="drag-area bg-white border-2 border-dashed border-slate-300 rounded-2xl p-12 transition-all cursor-pointer group hover:border-red-400" onclick="document.getElementById('file-input').click()">
+                        <input type="file" id="file-input" class="hidden" multiple>
+                        <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 group-hover:text-red-500"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-700 mb-2">Letakkan file di sini</h3>
+                        <p class="text-slate-500 mb-6">atau klik untuk membuka browser</p>
+                        <div class="inline-block bg-slate-800 text-white px-6 py-2 rounded-full text-sm font-medium shadow-lg shadow-slate-300/50">Pilih File Local</div>
+                    </div>
+                    <p id="upload-hint" class="mt-4 text-sm text-slate-400">Mendukung PDF</p>
+                </div>
+
+                <!-- STEP 2: CONFIGURATION -->
+                <div id="step-config" class="w-full max-w-4xl hidden animate-fade-in">
+                    
+                    <!-- File List / Preview Area -->
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 class="font-bold text-slate-700"><i class="fa-solid fa-list-check mr-2 text-red-500"></i>File Terpilih</h3>
+                            <div class="flex items-center gap-3">
+                                <!-- Tombol tambah file pendukung -->
+                                <button id="btn-add-more" onclick="document.getElementById('add-more-input').click()" class="text-xs text-slate-500 hover:text-red-600 transition flex items-center gap-1 font-bold">
+                                    <i class="fa-solid fa-plus"></i> Tambah File
+                                </button>
+                                <input type="file" id="add-more-input" class="hidden" multiple>
+
+                                <button onclick="resetTool()" class="text-xs text-red-500 hover:underline">Reset</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Simple List (Merge) -->
+                        <div id="file-list-simple" class="space-y-2 hidden"></div>
+
+                        <!-- Grid Preview (Organize / Image to PDF) -->
+                        <div id="file-preview-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 hidden max-h-[400px] overflow-y-auto p-2"></div>
+                    </div>
+
+                    <!-- Tool Specific Controls -->
+                    <div id="controls-area" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-8">
+                        <!-- Dynamic Controls injected here -->
+                    </div>
+
+                    <!-- Action Button -->
+                    <div class="text-center">
+                        <button id="btn-process" onclick="processFile()" class="bg-red-600 hover:bg-red-700 text-white px-10 py-3 rounded-xl font-bold text-lg shadow-lg shadow-red-200 transition transform active:scale-95 flex items-center gap-3 mx-auto">
+                            <i class="fa-solid fa-bolt"></i> <span id="btn-process-text">Proses PDF</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 3: LOADING -->
+                <div id="step-loading" class="hidden text-center py-20">
+                    <span class="loader"></span>
+                    <p class="mt-4 text-slate-600 font-medium animate-pulse">Sedang memproses dokumen...</p>
+                    <p class="text-xs text-slate-400 mt-2">Jangan tutup tab ini.</p>
+                </div>
+
+                <!-- STEP 4: RESULT -->
+                <div id="step-result" class="hidden text-center w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-green-100">
+                    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500 text-4xl">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-slate-800 mb-2">Selesai!</h3>
+                    <p class="text-slate-500 mb-8">File Anda telah berhasil diproses.</p>
+                    
+                    <div class="flex flex-col gap-3">
+                        <button id="btn-download" class="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-900 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-download"></i> Unduh File
+                        </button>
+                        <button onclick="resetTool()" class="w-full border border-slate-300 text-slate-600 py-3 rounded-lg font-bold hover:bg-slate-50 transition">
+                            Proses File Lain
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-slate-800 text-white py-8 text-center text-sm">
+        <p>&copy; 2026 PDFEdit</p>
+    </footer>
+
+    <!-- LOGIC -->
+    <script>
+        // --- STATE ---
+        let currentTool = '';
+        let files = []; 
+        let pageManifest = []; 
+        let imageManifest = []; // Cache url gambar untuk pratinjau instan
+
+        let draggedFileIndex = null;
+        let draggedPageIndex = null;
+
+        const tools = {
+            merge: { title: "Gabung PDF", accept: ".pdf", multiple: true, type: 'pdf' },
+            split: { title: "Pisah PDF", accept: ".pdf", multiple: false, type: 'pdf' },
+            organize: { title: "Atur Halaman", accept: ".pdf", multiple: false, type: 'pdf' },
+            watermark: { title: "Tanda Air", accept: ".pdf", multiple: false, type: 'pdf' },
+            img2pdf: { title: "Gambar ke PDF", accept: "image/*", multiple: true, type: 'img' },
+            pdf2img: { title: "PDF ke Gambar", accept: ".pdf", multiple: false, type: 'pdf' },
+            extract: { title: "Ambil Teks", accept: ".pdf", multiple: false, type: 'pdf' },
+            protect: { title: "Proteksi PDF", accept: ".pdf", multiple: false, type: 'pdf' },
+            metadata: { title: "Edit Metadata", accept: ".pdf", multiple: false, type: 'pdf' }
+        };
+
+        // --- NAVIGATION ---
+        function showHome() {
+            document.getElementById('view-home').classList.remove('hidden');
+            document.getElementById('view-tool').classList.add('hidden');
+            resetTool();
+        }
+
+        function selectTool(id) {
+            currentTool = id;
+            const config = tools[id];
+            
+            document.getElementById('tool-title').innerText = config.title;
+            document.getElementById('upload-hint').innerText = config.type === 'pdf' ? "Mendukung format PDF" : "Mendukung JPG, PNG";
+            
+            const input = document.getElementById('file-input');
+            input.accept = config.accept;
+            input.multiple = config.multiple;
+            input.value = '';
+
+            const btnAddMore = document.getElementById('btn-add-more');
+            if (config.multiple) {
+                btnAddMore.classList.remove('hidden');
+                document.getElementById('add-more-input').accept = config.accept;
+            } else {
+                btnAddMore.classList.add('hidden');
+            }
+
+            document.getElementById('view-home').classList.add('hidden');
+            document.getElementById('view-tool').classList.remove('hidden');
+            setStep('upload');
+        }
+
+        function setStep(step) {
+            ['upload', 'config', 'loading', 'result'].forEach(s => {
+                document.getElementById(`step-${s}`).classList.add('hidden');
+            });
+            document.getElementById(`step-${step}`).classList.remove('hidden');
+        }
+
+        function resetTool() {
+            files = [];
+            pageManifest = [];
+            imageManifest = [];
+            document.getElementById('file-list-simple').innerHTML = '';
+            document.getElementById('file-preview-grid').innerHTML = '';
+            setStep('upload');
+        }
+
+        // --- DRAG DROP & FILE INPUT ---
+        const dropZone = document.getElementById('drop-zone');
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); dropZone.classList.add('active'); }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); dropZone.classList.remove('active'); }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
+        document.getElementById('file-input').addEventListener('change', (e) => handleFiles(e.target.files));
+
+        document.getElementById('add-more-input').addEventListener('change', async (e) => {
+            const added = Array.from(e.target.files).filter(f => {
+                if(tools[currentTool].type === 'pdf') return f.type === 'application/pdf';
+                return f.type.startsWith('image/');
+            });
+            if (added.length > 0) {
+                files = files.concat(added);
+                setStep('loading');
+                await initConfigUI();
+                setStep('config');
+            }
+            e.target.value = '';
+        });
+
+        async function handleFiles(fileList) {
+            if (!fileList.length) return;
+            
+            // Validate
+            const validFiles = Array.from(fileList).filter(f => {
+                if(tools[currentTool].type === 'pdf') return f.type === 'application/pdf';
+                return f.type.startsWith('image/');
+            });
+
+            if (validFiles.length === 0) {
+                showToast('Error', 'Format file salah!', 'error');
+                return;
+            }
+
+            if (!tools[currentTool].multiple && validFiles.length > 1) {
+                files = [validFiles[0]];
+                showToast('Info', 'Hanya 1 file yang diproses untuk alat ini.');
+            } else {
+                files = validFiles;
+            }
+
+            setStep('loading'); 
+            await initConfigUI();
+            setStep('config');
+        }
+
+        // --- UI BUILDER ---
+        async function initConfigUI() {
+            const listSimple = document.getElementById('file-list-simple');
+            const listGrid = document.getElementById('file-preview-grid');
+            const controls = document.getElementById('controls-area');
+            
+            listSimple.innerHTML = '';
+            listGrid.innerHTML = '';
+            controls.innerHTML = '';
+            
+            listSimple.classList.add('hidden');
+            listGrid.classList.add('hidden');
+
+            // 1. SETUP PREVIEWS & SORTING
+            if (currentTool === 'organize') {
+                listGrid.classList.remove('hidden');
+                await generatePageThumbnails(listGrid);
+            } else if (currentTool === 'img2pdf') {
+                listGrid.classList.remove('hidden');
+                await loadImages();
+                renderImageGrid();
+            } else {
+                listSimple.classList.remove('hidden');
+                if (currentTool === 'merge') {
+                    renderFileListSimple();
+                } else {
+                    files.forEach(f => {
+                        listSimple.innerHTML += `
+                            <div class="flex justify-between items-center bg-slate-50 p-3 rounded border border-slate-200">
+                                <div class="flex items-center gap-2 truncate">
+                                    <i class="fa-solid fa-file text-slate-400"></i> ${f.name}
+                                </div>
+                                <span class="text-xs text-slate-400">${(f.size/1024/1024).toFixed(2)} MB</span>
+                            </div>
+                        `;
+                    });
+                }
+            }
+
+            // 2. SETUP CONTROLS DYNAMICALLY
+            let html = '';
+            
+            if (currentTool === 'split') {
+                html = `
+                    <label class="block font-bold mb-2">Mode Pemisahan</label>
+                    <select id="split-mode" class="w-full p-2.5 border rounded mb-4" onchange="toggleSplitInput()">
+                        <option value="all">Pisahkan Setiap Halaman (ZIP)</option>
+                        <option value="range">Pilih Rentang Halaman</option>
+                    </select>
+                    <div id="split-range-input" class="hidden">
+                        <label class="block text-sm text-slate-600 mb-1">Halaman (contoh: 1-5)</label>
+                        <input type="text" id="split-range" class="w-full p-2.5 border rounded" placeholder="1-5">
+                    </div>
+                `;
+            } else if (currentTool === 'watermark') {
+                html = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold mb-1">Teks Stempel</label>
+                            <input type="text" id="wm-text" class="w-full p-2.5 border rounded" value="RAHASIA">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-1">Ukuran Font</label>
+                            <input type="number" id="wm-size" class="w-full p-2.5 border rounded" value="50">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-1">Warna</label>
+                            <select id="wm-color" class="w-full p-2.5 border rounded">
+                                <option value="red">Merah</option>
+                                <option value="blue">Biru</option>
+                                <option value="black">Hitam</option>
+                                <option value="grey">Abu-abu</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-1">Posisi</label>
+                            <select id="wm-pos" class="w-full p-2.5 border rounded">
+                                <option value="center">Tengah (Miring)</option>
+                                <option value="top">Atas</option>
+                                <option value="bottom">Bawah</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+            } else if (currentTool === 'pdf2img') {
+                html = `
+                    <label class="block font-bold mb-2">Format Gambar</label>
+                    <select id="img-format" class="w-full p-2.5 border rounded mb-4">
+                        <option value="jpeg">JPG (Lebih Kecil)</option>
+                        <option value="png">PNG (Kualitas Tinggi)</option>
+                    </select>
+                    <p class="text-sm text-slate-500">Seluruh halaman akan di-convert dan diunduh sebagai file ZIP.</p>
+                `;
+            } else if (currentTool === 'protect') {
+                html = `
+                    <div class="max-w-md mx-auto">
+                        <label class="block font-bold mb-2">Set Password</label>
+                        <div class="relative">
+                            <input type="password" id="pdf-pass" class="w-full p-2.5 border rounded pr-10" placeholder="Masukkan password...">
+                            <i class="fa-solid fa-eye absolute right-3 top-3.5 text-slate-400 cursor-pointer" onclick="togglePassVisibility(this)"></i>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2">Password ini akan dibutuhkan untuk membuka file PDF.</p>
+                    </div>
+                `;
+            } else if (currentTool === 'metadata') {
+                try {
+                    const arrayBuffer = await files[0].arrayBuffer();
+                    const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                    const title = pdfDoc.getTitle() || '';
+                    const author = pdfDoc.getAuthor() || '';
+                    const subject = pdfDoc.getSubject() || '';
+                    const keywords = pdfDoc.getKeywords() || '';
+
+                    html = `
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-bold mb-1">Judul (Title)</label>
+                                <input type="text" id="meta-title" class="w-full p-2 border rounded" value="${title}">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold mb-1">Penulis (Author)</label>
+                                <input type="text" id="meta-author" class="w-full p-2 border rounded" value="${author}">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold mb-1">Subjek</label>
+                                <input type="text" id="meta-subject" class="w-full p-2 border rounded" value="${subject}">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold mb-1">Kata Kunci</label>
+                                <input type="text" id="meta-keywords" class="w-full p-2 border rounded" value="${keywords}">
+                            </div>
+                        </div>
+                    `;
+                } catch (e) {
+                    html = `<p class="text-red-500 text-sm">Gagal membaca metadata file.</p>`;
+                }
+            } else if (currentTool === 'organize' || currentTool === 'merge' || currentTool === 'img2pdf') {
+                html = `
+                    <p class="text-sm text-slate-500 text-center">
+                        <i class="fa-solid fa-hand-pointer mr-1 text-slate-400"></i> Silakan atur atau seret file/halaman untuk mengurutkan sebelum diproses.
+                    </p>
+                `;
+            }
+
+            if(html) controls.innerHTML = html;
+            else controls.innerHTML = '<p class="text-center text-slate-400 text-sm">Tidak ada konfigurasi tambahan. Klik proses untuk melanjutkan.</p>';
+        }
+
+        window.toggleSplitInput = function() {
+            const mode = document.getElementById('split-mode').value;
+            document.getElementById('split-range-input').classList.toggle('hidden', mode !== 'range');
+        }
+
+        window.togglePassVisibility = function(el) {
+            const input = document.getElementById('pdf-pass');
+            if(input.type === 'password') {
+                input.type = 'text';
+                el.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                el.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        // --- MANAJEMEN DAN RE-ORDER BERKAS (MERGE) ---
+        function renderFileListSimple() {
+            const listSimple = document.getElementById('file-list-simple');
+            listSimple.innerHTML = '';
+            
+            files.forEach((f, idx) => {
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm cursor-move hover:border-slate-300 transition-all';
+                item.setAttribute('draggable', 'true');
+                item.dataset.index = idx;
+
+                item.addEventListener('dragstart', (e) => {
+                    draggedFileIndex = idx;
+                    e.dataTransfer.effectAllowed = 'move';
+                    item.classList.add('opacity-40');
+                });
+                item.addEventListener('dragover', (e) => { e.preventDefault(); });
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const targetIdx = parseInt(item.dataset.index);
+                    if (draggedFileIndex !== null && draggedFileIndex !== targetIdx) {
+                        const moved = files.splice(draggedFileIndex, 1)[0];
+                        files.splice(targetIdx, 0, moved);
+                        renderFileListSimple();
+                    }
+                });
+                item.addEventListener('dragend', () => {
+                    item.classList.remove('opacity-40');
+                    draggedFileIndex = null;
+                });
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 truncate text-sm">
+                        <i class="fa-solid fa-grip-vertical text-slate-300 px-1 hover:text-slate-500 cursor-grab"></i>
+                        <span class="bg-red-50 text-red-600 font-bold text-xs w-5 h-5 rounded-full flex items-center justify-center">${idx + 1}</span>
+                        <span class="text-slate-700 truncate font-medium">${f.name}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">${(f.size/1024/1024).toFixed(2)} MB</span>
+                        
+                        <!-- Navigasi Seluler fallback -->
+                        <button onclick="moveFile(${idx}, -1, event)" class="p-1 text-slate-400 hover:text-red-500 transition"><i class="fa-solid fa-chevron-up text-xs"></i></button>
+                        <button onclick="moveFile(${idx}, 1, event)" class="p-1 text-slate-400 hover:text-red-500 transition"><i class="fa-solid fa-chevron-down text-xs"></i></button>
+                        
+                        <button onclick="removeFile(${idx}, event)" class="text-slate-400 hover:text-red-500 p-1 ml-1" title="Hapus">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                    </div>
+                `;
+                listSimple.appendChild(item);
+            });
+        }
+
+        window.moveFile = function(idx, direction, e) {
+            if(e) e.stopPropagation();
+            const targetIdx = idx + direction;
+            if (targetIdx >= 0 && targetIdx < files.length) {
+                const moved = files.splice(idx, 1)[0];
+                files.splice(targetIdx, 0, moved);
+                renderFileListSimple();
+            }
+        }
+
+        window.removeFile = function(idx, e) {
+            if(e) e.stopPropagation();
+            files.splice(idx, 1);
+            if (files.length === 0) {
+                resetTool();
+            } else {
+                renderFileListSimple();
+            }
+        }
+
+        // --- CACHE BERKAS GAMBAR (IMAGE TO PDF) ---
+        async function loadImages() {
+            imageManifest = [];
+            for (const f of files) {
+                const dataUrl = await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(f);
+                });
+                imageManifest.push({ file: f, dataUrl });
+            }
+        }
+
+        function renderImageGrid() {
+            const listGrid = document.getElementById('file-preview-grid');
+            listGrid.innerHTML = '';
+            
+            imageManifest.forEach((img, idx) => {
+                const div = document.createElement('div');
+                div.dataset.index = idx;
+                div.className = `bg-white p-2.5 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center relative page-thumb cursor-move select-none hover:border-pink-300`;
+                div.setAttribute('draggable', 'true');
+
+                div.addEventListener('dragstart', (e) => {
+                    draggedFileIndex = idx;
+                    e.dataTransfer.effectAllowed = 'move';
+                    div.classList.add('opacity-40');
+                });
+                div.addEventListener('dragover', (e) => { e.preventDefault(); });
+                div.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const targetIdx = parseInt(div.dataset.index);
+                    if (draggedFileIndex !== null && draggedFileIndex !== targetIdx) {
+                        const moved = imageManifest.splice(draggedFileIndex, 1)[0];
+                        imageManifest.splice(targetIdx, 0, moved);
+                        files = imageManifest.map(item => item.file);
+                        renderImageGrid();
+                    }
+                });
+                div.addEventListener('dragend', () => {
+                    div.classList.remove('opacity-40');
+                    draggedFileIndex = null;
+                });
+
+                div.innerHTML = `
+                    <div class="relative w-full aspect-square bg-slate-50 mb-1.5 rounded overflow-hidden flex items-center justify-center border border-slate-100">
+                         <img src="${img.dataUrl}" class="object-cover w-full h-full">
+                         <div class="absolute top-1 left-1 bg-slate-900/75 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">
+                            Hal ${idx + 1}
+                         </div>
+                    </div>
+                    <div class="text-[10px] text-slate-500 mb-2 truncate w-full text-center px-1">${img.file.name}</div>
+                    
+                    <div class="flex gap-1 w-full justify-center">
+                        <button onclick="moveImage(${idx}, -1, event)" class="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs flex-1 flex justify-center"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button onclick="removeImage(${idx}, event)" class="p-1 rounded bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-500 text-xs flex-1 flex justify-center"><i class="fa-solid fa-trash-can"></i></button>
+                        <button onclick="moveImage(${idx}, 1, event)" class="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs flex-1 flex justify-center"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                `;
+                listGrid.appendChild(div);
+            });
+        }
+
+        window.moveImage = function(idx, direction, e) {
+            if(e) e.stopPropagation();
+            const targetIdx = idx + direction;
+            if (targetIdx >= 0 && targetIdx < imageManifest.length) {
+                const moved = imageManifest.splice(idx, 1)[0];
+                imageManifest.splice(targetIdx, 0, moved);
+                files = imageManifest.map(item => item.file);
+                renderImageGrid();
+            }
+        }
+
+        window.removeImage = function(idx, e) {
+            if(e) e.stopPropagation();
+            imageManifest.splice(idx, 1);
+            files = imageManifest.map(item => item.file);
+            if (imageManifest.length === 0) {
+                resetTool();
+            } else {
+                renderImageGrid();
+            }
+        }
+
+        // --- THUMBNAIL GENERATOR (ORGANIZE PDF) ---
+        async function generatePageThumbnails(container) {
+            pageManifest = [];
+            const file = files[0];
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 0.3 });
+                const canvas = document.createElement('canvas');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                
+                const id = `pg-${i}`;
+                pageManifest.push({ 
+                    id, 
+                    origIndex: i - 1, 
+                    rotation: 0, 
+                    deleted: false,
+                    dataUrl: canvas.toDataURL()
+                });
+            }
+            renderOrganizeGrid();
+        }
+
+        function renderOrganizeGrid() {
+            const listGrid = document.getElementById('file-preview-grid');
+            listGrid.innerHTML = '';
+            
+            pageManifest.forEach((p, idx) => {
+                const div = document.createElement('div');
+                div.id = p.id;
+                div.dataset.index = idx;
+                div.className = `bg-white p-2.5 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center relative page-thumb cursor-move select-none hover:border-amber-300 ${p.deleted ? 'opacity-35' : ''}`;
+                div.setAttribute('draggable', 'true');
+
+                div.addEventListener('dragstart', (e) => {
+                    draggedPageIndex = idx;
+                    e.dataTransfer.effectAllowed = 'move';
+                    div.classList.add('opacity-40');
+                });
+                div.addEventListener('dragover', (e) => { e.preventDefault(); });
+                div.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const targetIdx = parseInt(div.dataset.index);
+                    if (draggedPageIndex !== null && draggedPageIndex !== targetIdx) {
+                        const moved = pageManifest.splice(draggedPageIndex, 1)[0];
+                        pageManifest.splice(targetIdx, 0, moved);
+                        renderOrganizeGrid();
+                    }
+                });
+                div.addEventListener('dragend', () => {
+                    div.classList.remove('opacity-40');
+                    draggedPageIndex = null;
+                });
+
+                div.innerHTML = `
+                    <div class="relative w-full aspect-[1/1.4] bg-slate-50 mb-1.5 rounded overflow-hidden flex items-center justify-center border border-slate-100">
+                         <img src="${p.dataUrl}" class="object-contain max-h-full transition-transform duration-200" id="img-${p.id}" style="transform: rotate(${p.rotation}deg)">
+                         <div id="del-overlay-${p.id}" class="absolute inset-0 bg-red-500/80 ${p.deleted ? 'flex' : 'hidden'} items-center justify-center text-white font-bold text-xs">DELETED</div>
+                         <div class="absolute top-1 left-1 bg-slate-800/75 text-white text-[9px] px-1.5 py-0.5 rounded">
+                            Asal: Hlm ${p.origIndex + 1}
+                         </div>
+                    </div>
+                    <div class="text-[10px] font-bold text-slate-500 mb-1.5">Halaman: ${idx + 1}</div>
+                    
+                    <div class="flex gap-1 w-full justify-center">
+                        <button onclick="movePage(${idx}, -1, event)" class="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs flex-1 flex justify-center"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button onclick="rotatePage('${p.id}', event)" class="p-1 rounded bg-slate-100 hover:bg-blue-100 hover:text-blue-600 text-slate-500 text-xs flex-1 flex justify-center" title="Putar"><i class="fa-solid fa-rotate-right"></i></button>
+                        <button onclick="deletePage('${p.id}', event)" class="p-1 rounded bg-slate-100 hover:bg-red-100 hover:text-red-600 text-slate-500 text-xs flex-1 flex justify-center" title="Hapus"><i class="fa-solid ${p.deleted ? 'fa-trash-arrow-up' : 'fa-trash'}"></i></button>
+                        <button onclick="movePage(${idx}, 1, event)" class="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs flex-1 flex justify-center"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                `;
+                listGrid.appendChild(div);
+            });
+        }
+
+        window.movePage = function(idx, direction, e) {
+            if(e) e.stopPropagation();
+            const targetIdx = idx + direction;
+            if (targetIdx >= 0 && targetIdx < pageManifest.length) {
+                const moved = pageManifest.splice(idx, 1)[0];
+                pageManifest.splice(targetIdx, 0, moved);
+                renderOrganizeGrid();
+            }
+        }
+
+        window.rotatePage = function(id, e) {
+            if(e) e.stopPropagation();
+            const page = pageManifest.find(p => p.id === id);
+            page.rotation = (page.rotation + 90) % 360;
+            renderOrganizeGrid();
+        }
+
+        window.deletePage = function(id, e) {
+            if(e) e.stopPropagation();
+            const page = pageManifest.find(p => p.id === id);
+            page.deleted = !page.deleted;
+            renderOrganizeGrid();
+        }
+
+        // --- CORE PROCESSOR ---
+        async function processFile() {
+            setStep('loading');
+            
+            try {
+                const { PDFDocument, rgb, degrees, StandardFonts } = PDFLib;
+                let resultData = null;
+                let fileName = "result.pdf";
+
+                if (currentTool === 'merge') {
+                    const mergedPdf = await PDFDocument.create();
+                    for (const file of files) {
+                        const pdf = await PDFDocument.load(await file.arrayBuffer());
+                        const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                        pages.forEach(p => mergedPdf.addPage(p));
+                    }
+                    const pdfBytes = await mergedPdf.save();
+                    resultData = new Blob([pdfBytes], { type: 'application/pdf' });
+                    fileName = "merged.pdf";
+
+                } else if (currentTool === 'split') {
+                    const mode = document.getElementById('split-mode').value;
+                    const file = files[0];
+                    const srcPdf = await PDFDocument.load(await file.arrayBuffer());
+                    
+                    if (mode === 'all') {
+                        const zip = new JSZip();
+                        const count = srcPdf.getPageCount();
+                        for (let i = 0; i < count; i++) {
+                            const newPdf = await PDFDocument.create();
+                            const [page] = await newPdf.copyPages(srcPdf, [i]);
+                            newPdf.addPage(page);
+                            zip.file(`page_${i+1}.pdf`, await newPdf.save());
+                        }
+                        resultData = await zip.generateAsync({type:"blob"});
+                        fileName = "split_pages.zip";
+                    } else {
+                        const newPdf = await PDFDocument.create();
+                        const rangeStr = document.getElementById('split-range').value;
+                        const [start, end] = rangeStr.split('-').map(n => parseInt(n)-1);
+                        if (isNaN(start) || isNaN(end) || start < 0 || end >= srcPdf.getPageCount() || start > end) {
+                            throw new Error("Format rentang salah.");
+                        }
+                        const indices = [];
+                        for(let i=start; i<=end; i++) indices.push(i);
+                        const pages = await newPdf.copyPages(srcPdf, indices);
+                        pages.forEach(p => newPdf.addPage(p));
+                        resultData = new Blob([await newPdf.save()], { type: 'application/pdf' });
+                        fileName = `split_${start+1}-${end+1}.pdf`;
+                    }
+
+                } else if (currentTool === 'organize') {
+                    const srcPdf = await PDFDocument.load(await files[0].arrayBuffer());
+                    const newPdf = await PDFDocument.create();
+                    const activePages = pageManifest.filter(p => !p.deleted);
+                    if (activePages.length === 0) throw new Error("Semua halaman dihapus!");
+
+                    for (const p of activePages) {
+                        const [page] = await newPdf.copyPages(srcPdf, [p.origIndex]);
+                        if (p.rotation !== 0) {
+                            page.setRotation(degrees(page.getRotation().angle + p.rotation));
+                        }
+                        newPdf.addPage(page);
+                    }
+                    resultData = new Blob([await newPdf.save()], { type: 'application/pdf' });
+                    fileName = "organized.pdf";
+
+                } else if (currentTool === 'watermark') {
+                    const srcPdf = await PDFDocument.load(await files[0].arrayBuffer());
+                    const helveticaFont = await srcPdf.embedFont(StandardFonts.HelveticaBold);
+                    const pages = srcPdf.getPages();
+                    const text = document.getElementById('wm-text').value || "RAHASIA";
+                    const size = parseInt(document.getElementById('wm-size').value) || 50;
+                    const colorName = document.getElementById('wm-color').value;
+                    const pos = document.getElementById('wm-pos').value;
+                    
+                    const colorMap = { red: rgb(1,0,0), blue: rgb(0,0,1), black: rgb(0,0,0), grey: rgb(0.5,0.5,0.5) };
+
+                    pages.forEach(page => {
+                        const { width, height } = page.getSize();
+                        let x, y, rotate = degrees(0);
+                        const textWidth = helveticaFont.widthOfTextAtSize(text, size);
+                        
+                        if (pos === 'center') {
+                            x = width/2 - textWidth/2; y = height/2; rotate = degrees(45);
+                        } else if (pos === 'top') {
+                            x = width/2 - textWidth/2; y = height - size - 20;
+                        } else {
+                            x = width/2 - textWidth/2; y = 40;
+                        }
+
+                        page.drawText(text, { x, y, size, font: helveticaFont, color: colorMap[colorName], rotate, opacity: 0.5 });
+                    });
+                    resultData = new Blob([await srcPdf.save()], { type: 'application/pdf' });
+                    fileName = "watermarked.pdf";
+
+                } else if (currentTool === 'img2pdf') {
+                    const newPdf = await PDFDocument.create();
+                    for (const f of files) {
+                        const imgBytes = await f.arrayBuffer();
+                        let img;
+                        if (f.type === 'image/jpeg' || f.type === 'image/jpg') {
+                            img = await newPdf.embedJpg(imgBytes);
+                        } else {
+                            img = await newPdf.embedPng(imgBytes);
+                        }
+                        const page = newPdf.addPage([img.width, img.height]);
+                        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+                    }
+                    resultData = new Blob([await newPdf.save()], { type: 'application/pdf' });
+                    fileName = "images.pdf";
+
+                } else if (currentTool === 'pdf2img') {
+                    const format = document.getElementById('img-format').value;
+                    const zip = new JSZip();
+                    const pdf = await pdfjsLib.getDocument(await files[0].arrayBuffer()).promise;
+                    
+                    for(let i=1; i<=pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 2.0 });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        
+                        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                        
+                        const blob = await new Promise(resolve => canvas.toBlob(resolve, `image/${format}`, 0.8));
+                        zip.file(`page_${i}.${format === 'jpeg' ? 'jpg' : 'png'}`, blob);
+                    }
+                    
+                    resultData = await zip.generateAsync({type:"blob"});
+                    fileName = "pdf_images.zip";
+
+                } else if (currentTool === 'protect') {
+                    const password = document.getElementById('pdf-pass').value;
+                    if(!password) throw new Error("Password tidak boleh kosong");
+                    
+                    const srcPdf = await PDFDocument.load(await files[0].arrayBuffer());
+                    srcPdf.encrypt({
+                        userPassword: password,
+                        ownerPassword: password,
+                        permissions: { printing: 'highResolution', modifying: false, copying: false }
+                    });
+                    
+                    resultData = new Blob([await srcPdf.save()], { type: 'application/pdf' });
+                    fileName = "protected.pdf";
+
+                } else if (currentTool === 'metadata') {
+                    const srcPdf = await PDFDocument.load(await files[0].arrayBuffer());
+                    
+                    srcPdf.setTitle(document.getElementById('meta-title').value);
+                    srcPdf.setAuthor(document.getElementById('meta-author').value);
+                    srcPdf.setSubject(document.getElementById('meta-subject').value);
+                    srcPdf.setKeywords(document.getElementById('meta-keywords').value.split(' '));
+                    
+                    resultData = new Blob([await srcPdf.save()], { type: 'application/pdf' });
+                    fileName = "metadata_updated.pdf";
+
+                } else if (currentTool === 'extract') {
+                    const pdf = await pdfjsLib.getDocument(await files[0].arrayBuffer()).promise;
+                    let fullText = "";
+                    for(let i=1; i<=pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        fullText += `--- Hal ${i} ---\n${content.items.map(item => item.str).join(' ')}\n\n`;
+                    }
+                    resultData = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+                    fileName = "extracted_text.txt";
+                }
+
+                setStep('result');
+                const btn = document.getElementById('btn-download');
+                btn.onclick = () => saveAs(resultData, fileName);
+
+            } catch (err) {
+                console.error(err);
+                showToast('Kesalahan', err.message, 'error');
+                setStep('config');
+            }
+        }
+
+        // --- TOAST NOTIFICATION ---
+        function showToast(title, msg, type='info') {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-title').innerText = title;
+            document.getElementById('toast-msg').innerText = msg;
+            const icon = type === 'error' ? '<i class="fa-solid fa-circle-xmark text-red-500 text-2xl"></i>' : '<i class="fa-solid fa-circle-info text-blue-500 text-2xl"></i>';
+            document.getElementById('toast-icon').innerHTML = icon;
+            t.classList.remove('translate-x-full');
+            setTimeout(() => t.classList.add('translate-x-full'), 3000);
+        }
+    </script>
+</body>
+</html>

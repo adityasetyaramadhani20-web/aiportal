@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartGraph</title>
+    <!-- Tailwind CSS untuk Styling Premium -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome untuk Ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow: hidden;
+        }
+        /* Grid pola titik-titik (dot-grid) premium untuk kanvas */
+        .workspace-grid {
+            background-color: #0b0f19;
+            background-image: radial-gradient(#1e293b 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+        }
+        /* Custom scrollbar */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* Bentuk belah ketupat keputusan flowchart */
+        .diamond-shape {
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+        }
+        /* Bentuk kapsul/oval untuk mulai/selesai */
+        .oval-shape {
+            border-radius: 9999px;
+        }
+        /* Garis koneksi bezier */
+        .connector-path {
+            fill: none;
+            stroke-width: 3;
+            transition: stroke 0.2s, stroke-width 0.2s;
+        }
+        .connector-path:hover {
+            stroke-width: 5;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col bg-[#070a13] text-slate-100 selection:bg-indigo-500 selection:text-white">
+
+    <!-- Header UI Modern & Efisien -->
+    <header class="h-14 border-b border-slate-800 bg-slate-900/60 backdrop-blur px-5 flex items-center justify-between z-30 select-none">
+        <div class="flex items-center gap-2">
+            <div class="h-8 w-8 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-diagram-project text-white text-sm"></i>
+            </div>
+            <div>
+                <h1 class="text-md font-extrabold tracking-tight text-white flex items-center gap-1">
+                    Smart<span class="text-indigo-400">Graph</span>
+                </h1>
+            </div>
+        </div>
+
+        <!-- Mode Editor Utama -->
+        <div class="flex bg-slate-950/80 p-0.5 rounded-lg border border-slate-800">
+            <button onclick="switchParsingMode('mindmap')" id="btn-mode-mindmap" class="px-4 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white">
+                <i class="fa-solid fa-network-wired"></i> Pembuat Mindmap
+            </button>
+            <button onclick="switchParsingMode('flowchart')" id="btn-mode-flowchart" class="px-4 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-arrows-split-up-and-left"></i> Flowchart (SOP)
+            </button>
+        </div>
+
+        <!-- Tombol Aksi & Ekspor -->
+        <div class="flex items-center gap-2">
+            <!-- Ekspor Utama -->
+            <button onclick="exportWorkspacePNG()" title="Ekspor sebagai Gambar PNG" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500/20 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-image"></i> Ekspor PNG
+            </button>
+            <button onclick="exportWorkspaceHTML()" title="Ekspor sebagai Aplikasi HTML Mandiri" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500/20 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-code"></i> Ekspor HTML
+            </button>
+            
+            <div class="h-6 w-px bg-slate-800 mx-1"></div>
+
+            <!-- Manajer Berkas JSON -->
+            <button onclick="exportWorkspaceJSON()" title="Simpan Proyek JSON" class="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 transition flex items-center justify-center">
+                <i class="fa-solid fa-save"></i>
+            </button>
+            <label title="Muat Proyek JSON" class="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/50 cursor-pointer transition flex items-center justify-center">
+                <i class="fa-solid fa-folder-open"></i>
+                <input type="file" id="import-file" class="hidden" onchange="importWorkspaceJSON(event)">
+            </label>
+            <button onclick="clearWorkspace()" title="Kosongkan Kanvas" class="h-8 w-8 rounded-lg bg-slate-800 hover:bg-rose-500/15 hover:text-rose-400 text-slate-400 border border-slate-700/50 transition flex items-center justify-center">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Area Kerja Utama -->
+    <div class="flex-grow flex overflow-hidden relative">
+        
+        <!-- Sidebar Input Teks & Editor Panel -->
+        <aside class="w-80 border-r border-slate-800 bg-[#0c101d] flex flex-col justify-between z-20 shadow-xl select-none">
+            <div class="flex-grow overflow-y-auto p-4 custom-scroll space-y-4">
+                
+                <!-- Panel Tab Sidebar (Tulis Teks vs Properti Detail) -->
+                <div class="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px] font-bold">
+                    <button onclick="switchSidebarTab('input')" id="btn-tab-input" class="py-1.5 rounded bg-slate-800 text-white flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-pen-fancy"></i> Tulis Teks
+                    </button>
+                    <button onclick="switchSidebarTab('property')" id="btn-tab-property" class="py-1.5 rounded text-slate-400 hover:text-white flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-sliders"></i> Edit Manual
+                    </button>
+                </div>
+
+                <!-- TAB 1: INPUT TEKS PARSER -->
+                <div id="tab-content-input" class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" id="label-text-mode">INPUT MINDMAP</span>
+                        <button onclick="loadTemplate()" class="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1">
+                            <i class="fa-solid fa-magic-wand-tools"></i> Pakai Template
+                        </button>
+                    </div>
+
+                    <!-- Input Editor Utama -->
+                    <div class="relative">
+                        <textarea id="parser-input-text" rows="12" class="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 text-xs text-slate-200 p-3 rounded-xl outline-none font-mono resize-none leading-relaxed custom-scroll" placeholder="Ketik draf Anda di sini..."></textarea>
+                        <div class="absolute bottom-2 right-2 text-[9px] text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded font-mono select-none">
+                            TAB/Spasi = Cabang baru
+                        </div>
+                    </div>
+
+                    <!-- Tombol Generate Diagram -->
+                    <button onclick="generateDiagramFromText()" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-indigo-600/10 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-rotate"></i> Hasilkan Diagram Cerdas
+                    </button>
+
+                    <!-- Petunjuk Ringkas Pengetikan -->
+                    <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 text-[10px] text-slate-400 leading-relaxed">
+                        <span class="font-bold text-slate-300 block mb-1">Panduan Menulis:</span>
+                        <div id="guide-text-mindmap" class="space-y-1">
+                            <p>• Gunakan <code class="text-indigo-300">Identasi</code> (2 spasi atau Tab) untuk cabang.</p>
+                            <p>• Baris paling atas otomatis menjadi Ide Utama.</p>
+                            <p>• Contoh: <code class="text-indigo-400">Ide -> Cabang A -> Subcabang</code></p>
+                        </div>
+                        <div id="guide-text-flowchart" class="space-y-1 hidden">
+                            <p>• Gunakan tanda <code class="text-indigo-300">-&gt;</code> untuk menghubungkan proses.</p>
+                            <p>• Tambahkan teks dalam kurung <code class="text-indigo-300">(Ya)</code> untuk melabeli garis.</p>
+                            <p>• Contoh: <code class="text-indigo-400">Mulai -&gt; Proses Input (Mulai SOP)</code></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: PROPERTI & MANUAL EDIT -->
+                <div id="tab-content-property" class="space-y-4 hidden">
+                    <!-- Detil Node Terpilih -->
+                    <div id="active-node-editor" class="space-y-4">
+                        <p class="text-[10px] text-slate-500 italic text-center py-4">Pilih salah satu objek di kanvas untuk mengedit propertinya secara rinci.</p>
+                    </div>
+
+                    <!-- Hubungkan Node Manual -->
+                    <div class="border-t border-slate-800/80 pt-4 space-y-3">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <i class="fa-solid fa-link text-indigo-400"></i> Buat Hubungan Manual
+                        </h3>
+                        <div class="space-y-2.5 text-xs" id="manual-connection-panel">
+                            <!-- Diisi dinamis oleh JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Quick Info / Status Koordinat Kamera -->
+            <div class="p-3 border-t border-slate-800 bg-slate-950/40 text-[10px] text-slate-400 flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <span>Skala Kanvas:</span>
+                    <span id="scale-indicator" class="font-bold text-indigo-400">100%</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Geser Kamera:</span>
+                    <span id="pan-indicator" class="font-bold text-indigo-400">X: 0, Y: 0</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Kanvas Area Interaktif -->
+        <main id="workspace" class="flex-grow workspace-grid relative overflow-hidden flex items-center justify-center select-none cursor-grab active:cursor-grabbing">
+            
+            <!-- Transformasi Zoom & Geser -->
+            <div id="canvas-inner" class="absolute inset-0 origin-center pointer-events-none" style="transform: translate(0px, 0px) scale(1);">
+                
+                <!-- SVG Connector Layer -->
+                <svg id="svg-layer" class="absolute inset-0 w-[5000px] h-[5000px] pointer-events-auto overflow-visible" style="left: -2500px; top: -2500px;">
+                    <defs>
+                        <!-- Penanda Panah Menunjuk -->
+                        <marker id="arrow" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#6366f1"/>
+                        </marker>
+                        <!-- Penanda Panah untuk Mindmap -->
+                        <marker id="arrow-violet" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                            <path d="M 0 1 L 9 5 L 0 9 z" fill="#818cf8"/>
+                        </marker>
+                    </defs>
+                    <g id="svg-connections"></g>
+                    <!-- Garis bantu pembuatan koneksi ditarik (Drag connection line) -->
+                    <line id="temp-drag-line" class="hidden" stroke="#818cf8" stroke-width="3" stroke-dasharray="5,5" pointer-events="none"></line>
+                </svg>
+
+                <!-- Layer DOM Interaktif -->
+                <div id="dom-layer" class="absolute inset-0 w-[5000px] h-[5000px] pointer-events-auto" style="left: -2500px; top: -2500px;">
+                    <!-- Node Mindmap/Flowchart akan dimasukkan ke mari -->
+                </div>
+
+            </div>
+
+            <!-- Kontrol Mengambang (Zoom & Reset) -->
+            <div class="absolute bottom-4 right-4 flex flex-col gap-2.5 z-10 select-none">
+                <button onclick="zoomIn()" class="h-9 w-9 bg-slate-900/90 border border-slate-800 hover:bg-slate-800 text-slate-200 rounded-xl shadow-lg flex items-center justify-center transition">
+                    <i class="fa-solid fa-plus text-sm"></i>
+                </button>
+                <button onclick="zoomOut()" class="h-9 w-9 bg-slate-900/90 border border-slate-800 hover:bg-slate-800 text-slate-200 rounded-xl shadow-lg flex items-center justify-center transition">
+                    <i class="fa-solid fa-minus text-sm"></i>
+                </button>
+                <button onclick="resetZoomPan()" class="h-9 w-9 bg-slate-900/90 border border-indigo-500/30 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl shadow-lg flex items-center justify-center transition">
+                    <i class="fa-solid fa-arrows-to-dot text-sm"></i>
+                </button>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Toast Notifikasi Ringkas -->
+    <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 border border-indigo-500/30 text-indigo-200 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 translate-y-24 opacity-0 transition-all duration-300 z-50 select-none">
+        <i class="fa-solid fa-circle-info text-indigo-400"></i>
+        <span id="toast-message" class="text-xs font-semibold">Berhasil!</span>
+    </div>
+
+    <!-- Logic Engine JS -->
+    <script>
+        // Data Global State
+        let parsingMode = 'mindmap'; // mindmap, flowchart
+        let activeSidebarTab = 'input'; // input, property
+        let scale = 1.0;
+        let panX = 0, panY = 0;
+        let isPanning = false;
+        let startX = 0, startY = 0;
+
+        // Data Elemen Grafik
+        let elements = [];
+        let connections = [];
+        let activeSelectionId = null;
+
+        // State Interaksi Pembuatan Relasi via Dragging Line
+        let isDrawingConnection = false;
+        let connectionSourceId = null;
+
+        // DOM Layering References
+        const DOM_LAYER = document.getElementById('dom-layer');
+        const SVG_CONNECTIONS = document.getElementById('svg-connections');
+        const CANVAS_INNER = document.getElementById('canvas-inner');
+        const WORKSPACE = document.getElementById('workspace');
+        const TEMP_DRAG_LINE = document.getElementById('temp-drag-line');
+
+        // Palet Warna Premium
+        const COLORS = {
+            root: '#6366f1',       // Indigo
+            branch: '#8b5cf6',     // Violet
+            subbranch: '#14b8a6',  // Teal
+            leaf: '#10b981',       // Emerald
+            warning: '#f59e0b',    // Amber
+            danger: '#ef4444',     // Red
+            neutral: '#475569'     // Slate
+        };
+
+        // Template Contoh Konten Default
+        const TEMPLATES = {
+            mindmap: `Strategi Pemasaran Digital
+  Media Sosial
+    Instagram Reels
+    TikTok Edukasi
+  Kampanye Email
+    Buletin Mingguan
+    Penawaran Khusus
+  Optimasi SEO
+    Riset Kata Kunci
+    Artikel Blog`,
+
+            flowchart: `Mulai -> Ajukan Permohonan SOP
+Ajukan Permohonan SOP -> Evaluasi Admin
+Evaluasi Admin -> Keputusan Kelayakan?
+Keputusan Kelayakan? -> Proses Persetujuan (Layak)
+Keputusan Kelayakan? -> Tolak & Revisi (Tidak Layak)
+Tolak & Revisi -> Ajukan Permohonan SOP (Ulangi)
+Proses Persetujuan -> Selesai (Selesai SOP)`
+        };
+
+        // Setup Awal Aplikasi
+        window.addEventListener('DOMContentLoaded', () => {
+            initWorkspaceInteraction();
+            switchParsingMode('mindmap');
+            loadTemplate();
+        });
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = message;
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-24', 'opacity-0');
+            }, 3000);
+        }
+
+        // ==========================================
+        // 1. DOCKING VIEW CONTROL (ZOOM, PAN, RESET)
+        // ==========================================
+        function initWorkspaceInteraction() {
+            // Drag-panning background workspace
+            WORKSPACE.addEventListener('mousedown', (e) => {
+                if (e.target === WORKSPACE || e.target === DOM_LAYER || e.target.id === 'svg-layer') {
+                    isPanning = true;
+                    startX = e.clientX - panX;
+                    startY = e.clientY - panY;
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (isPanning) {
+                    panX = e.clientX - startX;
+                    panY = e.clientY - startY;
+                    updateCanvasTransform();
+                } else if (isDrawingConnection) {
+                    // Update posisi garis tarik relasi secara real-time
+                    const rect = WORKSPACE.getBoundingClientRect();
+                    const targetX = (e.clientX - rect.left - panX) / scale + 2500;
+                    const targetY = (e.clientY - rect.top - panY) / scale + 2500;
+                    
+                    TEMP_DRAG_LINE.setAttribute('x2', targetX);
+                    TEMP_DRAG_LINE.setAttribute('y2', targetY);
+                }
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                if (isPanning) {
+                    isPanning = false;
+                }
+                if (isDrawingConnection) {
+                    // Batal jika dilepas sembarang tempat
+                    isDrawingConnection = false;
+                    TEMP_DRAG_LINE.classList.add('hidden');
+                }
+            });
+
+            // Zooming dengan mousewheel
+            WORKSPACE.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const zoomIntensity = 0.05;
+                const delta = e.deltaY > 0 ? -1 : 1;
+                scale += delta * zoomIntensity;
+                scale = Math.min(Math.max(0.3, scale), 3.0);
+                updateCanvasTransform();
+            }, { passive: false });
+        }
+
+        function updateCanvasTransform() {
+            CANVAS_INNER.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+            document.getElementById('scale-indicator').innerText = `${Math.round(scale * 100)}%`;
+            document.getElementById('pan-indicator').innerText = `X: ${Math.round(panX)}, Y: ${Math.round(panY)}`;
+        }
+
+        function zoomIn() {
+            scale = Math.min(scale + 0.1, 3.0);
+            updateCanvasTransform();
+        }
+
+        function zoomOut() {
+            scale = Math.max(scale - 0.1, 0.3);
+            updateCanvasTransform();
+        }
+
+        function resetZoomPan() {
+            scale = 1.0;
+            panX = 0;
+            panY = 0;
+            updateCanvasTransform();
+            showToast("Kamera kanvas diatur ulang.");
+        }
+
+        // ==========================================
+        // 2. PARSING TEKS DINAMIS (MINDMAP & FLOWCHART)
+        // ==========================================
+        function switchParsingMode(mode) {
+            parsingMode = mode;
+            
+            // Perbarui tombol status navigasi
+            const btnMM = document.getElementById('btn-mode-mindmap');
+            const btnFC = document.getElementById('btn-mode-flowchart');
+            const mmGuide = document.getElementById('guide-text-mindmap');
+            const fcGuide = document.getElementById('guide-text-flowchart');
+            const labelTextMode = document.getElementById('label-text-mode');
+
+            if (mode === 'mindmap') {
+                btnMM.className = "px-4 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow-md";
+                btnFC.className = "px-4 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white";
+                mmGuide.classList.remove('hidden');
+                fcGuide.classList.add('hidden');
+                labelTextMode.innerText = "INPUT MINDMAP";
+            } else {
+                btnFC.className = "px-4 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 bg-indigo-600 text-white shadow-md";
+                btnMM.className = "px-4 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white";
+                fcGuide.classList.remove('hidden');
+                mmGuide.classList.add('hidden');
+                labelTextMode.innerText = "INPUT FLOWCHART (SOP)";
+            }
+
+            loadTemplate();
+        }
+
+        function loadTemplate() {
+            const editorText = document.getElementById('parser-input-text');
+            editorText.value = TEMPLATES[parsingMode];
+        }
+
+        function generateDiagramFromText() {
+            const rawText = document.getElementById('parser-input-text').value;
+            if (!rawText.trim()) {
+                showToast("Silakan isi teks draf terlebih dahulu!");
+                return;
+            }
+
+            if (parsingMode === 'mindmap') {
+                parseMindmap(rawText);
+            } else {
+                parseFlowchart(rawText);
+            }
+
+            resetZoomPan();
+            renderAll();
+            renderSidebar();
+            showToast("Diagram berhasil dibuat.");
+        }
+
+        // --- MINDMAP PARSER ENGINE ---
+        function parseMindmap(text) {
+            elements = [];
+            connections = [];
+
+            const lines = text.split('\n').filter(l => l.trim() !== '');
+            if (lines.length === 0) return;
+
+            let parsedNodes = [];
+            let lastNodesAtLevel = {};
+
+            lines.forEach((line, index) => {
+                // Hitung kedalaman tab/spasi
+                const leadingSpaces = line.search(/\S/);
+                const cleanText = line.trim();
+                const level = Math.floor(leadingSpaces / 2); // 2 spasi = 1 tingkat kedalaman
+
+                const nodeId = `mm_${index}`;
+                let parentId = null;
+
+                if (level > 0 && lastNodesAtLevel[level - 1]) {
+                    parentId = lastNodesAtLevel[level - 1];
+                }
+
+                parsedNodes.push({
+                    id: nodeId,
+                    text: cleanText,
+                    level: level,
+                    parentId: parentId
+                });
+
+                lastNodesAtLevel[level] = nodeId;
+            });
+
+            // Tentukan koordinat berstruktur radial agar tidak saling bertindihan
+            const rootX = 2500;
+            const rootY = 2500;
+
+            parsedNodes.forEach(node => {
+                if (node.level === 0) {
+                    // Root / Ide Utama
+                    elements.push({
+                        id: node.id,
+                        text: node.text,
+                        x: rootX - 100,
+                        y: rootY - 30,
+                        w: 200,
+                        h: 60,
+                        shape: 'rounded',
+                        color: COLORS.root,
+                        fontSize: 14
+                    });
+                } else {
+                    // Distribusikan cabang secara radial / menyebar horizontal kiri-kanan
+                    const siblings = parsedNodes.filter(n => n.parentId === node.parentId);
+                    const idx = siblings.findIndex(n => n.id === node.id);
+                    const totalSiblings = siblings.length;
+
+                    let px, py;
+                    const parent = elements.find(e => e.id === node.parentId);
+                    
+                    if (parent) {
+                        // Sudut sebaran horizontal
+                        const isRight = (idx % 2 === 0);
+                        const xOffset = node.level === 1 ? 280 : 200;
+                        const yStep = 100;
+
+                        px = parent.x + (isRight ? xOffset : -xOffset);
+                        py = parent.y + (idx - (totalSiblings - 1) / 2) * yStep;
+
+                        elements.push({
+                            id: node.id,
+                            text: node.text,
+                            x: px,
+                            y: py,
+                            w: 150,
+                            h: 50,
+                            shape: 'rounded',
+                            color: node.level === 1 ? COLORS.branch : (node.level === 2 ? COLORS.subbranch : COLORS.leaf),
+                            fontSize: 12
+                        });
+
+                        // Hubungkan langsung ke parent
+                        connections.push({
+                            id: `c_${node.parentId}_${node.id}`,
+                            from: node.parentId,
+                            to: node.id,
+                            label: ''
+                        });
+                    }
+                }
+            });
+        }
+
+        // --- FLOWCHART PARSER ENGINE ---
+        function parseFlowchart(text) {
+            elements = [];
+            connections = [];
+
+            const lines = text.split('\n').filter(l => l.trim() !== '');
+            let uniqueNodeNames = new Set();
+            let parsedSteps = [];
+
+            // Memindai relasi `A -> B` atau `A -> B (Label)`
+            lines.forEach((line, index) => {
+                if (line.includes('->')) {
+                    const parts = line.split('->');
+                    let fromName = parts[0].trim();
+                    let rest = parts[1].trim();
+                    let toName = rest;
+                    let label = '';
+
+                    // Deteksi label kurung bulat jika ada
+                    if (rest.includes('(') && rest.endsWith(')')) {
+                        const labelStart = rest.indexOf('(');
+                        toName = rest.substring(0, labelStart).trim();
+                        label = rest.substring(labelStart + 1, rest.length - 1).trim();
+                    }
+
+                    uniqueNodeNames.add(fromName);
+                    uniqueNodeNames.add(toName);
+
+                    parsedSteps.push({
+                        from: fromName,
+                        to: toName,
+                        label: label
+                    });
+                } else {
+                    // Node tunggal tanpa relasi
+                    uniqueNodeNames.add(line.trim());
+                }
+            });
+
+            // Membuat Node Unik dengan bentuk cerdas berbasis kosakata
+            const nodeMap = {};
+            let nodeIndex = 0;
+            const nodeWidth = 160;
+            const nodeHeight = 55;
+
+            uniqueNodeNames.forEach(name => {
+                const id = `fc_${nodeIndex++}`;
+                nodeMap[name] = id;
+
+                let shape = 'process'; // Default: Persegi proses
+                let color = COLORS.root;
+
+                const lowerName = name.toLowerCase();
+                if (lowerName.includes('mulai') || lowerName.includes('start') || lowerName.includes('pembukaan')) {
+                    shape = 'oval';
+                    color = COLORS.leaf; // Hijau mulai
+                } else if (lowerName.includes('selesai') || lowerName.includes('end') || lowerName.includes('tutup')) {
+                    shape = 'oval';
+                    color = COLORS.danger; // Merah selesai
+                } else if (lowerName.endsWith('?') || lowerName.includes('keputusan') || lowerName.includes('evaluasi') || lowerName.includes('kelayakan')) {
+                    shape = 'diamond';
+                    color = COLORS.warning; // Kuning keputusan
+                } else if (lowerName.includes('revisis') || lowerName.includes('tolak') || lowerName.includes('ulangi')) {
+                    color = COLORS.warning;
+                }
+
+                elements.push({
+                    id: id,
+                    text: name,
+                    x: 2500 - (nodeWidth / 2),
+                    y: 2200 + (nodeIndex * 110), // Menyebar vertikal ke bawah
+                    w: nodeWidth,
+                    h: nodeHeight,
+                    shape: shape,
+                    color: color,
+                    fontSize: 11
+                });
+            });
+
+            // Membangun Garis Relasi
+            parsedSteps.forEach(step => {
+                const fromId = nodeMap[step.from];
+                const toId = nodeMap[step.to];
+                if (fromId && toId) {
+                    connections.push({
+                        id: `c_${fromId}_${toId}`,
+                        from: fromId,
+                        to: toId,
+                        label: step.label
+                    });
+                }
+            });
+
+            // Atur otomatis koordinat vertikal untuk menghindari overlap
+            autoArrangeFlowchart();
+        }
+
+        // Algoritma Penempatan Alur Flowchart secara Top-to-Bottom
+        function autoArrangeFlowchart() {
+            // Urutkan tingkatan kedalaman dengan BFS sederhana
+            const inDegree = {};
+            elements.forEach(e => inDegree[e.id] = 0);
+
+            connections.forEach(c => {
+                if (inDegree[c.to] !== undefined) {
+                    inDegree[c.to]++;
+                }
+            });
+
+            // Tentukan node paling awal (indegree = 0)
+            let queue = elements.filter(e => inDegree[e.id] === 0).map(e => e.id);
+            if (queue.length === 0 && elements.length > 0) {
+                queue = [elements[0].id];
+            }
+
+            const levelMap = {};
+            queue.forEach(id => levelMap[id] = 0);
+
+            const visited = new Set(queue);
+
+            while (queue.length > 0) {
+                const curr = queue.shift();
+                const currLevel = levelMap[curr];
+
+                const children = connections.filter(c => c.from === curr).map(c => c.to);
+                children.forEach(child => {
+                    if (!visited.has(child)) {
+                        visited.add(child);
+                        levelMap[child] = currLevel + 1;
+                        queue.push(child);
+                    } else {
+                        // Ambil level terdalam jika referensi ganda
+                        levelMap[child] = Math.max(levelMap[child] || 0, currLevel + 1);
+                    }
+                });
+            }
+
+            // Kumpulkan node per baris kedalaman
+            const levels = {};
+            elements.forEach(e => {
+                const lvl = levelMap[e.id] || 0;
+                if (!levels[lvl]) levels[lvl] = [];
+                levels[lvl].push(e);
+            });
+
+            // Letakkan koordinat visual
+            const startY = 2300;
+            const ySpacing = 140;
+            const xSpacing = 240;
+
+            Object.keys(levels).forEach(lvl => {
+                const rowElements = levels[lvl];
+                const totalRowWidth = (rowElements.length - 1) * xSpacing;
+                const startX = 2500 - (totalRowWidth / 2);
+
+                rowElements.forEach((elem, idx) => {
+                    elem.x = startX + (idx * xSpacing) - (elem.w / 2);
+                    elem.y = startY + (lvl * ySpacing);
+                    
+                    // Bentuk belah ketupat keputusan perlu ruang simetris
+                    if (elem.shape === 'diamond') {
+                        elem.w = 110;
+                        elem.h = 110;
+                    }
+                });
+            });
+        }
+
+        // ==========================================
+        // 3. RENDER CORE ENGINE (DOM LAYER & SVG CURVE)
+        // ==========================================
+        function renderAll() {
+            DOM_LAYER.innerHTML = '';
+            
+            elements.forEach(elem => {
+                renderNode(elem);
+            });
+            
+            renderSVGConnections();
+        }
+
+        function renderNode(elem) {
+            const div = document.createElement('div');
+            div.id = `node-${elem.id}`;
+            div.className = `absolute select-none flex flex-col justify-center items-center text-center shadow-xl border border-white/5 cursor-grab active:cursor-grabbing hover:border-indigo-400 transition-colors pointer-events-auto group ${activeSelectionId === elem.id ? 'ring-4 ring-indigo-500 ring-offset-2 ring-offset-slate-900' : ''}`;
+            div.style.left = `${elem.x}px`;
+            div.style.top = `${elem.y}px`;
+            div.style.width = `${elem.w}px`;
+            div.style.height = `${elem.h}px`;
+
+            // Atur gaya visual berdasarkan tipe bentuk
+            if (elem.shape === 'oval') {
+                div.className += ' oval-shape px-4';
+                div.style.backgroundColor = elem.color;
+            } else if (elem.shape === 'diamond') {
+                div.className += ' diamond-shape p-4 justify-center items-center';
+                div.style.backgroundColor = elem.color;
+            } else {
+                // Default: rounded rectangle
+                div.className += ' rounded-2xl px-3';
+                div.style.backgroundColor = elem.color;
+            }
+
+            // Area Teks
+            const textSpan = document.createElement('span');
+            textSpan.className = 'w-full text-white font-bold leading-tight break-words select-none pointer-events-none';
+            textSpan.style.fontSize = `${elem.fontSize || 12}px`;
+            textSpan.innerText = elem.text;
+            div.appendChild(textSpan);
+
+            // 1. Tombol Hapus Pojok Kanan Atas
+            const delBtn = document.createElement('div');
+            delBtn.className = 'absolute -top-2.5 -right-2.5 h-6 w-6 bg-rose-500 hover:bg-rose-600 border border-rose-400 rounded-full flex items-center justify-center text-white text-[10px] opacity-0 group-hover:opacity-100 scale-90 hover:scale-115 transition-all cursor-pointer shadow-md shadow-rose-500/20 z-10';
+            delBtn.innerHTML = '<i class="fa-solid fa-times"></i>';
+            delBtn.title = "Hapus Objek";
+            delBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteNode(elem.id);
+            });
+            div.appendChild(delBtn);
+
+            // 2. Interactive Connector Anchor (Interactive Drag-to-Connect)
+            const anchor = document.createElement('div');
+            anchor.className = 'absolute bottom-1 right-1 h-3.5 w-3.5 bg-white border-2 border-indigo-500 rounded-full cursor-crosshair opacity-0 group-hover:opacity-100 hover:scale-125 hover:bg-indigo-400 transition-all z-10';
+            anchor.title = "Tarik untuk hubungkan ke cabang lain";
+            anchor.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                startDrawingConnection(e, elem.id);
+            });
+            div.appendChild(anchor);
+
+            // 3. Resize Handle Pojok Kiri Bawah
+            const resizeH = document.createElement('div');
+            resizeH.className = 'absolute bottom-1 left-1 cursor-se-resize text-slate-400 opacity-0 group-hover:opacity-100 hover:text-white transition-all';
+            resizeH.style.fontSize = '8px';
+            resizeH.innerHTML = '<i class="fa-solid fa-arrows-up-down-left-right transform rotate-45"></i>';
+            resizeH.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                initWidgetResize(e, elem.id);
+            });
+            div.appendChild(resizeH);
+
+            // Aktifkan Drag & Drop Posisi
+            makeDraggable(div, elem);
+
+            // Event Seleksi Objek
+            div.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isDrawingConnection) {
+                    finishDrawingConnection(elem.id);
+                } else {
+                    activeSelectionId = elem.id;
+                    renderAll();
+                    renderSidebar();
+                }
+            });
+
+            // Deteksi mouse up saat melepaskan jalur koneksi
+            div.addEventListener('mouseup', (e) => {
+                if (isDrawingConnection) {
+                    e.stopPropagation();
+                    finishDrawingConnection(elem.id);
+                }
+            });
+
+            DOM_LAYER.appendChild(div);
+        }
+
+        // Menghubungkan dua cabang menggunakan SVG dengan gaya Bezier melengkung modern
+        function renderSVGConnections() {
+            let svgContent = '';
+            
+            connections.forEach(con => {
+                const nodeFrom = elements.find(e => e.id === con.from);
+                const nodeTo = elements.find(e => e.id === con.to);
+                if (!nodeFrom || !nodeTo) return;
+
+                // Hitung posisi titik koordinat di tengah
+                const fromX = nodeFrom.x + (nodeFrom.w / 2);
+                const fromY = nodeFrom.y + (nodeFrom.h / 2);
+                const toX = nodeTo.x + (nodeTo.w / 2);
+                const toY = nodeTo.y + (nodeTo.h / 2);
+
+                // Buat lengkungan Bezier alami (Horizontal untuk Mindmap, Vertikal untuk Flowchart)
+                let dPath = '';
+                if (parsingMode === 'mindmap') {
+                    const controlX = (fromX + toX) / 2;
+                    dPath = `M ${fromX} ${fromY} C ${controlX} ${fromY}, ${controlX} ${toY}, ${toX} ${toY}`;
+                } else {
+                    const controlY = (fromY + toY) / 2;
+                    dPath = `M ${fromX} ${fromY} C ${fromX} ${controlY}, ${toX} ${controlY}, ${toX} ${toY}`;
+                }
+
+                // Titik Tengah untuk Label Relasi & Tombol Hapus Garis
+                const midX = (fromX + toX) / 2;
+                const midY = (fromY + toY) / 2;
+
+                const strokeColor = con.label ? '#a78bfa' : '#6366f1';
+
+                svgContent += `
+                    <g class="group" id="group-con-${con.id}">
+                        <!-- Garis Nyata Bezier -->
+                        <path d="${dPath}" class="connector-path" stroke="${strokeColor}" marker-end="url(#arrow)" id="path-${con.id}" onclick="event.stopPropagation(); selectConnection('${con.id}')" />
+                        
+                        <!-- Label Box Teks Relasi -->
+                        ${con.label ? `
+                            <g transform="translate(${midX - 50}, ${midY - 11})">
+                                <rect width="100" height="22" rx="6" fill="#0c101d" stroke="#334155" stroke-width="1.5" />
+                                <text x="50" y="14" fill="#cbd5e1" font-size="10px" font-weight="700" text-anchor="middle" font-family="Plus Jakarta Sans">${con.label}</text>
+                            </g>
+                        ` : ''}
+
+                        <!-- Tombol Hapus Sambungan Terintegrasi -->
+                        <g class="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" transform="translate(${midX - 8}, ${midY - 8})" onclick="event.stopPropagation(); deleteConnection('${con.id}')">
+                            <circle cx="8" cy="8" r="9" fill="#ef4444" stroke="#fca5a5" stroke-width="1"/>
+                            <text x="8" y="11.5" fill="#ffffff" font-size="9px" font-weight="900" text-anchor="middle">×</text>
+                        </g>
+                    </g>
+                `;
+            });
+            
+            SVG_CONNECTIONS.innerHTML = svgContent;
+        }
+
+        // ==========================================
+        // 4. ALUR INTERAKSI DRAG-TO-CONNECT & DRAG WIDGET
+        // ==========================================
+        function startDrawingConnection(e, fromNodeId) {
+            isDrawingConnection = true;
+            connectionSourceId = fromNodeId;
+
+            const fromNode = elements.find(el => el.id === fromNodeId);
+            if (!fromNode) return;
+
+            const startX = fromNode.x + (fromNode.w / 2);
+            const startY = fromNode.y + (fromNode.h / 2);
+
+            // Munculkan garis panduan titik-titik
+            TEMP_DRAG_LINE.setAttribute('x1', startX);
+            TEMP_DRAG_LINE.setAttribute('y1', startY);
+            TEMP_DRAG_LINE.setAttribute('x2', startX);
+            TEMP_DRAG_LINE.setAttribute('y2', startY);
+            TEMP_DRAG_LINE.classList.remove('hidden');
+        }
+
+        function finishDrawingConnection(toNodeId) {
+            if (!isDrawingConnection || !connectionSourceId) return;
+
+            const fromId = connectionSourceId;
+            const toId = toNodeId;
+
+            isDrawingConnection = false;
+            TEMP_DRAG_LINE.classList.add('hidden');
+
+            if (fromId === toId) {
+                showToast("Tidak bisa menghubungkan ke diri sendiri!");
+                return;
+            }
+
+            // Periksa redundansi koneksi
+            const exist = connections.some(c => c.from === fromId && c.to === toId);
+            if (exist) {
+                showToast("Koneksi tersebut sudah ada.");
+                return;
+            }
+
+            // Hubungkan
+            connections.push({
+                id: `c_${Date.now()}`,
+                from: fromId,
+                to: toId,
+                label: ''
+            });
+
+            renderAll();
+            renderSidebar();
+            showToast("Relasi baru terhubung.");
+        }
+
+        // --- DRAGGING NODE HANDLING ---
+        function makeDraggable(element, dataObj) {
+            let offsetDragX = 0, offsetDragY = 0;
+            
+            element.addEventListener('mousedown', (e) => {
+                if (e.target.closest('button') || e.target.closest('.cursor-se-resize') || isDrawingConnection) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+
+                offsetDragX = (e.clientX / scale) - dataObj.x;
+                offsetDragY = (e.clientY / scale) - dataObj.y;
+
+                function elementDrag(dragEvent) {
+                    dataObj.x = (dragEvent.clientX / scale) - offsetDragX;
+                    dataObj.y = (dragEvent.clientY / scale) - offsetDragY;
+                    element.style.left = `${dataObj.x}px`;
+                    element.style.top = `${dataObj.y}px`;
+                    renderSVGConnections();
+                }
+
+                function closeDragElement() {
+                    window.removeEventListener('mousemove', elementDrag);
+                    window.removeEventListener('mouseup', closeDragElement);
+                }
+
+                window.addEventListener('mousemove', elementDrag);
+                window.addEventListener('mouseup', closeDragElement);
+            });
+        }
+
+        // --- RESIZING NODE HANDLING ---
+        function initWidgetResize(e, id) {
+            const elem = elements.find(el => el.id === id);
+            if (!elem) return;
+
+            const startW = elem.w;
+            const startH = elem.h;
+            const startX = e.clientX;
+            const startY = e.clientY;
+
+            function doResize(moveEvent) {
+                const deltaX = (moveEvent.clientX - startX) / scale;
+                const deltaY = (moveEvent.clientY - startY) / scale;
+                elem.w = Math.max(80, startW + deltaX);
+                elem.h = Math.max(35, startH + deltaY);
+                renderAll();
+            }
+
+            function stopResize() {
+                window.removeEventListener('mousemove', doResize);
+                window.removeEventListener('mouseup', stopResize);
+            }
+
+            window.addEventListener('mousemove', doResize);
+            window.addEventListener('mouseup', stopResize);
+        }
+
+        // ==========================================
+        // 5. MANAJEMEN DATA WORKSPACE (CRUD MANUAL)
+        // ==========================================
+        function addNewNodeManual() {
+            const id = `node_${Date.now()}`;
+            const newNode = {
+                id: id,
+                text: 'Cabang Baru',
+                x: 2500 - 75,
+                y: 2500 - 25,
+                w: 150,
+                h: 50,
+                shape: 'rounded',
+                color: COLORS.branch,
+                fontSize: 12
+            };
+            
+            elements.push(newNode);
+            activeSelectionId = id;
+            renderAll();
+            renderSidebar();
+            showToast("Objek baru ditambahkan.");
+        }
+
+        function deleteNode(nodeId) {
+            elements = elements.filter(e => e.id !== nodeId);
+            connections = connections.filter(c => c.from !== nodeId && c.to !== nodeId);
+            if (activeSelectionId === nodeId) {
+                activeSelectionId = null;
+            }
+            renderAll();
+            renderSidebar();
+            showToast("Objek berhasil dihapus.");
+        }
+
+        function selectConnection(conId) {
+            showToast("Hubungan terpilih.");
+        }
+
+        function deleteConnection(conId) {
+            connections = connections.filter(c => c.id !== conId);
+            renderAll();
+            renderSidebar();
+            showToast("Relasi diputus.");
+        }
+
+        function createManualConnection() {
+            const from = document.getElementById('manual-con-from').value;
+            const to = document.getElementById('manual-con-to').value;
+            const label = document.getElementById('manual-con-label').value;
+
+            if (from === to) {
+                showToast("Tidak bisa menghubungkan ke diri sendiri!");
+                return;
+            }
+
+            connections.push({
+                id: `c_${Date.now()}`,
+                from: from,
+                to: to,
+                label: label
+            });
+
+            renderAll();
+            renderSidebar();
+            showToast("Relasi manual berhasil dibuat.");
+        }
+
+        function updateNodeProperty(key, value) {
+            const node = elements.find(e => e.id === activeSelectionId);
+            if (!node) return;
+
+            if (key === 'fontSize' || key === 'w' || key === 'h') {
+                node[key] = parseInt(value) || node[key];
+            } else {
+                node[key] = value;
+            }
+            
+            renderAll();
+        }
+
+        function clearWorkspace() {
+            elements = [];
+            connections = [];
+            activeSelectionId = null;
+            renderAll();
+            renderSidebar();
+            showToast("Kanvas dikosongkan.");
+        }
+
+        // ==========================================
+        // 6. SIDEBAR MANAGER PANEL (TAB CONTROL)
+        // ==========================================
+        function switchSidebarTab(tab) {
+            activeSidebarTab = tab;
+            const tInput = document.getElementById('btn-tab-input');
+            const tProperty = document.getElementById('btn-tab-property');
+            
+            const cInput = document.getElementById('tab-content-input');
+            const cProperty = document.getElementById('tab-content-property');
+
+            if (tab === 'input') {
+                tInput.className = "py-1.5 rounded bg-slate-800 text-white flex items-center justify-center gap-1";
+                tProperty.className = "py-1.5 rounded text-slate-400 hover:text-white flex items-center justify-center gap-1";
+                cInput.classList.remove('hidden');
+                cProperty.classList.add('hidden');
+            } else {
+                tProperty.className = "py-1.5 rounded bg-slate-800 text-white flex items-center justify-center gap-1";
+                tInput.className = "py-1.5 rounded text-slate-400 hover:text-white flex items-center justify-center gap-1";
+                cProperty.classList.remove('hidden');
+                cInput.classList.add('hidden');
+            }
+        }
+
+        function renderSidebar() {
+            const container = document.getElementById('active-node-editor');
+            const activeNode = elements.find(e => e.id === activeSelectionId);
+
+            if (!activeNode) {
+                container.innerHTML = `
+                    <div class="text-center py-6 space-y-3">
+                        <p class="text-[11px] text-slate-500 italic">Klik salah satu objek di kanvas untuk mulai melakukan modifikasi visual.</p>
+                        <button onclick="addNewNodeManual()" class="w-full py-2 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 text-xs font-bold rounded-xl transition">
+                            + Tambah Objek Manual
+                        </button>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span class="text-xs font-extrabold text-indigo-400 uppercase tracking-wider">Editor Properti</span>
+                            <span class="text-[9px] text-slate-500 font-mono">${activeNode.id}</span>
+                        </div>
+
+                        <!-- Edit Teks Objek -->
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">Isi Teks / Judul:</label>
+                            <textarea rows="3" oninput="updateNodeProperty('text', this.value)" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 text-xs text-slate-200 p-2.5 rounded-xl outline-none resize-none font-medium custom-scroll">${activeNode.text}</textarea>
+                        </div>
+
+                        <!-- Ukuran & Font -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase">Ukuran Font:</label>
+                                <input type="number" value="${activeNode.fontSize || 12}" min="9" max="24" oninput="updateNodeProperty('fontSize', this.value)" class="w-full bg-slate-950 border border-slate-800 text-xs text-white p-2 rounded-xl outline-none" />
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase font-semibold">Tipe Bentuk:</label>
+                                <select onchange="updateNodeProperty('shape', this.value)" class="w-full bg-slate-950 border border-slate-800 text-xs text-white p-2 rounded-xl outline-none">
+                                    <option value="rounded" ${activeNode.shape === 'rounded' ? 'selected' : ''}>Persegi Bulat</option>
+                                    <option value="oval" ${activeNode.shape === 'oval' ? 'selected' : ''}>Kapsul (Oval)</option>
+                                    <option value="diamond" ${activeNode.shape === 'diamond' ? 'selected' : ''}>Belah Ketupat</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Skema Warna -->
+                        <div class="space-y-1.5">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">Warna Latar:</label>
+                            <div class="grid grid-cols-5 gap-1.5">
+                                ${Object.keys(COLORS).map(name => `
+                                    <button onclick="updateNodeProperty('color', '${COLORS[name]}')" class="h-6 rounded-lg border border-white/10 transition hover:scale-110" style="background-color: ${COLORS[name]};" title="${name}"></button>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <!-- Hapus Objek -->
+                        <button onclick="deleteNode('${activeNode.id}')" class="w-full py-2 bg-rose-500/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-trash-can"></i> Hapus Objek Ini
+                        </button>
+                    </div>
+                `;
+            }
+
+            // Update panel relasi manual
+            const conPanel = document.getElementById('manual-connection-panel');
+            if (elements.length < 2) {
+                conPanel.innerHTML = `<p class="text-[10px] text-slate-500 italic">Buat minimal 2 objek untuk mengaktifkan editor relasi manual.</p>`;
+            } else {
+                conPanel.innerHTML = `
+                    <div class="space-y-2">
+                        <div>
+                            <span class="text-[9px] text-slate-500 block mb-0.5">Dari Objek:</span>
+                            <select id="manual-con-from" class="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white">
+                                ${elements.map(e => `<option value="${e.id}">${e.text.substring(0,25)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <span class="text-[9px] text-slate-500 block mb-0.5">Ke Objek:</span>
+                            <select id="manual-con-to" class="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white">
+                                ${elements.map(e => `<option value="${e.id}">${e.text.substring(0,25)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <span class="text-[9px] text-slate-500 block mb-0.5">Label Relasi (Opsional):</span>
+                            <input type="text" id="manual-con-label" placeholder="contoh: Ya / Tidak / Sukses" class="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white" />
+                        </div>
+                        <button onclick="createManualConnection()" class="w-full py-2 mt-1 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 font-bold rounded-xl transition">
+                            Hubungkan Sekarang
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // ==========================================
+        // 7. SISTEM EKSPOR (PNG, HTML MANDIRI, & JSON)
+        // ==========================================
+        function exportWorkspacePNG() {
+            if (elements.length === 0) {
+                showToast("Tidak ada komponen untuk diekspor!");
+                return;
+            }
+
+            // Hitung bounding box agar gambar pas di tengah
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            elements.forEach(e => {
+                if (e.x < minX) minX = e.x;
+                if (e.y < minY) minY = e.y;
+                if (e.x + e.w > maxX) maxX = e.x + e.w;
+                if (e.y + e.h > maxY) maxY = e.y + e.h;
+            });
+
+            // Tambahkan margin padding sekeliling gambar
+            const margin = 80;
+            minX -= margin;
+            minY -= margin;
+            maxX += margin;
+            maxY += margin;
+
+            const width = maxX - minX;
+            const height = maxY - minY;
+
+            // Buat Canvas Offscreen
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            // 1. Gambar latar belakang gelap
+            ctx.fillStyle = "#070a13";
+            ctx.fillRect(0, 0, width, height);
+
+            // 2. Gambar Grid Titik-Titik Halus
+            ctx.fillStyle = "#1e293b";
+            for (let gx = Math.floor(minX / 24) * 24; gx < maxX; gx += 24) {
+                for (let gy = Math.floor(minY / 24) * 24; gy < maxY; gy += 24) {
+                    ctx.fillRect(gx - minX, gy - minY, 1.5, 1.5);
+                }
+            }
+
+            // Helper koordinat lokal
+            function toLocal(x, y) {
+                return { x: x - minX, y: y - minY };
+            }
+
+            // 3. Gambar Koneksi Bezier
+            connections.forEach(con => {
+                const nodeFrom = elements.find(e => e.id === con.from);
+                const nodeTo = elements.find(e => e.id === con.to);
+                if (!nodeFrom || !nodeTo) return;
+
+                const fromPt = toLocal(nodeFrom.x + (nodeFrom.w / 2), nodeFrom.y + (nodeFrom.h / 2));
+                const toPt = toLocal(nodeTo.x + (nodeTo.w / 2), nodeTo.y + (nodeTo.h / 2));
+
+                ctx.strokeStyle = con.label ? '#a78bfa' : '#6366f1';
+                ctx.lineWidth = 3;
+
+                ctx.beginPath();
+                ctx.moveTo(fromPt.x, fromPt.y);
+                
+                let ctrl1X, ctrl1Y, ctrl2X, ctrl2Y;
+                if (parsingMode === 'mindmap') {
+                    const ctrlX = (fromPt.x + toPt.x) / 2;
+                    ctx.bezierCurveTo(ctrlX, fromPt.y, ctrlX, toPt.y, toPt.x, toPt.y);
+                } else {
+                    const ctrlY = (fromPt.y + toPt.y) / 2;
+                    ctx.bezierCurveTo(fromPt.x, ctrlY, toPt.x, ctrlY, toPt.x, toPt.y);
+                }
+                ctx.stroke();
+
+                // Gambar Panah Menunjuk di Akhir Garis
+                ctx.fillStyle = con.label ? '#a78bfa' : '#6366f1';
+                ctx.beginPath();
+                // Menggambar lingkaran kecil di tujuan koneksi
+                ctx.arc(toPt.x, toPt.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Gambar teks label jika ada
+                if (con.label) {
+                    const midX = (fromPt.x + toPt.x) / 2;
+                    const midY = (fromPt.y + toPt.y) / 2;
+                    
+                    ctx.fillStyle = "#0c101d";
+                    ctx.strokeStyle = "#334155";
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.roundRect(midX - 45, midY - 10, 90, 20, 5);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = "#cbd5e1";
+                    ctx.font = "bold 9px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(con.label, midX, midY);
+                }
+            });
+
+            // 4. Gambar Node Objek
+            elements.forEach(elem => {
+                const pt = toLocal(elem.x, elem.y);
+                
+                // Gambar bayangan kotak
+                ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 4;
+
+                ctx.fillStyle = elem.color || '#3b82f6';
+                
+                ctx.beginPath();
+                if (elem.shape === 'oval') {
+                    ctx.roundRect(pt.x, pt.y, elem.w, elem.h, elem.h / 2);
+                } else if (elem.shape === 'diamond') {
+                    ctx.moveTo(pt.x + elem.w / 2, pt.y);
+                    ctx.lineTo(pt.x + elem.w, pt.y + elem.h / 2);
+                    ctx.lineTo(pt.x + elem.w / 2, pt.y + elem.h);
+                    ctx.lineTo(pt.x, pt.y + elem.h / 2);
+                    ctx.closePath();
+                } else {
+                    ctx.roundRect(pt.x, pt.y, elem.w, elem.h, 12);
+                }
+                ctx.fill();
+
+                // Reset shadow untuk menggambar teks
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetY = 0;
+
+                // Border halus
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Teks Node
+                ctx.fillStyle = "#ffffff";
+                ctx.font = `bold ${elem.fontSize || 12}px sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+
+                // Memisahkan teks multiline jika terlalu panjang
+                const words = elem.text.split(' ');
+                let lines = [];
+                let currentLine = words[0];
+
+                for (let i = 1; i < words.length; i++) {
+                    let testLine = currentLine + " " + words[i];
+                    let metrics = ctx.measureText(testLine);
+                    if (metrics.width > elem.w - 20) {
+                        lines.push(currentLine);
+                        currentLine = words[i];
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                lines.push(currentLine);
+
+                // Menggambar baris teks di tengah-tengah bentuk
+                const lineHeight = (elem.fontSize || 12) + 4;
+                const startTextY = (pt.y + elem.h / 2) - ((lines.length - 1) * lineHeight) / 2;
+                
+                lines.forEach((line, index) => {
+                    ctx.fillText(line, pt.x + elem.w / 2, startTextY + (index * lineHeight));
+                });
+            });
+
+            // Eksekusi download gambar PNG
+            const link = document.createElement('a');
+            link.download = `smartgraph_${parsingMode}_${Date.now()}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+            showToast("Workspace berhasil diekspor ke PNG.");
+        }
+
+        // Fitur Unggulan: Ekspor Seluruh Kode HTML Mandiri beserta Data State Grafiknya Saat Ini
+        function exportWorkspaceHTML() {
+            // Ambil konten HTML halaman saat ini
+            let pageSource = document.documentElement.outerHTML;
+
+            // Injeksi state variabel data aktif ke dalam source kodenya
+            const activeElementsStr = `let elements = ${JSON.stringify(elements)};`;
+            const activeConnectionsStr = `let connections = ${JSON.stringify(connections)};`;
+            const activeModeStr = `let parsingMode = '${parsingMode}';`;
+
+            // Cari dan gantikan inisialisasi default variabel data
+            pageSource = pageSource.replace(/let elements = \[.*?\];/s, activeElementsStr);
+            pageSource = pageSource.replace(/let connections = \[.*?\];/s, activeConnectionsStr);
+            pageSource = pageSource.replace(/let parsingMode = '.*?';/s, activeModeStr);
+
+            // Buat blob unduhan berkas
+            const blob = new Blob([`<!DOCTYPE html>\n` + pageSource], { type: 'text/html;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `smartgraph_workspace_${parsingMode}.html`;
+            link.click();
+            showToast("Aplikasi HTML mandiri siap diunduh.");
+        }
+
+        function exportWorkspaceJSON() {
+            const dump = {
+                version: "2.0",
+                parsingMode: parsingMode,
+                elements: elements,
+                connections: connections
+            };
+
+            const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `smartgraph_project_${parsingMode}_${Date.now()}.json`;
+            link.click();
+            showToast("Proyek JSON berhasil disimpan.");
+        }
+
+        function importWorkspaceJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.elements && data.connections) {
+                        elements = data.elements;
+                        connections = data.connections;
+                        if (data.parsingMode) {
+                            switchParsingMode(data.parsingMode);
+                        }
+                        renderAll();
+                        renderSidebar();
+                        showToast("Proyek JSON berhasil dimuat!");
+                    } else {
+                        showToast("Format file JSON tidak cocok!");
+                    }
+                } catch (err) {
+                    showToast("Gagal membaca file proyek JSON.");
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+
+</body>
+</html>
