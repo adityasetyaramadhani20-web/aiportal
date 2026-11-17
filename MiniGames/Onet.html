@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Onet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #0f172a;
+            background-image: radial-gradient(circle at top right, #1e1b4b, #0f172a);
+            color: white;
+        }
+
+        .game-grid {
+            display: grid;
+            gap: 4px;
+            /* Grid akan di-set secara dinamis melalui JavaScript */
+        }
+
+        .tile {
+            position: relative;
+            background: linear-gradient(145deg, #f8fafc, #e2e8f0);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(1.2rem, 5vw, 2.5rem);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center;
+        }
+
+        .tile:active {
+            transform: scale(0.95);
+        }
+
+        .tile.selected {
+            background: linear-gradient(145deg, #fef08a, #fde047);
+            box-shadow: 0 0 15px 2px rgba(250, 204, 21, 0.6);
+            transform: scale(0.95);
+            z-index: 10;
+        }
+
+        .tile.matched {
+            transform: scale(0);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .tile-empty {
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        /* Modal Animasi */
+        .modal-enter {
+            animation: modalPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes shuffleAnim {
+            0% { transform: rotate(0deg) scale(1); opacity: 1;}
+            50% { transform: rotate(180deg) scale(0.5); opacity: 0.5;}
+            100% { transform: rotate(360deg) scale(1); opacity: 1;}
+        }
+
+        .shuffling {
+            animation: shuffleAnim 0.6s ease-in-out;
+        }
+
+        /* Garis Koneksi */
+        .path-line {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: drawPath 0.3s ease-out forwards;
+        }
+
+        @keyframes drawPath {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 overflow-hidden">
+
+    <div class="w-full max-w-2xl flex flex-col gap-4">
+        
+        <!-- Header Info -->
+        <div class="bg-slate-800/80 backdrop-blur-md border border-slate-700 p-4 rounded-2xl shadow-xl flex justify-between items-center">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-orange-500">Onet</h1>
+                <p class="text-slate-400 text-sm">Level: <span id="level-display" class="text-white font-semibold">1</span> <span class="mx-1 text-slate-600">|</span> <span id="mode-display" class="text-white font-semibold text-xs bg-slate-700 px-2 py-0.5 rounded-full">Sedang</span></p>
+            </div>
+            
+            <div class="flex flex-col items-end gap-1">
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <p class="text-xs text-slate-400 uppercase tracking-wider">Skor</p>
+                        <p id="score-display" class="text-xl sm:text-2xl font-bold text-yellow-400">0</p>
+                    </div>
+                    <button id="btn-shuffle" class="p-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg shadow transition active:scale-95" title="Acak Ulang (Penalti Waktu)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-94.71,96H128A95.38,95.38,0,0,1,62.1,196.68a8,8,0,0,1,11.8-10.77A79.4,79.4,0,0,0,128,208h1.29A80,80,0,0,0,208,128c0-42.61-33.34-77.94-75.39-79.91L136,70.63a8,8,0,1,1-16-7.26l9.63-21.19A8.13,8.13,0,0,1,137,36.56l21.19,9.63a8,8,0,0,1-6.63,14.6L130,51.89C181.76,54.78,224,96.66,224,128ZM126,204.11c-51.76-2.89-94-44.77-94-76.11a96,96,0,0,1,94.71-96H128a95.38,95.38,0,0,1,65.9,27.32,8,8,0,0,1-11.8,10.77A79.4,79.4,0,0,0,128,48h-1.29A80,80,0,0,0,48,128c0,42.61,33.34,77.94,75.39,79.91L120,185.37a8,8,0,1,1,16,7.26l-9.63,21.19a8.13,8.13,0,0,1-7.39,5.62l-21.19-9.63a8,8,0,0,1,6.63-14.6Z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timer Bar -->
+        <div class="h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-700 shadow-inner relative">
+            <div id="time-bar" class="h-full bg-gradient-to-r from-emerald-400 via-yellow-400 to-red-500 w-full transition-all duration-1000 linear origin-left"></div>
+        </div>
+
+        <!-- Game Area Container -->
+        <div id="game-container" class="relative w-full bg-slate-800/50 p-2 sm:p-3 rounded-2xl border border-slate-700/50 shadow-2xl mx-auto touch-none">
+            <!-- Grid akan dimasukkan di sini oleh JS -->
+            <div id="grid-element" class="game-grid w-full"></div>
+            
+            <!-- Layer SVG untuk menggambar jalur koneksi -->
+            <svg id="path-layer" class="absolute inset-0 w-full h-full pointer-events-none drop-shadow-lg z-50"></svg>
+        </div>
+    </div>
+
+    <!-- Pesan Mengambang (Toast) -->
+    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white px-6 py-2 rounded-full shadow-lg font-medium opacity-0 pointer-events-none transition-opacity duration-300 z-50">
+        Pesan di sini
+    </div>
+
+    <!-- Modal Status -->
+    <div id="status-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-800 border border-slate-600 p-8 rounded-3xl shadow-2xl text-center max-w-sm w-11/12 modal-enter">
+            <h2 id="modal-title" class="text-3xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-orange-500">Waktu Habis!</h2>
+            <p id="modal-desc" class="text-slate-300 mb-6 text-lg">Skor akhir kamu: <span id="modal-score" class="font-bold text-white">0</span></p>
+            
+            <div class="flex flex-col gap-3">
+                <button id="btn-next-level" class="hidden w-full py-3 px-6 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg transition transform active:scale-95">
+                    Lanjut Level Berikutnya
+                </button>
+                <button id="btn-restart" class="w-full py-3 px-6 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white font-bold rounded-xl shadow-lg transition transform active:scale-95">
+                    Main Lagi (Mulai Awal)
+                </button>
+                <button id="btn-main-menu" class="w-full py-3 px-6 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-white font-bold rounded-xl shadow-lg transition transform active:scale-95">
+                    Menu Utama
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Menu Utama / Pilih Kesulitan -->
+    <div id="difficulty-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[60] flex items-center justify-center">
+        <div class="bg-slate-800 border border-slate-600 p-8 rounded-3xl shadow-2xl text-center max-w-sm w-11/12 modal-enter">
+            <h2 class="text-4xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-orange-500">Onet</h2>
+            <p class="text-slate-300 mb-8 text-md">Pilih tingkat kesulitan awal:</p>
+            
+            <div class="flex flex-col gap-4">
+                <button id="btn-mudah" class="w-full py-3 px-6 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg transition transform active:scale-95 flex flex-col items-center">
+                    <span class="text-lg">Mudah</span>
+                    <span class="text-xs font-normal opacity-80">Waktu 2x lebih lambat</span>
+                </button>
+                <button id="btn-sedang" class="w-full py-3 px-6 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white font-bold rounded-xl shadow-lg transition transform active:scale-95 flex flex-col items-center">
+                    <span class="text-lg">Sedang</span>
+                    <span class="text-xs font-normal opacity-80">Waktu berjalan normal</span>
+                </button>
+                <button id="btn-sulit" class="w-full py-3 px-6 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 text-white font-bold rounded-xl shadow-lg transition transform active:scale-95 flex flex-col items-center">
+                    <span class="text-lg">Sulit</span>
+                    <span class="text-xs font-normal opacity-80">Waktu 1.5x lebih cepat</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Koleksi Emojis (Tema Campuran)
+        const EMOJI_POOL = ['🍎', '🍌', '🍉', '🍇', '🍓', '🍒', '🍍', '🥝', '🥥', '🍅', '🥑', '🍔', '🍟', '🍕', '🍩', '🍦', '🐶', '🐱', '🐼', '🦊', '🐸', '🐙'];
+        
+        let GAME_CONFIG = {
+            playableRows: 6,
+            playableCols: 4,
+            maxTime: 60, // detik
+        };
+
+        let board = [];
+        let totalRows, totalCols;
+        let selectedTile = null;
+        let isProcessing = false;
+        let pairsRemaining = 0;
+        let score = 0;
+        let currentLevel = 1;
+        let timeRemaining = 0;
+        let timerInterval = null;
+        
+        // Timer settings
+        let baseTimerSpeed = 1000; // Untuk di-reset ketika new game
+        let timerSpeed = 1000; // Kecepatan interval timer saat ini dalam ms
+
+        // Elemen DOM
+        const gridElement = document.getElementById('grid-element');
+        const pathLayer = document.getElementById('path-layer');
+        const scoreDisplay = document.getElementById('score-display');
+        const levelDisplay = document.getElementById('level-display');
+        const timeBar = document.getElementById('time-bar');
+        const toastEl = document.getElementById('toast');
+        const statusModal = document.getElementById('status-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+        const modalScore = document.getElementById('modal-score');
+        const btnNextLevel = document.getElementById('btn-next-level');
+        const btnRestart = document.getElementById('btn-restart');
+        const btnMainMenu = document.getElementById('btn-main-menu');
+        const btnShuffle = document.getElementById('btn-shuffle');
+
+        // Elemen Menu Kesulitan
+        const difficultyModal = document.getElementById('difficulty-modal');
+        const modeDisplay = document.getElementById('mode-display');
+        const btnMudah = document.getElementById('btn-mudah');
+        const btnSedang = document.getElementById('btn-sedang');
+        const btnSulit = document.getElementById('btn-sulit');
+
+        // --- FUNGSI BARU UNTUK MEMPERBAIKI BUG ---
+        function showToast(message) {
+            toastEl.textContent = message;
+            toastEl.classList.remove('opacity-0');
+            
+            // Hapus timeout lama agar tidak berkedip jika di-spam
+            if (window.toastTimeout) {
+                clearTimeout(window.toastTimeout);
+            }
+            
+            window.toastTimeout = setTimeout(() => {
+                toastEl.classList.add('opacity-0');
+            }, 2000);
+        }
+        // -----------------------------------------
+
+        function initGame(isNewGame = true) {
+            if (isNewGame) {
+                score = 0;
+                currentLevel = 1;
+                GAME_CONFIG.playableRows = 6;
+                GAME_CONFIG.playableCols = 6;
+                GAME_CONFIG.maxTime = 90;
+                timerSpeed = baseTimerSpeed; // Kembalikan kecepatan ke default kesulitan
+            }
+
+            scoreDisplay.textContent = score;
+            levelDisplay.textContent = currentLevel;
+            timeRemaining = GAME_CONFIG.maxTime;
+            
+            // Konfigurasi Grid (ditambah 2 untuk border kosong keliling)
+            totalRows = GAME_CONFIG.playableRows + 2;
+            totalCols = GAME_CONFIG.playableCols + 2;
+            
+            gridElement.style.gridTemplateColumns = `repeat(${totalCols}, 1fr)`;
+            
+            // Menyiapkan pasangan Emojis
+            const totalPlayableCells = GAME_CONFIG.playableRows * GAME_CONFIG.playableCols;
+            pairsRemaining = totalPlayableCells / 2;
+            
+            let selectedEmojis = [];
+            // Pilih emoji acak dari pool, pastikan cukup untuk menutupi pairs (boleh berulang)
+            for(let i=0; i<pairsRemaining; i++) {
+                let randomEmoji = EMOJI_POOL[Math.floor(Math.random() * EMOJI_POOL.length)];
+                selectedEmojis.push(randomEmoji, randomEmoji);
+            }
+            
+            // Acak (Shuffle) array emoji
+            selectedEmojis = selectedEmojis.sort(() => Math.random() - 0.5);
+
+            // Bangun Array Board 2D
+            board = Array.from({length: totalRows}, () => Array(totalCols).fill(null));
+            gridElement.innerHTML = ''; // Kosongkan grid
+
+            let emojiIndex = 0;
+
+            for (let r = 0; r < totalRows; r++) {
+                for (let c = 0; c < totalCols; c++) {
+                    const isBorder = r === 0 || r === totalRows - 1 || c === 0 || c === totalCols - 1;
+                    
+                    const cellDiv = document.createElement('div');
+                    cellDiv.dataset.r = r;
+                    cellDiv.dataset.c = c;
+                    cellDiv.className = 'aspect-square '; // Gunakan aspect-square agar proporsional
+                    
+                    if (isBorder) {
+                        board[r][c] = null;
+                        cellDiv.classList.add('tile-empty');
+                    } else {
+                        board[r][c] = selectedEmojis[emojiIndex];
+                        cellDiv.classList.add('tile');
+                        cellDiv.textContent = selectedEmojis[emojiIndex];
+                        cellDiv.addEventListener('click', () => handleTileClick(r, c));
+                        emojiIndex++;
+                    }
+                    
+                    gridElement.appendChild(cellDiv);
+                }
+            }
+
+            pathLayer.innerHTML = '';
+            selectedTile = null;
+            isProcessing = false;
+            
+            startTimer();
+            
+            // Pastikan ada langkah yang bisa dimainkan, jika tidak acak
+            setTimeout(() => {
+                if (!hasAvailableMoves()) {
+                    showToast("Mencari papan yang bisa dimainkan...");
+                    shuffleBoard();
+                }
+            }, 500);
+        }
+
+        function handleTileClick(r, c) {
+            if (isProcessing) return;
+            if (board[r][c] === null) return; // Klik area kosong
+            
+            const clickedDOM = getTileDOM(r, c);
+
+            // Jika belum ada yang dipilih
+            if (!selectedTile) {
+                selectedTile = { r, c, dom: clickedDOM };
+                clickedDOM.classList.add('selected');
+                return;
+            }
+
+            // Jika klik ubin yang sama (batal pilih)
+            if (selectedTile.r === r && selectedTile.c === c) {
+                selectedTile.dom.classList.remove('selected');
+                selectedTile = null;
+                return;
+            }
+
+            // Jika ubin berbeda tapi ikon sama -> Cek Jalur
+            if (board[selectedTile.r][selectedTile.c] === board[r][c]) {
+                const path = findPath(selectedTile.r, selectedTile.c, r, c);
+                
+                if (path) {
+                    // BERHASIL MATCH!
+                    isProcessing = true;
+                    drawPathLine(path);
+                    
+                    // Mainkan animasi dan Hapus Ubin
+                    setTimeout(() => {
+                        board[selectedTile.r][selectedTile.c] = null;
+                        board[r][c] = null;
+                        
+                        selectedTile.dom.classList.remove('selected');
+                        selectedTile.dom.classList.add('matched');
+                        clickedDOM.classList.add('matched');
+                        
+                        pathLayer.innerHTML = ''; // Hapus garis
+                        
+                        score += 10;
+                        scoreDisplay.textContent = score;
+                        pairsRemaining--;
+                        
+                        selectedTile = null;
+                        isProcessing = false;
+                        
+                        checkWinCondition();
+                    }, 350); // Waktu tayang garis
+                } else {
+                    // Ikon sama tapi tidak ada jalur, pindah seleksi saja atau beri feedback error
+                    switchSelection(r, c, clickedDOM);
+                }
+            } else {
+                // Ikon beda, pindah seleksi
+                switchSelection(r, c, clickedDOM);
+            }
+        }
+
+        function switchSelection(r, c, dom) {
+            selectedTile.dom.classList.remove('selected');
+            selectedTile = { r, c, dom: dom };
+            dom.classList.add('selected');
+        }
+
+        function getTileDOM(r, c) {
+            return document.querySelector(`div[data-r="${r}"][data-c="${c}"]`);
+        }
+
+        function findPath(r1, c1, r2, c2) {
+            // Queue format: { r, c, path: [{r,c}...], dir: direction, turns: numTurns }
+            // Dir: 0=Up, 1=Right, 2=Down, 3=Left, -1=Start
+            const queue = [{ r: r1, c: c1, path: [{r: r1, c: c1}], dir: -1, turns: 0 }];
+            
+            // visited array menyimpan minimal turn untuk mencapai suatu cell dari arah tertentu.
+            // Membutuhkan 3D array: [row][col][direction]
+            const visited = Array.from({length: totalRows}, () =>
+                Array.from({length: totalCols}, () =>
+                    Array(4).fill(Infinity)
+                )
+            );
+
+            // Menandai start node
+            for(let i=0; i<4; i++) visited[r1][c1][i] = 0;
+
+            const dr = [-1, 0, 1, 0];
+            const dc = [0, 1, 0, -1];
+
+            while (queue.length > 0) {
+                let curr = queue.shift();
+
+                // Jika sampai target
+                if (curr.r === r2 && curr.c === c2) {
+                    return curr.path; 
+                }
+
+                for (let i = 0; i < 4; i++) {
+                    let nr = curr.r + dr[i];
+                    let nc = curr.c + dc[i];
+
+                    // Cek batas array
+                    if (nr >= 0 && nr < totalRows && nc >= 0 && nc < totalCols) {
+                        let isTarget = (nr === r2 && nc === c2);
+                        
+                        // Hanya bisa lewat jika kosong ATAU itu adalah target
+                        if (board[nr][nc] === null || isTarget) {
+                            let newTurns = curr.turns;
+                            // Tambah turn jika arah berubah dan bukan langkah pertama
+                            if (curr.dir !== -1 && curr.dir !== i) {
+                                newTurns++;
+                            }
+
+                            // Hanya boleh mask 2 turn (3 garis)
+                            if (newTurns <= 2 && newTurns < visited[nr][nc][i]) {
+                                visited[nr][nc][i] = newTurns;
+                                queue.push({
+                                    r: nr,
+                                    c: nc,
+                                    path: [...curr.path, {r: nr, c: nc}],
+                                    dir: i,
+                                    turns: newTurns
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            return null; // Tidak ada jalur
+        }
+
+        function drawPathLine(pathCoords) {
+            const containerRect = gridElement.getBoundingClientRect();
+            
+            // Konversi path grid koordinat menjadi point pixel
+            const points = pathCoords.map(p => {
+                const dom = getTileDOM(p.r, p.c);
+                const rect = dom.getBoundingClientRect();
+                
+                // Kalkulasi pusat element relatif terhadap parent grid container
+                const x = (rect.left - containerRect.left) + (rect.width / 2);
+                const y = (rect.top - containerRect.top) + (rect.height / 2);
+                return `${x},${y}`;
+            });
+
+            // Buat element Polyline SVG
+            const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+            polyline.setAttribute('points', points.join(' '));
+            polyline.setAttribute('fill', 'none');
+            polyline.setAttribute('stroke', '#a78bfa'); // warna jalur (ungu terang)
+            polyline.setAttribute('stroke-width', '6');
+            polyline.setAttribute('stroke-linecap', 'round');
+            polyline.setAttribute('stroke-linejoin', 'round');
+            
+            // Efek glow
+            polyline.setAttribute('filter', 'drop-shadow(0 0 6px rgba(167, 139, 250, 0.8))');
+            polyline.classList.add('path-line');
+
+            pathLayer.appendChild(polyline);
+        }
+
+        function hasAvailableMoves() {
+            if (pairsRemaining === 0) return true;
+
+            // Kelompokkan semua koordinat berdasarkan emoji
+            const emojiMap = new Map();
+            for (let r = 1; r < totalRows - 1; r++) {
+                for (let c = 1; c < totalCols - 1; c++) {
+                    let val = board[r][c];
+                    if (val !== null) {
+                        if (!emojiMap.has(val)) emojiMap.set(val, []);
+                        emojiMap.get(val).push({r, c});
+                    }
+                }
+            }
+
+            // Cek setiap kombinasi pasangan dari emoji yang sama
+            for (let [emoji, coords] of emojiMap.entries()) {
+                for (let i = 0; i < coords.length; i++) {
+                    for (let j = i + 1; j < coords.length; j++) {
+                        let path = findPath(coords[i].r, coords[i].c, coords[j].r, coords[j].c);
+                        if (path !== null) {
+                            return true; // Ditemukan minimal 1 move yang valid
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function shuffleBoard(manual = false) {
+            if (isProcessing) return;
+            
+            if (manual) {
+                // Penalti waktu 5 detik jika manual
+                timeRemaining = Math.max(1, timeRemaining - 5);
+                showToast("-5 Detik (Acak Papan)");
+            }
+
+            isProcessing = true;
+            
+            // Kumpulkan semua nilai yang tersisa
+            let remainingItems = [];
+            let emptySpots = []; // Koordinat yang sebelumnya terisi
+            
+            for (let r = 1; r < totalRows - 1; r++) {
+                for (let c = 1; c < totalCols - 1; c++) {
+                    if (board[r][c] !== null) {
+                        remainingItems.push(board[r][c]);
+                        emptySpots.push({r, c});
+                    }
+                }
+            }
+
+            // Acak
+            remainingItems = remainingItems.sort(() => Math.random() - 0.5);
+
+            // Masukkan kembali dan tambahkan animasi rotasi
+            emptySpots.forEach((spot, index) => {
+                board[spot.r][spot.c] = remainingItems[index];
+                const dom = getTileDOM(spot.r, spot.c);
+                
+                dom.classList.add('shuffling');
+                setTimeout(() => {
+                    dom.textContent = remainingItems[index];
+                    dom.classList.remove('selected'); // Reset selection
+                }, 300); // ganti text di tengah animasi
+            });
+
+            selectedTile = null;
+
+            setTimeout(() => {
+                // Hapus class animasi
+                emptySpots.forEach(spot => {
+                    getTileDOM(spot.r, spot.c).classList.remove('shuffling');
+                });
+                isProcessing = false;
+                
+                // Pastikan papan yang diacak memiliki solusi
+                if (pairsRemaining > 0 && !hasAvailableMoves()) {
+                    shuffleBoard(false); // Acak lagi secara otomatis jika masih tidak ada jalan
+                }
+            }, 600);
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            updateTimeBar();
+            
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateTimeBar();
+
+                if (timeRemaining <= 0) {
+                    gameOver(false);
+                }
+            }, timerSpeed);
+        }
+
+        function updateTimeBar() {
+            const percentage = Math.max(0, (timeRemaining / GAME_CONFIG.maxTime) * 100);
+            timeBar.style.width = `${percentage}%`;
+            
+            // Ubah warna jika kritis
+            if (percentage < 20) {
+                timeBar.className = "h-full bg-red-500 w-full transition-all linear origin-left animate-pulse";
+            } else if (percentage < 50) {
+                timeBar.className = "h-full bg-yellow-400 w-full transition-all linear origin-left";
+            } else {
+                timeBar.className = "h-full bg-emerald-400 w-full transition-all linear origin-left";
+            }
+            
+            // Sinkronkan durasi transisi CSS bar dengan interval speed yang dipilih
+            timeBar.style.transitionDuration = `${timerSpeed}ms`;
+        }
+
+        function checkWinCondition() {
+            if (pairsRemaining === 0) {
+                // Bonus skor berdasarkan sisa waktu
+                score += timeRemaining * 2;
+                scoreDisplay.textContent = score;
+                gameOver(true);
+            } else {
+                // Auto shuffle check setiap kali match
+                if (!hasAvailableMoves()) {
+                    showToast("Papan buntu! Mengacak otomatis...");
+                    setTimeout(() => shuffleBoard(false), 800);
+                }
+            }
+        }
+
+        function gameOver(isWin) {
+            clearInterval(timerInterval);
+            statusModal.classList.remove('hidden');
+
+            if (isWin) {
+                modalTitle.textContent = "Level Selesai! 🎉";
+                modalTitle.className = "text-3xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-400";
+                
+                // Tambahkan keterangan skor sementara
+                modalDesc.innerHTML = `Skor kamu sementara: <span class="font-bold text-white">${score}</span><br><br><span class="text-sm text-yellow-300 bg-yellow-900/40 px-3 py-1 rounded-full border border-yellow-600/50">⚡ Level selanjutnya waktu 5% lebih cepat!</span>`;
+                
+                btnNextLevel.classList.remove('hidden');
+                btnRestart.classList.add('hidden');
+            } else {
+                modalTitle.textContent = "Waktu Habis! 😢";
+                modalTitle.className = "text-3xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-pink-500";
+                
+                modalDesc.innerHTML = `Permainan berakhir. Skor akhir kamu: <span class="font-bold text-white">${score}</span>`;
+                
+                btnNextLevel.classList.add('hidden');
+                btnRestart.classList.remove('hidden');
+            }
+        }
+
+        btnRestart.addEventListener('click', () => {
+            statusModal.classList.add('hidden');
+            initGame(true);
+        });
+
+        btnNextLevel.addEventListener('click', () => {
+            statusModal.classList.add('hidden');
+            currentLevel++;
+            
+            // Tingkatkan tingkat kesulitan ukuran papan
+            if (currentLevel % 2 === 0 && GAME_CONFIG.playableCols < 8) {
+                GAME_CONFIG.playableCols += 2;
+            } else if (currentLevel % 2 !== 0 && GAME_CONFIG.playableRows < 10) {
+                GAME_CONFIG.playableRows += 2;
+            }
+            
+            // Set waktu standar maksimum setiap level
+            GAME_CONFIG.maxTime = 90 + (currentLevel * 10);
+            
+            // TINGKATKAN KECEPATAN TIMER (Interval berkurang 5% atau 0.05x lebih cepat)
+            timerSpeed = timerSpeed * 0.95;
+            
+            // Batas kecepatan interval terkecil agar tidak terjadi crash (minimal 100ms)
+            if (timerSpeed < 100) {
+                timerSpeed = 100;
+            }
+            
+            // Memulai dengan isNewGame = false agar skor terus berlanjut
+            initGame(false);
+        });
+
+        btnShuffle.addEventListener('click', () => {
+            shuffleBoard(true);
+        });
+
+        // Handler Pilihan Kesulitan & Navigasi
+        function setDifficultyAndStart(modeName, speedMs) {
+            difficultyModal.classList.add('hidden');
+            modeDisplay.textContent = modeName;
+            
+            // Set kedua timer speed untuk patokan reset saat "Main Lagi"
+            baseTimerSpeed = speedMs;
+            timerSpeed = speedMs;
+            
+            // Ubah warna mode badge
+            modeDisplay.className = `text-white font-semibold text-xs px-2 py-0.5 rounded-full ${modeName === 'Mudah' ? 'bg-emerald-600' : modeName === 'Sedang' ? 'bg-indigo-600' : 'bg-red-600'}`;
+            
+            initGame(true);
+        }
+
+        btnMudah.addEventListener('click', () => setDifficultyAndStart('Mudah', 2000));
+        btnSedang.addEventListener('click', () => setDifficultyAndStart('Sedang', 1000));
+        btnSulit.addEventListener('click', () => setDifficultyAndStart('Sulit', 667));
+
+        btnMainMenu.addEventListener('click', () => {
+            statusModal.classList.add('hidden');
+            difficultyModal.classList.remove('hidden');
+            clearInterval(timerInterval);
+        });
+
+        // Window resize handler untuk memastikan path line tetap presisi jika ukuran layar berubah
+        window.addEventListener('resize', () => {
+            pathLayer.innerHTML = ''; // Hapus garis yang sedang digambar agar tidak aneh
+        });
+
+        // Mulai game ketika halaman siap
+        window.onload = () => {
+            // Tampilkan Modal Kesulitan terlebih dahulu saat web dimuat
+            difficultyModal.classList.remove('hidden');
+        };
+
+    </script>
+</body>
+</html>

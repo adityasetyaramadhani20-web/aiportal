@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DuckHunt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden;
+            touch-action: none; /* Mencegah zoom/scroll pada mobile */
+        }
+
+        .cursor-scope {
+            cursor: crosshair;
+        }
+
+        /* Animasi Flash saat menembak */
+        @keyframes flash {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        .flash-effect {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .animate-flash {
+            animation: flash 0.1s ease-out;
+        }
+
+        /* Styling untuk Bebek */
+        .duck {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            user-select: none;
+            z-index: 10;
+            cursor: crosshair;
+            transition: transform 0.1s;
+        }
+
+        /* Animasi Sayap (Visual Sederhana dengan scale) */
+        @keyframes flap {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.8); }
+        }
+        .duck-inner {
+            width: 100%;
+            height: 100%;
+            animation: flap 0.3s infinite;
+        }
+
+        /* Rumput di depan */
+        .grass-foreground {
+            background-image: linear-gradient(135deg, #4ade80 25%, transparent 25%), linear-gradient(225deg, #4ade80 25%, transparent 25%), linear-gradient(45deg, #22c55e 25%, transparent 25%), linear-gradient(315deg, #22c55e 25%, #e5e7eb 25%);
+            background-position:  10px 0, 10px 0, 0 0, 0 0;
+            background-size: 20px 20px;
+            background-repeat: repeat-x;
+        }
+
+        /* Efek teks saat kena */
+        .score-popup {
+            position: absolute;
+            color: white;
+            font-size: 20px;
+            pointer-events: none;
+            text-shadow: 2px 2px 0 #000;
+            animation: floatUp 0.5s ease-out forwards;
+            z-index: 20;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        .pixel-text {
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        /* Animasi tombol level */
+        .btn-level {
+            transition: all 0.1s;
+        }
+        .btn-level:active {
+            transform: translateY(4px);
+            border-bottom-width: 0px;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body class="bg-blue-400 h-screen w-screen relative select-none cursor-scope">
+
+    <!-- Flash Layar saat menembak -->
+    <div id="flash-overlay" class="flash-effect"></div>
+
+    <!-- UI: Skor dan Info -->
+    <div class="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-30 pointer-events-none">
+        <div class="bg-black/50 p-3 rounded border-2 border-white text-white">
+            <p class="text-xs text-yellow-300 mb-1">SKOR</p>
+            <p id="score-display" class="text-xl">0</p>
+            <p id="level-display" class="text-[10px] text-gray-300 mt-1 uppercase"></p>
+        </div>
+
+        <div class="flex flex-col items-end gap-2">
+            <div class="bg-black/50 p-3 rounded border-2 border-white text-white text-right">
+                <p class="text-xs text-red-400 mb-1">LOLOS</p>
+                <div id="missed-display" class="flex gap-1 text-red-500 text-xl">
+                    <!-- Icon X akan muncul di sini -->
+                </div>
+            </div>
+            
+            <div class="bg-black/50 p-2 rounded border-2 border-white text-white">
+                <div id="ammo-display" class="flex gap-1">
+                    <!-- Peluru akan muncul di sini -->
+                </div>
+                <p id="reload-msg" class="text-[10px] text-center text-yellow-300 hidden mt-1">RELOADING...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Area Permainan (Langit) -->
+    <div id="game-area" class="absolute inset-0 overflow-hidden">
+        <!-- Awan Dekorasi -->
+        <div class="absolute top-10 left-10 text-white/40 text-6xl opacity-80 animate-pulse">☁️</div>
+        <div class="absolute top-24 right-20 text-white/40 text-5xl opacity-60">☁️</div>
+    </div>
+
+    <!-- Foreground (Tanah/Rumput) -->
+    <div class="absolute bottom-0 w-full h-24 sm:h-32 bg-green-700 z-20 border-t-8 border-green-800 flex items-end overflow-hidden pointer-events-none">
+        <!-- Dekorasi Rumput Pixel -->
+        <div class="w-full h-8 bg-green-500 grass-foreground absolute -top-4"></div>
+        
+        <!-- Semak-semak dekoratif -->
+        <div class="absolute bottom-0 left-5 text-6xl transform translate-y-2">🌳</div>
+        <div class="absolute bottom-0 right-10 text-7xl transform translate-y-2">🌲</div>
+        <div class="absolute bottom-0 left-1/3 text-5xl transform translate-y-4">🌿</div>
+    </div>
+
+    <!-- Layar Start / Game Over -->
+    <div id="menu-overlay" class="absolute inset-0 bg-black/80 z-50 flex flex-col items-center justify-center text-center p-4">
+        <h1 class="text-4xl md:text-6xl text-yellow-400 mb-2 pixel-text tracking-widest leading-relaxed">
+            DUCK<br>HUNT
+        </h1>
+        <p class="text-white mb-6 text-sm md:text-base max-w-md leading-6">
+            Pilih Tingkat Kesulitan
+        </p>
+        
+        <div id="final-score-container" class="hidden mb-6">
+            <p class="text-red-400 text-xl mb-2">PERMAINAN SELESAI</p>
+            <p class="text-white text-2xl">Skor Akhir: <span id="final-score" class="text-green-400">0</span></p>
+        </div>
+
+        <div id="level-buttons" class="flex flex-col gap-4 w-full max-w-xs">
+            <button onclick="startGame('easy')" class="btn-level bg-green-500 hover:bg-green-600 text-white border-b-4 border-green-700 px-6 py-3 rounded pixel-text">
+                MUDAH
+                <span class="block text-[10px] opacity-80 normal-case font-sans mt-1">Lambat & Santai</span>
+            </button>
+            <button onclick="startGame('medium')" class="btn-level bg-yellow-500 hover:bg-yellow-600 text-white border-b-4 border-yellow-700 px-6 py-3 rounded pixel-text">
+                SEDANG
+                <span class="block text-[10px] opacity-80 normal-case font-sans mt-1">Kecepatan Normal</span>
+            </button>
+            <button onclick="startGame('hard')" class="btn-level bg-red-500 hover:bg-red-600 text-white border-b-4 border-red-700 px-6 py-3 rounded pixel-text">
+                SULIT
+                <span class="block text-[10px] opacity-80 normal-case font-sans mt-1">Cepat & Brutal</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Script Game -->
+    <script>
+        // State Game
+        let score = 0;
+        let missedCount = 0;
+        let maxMissed = 5;
+        let ammo = 3;
+        let isReloading = false;
+        let gameActive = false;
+        let difficultyMultiplier = 1;
+        let activeDucks = [];
+        let spawnInterval;
+        let currentLevel = 'medium';
+
+        // Konfigurasi Level
+        const levelConfig = {
+            easy: { speed: 2, spawnRate: 2000, label: "MUDAH" },   // Lambat, spawn 2 detik
+            medium: { speed: 4, spawnRate: 1500, label: "SEDANG" }, // Sedang, spawn 1.5 detik
+            hard: { speed: 7, spawnRate: 800, label: "SULIT" }      // Cepat, spawn 0.8 detik
+        };
+        
+        // Element Audio Sederhana (Menggunakan Oscillator Web Audio API untuk menghindari file eksternal)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            if (type === 'shoot') {
+                // Suara Tembakan
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'hit') {
+                // Suara Kena
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'empty') {
+                // Suara Kosong
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.05);
+            }
+        }
+
+        // SVG Duck Template
+        const duckSVG = `
+            <svg viewBox="0 0 100 100" class="duck-inner drop-shadow-md">
+                <!-- Body -->
+                <path d="M20,60 Q10,60 10,50 Q10,40 30,40 L70,40 Q90,40 90,50 Q90,60 80,60 Z" fill="#fff" stroke="#000" stroke-width="2"/>
+                <!-- Head -->
+                <circle cx="75" cy="35" r="15" fill="#166534" stroke="#000" stroke-width="2"/>
+                <circle cx="80" cy="30" r="3" fill="white"/> <!-- Eye -->
+                <path d="M85,35 L98,32 L85,40 Z" fill="#fbbf24" stroke="#000" stroke-width="1"/> <!-- Beak -->
+                <!-- Wing -->
+                <path d="M35,50 Q45,20 65,50" fill="#78350f" stroke="#000" stroke-width="2"/>
+            </svg>
+        `;
+
+        function updateUI() {
+            document.getElementById('score-display').textContent = score;
+            
+            // Render Missed Icons
+            const missedEl = document.getElementById('missed-display');
+            missedEl.innerHTML = '';
+            for(let i=0; i<maxMissed; i++) {
+                const span = document.createElement('span');
+                span.textContent = i < missedCount ? '💀' : '⚪';
+                span.className = i < missedCount ? 'opacity-100' : 'opacity-30';
+                missedEl.appendChild(span);
+            }
+
+            // Render Ammo
+            const ammoEl = document.getElementById('ammo-display');
+            ammoEl.innerHTML = '';
+            for(let i=0; i<3; i++) {
+                const bullet = document.createElement('div');
+                bullet.className = `w-3 h-6 rounded-sm border border-white ${i < ammo ? 'bg-yellow-400' : 'bg-gray-600'}`;
+                ammoEl.appendChild(bullet);
+            }
+
+            const reloadMsg = document.getElementById('reload-msg');
+            reloadMsg.style.display = isReloading ? 'block' : 'none';
+        }
+
+        function startGame(level) {
+            currentLevel = level;
+            score = 0;
+            missedCount = 0;
+            ammo = 3;
+            difficultyMultiplier = 1; // Reset multiplier, but base speed depends on level
+            gameActive = true;
+            isReloading = false;
+            activeDucks = []; 
+            
+            document.getElementById('game-area').innerHTML = `
+                <div class="absolute top-10 left-10 text-white/40 text-6xl opacity-80 animate-pulse">☁️</div>
+                <div class="absolute top-24 right-20 text-white/40 text-5xl opacity-60">☁️</div>
+            `;
+            document.getElementById('menu-overlay').classList.add('hidden');
+            document.getElementById('final-score-container').classList.add('hidden');
+            document.getElementById('level-display').textContent = levelConfig[level].label;
+            
+            updateUI();
+            
+            // Start spawning based on level config
+            spawnInterval = setInterval(spawnDuck, levelConfig[level].spawnRate);
+            requestAnimationFrame(gameLoop);
+        }
+
+        function spawnDuck() {
+            if (!gameActive) return;
+
+            const config = levelConfig[currentLevel];
+            const gameArea = document.getElementById('game-area');
+            const duckEl = document.createElement('div');
+            duckEl.className = 'duck';
+            duckEl.innerHTML = duckSVG;
+
+            // Random start position (Left or Right side)
+            const startLeft = Math.random() > 0.5;
+            const startY = Math.random() * (window.innerHeight - 250); 
+            
+            let x = startLeft ? -60 : window.innerWidth;
+            let y = startY;
+            
+            // Speed Calculation: Base Speed (Level) + Random variation + Difficulty Ramp
+            let baseSpeed = config.speed;
+            let randomVar = Math.random() * 2; 
+            let rampUp = (score / 500); // Slight speed up every 500 points
+            
+            let finalSpeedX = (baseSpeed + randomVar + rampUp) * (startLeft ? 1 : -1);
+            let speedY = (Math.random() * 2 - 1) * 2; 
+
+            // Flip visual based on direction
+            if (!startLeft) {
+                duckEl.style.transform = 'scaleX(-1)';
+            }
+
+            duckEl.style.left = x + 'px';
+            duckEl.style.top = y + 'px';
+
+            // Events
+            duckEl.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                hitDuck(duckEl, e.clientX, e.clientY);
+            });
+            duckEl.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                hitDuck(duckEl, e.touches[0].clientX, e.touches[0].clientY);
+            });
+
+            gameArea.appendChild(duckEl);
+
+            activeDucks.push({
+                element: duckEl,
+                x: x,
+                y: y,
+                speedX: finalSpeedX,
+                speedY: speedY,
+                isDead: false
+            });
+
+            // Adjust spawn rate slightly as game progresses (only for Medium/Hard)
+            if (currentLevel !== 'easy') {
+                clearInterval(spawnInterval);
+                let currentRate = config.spawnRate - (score * 0.5); 
+                // Cap max speed
+                let minRate = currentLevel === 'medium' ? 800 : 500;
+                let newRate = Math.max(minRate, currentRate);
+                spawnInterval = setInterval(spawnDuck, newRate);
+            }
+        }
+
+        function hitDuck(duckEl, clickX, clickY) {
+            if (ammo <= 0 || isReloading || !gameActive) return;
+
+            shootMechanic();
+
+            const duckObj = activeDucks.find(d => d.element === duckEl);
+            if (duckObj && !duckObj.isDead) {
+                duckObj.isDead = true;
+                playSound('hit');
+                score += 100;
+                
+                duckEl.innerHTML = `<div class="text-4xl">💥</div>`;
+                duckEl.style.transition = 'top 0.5s ease-in';
+                
+                const popup = document.createElement('div');
+                popup.textContent = "100";
+                popup.className = 'score-popup';
+                popup.style.left = clickX + 'px';
+                popup.style.top = clickY + 'px';
+                document.body.appendChild(popup);
+                setTimeout(() => popup.remove(), 600);
+
+                setTimeout(() => {
+                    if(duckEl.parentNode) duckEl.parentNode.removeChild(duckEl);
+                    activeDucks = activeDucks.filter(d => d !== duckObj);
+                }, 500);
+
+                updateUI();
+            }
+        }
+
+        function handleMiss() {
+            missedCount++;
+            updateUI();
+            
+            const missedEl = document.getElementById('missed-display');
+            missedEl.classList.add('scale-125');
+            setTimeout(() => missedEl.classList.remove('scale-125'), 200);
+
+            if (missedCount >= maxMissed) {
+                endGame();
+            }
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(spawnInterval);
+            document.getElementById('menu-overlay').classList.remove('hidden');
+            document.getElementById('final-score-container').classList.remove('hidden');
+            document.getElementById('final-score').textContent = score;
+        }
+
+        function reload() {
+            if (isReloading) return;
+            isReloading = true;
+            updateUI();
+            
+            setTimeout(() => {
+                ammo = 3;
+                isReloading = false;
+                updateUI();
+                playSound('empty'); 
+            }, 1200);
+        }
+
+        function shootMechanic() {
+            if (ammo > 0 && !isReloading) {
+                ammo--;
+                playSound('shoot');
+                
+                const flash = document.getElementById('flash-overlay');
+                flash.classList.remove('animate-flash');
+                void flash.offsetWidth;
+                flash.classList.add('animate-flash');
+                
+                if (ammo === 0) {
+                    reload();
+                }
+                updateUI();
+            } else {
+                playSound('empty');
+            }
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+
+            activeDucks.forEach(duck => {
+                if (duck.isDead) {
+                    duck.y += 10;
+                    duck.element.style.top = duck.y + 'px';
+                } else {
+                    duck.x += duck.speedX;
+                    duck.y += duck.speedY;
+
+                    if (duck.y < 0 || duck.y > window.innerHeight - 150) {
+                        duck.speedY *= -1;
+                    }
+
+                    duck.element.style.left = duck.x + 'px';
+                    duck.element.style.top = duck.y + 'px';
+
+                    const outRight = duck.speedX > 0 && duck.x > window.innerWidth;
+                    const outLeft = duck.speedX < 0 && duck.x < -100;
+
+                    if (outRight || outLeft) {
+                        duck.element.remove();
+                        activeDucks = activeDucks.filter(d => d !== duck);
+                        handleMiss();
+                    }
+                }
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.addEventListener('mousedown', (e) => {
+            if(gameActive && !e.target.closest('.duck') && !e.target.closest('button')) {
+                shootMechanic();
+            }
+        });
+
+        window.addEventListener('touchstart', (e) => {
+            if(gameActive && !e.target.closest('.duck') && !e.target.closest('button')) {
+                shootMechanic();
+            }
+        });
+
+    </script>
+</body>
+</html>

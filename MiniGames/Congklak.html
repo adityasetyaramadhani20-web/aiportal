@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Congklak</title>
+    <!-- Menggunakan Tailwind CSS untuk styling cepat -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f3f4f6;
+            touch-action: manipulation; /* Mencegah zoom ganda pada mobile */
+        }
+
+        /* */
+        /* Styling Papan Kayu dengan kedalaman 3D */
+        .board-wood {
+            background: linear-gradient(to bottom right, #8B4513, #5D4037);
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.6), 
+                0 15px 20px -10px rgba(0, 0, 0, 0.5),
+                inset 0 0 50px rgba(0,0,0,0.7);
+            border: 6px solid #3E2723;
+        }
+
+        /* Styling Lubang Kecil & Lumbung */
+        .hole {
+            background-color: #2D150F;
+            box-shadow: inset 0 6px 10px rgba(0,0,0,0.8), 0 2px 2px rgba(255,255,255,0.1);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Efek Hover untuk Lubang yang Bisa Diklik */
+        .hole.playable:hover {
+            transform: scale(1.08);
+            background-color: #3E2723;
+            cursor: pointer;
+            box-shadow: 
+                inset 0 4px 6px rgba(0,0,0,0.8),
+                0 0 15px #f59e0b; /* Amber-500 glow */
+        }
+        
+        .hole.active-movement {
+            background-color: #4c1d95 !important; /* Indigo-900 */
+            transform: scale(1.12);
+            box-shadow: 
+                inset 0 2px 4px rgba(0,0,0,0.5),
+                0 0 20px #8b5cf6; /* Purple-500 glow */
+        }
+
+        /* Biji Congklak Visual */
+        .visual-seed {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: inset -2px -2px 3px rgba(0,0,0,0.4), 1px 1px 2px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        /* Indikator Giliran */
+        .turn-indicator {
+            transition: all 0.3s ease;
+            opacity: 0.4;
+        }
+        .turn-indicator.active {
+            opacity: 1;
+            font-weight: bold;
+            transform: scale(1.05);
+        }
+
+        /* Modal Overlay */
+        #message-overlay {
+            background-color: rgba(0,0,0,0.85);
+            backdrop-filter: blur(6px);
+        }
+
+        /* Animasi Kemenangan */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-custom {
+            animation: bounce 1s infinite;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col items-center justify-center select-none text-gray-800 bg-gray-100">
+
+    <!-- -->
+    <div class="absolute top-4 w-full px-6 flex justify-between items-center max-w-5xl z-10">
+        <!-- Pemain 2 (Atas) -->
+        <div id="p2-indicator" class="turn-indicator text-base md:text-lg bg-white px-4 py-2 rounded-xl shadow-md border border-gray-200 flex items-center gap-2">
+            <span id="p2-icon">👤</span> 
+            <span id="p2-name" class="font-semibold text-gray-700">Pemain 2 (Atas)</span>
+        </div>
+        
+        <!-- Judul Game -->
+        <div class="text-3xl font-extrabold tracking-widest text-amber-900 hidden sm:block">CONGKLAK</div>
+        
+        <!-- Pemain 1 (Bawah) -->
+        <div id="p1-indicator" class="turn-indicator text-base md:text-lg bg-white px-4 py-2 rounded-xl shadow-md border border-gray-200 flex items-center gap-2">
+            <span class="font-semibold text-gray-700">👤 Pemain 1 (Bawah)</span>
+        </div>
+    </div>
+
+    <!-- Status Aksi (Jalan Lagi, Nembak, dll) -->
+    <div id="action-status" class="h-8 mb-2 text-amber-800 font-bold text-lg animate-pulse text-center mt-12 z-10"></div>
+
+    <!-- -->
+    <!-- Pengaturan Jumlah Biji & Kesulitan AI -->
+    <div class="mb-4 flex flex-wrap gap-3 justify-center items-center bg-white/95 p-3 rounded-2xl shadow-sm border border-gray-200 z-10 text-xs sm:text-sm">
+        <div class="flex items-center gap-2">
+            <label class="font-semibold text-gray-600">Biji/Lubang:</label>
+            <select id="start-seeds-select" onchange="changeStartSeeds(this.value)" class="bg-gray-100 border border-gray-300 rounded-lg px-2 py-1 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <option value="5">5 Biji</option>
+                <option value="7" selected>7 Biji</option>
+                <option value="9">9 Biji</option>
+            </select>
+        </div>
+
+        <div id="difficulty-wrapper" class="hidden flex items-center gap-2 border-l border-gray-200 pl-3">
+            <label class="font-semibold text-gray-600">Kesulitan AI:</label>
+            <select id="ai-difficulty" onchange="changeDifficulty(this.value)" class="bg-gray-100 border border-gray-300 rounded-lg px-2 py-1 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <option value="easy" selected>Mudah</option>
+                <option value="hard">Sulit (Minimax)</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- -->
+    <div class="relative w-full max-w-5xl px-4 flex flex-col items-center justify-center scale-90 md:scale-100 origin-center">
+        
+        <!-- Bungkus Papan agar kita bisa menonaktifkan klik saat animasi -->
+        <div id="board-container" class="relative">
+            <!-- Papan Congklak Kayu -->
+            <div class="board-wood rounded-[50px] p-6 md:p-8 flex items-center gap-4 md:gap-8 relative">
+                
+                <!-- Lumbung P2 (Kiri) - Index 15 -->
+                <div id="hole-15" class="store w-20 h-48 md:w-24 md:h-60 rounded-full flex flex-col justify-between items-center hole text-white p-3">
+                    <span class="text-xs font-bold tracking-wider opacity-60">LUMBUNG P2</span>
+                    <div id="visual-seeds-15" class="relative w-full h-24 md:h-36 overflow-hidden pointer-events-none"></div>
+                    <span id="seed-15" class="seed-count text-3xl font-extrabold tracking-tight z-10 bg-black/40 px-2.5 py-0.5 rounded-full text-amber-300">0</span>
+                </div>
+
+                <!-- Area Lubang Kecil -->
+                <div class="flex flex-col gap-6 md:gap-8">
+                    
+                    <!-- Baris P2 (Atas) - Index 14 s/d 8 (TIDAK menggunakan flex-row-reverse agar alur melingkar & tembak sejajar secara fisik) -->
+                    <div class="flex gap-2 md:gap-4">
+                        <div id="hole-14" onclick="handleClick(14)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p2-hole">
+                            <div id="visual-seeds-14" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-14" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-13" onclick="handleClick(13)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p2-hole">
+                            <div id="visual-seeds-13" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-13" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-12" onclick="handleClick(12)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p2-hole">
+                            <div id="visual-seeds-12" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-12" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-11" onclick="handleClick(11)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p2-hole">
+                            <div id="visual-seeds-11" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-11" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-10" onclick="handleClick(10)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p2-hole">
+                            <div id="visual-seeds-10" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-10" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-9" onclick="handleClick(9)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p2-hole">
+                            <div id="visual-seeds-9" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-9" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-8" onclick="handleClick(8)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p2-hole">
+                            <div id="visual-seeds-8" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-8" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                    </div>
+
+                    <!-- Baris P1 (Bawah) - Index 0 s/d 6 -->
+                    <div class="flex gap-2 md:gap-4">
+                        <div id="hole-0" onclick="handleClick(0)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p1-hole">
+                            <div id="visual-seeds-0" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-0" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-1" onclick="handleClick(1)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p1-hole">
+                            <div id="visual-seeds-1" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-1" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-2" onclick="handleClick(2)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p1-hole">
+                            <div id="visual-seeds-2" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-2" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-3" onclick="handleClick(3)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p1-hole">
+                            <div id="visual-seeds-3" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-3" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-4" onclick="handleClick(4)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p1-hole">
+                            <div id="visual-seeds-4" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-4" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-5" onclick="handleClick(5)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p1-hole">
+                            <div id="visual-seeds-5" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-5" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                        <div id="hole-6" onclick="handleClick(6)" class="hole w-12 h-12 md:w-16 md:h-16 rounded-full flex justify-center items-center text-white text-xl font-bold playable p1-hole">
+                            <div id="visual-seeds-6" class="absolute inset-0 pointer-events-none"></div>
+                            <span id="seed-6" class="absolute bottom-1 bg-black/40 px-1 rounded text-xs text-amber-200 pointer-events-none z-10">7</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Lumbung P1 (Kanan) - Index 7 -->
+                <div id="hole-7" class="store w-20 h-48 md:w-24 md:h-60 rounded-full flex flex-col justify-between items-center hole text-white p-3">
+                    <span class="text-xs font-bold tracking-wider opacity-60">LUMBUNG P1</span>
+                    <div id="visual-seeds-7" class="relative w-full h-24 md:h-36 overflow-hidden pointer-events-none"></div>
+                    <span id="seed-7" class="seed-count text-3xl font-extrabold tracking-tight z-10 bg-black/40 px-2.5 py-0.5 rounded-full text-amber-300">0</span>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Tombol Aksi Bawah -->
+        <div class="mt-8 flex gap-4 z-10">
+            <button onclick="toggleMode()" id="mode-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition transform active:scale-95 flex items-center gap-2">
+                👥 Mode: 2 Pemain
+            </button>
+            <button onclick="resetGame()" class="bg-amber-800 hover:bg-amber-900 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg transition transform active:scale-95">
+                🔄 Reset
+            </button>
+        </div>
+    </div>
+
+    <!-- Overlay Pesan Game Over -->
+    <div id="message-overlay" class="fixed inset-0 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-8 max-w-sm text-center shadow-2xl animate-bounce-custom border border-amber-900/10">
+            <h2 id="modal-title" class="text-2xl font-bold mb-4 text-amber-900">Permainan Selesai!</h2>
+            <p id="modal-message" class="text-lg mb-6 text-gray-700 font-medium"></p>
+            <button onclick="resetGame()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition transform active:scale-95">
+                Main Lagi
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* */
+        let startSeedsPerHole = 7;
+        let seeds = new Array(16).fill(startSeedsPerHole);
+        seeds[7] = 0; 
+        seeds[15] = 0;
+
+        let currentPlayer = 1; // 1 (Human) atau 2 (Human/AI)
+        let isAnimating = false; 
+        let isSinglePlayer = false; // Default: 2 Pemain
+        let difficulty = 'easy'; // easy atau hard
+        const delay = 350; // milidetik perpindahan biji
+
+        // Palet warna gradasi biji congklak untuk rendering visual
+        const seedColors = [
+            'linear-gradient(135deg, #f87171, #dc2626)', // Red
+            'linear-gradient(135deg, #60a5fa, #2563eb)', // Blue
+            'linear-gradient(135deg, #34d399, #059669)', // Green
+            'linear-gradient(135deg, #fbbf24, #d97706)', // Amber
+            'linear-gradient(135deg, #c084fc, #7c3aed)', // Purple
+            'linear-gradient(135deg, #f472b6, #db2777)', // Pink
+            'linear-gradient(135deg, #22d3ee, #0891b2)'  // Cyan
+        ];
+
+        /* */
+        // Web Audio API Synth untuk Efek Suara Ketukan Kayu (Thock)
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Sintesis suara tumbukan biji kayu / kerikil yang realistis
+        function playThockSound() {
+            initAudio();
+            if (!audioCtx) return;
+
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const now = audioCtx.currentTime;
+
+            // 1. Nada utama yang diredam (Hollow wood thock)
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(140, now);
+            // Penurunan frekuensi cepat agar terdengar seperti tumbukan padat
+            osc.frequency.exponentialRampToValueAtTime(70, now + 0.08);
+
+            gainNode.gain.setValueAtTime(0.6, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.12);
+
+            // 2. Nada transient tajam (Marble click clack)
+            const clickOsc = audioCtx.createOscillator();
+            const clickGain = audioCtx.createGain();
+
+            clickOsc.type = 'sine';
+            clickOsc.frequency.setValueAtTime(1200, now);
+            clickOsc.frequency.exponentialRampToValueAtTime(300, now + 0.02);
+
+            clickGain.gain.setValueAtTime(0.15, now);
+            clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+
+            clickOsc.connect(clickGain);
+            clickGain.connect(audioCtx.destination);
+            clickOsc.start(now);
+            clickOsc.stop(now + 0.03);
+        }
+
+        /* */
+        function changeStartSeeds(val) {
+            startSeedsPerHole = parseInt(val);
+            resetGame();
+        }
+
+        function changeDifficulty(val) {
+            difficulty = val;
+            resetGame();
+        }
+
+        // Mengubah Mode Antara 2 Pemain & Lawan Komputer
+        function toggleMode() {
+            isSinglePlayer = !isSinglePlayer;
+            const btn = document.getElementById('mode-btn');
+            const p2Name = document.getElementById('p2-name');
+            const p2Icon = document.getElementById('p2-icon');
+            const diffWrapper = document.getElementById('difficulty-wrapper');
+            
+            if (isSinglePlayer) {
+                btn.innerText = "🤖 Mode: Lawan Komputer";
+                btn.classList.replace('bg-blue-600', 'bg-purple-600');
+                btn.classList.replace('hover:bg-blue-700', 'hover:bg-purple-700');
+                p2Name.innerText = "Komputer (AI)";
+                p2Icon.innerText = "🤖";
+                diffWrapper.classList.remove('hidden');
+            } else {
+                btn.innerText = "👥 Mode: 2 Pemain";
+                btn.classList.replace('bg-purple-600', 'bg-blue-600');
+                btn.classList.replace('hover:bg-purple-700', 'hover:bg-blue-700');
+                p2Name.innerText = "Pemain 2 (Atas)";
+                p2Icon.innerText = "👤";
+                diffWrapper.classList.add('hidden');
+            }
+            resetGame();
+        }
+
+        /* */
+        // Menghasilkan posisi acak namun konsisten di dalam lubang agar tidak saling menumpuk terlalu rapi
+        function renderVisualSeeds(holeIndex, count) {
+            const container = document.getElementById(`visual-seeds-${holeIndex}`);
+            if (!container) return;
+            container.innerHTML = '';
+
+            const maxVisuals = 18; // Batasi jumlah biji visual agar tidak lag / berantakan
+            const visibleCount = Math.min(count, maxVisuals);
+            const isStore = (holeIndex === 7 || holeIndex === 15);
+
+            for (let i = 0; i < visibleCount; i++) {
+                const seed = document.createElement('div');
+                seed.className = 'visual-seed';
+                
+                // Pilih warna berdasarkan index biji agar bervariasi
+                seed.style.background = seedColors[i % seedColors.length];
+
+                // Hitung sebaran melingkar secara probabilistik di dalam lubang
+                let radius, angle, x, y;
+                if (isStore) {
+                    // Distribusi elips untuk lumbung memanjang
+                    radius = Math.random() * 22 + 5;
+                    angle = Math.random() * Math.PI * 2;
+                    x = 50 + Math.cos(angle) * radius * 0.7;
+                    y = 50 + Math.sin(angle) * radius * 1.5;
+                } else {
+                    // Distribusi melingkar untuk lubang kecil
+                    radius = Math.random() * 16 + 4;
+                    angle = Math.random() * Math.PI * 2;
+                    x = 50 + Math.cos(angle) * radius;
+                    y = 50 + Math.sin(angle) * radius;
+                }
+
+                seed.style.left = `${x}%`;
+                seed.style.top = `${y}%`;
+                seed.style.transform = 'translate(-50%, -50%)';
+                
+                container.appendChild(seed);
+            }
+
+            // Jika jumlah biji melebihi batas visual, tampilkan tumpukan ekstra kecil
+            if (count > maxVisuals) {
+                const plusText = document.createElement('div');
+                plusText.className = 'absolute text-[9px] text-white/80 font-bold pointer-events-none';
+                plusText.style.right = '4px';
+                plusText.style.top = '4px';
+                plusText.innerText = `+${count - maxVisuals}`;
+                container.appendChild(plusText);
+            }
+        }
+
+        /* */
+        function updateUI() {
+            // Update teks jumlah dan visualisasi biji di setiap lubang
+            for (let i = 0; i < 16; i++) {
+                const el = document.getElementById(`seed-${i}`);
+                if (el) el.innerText = seeds[i];
+                
+                const holeEl = document.getElementById(`hole-${i}`);
+                if(holeEl) {
+                    if (seeds[i] === 0 && i !== 7 && i !== 15) {
+                        holeEl.classList.add('opacity-40');
+                    } else {
+                        holeEl.classList.remove('opacity-40');
+                    }
+                }
+                renderVisualSeeds(i, seeds[i]);
+            }
+
+            const p1Ind = document.getElementById('p1-indicator');
+            const p2Ind = document.getElementById('p2-indicator');
+            const p1Holes = document.querySelectorAll('.p1-hole');
+            const p2Holes = document.querySelectorAll('.p2-hole');
+            const boardContainer = document.getElementById('board-container');
+
+            // Set kontrol interaksi papan global berdasarkan status animasi / giliran
+            if (isAnimating || (isSinglePlayer && currentPlayer === 2)) {
+                boardContainer.classList.add('pointer-events-none');
+            } else {
+                boardContainer.classList.remove('pointer-events-none');
+            }
+
+            // Hapus kelas playable dari semua terlebih dahulu
+            p1Holes.forEach(el => el.classList.remove('playable'));
+            p2Holes.forEach(el => el.classList.remove('playable'));
+
+            if (currentPlayer === 1) {
+                p1Ind.classList.add('active', 'ring-2', 'ring-amber-500');
+                p2Ind.classList.remove('active', 'ring-2', 'ring-amber-500');
+                // P1 hanya bisa memainkan lubangnya sendiri yang berisi biji
+                p1Holes.forEach((el, index) => {
+                    if (seeds[index] > 0) el.classList.add('playable');
+                });
+            } else {
+                p2Ind.classList.add('active', 'ring-2', 'ring-amber-500');
+                p1Ind.classList.remove('active', 'ring-2', 'ring-amber-500');
+                // P2 (Human) hanya bisa memainkan lubangnya sendiri jika dalam mode 2 Pemain
+                if (!isSinglePlayer) {
+                    p2Holes.forEach((el, idx) => {
+                        const originalIdx = idx + 8; // Mapping ke index 8 s/d 14
+                        if (seeds[originalIdx] > 0) el.classList.add('playable');
+                    });
+                }
+            }
+        }
+
+        function setStatus(msg) {
+            const el = document.getElementById('action-status');
+            el.innerText = msg;
+            setTimeout(() => {
+                if(el.innerText === msg) el.innerText = "";
+            }, 2500);
+        }
+
+        /* */
+        async function handleClick(index, isAI = false) {
+            if (isAnimating) return;
+            initAudio(); // Bangun konteks audio dari interaksi pengguna
+
+            // Validasi kepemilikan lubang saat giliran berlangsung
+            if (currentPlayer === 1) {
+                if (index < 0 || index > 6) return; 
+            } else {
+                if (isSinglePlayer && !isAI) return; // Kunci interaksi manual P2 saat mode AI aktif
+                if (index < 8 || index > 14) return;
+            }
+
+            if (seeds[index] === 0) return;
+
+            isAnimating = true;
+            updateUI();
+            await distributeSeeds(index);
+        }
+
+        /* */
+        // Simulasi pembagian biji secara berputar searah jarum jam (Estafet)
+        async function distributeSeeds(startIndex) {
+            let hand = seeds[startIndex];
+            seeds[startIndex] = 0;
+            updateUI();
+            
+            let currentIndex = startIndex;
+            
+            const startHole = document.getElementById(`hole-${startIndex}`);
+            if (startHole) startHole.classList.add('active-movement');
+
+            while (hand > 0) {
+                await new Promise(r => setTimeout(r, delay));
+                document.getElementById(`hole-${currentIndex}`)?.classList.remove('active-movement');
+
+                currentIndex = (currentIndex + 1) % 16;
+
+                // Skip lumbung lawan berdasarkan giliran pemain
+                if (currentPlayer === 1 && currentIndex === 15) currentIndex = 0; 
+                if (currentPlayer === 2 && currentIndex === 7) currentIndex = 8;  
+
+                const currentHole = document.getElementById(`hole-${currentIndex}`);
+                if (currentHole) currentHole.classList.add('active-movement');
+                
+                seeds[currentIndex]++;
+                hand--;
+                
+                // Mainkan suara thock di setiap pembagian biji
+                playThockSound();
+                updateUI();
+            }
+
+            await new Promise(r => setTimeout(r, delay));
+            document.getElementById(`hole-${currentIndex}`)?.classList.remove('active-movement');
+
+            await checkLandingRule(currentIndex);
+        }
+
+        /* */
+        async function checkLandingRule(lastIndex) {
+            // 1. Jatuh di Lumbung Sendiri (Pemain berhak jalan lagi)
+            if ((currentPlayer === 1 && lastIndex === 7) || (currentPlayer === 2 && lastIndex === 15)) {
+                setStatus(isSinglePlayer && currentPlayer === 2 ? "🤖 Komputer JALAN LAGI!" : "🎉 JALAN LAGI!");
+                
+                if (isSideEmpty(currentPlayer)) {
+                    collectAllRemainingSeeds();
+                    finishGame();
+                } else {
+                    isAnimating = false;
+                    updateUI();
+                    // Jika giliran komputer dan dapat bonus, panggil AI lagi
+                    if (isSinglePlayer && currentPlayer === 2) {
+                        aiTurn();
+                    }
+                }
+                return;
+            }
+
+            // 2. Jatuh di lubang berisi (Putaran berlanjut / Estafet)
+            if (seeds[lastIndex] > 1 && lastIndex !== 7 && lastIndex !== 15) {
+                await new Promise(r => setTimeout(r, 400));
+                await distributeSeeds(lastIndex);
+                return;
+            }
+
+            // 3. Jatuh di lubang kosong di sisi sendiri (Menembak lubang lawan secara lurus / sejajar secara vertikal)
+            const isOwnSide = (currentPlayer === 1 && lastIndex >= 0 && lastIndex <= 6) || 
+                              (currentPlayer === 2 && lastIndex >= 8 && lastIndex <= 14);
+
+            if (seeds[lastIndex] === 1 && isOwnSide && lastIndex !== 7 && lastIndex !== 15) {
+                let oppositeIndex = 14 - lastIndex;
+                if (seeds[oppositeIndex] > 0) {
+                    setStatus("💥 NEMBAK!");
+                    await new Promise(r => setTimeout(r, 600));
+
+                    let captured = seeds[oppositeIndex] + seeds[lastIndex];
+                    seeds[oppositeIndex] = 0;
+                    seeds[lastIndex] = 0;
+
+                    let storeIndex = currentPlayer === 1 ? 7 : 15;
+                    seeds[storeIndex] += captured;
+                    
+                    // Mainkan variasi ketukan thock berganda untuk tembakan
+                    playThockSound();
+                    setTimeout(playThockSound, 80);
+                    setTimeout(playThockSound, 160);
+                    
+                    updateUI();
+                }
+            }
+
+            endTurn();
+        }
+
+        function endTurn() {
+            // Ganti Giliran Pemain
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            
+            // Periksa ketersediaan biji pada sisi pemain baru
+            if (isSideEmpty(currentPlayer)) {
+                let skippedPlayer = currentPlayer;
+                // Lewati giliran jika kosong
+                currentPlayer = currentPlayer === 1 ? 2 : 1; 
+                
+                if (isSideEmpty(currentPlayer)) {
+                    // Jika kedua sisi kosong, selesaikan game
+                    collectAllRemainingSeeds();
+                    finishGame();
+                    return;
+                }
+                
+                setStatus(`${skippedPlayer === 1 ? 'Pemain 1' : (isSinglePlayer ? 'Komputer' : 'Pemain 2')} Habis! Giliran Dilewati.`);
+            }
+
+            isAnimating = false;
+            updateUI();
+            
+            // Panggil aksi AI jika gilirannya tiba
+            if (isSinglePlayer && currentPlayer === 2) {
+                aiTurn();
+            }
+        }
+
+        // Memeriksa apakah seluruh lubang di satu sisi kosong
+        function isSideEmpty(player) {
+            let start = player === 1 ? 0 : 8;
+            let end = player === 1 ? 6 : 14;
+            let total = 0;
+            for(let i = start; i <= end; i++) total += seeds[i];
+            return total === 0;
+        }
+
+        // Aturan Akhir Permainan Tradisional: Mengambil sisa biji di lubang masing-masing ke lumbung
+        function collectAllRemainingSeeds() {
+            let p1Extra = 0;
+            let p2Extra = 0;
+            
+            for (let i = 0; i <= 6; i++) {
+                p1Extra += seeds[i];
+                seeds[i] = 0;
+            }
+            for (let i = 8; i <= 14; i++) {
+                p2Extra += seeds[i];
+                seeds[i] = 0;
+            }
+
+            seeds[7] += p1Extra;
+            seeds[15] += p2Extra;
+            updateUI();
+        }
+
+        /* */
+        async function aiTurn() {
+            if (!isSinglePlayer || currentPlayer !== 2) return;
+            
+            setStatus("Komputer sedang berpikir...");
+            await new Promise(r => setTimeout(r, 1200)); // Jeda berpikir realistis
+
+            let possibleMoves = [];
+            // Deteksi semua lubang P2 yang valid dan memiliki biji
+            for (let i = 8; i <= 14; i++) {
+                if (seeds[i] > 0) possibleMoves.push(i);
+            }
+
+            if (possibleMoves.length === 0) {
+                endTurn();
+                return;
+            }
+
+            let chosenIndex = -1;
+
+            if (difficulty === 'easy') {
+                // Mode Mudah: Pilih acak, tapi utamakan jika ada langkah langsung masuk ke lumbung sendiri
+                let extraTurnMoves = possibleMoves.filter(move => {
+                    return (seeds[move] % 15 === (15 - move));
+                });
+                if (extraTurnMoves.length > 0) {
+                    chosenIndex = extraTurnMoves[Math.floor(Math.random() * extraTurnMoves.length)];
+                } else {
+                    chosenIndex = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                }
+            } else {
+                // Mode Sulit: Simulasi Heuristik (Analisis 1-Langkah Depan)
+                let bestScore = -999;
+                
+                for (let move of possibleMoves) {
+                    let score = evaluateMove(move);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        chosenIndex = move;
+                    }
+                }
+                
+                // Safety net jika semua bobot bernilai sama
+                if (chosenIndex === -1) {
+                    chosenIndex = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                }
+            }
+            
+            await handleClick(chosenIndex, true);
+        }
+
+        // Heuristik sederhana untuk menghitung langkah terbaik secara deterministik
+        function evaluateMove(startIndex) {
+            let tempSeeds = [...seeds];
+            let hand = tempSeeds[startIndex];
+            tempSeeds[startIndex] = 0;
+            
+            let currentIndex = startIndex;
+            let score = 0;
+
+            // Simulasi distribusi biji
+            while (hand > 0) {
+                currentIndex = (currentIndex + 1) % 16;
+                if (currentIndex === 7) currentIndex = 8; // Lewati lumbung P1
+                
+                tempSeeds[currentIndex]++;
+                hand--;
+            }
+
+            // Bobot Keuntungan 1: Mendarat tepat di lumbung P2 (Dapat kesempatan jalan lagi)
+            if (currentIndex === 15) {
+                score += 15; // Prioritas sangat tinggi
+            }
+
+            // Bobot Keuntungan 2: Menembak lurus lubang lawan
+            const isP2Side = (currentIndex >= 8 && currentIndex <= 14);
+            if (tempSeeds[currentIndex] === 1 && isP2Side && currentIndex !== 15) {
+                let oppositeIndex = 14 - currentIndex;
+                if (tempSeeds[oppositeIndex] > 0) {
+                    score += (tempSeeds[oppositeIndex] + 5); // Sangat menguntungkan berdasarkan jumlah biji musuh
+                }
+            }
+
+            // Bobot Keuntungan 3: Mencegah lubang sendiri kosong dengan sengaja jika mengundang bahaya
+            // Tambahkan nilai mikro acak agar pola bermain tidak terlalu monoton
+            score += (Math.random() * 2);
+
+            return score;
+        }
+
+        /* */
+        function finishGame() {
+            updateUI();
+            let scoreP1 = seeds[7];
+            let scoreP2 = seeds[15];
+            let msg = "";
+            
+            if (scoreP1 > scoreP2) {
+                msg = "Pemain 1 Menang!";
+            } else if (scoreP2 > scoreP1) {
+                msg = (isSinglePlayer ? "Komputer Menang!" : "Pemain 2 Menang!");
+            } else {
+                msg = "Hasil Seri!";
+            }
+
+            document.getElementById('modal-title').innerText = msg;
+            document.getElementById('modal-message').innerText = `Skor Akhir: ${scoreP1} - ${scoreP2}`;
+            document.getElementById('message-overlay').classList.remove('hidden');
+        }
+
+        function resetGame() {
+            seeds = new Array(16).fill(startSeedsPerHole);
+            seeds[7] = 0;
+            seeds[15] = 0;
+            currentPlayer = 1;
+            isAnimating = false;
+            document.getElementById('message-overlay').classList.add('hidden');
+            document.getElementById('action-status').innerText = "";
+            updateUI();
+        }
+
+        // Inisialisasi awal permainan saat halaman dimuat
+        window.onload = function() {
+            updateUI();
+        };
+    </script>
+</body>
+</html>

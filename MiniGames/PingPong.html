@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PingPong</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050510;
+            --primary-color: #00f3ff; /* Cyan Neon */
+            --secondary-color: #ff0055; /* Magenta Neon */
+            --text-color: #ffffff;
+            --panel-bg: rgba(255, 255, 255, 0.05);
+        }
+
+        * { box-sizing: border-box; touch-action: manipulation; }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Orbitron', sans-serif;
+            margin: 0;
+            overflow: hidden; /* Mencegah scroll saat bermain */
+        }
+
+        /* Container Utama */
+        #main-wrapper {
+            width: 100%;
+            max-width: 800px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Scoreboard */
+        #score-board {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            padding: 10px 20px;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(5px);
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .p1-score { color: var(--primary-color); }
+        .p2-score { color: var(--secondary-color); }
+
+        /* Game Area */
+        #game-container {
+            position: relative;
+            width: 100%;
+            /* Aspect ratio trick untuk menjaga proporsi canvas */
+            aspect-ratio: 4/3; 
+            background-color: #0a0a14;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
+            border: 2px solid #333;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Overlay (Menu, Pause, Game Over) */
+        #game-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 16, 0.85);
+            backdrop-filter: blur(4px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            transition: opacity 0.3s;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin: 0 0 10px 0;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+
+        button {
+            padding: 12px 30px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(45deg, var(--primary-color), #00aaff);
+            color: #000;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 15px;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px var(--primary-color);
+        }
+
+        button:active { transform: scale(0.95); }
+
+        /* Controls Panel (Settings) */
+        #controls-panel {
+            margin-top: 15px;
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+        }
+
+        label { font-size: 0.8rem; color: #aaa; }
+
+        select, input[type="range"], input[type="number"] {
+            background: #222;
+            border: 1px solid #444;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-family: inherit;
+        }
+
+        /* Mobile Controls (Touch) */
+        #mobile-controls {
+            display: none; /* Hidden on desktop by default */
+            width: 100%;
+            margin-top: 10px;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .touch-btn {
+            flex: 1;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: white;
+            font-size: 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            box-shadow: none; /* Reset default button shadow */
+        }
+        
+        .touch-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Responsive Logic */
+        @media (max-width: 768px) {
+            #mobile-controls { display: flex; }
+            #instructions-text { display: none; }
+            h1 { font-size: 1.8rem; }
+            #score-board { font-size: 1rem; }
+            button { padding: 10px 20px; font-size: 0.9rem; }
+        }
+
+        /* Shake Animation */
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-wrapper">
+        <!-- Scoreboard -->
+        <div id="score-board">
+            <span class="p1-score">PLAYER 1: <span id="score1">0</span></span>
+            <span class="p2-score">PLAYER 2: <span id="score2">0</span></span>
+        </div>
+
+        <!-- Game Canvas Container -->
+        <div id="game-container">
+            <canvas id="pongCanvas"></canvas>
+            
+            <!-- Overlay Menu -->
+            <div id="game-overlay">
+                <h1 id="overlay-title">PING PONG</h1>
+                <p id="overlay-message" style="margin-bottom: 20px; color: #ccc;">Siap Bermain?</p>
+                <button id="start-btn">MULAI GAME</button>
+                <p id="countdown" style="font-size: 4rem; display: none; margin: 0; color: var(--primary-color);">3</p>
+            </div>
+        </div>
+
+        <!-- Mobile Touch Controls -->
+        <div id="mobile-controls">
+            <button class="touch-btn" id="btn-up">▲</button>
+            <button class="touch-btn" id="btn-down">▼</button>
+        </div>
+
+        <!-- Settings Panel -->
+        <div id="controls-panel">
+            <div class="control-group">
+                <label>Mode:</label>
+                <select id="gameMode">
+                    <option value="ai">1 Pemain (vs AI)</option>
+                    <option value="human">2 Pemain (Lokal)</option>
+                    <option value="ai-vs-ai">Demo (AI vs AI)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Kesulitan:</label>
+                <select id="difficulty">
+                    <option value="easy">Mudah</option>
+                    <option value="medium" selected>Sedang</option>
+                    <option value="hard">Sulit</option>
+                    <option value="impossible">Dewa</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Target Skor:</label>
+                <input type="number" id="winningScore" min="3" max="20" value="5" style="width: 60px;">
+            </div>
+            <div id="instructions-text" style="width: 100%; text-align: center; font-size: 0.8rem; color: #666; margin-top: 10px;">
+                <kbd>W</kbd>/<kbd>S</kbd> untuk P1 &nbsp;|&nbsp; <kbd>↑</kbd>/<kbd>↓</kbd> untuk P2 &nbsp;|&nbsp; <kbd>SPASI</kbd> untuk Pause
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * LOGIKA GAME
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('pongCanvas');
+            const ctx = canvas.getContext('2d');
+            const container = document.getElementById('game-container');
+            
+            // Elements
+            const score1El = document.getElementById('score1');
+            const score2El = document.getElementById('score2');
+            const overlay = document.getElementById('game-overlay');
+            const titleEl = document.getElementById('overlay-title');
+            const msgEl = document.getElementById('overlay-message');
+            const startBtn = document.getElementById('start-btn');
+            const countdownEl = document.getElementById('countdown');
+            
+            // Inputs
+            const modeSelect = document.getElementById('gameMode');
+            const diffSelect = document.getElementById('difficulty');
+            const winInput = document.getElementById('winningScore');
+
+            // Game State
+            let gameState = 'MENU'; // MENU, PLAYING, PAUSED, OVER
+            let p1Score = 0;
+            let p2Score = 0;
+            let animationId;
+            let particles = [];
+            
+            // Setup Canvas Resolution (Fixed Logic, Scaled Display)
+            const LOGICAL_WIDTH = 800;
+            const LOGICAL_HEIGHT = 600;
+            canvas.width = LOGICAL_WIDTH;
+            canvas.height = LOGICAL_HEIGHT;
+
+            // Objects
+            const paddle = { w: 15, h: 100, speed: 8 };
+            
+            const player1 = {
+                x: 20,
+                y: LOGICAL_HEIGHT/2 - 50,
+                color: '#00f3ff',
+                dy: 0,
+                score: 0
+            };
+
+            const player2 = {
+                x: LOGICAL_WIDTH - 35,
+                y: LOGICAL_HEIGHT/2 - 50,
+                color: '#ff0055',
+                dy: 0,
+                score: 0
+            };
+
+            const ball = {
+                x: LOGICAL_WIDTH/2,
+                y: LOGICAL_HEIGHT/2,
+                r: 8,
+                speed: 7,
+                dx: 7,
+                dy: 7,
+                color: '#ffffff'
+            };
+
+            // Input States
+            const keys = {
+                w: false, s: false, 
+                ArrowUp: false, ArrowDown: false
+            };
+
+            // --- FUNGSI UTAMA ---
+
+            function drawRect(x, y, w, h, c, shadow = false) {
+                ctx.fillStyle = c;
+                if (shadow) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = c;
+                }
+                ctx.fillRect(x, y, w, h);
+                ctx.shadowBlur = 0;
+            }
+
+            function drawCircle(x, y, r, c) {
+                ctx.fillStyle = c;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = c;
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            function drawNet() {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                for(let i=0; i<canvas.height; i+=30) {
+                    ctx.fillRect(canvas.width/2 - 1, i, 2, 15);
+                }
+            }
+
+            // Sistem Partikel (Efek ledakan kecil)
+            function createParticles(x, y, color) {
+                for(let i=0; i<10; i++) {
+                    particles.push({
+                        x: x, y: y,
+                        dx: (Math.random() - 0.5) * 8,
+                        dy: (Math.random() - 0.5) * 8,
+                        life: 1,
+                        color: color
+                    });
+                }
+            }
+
+            function updateParticles() {
+                for(let i=0; i<particles.length; i++) {
+                    let p = particles[i];
+                    p.x += p.dx;
+                    p.y += p.dy;
+                    p.life -= 0.05;
+                    
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+
+                    if(p.life <= 0) {
+                        particles.splice(i, 1);
+                        i--;
+                    }
+                }
+            }
+
+            function resetBall() {
+                ball.x = canvas.width / 2;
+                ball.y = canvas.height / 2;
+                ball.speed = 7; // Reset speed
+                
+                // Random direction start
+                ball.dx = (Math.random() > 0.5 ? 1 : -1) * ball.speed;
+                ball.dy = (Math.random() * 2 - 1) * ball.speed; 
+            }
+
+            function screenShake() {
+                container.classList.add('shake');
+                setTimeout(() => container.classList.remove('shake'), 500);
+            }
+
+            // AI Logic
+            function moveAI(p, ball) {
+                // Kalkulasi pusat paddle
+                const center = p.y + paddle.h / 2;
+                
+                // Faktor kesalahan AI berdasarkan kesulitan
+                let mistakeChance = 0;
+                let reactionSpeed = 6;
+
+                switch(diffSelect.value) {
+                    case 'easy': mistakeChance = 0.2; reactionSpeed = 4; break;
+                    case 'medium': mistakeChance = 0.1; reactionSpeed = 7; break;
+                    case 'hard': mistakeChance = 0.02; reactionSpeed = 10; break;
+                    case 'impossible': mistakeChance = 0; reactionSpeed = 15; break;
+                }
+
+                // AI hanya bergerak jika bola mendekat (opsional, tapi lebih natural)
+                // if (ball.dx < 0 && p === player2) return; 
+
+                // Prediksi sederhana
+                if (Math.random() > mistakeChance) {
+                    if (center < ball.y - 10) {
+                        p.y += reactionSpeed;
+                    } else if (center > ball.y + 10) {
+                        p.y -= reactionSpeed;
+                    }
+                }
+            }
+
+            function update() {
+                if (gameState !== 'PLAYING') return;
+
+                // Gerakan Player 1
+                if (modeSelect.value === 'ai-vs-ai') {
+                     moveAI(player1, ball);
+                } else {
+                    // Manual Controls
+                    if (keys.w && player1.y > 0) player1.y -= paddle.speed;
+                    if (keys.s && player1.y < canvas.height - paddle.h) player1.y += paddle.speed;
+                }
+
+                // Gerakan Player 2
+                if (modeSelect.value === 'human') {
+                    if (keys.ArrowUp && player2.y > 0) player2.y -= paddle.speed;
+                    if (keys.ArrowDown && player2.y < canvas.height - paddle.h) player2.y += paddle.speed;
+                } else {
+                    // AI Move
+                    moveAI(player2, ball);
+                }
+
+                // Clamp Paddle Positions
+                player1.y = Math.max(0, Math.min(canvas.height - paddle.h, player1.y));
+                player2.y = Math.max(0, Math.min(canvas.height - paddle.h, player2.y));
+
+                // Gerakan Bola
+                ball.x += ball.dx;
+                ball.y += ball.dy;
+
+                // Pantulan Dinding Atas/Bawah
+                if (ball.y - ball.r < 0 || ball.y + ball.r > canvas.height) {
+                    ball.dy = -ball.dy;
+                    // Sound effect placeholder here
+                }
+
+                // Pantulan Paddle
+                let player = (ball.x < canvas.width / 2) ? player1 : player2;
+                
+                if (
+                    ball.x - ball.r < player.x + paddle.w &&
+                    ball.x + ball.r > player.x &&
+                    ball.y + ball.r > player.y &&
+                    ball.y - ball.r < player.y + paddle.h
+                ) {
+                    // Logika tabrakan: pantulkan bola
+                    // Normalisasi titik tabrakan (-1 sampai 1)
+                    let collidePoint = ball.y - (player.y + paddle.h/2);
+                    collidePoint = collidePoint / (paddle.h/2);
+
+                    // Sudut pantul (maks 45 derajat)
+                    let angleRad = collidePoint * (Math.PI/4);
+
+                    // Arah X (tergantung paddle mana yang kena)
+                    let direction = (ball.x < canvas.width/2) ? 1 : -1;
+
+                    // Tambah kecepatan setiap kali kena paddle
+                    ball.speed += 0.5;
+                    // Cap max speed
+                    if(ball.speed > 20) ball.speed = 20;
+
+                    ball.dx = direction * ball.speed * Math.cos(angleRad);
+                    ball.dy = ball.speed * Math.sin(angleRad);
+
+                    // Efek Visual
+                    createParticles(ball.x, ball.y, player.color);
+                }
+
+                // Skor
+                if (ball.x - ball.r < 0) {
+                    p2Score++;
+                    score2El.innerText = p2Score;
+                    screenShake();
+                    checkWin();
+                } else if (ball.x + ball.r > canvas.width) {
+                    p1Score++;
+                    score1El.innerText = p1Score;
+                    screenShake();
+                    checkWin();
+                }
+            }
+
+            function checkWin() {
+                const target = parseInt(winInput.value);
+                if (p1Score >= target || p2Score >= target) {
+                    let winner = p1Score >= target ? "PLAYER 1" : "PLAYER 2";
+                    gameOver(winner);
+                } else {
+                    resetBall();
+                }
+            }
+
+            function draw() {
+                // Clear Background
+                drawRect(0, 0, canvas.width, canvas.height, '#050510'); // Dark BG
+                drawNet();
+
+                // Draw Elements
+                drawRect(player1.x, player1.y, paddle.w, paddle.h, player1.color, true);
+                drawRect(player2.x, player2.y, paddle.w, paddle.h, player2.color, true);
+                drawCircle(ball.x, ball.y, ball.r, ball.color);
+
+                // Particles
+                updateParticles();
+            }
+
+            function loop() {
+                if (gameState === 'PLAYING' || gameState === 'MENU') {
+                    update();
+                }
+                draw();
+                animationId = requestAnimationFrame(loop);
+            }
+
+            // --- KONTROL ALUR GAME ---
+
+            function startCountdown() {
+                gameState = 'MENU'; // Freeze updates
+                overlay.style.display = 'flex';
+                titleEl.style.display = 'none';
+                msgEl.style.display = 'none';
+                startBtn.style.display = 'none';
+                
+                countdownEl.style.display = 'block';
+                let count = 3;
+                countdownEl.innerText = count;
+
+                let intv = setInterval(() => {
+                    count--;
+                    if (count > 0) {
+                        countdownEl.innerText = count;
+                    } else {
+                        clearInterval(intv);
+                        countdownEl.innerText = "GO!";
+                        setTimeout(() => {
+                            overlay.style.display = 'none';
+                            gameState = 'PLAYING';
+                        }, 500);
+                    }
+                }, 1000);
+            }
+
+            function initGame() {
+                p1Score = 0;
+                p2Score = 0;
+                score1El.innerText = 0;
+                score2El.innerText = 0;
+                resetBall();
+                startCountdown();
+            }
+
+            function gameOver(winner) {
+                gameState = 'OVER';
+                overlay.style.display = 'flex';
+                titleEl.style.display = 'block';
+                titleEl.innerText = "GAME OVER";
+                
+                countdownEl.style.display = 'none';
+                msgEl.style.display = 'block';
+                msgEl.innerText = `${winner} MENANG!`;
+                msgEl.style.color = (winner === 'PLAYER 1') ? player1.color : player2.color;
+                
+                startBtn.style.display = 'block';
+                startBtn.innerText = "MAIN LAGI";
+            }
+
+            function togglePause() {
+                if (gameState === 'PLAYING') {
+                    gameState = 'PAUSED';
+                    overlay.style.display = 'flex';
+                    titleEl.style.display = 'block';
+                    titleEl.innerText = "PAUSED";
+                    msgEl.style.display = 'none';
+                    startBtn.style.display = 'block';
+                    startBtn.innerText = "LANJUTKAN";
+                    countdownEl.style.display = 'none';
+                } else if (gameState === 'PAUSED') {
+                    gameState = 'PLAYING';
+                    overlay.style.display = 'none';
+                }
+            }
+
+            // --- EVENT LISTENERS ---
+
+            // Keyboard
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'w' || e.key === 'W') keys.w = true;
+                if (e.key === 's' || e.key === 'S') keys.s = true;
+                if (e.key === 'ArrowUp') keys.ArrowUp = true;
+                if (e.key === 'ArrowDown') keys.ArrowDown = true;
+                if (e.code === 'Space') togglePause();
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (e.key === 'w' || e.key === 'W') keys.w = false;
+                if (e.key === 's' || e.key === 'S') keys.s = false;
+                if (e.key === 'ArrowUp') keys.ArrowUp = false;
+                if (e.key === 'ArrowDown') keys.ArrowDown = false;
+            });
+
+            // Mobile Touch Controls
+            const btnUp = document.getElementById('btn-up');
+            const btnDown = document.getElementById('btn-down');
+
+            const handleTouch = (key, state) => (e) => {
+                e.preventDefault(); // Mencegah scrolling/zooming
+                
+                // Logic untuk mengontrol pemain yang relevan
+                // Jika Human vs Human, tombol ini kontrol P2? Atau P1?
+                // Untuk kesederhanaan mobile:
+                // Jika 1 Player: Kontrol P1 (W/S logic)
+                // Jika 2 Player: HP biasanya tidak cukup lebar untuk 2 orang, 
+                // jadi asumsi Mobile = Single Player mode untuk sekarang.
+                
+                if (modeSelect.value === 'ai') {
+                    // Kontrol P1
+                    if (key === 'up') keys.w = state;
+                    if (key === 'down') keys.s = state;
+                } else {
+                    // Default behavior (bisa disesuaikan)
+                    if (key === 'up') keys.w = state;
+                    if (key === 'down') keys.s = state;
+                }
+            };
+
+            btnUp.addEventListener('touchstart', handleTouch('up', true));
+            btnUp.addEventListener('touchend', handleTouch('up', false));
+            btnUp.addEventListener('mousedown', handleTouch('up', true)); // Mouse support for testing
+            btnUp.addEventListener('mouseup', handleTouch('up', false));
+
+            btnDown.addEventListener('touchstart', handleTouch('down', true));
+            btnDown.addEventListener('touchend', handleTouch('down', false));
+            btnDown.addEventListener('mousedown', handleTouch('down', true));
+            btnDown.addEventListener('mouseup', handleTouch('down', false));
+
+            // UI Buttons
+            startBtn.addEventListener('click', () => {
+                if (gameState === 'PAUSED') {
+                    togglePause();
+                } else {
+                    initGame();
+                }
+            });
+
+            // Init Loop
+            resetBall();
+            draw(); // Gambar frame awal
+            loop(); // Start loop (meskipun state MENU)
+        });
+    </script>
+</body>
+</html>

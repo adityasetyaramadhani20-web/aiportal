@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-white select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SimTok</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            tokRed: '#fe2c55',
+            tokCyan: '#25f4ee',
+            darkOverlay: 'rgba(0, 0, 0, 0.45)',
+          },
+          animation: {
+            'spin-slow': 'spin 5s linear infinite',
+            'bounce-heart': 'bounceHeart 0.8s ease-out forwards',
+            'float-note': 'floatNote 2.4s ease-out infinite',
+            'marquee': 'marquee 12s linear infinite',
+          },
+          keyframes: {
+            bounceHeart: {
+              '0%': { transform: 'scale(0) rotate(-15deg)', opacity: '0' },
+              '35%': { transform: 'scale(1.3) rotate(10deg)', opacity: '0.95' },
+              '60%': { transform: 'scale(0.95) rotate(-5deg)', opacity: '1' },
+              '100%': { transform: 'scale(1.2) translateY(-60px) rotate(5deg)', opacity: '0' },
+            },
+            floatNote: {
+              '0%': { transform: 'translate(0, 0) scale(0.6)', opacity: '0' },
+              '30%': { opacity: '0.9' },
+              '100%': { transform: 'translate(-28px, -45px) scale(1.1)', opacity: '0' },
+            },
+            marquee: {
+              '0%': { transform: 'translateX(100%)' },
+              '100%': { transform: 'translateX(-100%)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom scroll snapping for silky smooth 60fps vertical swipe */
+    .snap-y-mandatory {
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; /* Firefox */
+    }
+    .snap-y-mandatory::-webkit-scrollbar {
+      display: none; /* Chrome, Safari, Edge */
+    }
+    .snap-child {
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+    }
+    
+    /* Radial vignette gradient overlay for text readability */
+    .vignette-overlay {
+      background: linear-gradient(
+        180deg, 
+        rgba(0, 0, 0, 0.45) 0%, 
+        transparent 20%, 
+        transparent 60%, 
+        rgba(0, 0, 0, 0.85) 100%
+      );
+    }
+
+    /* Subtle neon glow for active items */
+    .neon-text-glow {
+      text-shadow: 0 0 12px rgba(254, 44, 85, 0.6);
+    }
+    
+    /* Interactive progress bar scrub styles */
+    .scrubber-thumb {
+      transition: transform 0.15s ease, height 0.15s ease;
+    }
+    .scrubber-container:hover .scrubber-thumb {
+      height: 6px;
+    }
+  </style>
+</head>
+<body class="h-full w-full overflow-hidden bg-slate-950 flex items-center justify-center font-sans antialiased text-white">
+
+  <!-- Desktop App Frame Container (Adaptive: Fullscreen on mobile, centered smartphone canvas on desktop) -->
+  <main class="relative w-full h-full sm:max-w-[420px] sm:h-[94vh] sm:max-h-[890px] sm:rounded-[36px] sm:border-[8px] sm:border-slate-800 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden bg-black flex flex-col">
+
+    <!-- Top Navigation Header (Floating Overlay) -->
+    <header class="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-3 pb-2 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
+      <!-- Left: Playlist Library & Info Button -->
+      <div class="pointer-events-auto flex items-center space-x-2">
+        <button id="openPlaylistModalBtn" class="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 hover:bg-white/20 active:scale-95 transition-all text-white/90" title="Playlist Manager">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h7" />
+          </svg>
+        </button>
+        <span id="playlistBadge" class="hidden text-xs bg-slate-800/80 px-2.5 py-1 rounded-full text-slate-300 font-medium backdrop-blur-md border border-white/10">Default</span>
+      </div>
+
+      <!-- Center: Feed Tabs (Following / For You) -->
+      <div class="pointer-events-auto flex items-center space-x-4 text-sm font-semibold tracking-wide">
+        <button id="tabFollowing" class="text-white/60 hover:text-white transition-colors py-1">Following</button>
+        <div class="w-0.5 h-3 bg-white/20"></div>
+        <button id="tabFYP" class="text-white border-b-2 border-white pb-0.5 transition-all font-bold">For You</button>
+      </div>
+
+      <!-- Right: Search & Global Sound Switch -->
+      <div class="pointer-events-auto flex items-center space-x-2">
+        <button id="globalAudioBtn" class="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 hover:bg-white/20 active:scale-95 transition-all text-white/90" title="Mute/Unmute (M)">
+          <!-- Unmuted Icon -->
+          <svg id="iconVolumeOn" class="w-5 h-5 hidden text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z"/>
+          </svg>
+          <!-- Muted Icon -->
+          <svg id="iconVolumeMuted" class="w-5 h-5 text-tokRed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+          </svg>
+        </button>
+        
+        <button id="openShortcutsBtn" class="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 hover:bg-white/20 active:scale-95 transition-all text-white/90" title="Keyboard Shortcuts">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Top Autoplay / Audio Prompt Notification -->
+    <div id="unmuteToast" class="absolute top-16 inset-x-4 z-30 transition-all duration-300 opacity-100 flex items-center justify-between px-3.5 py-2.5 bg-tokRed/90 backdrop-blur-md rounded-xl text-xs font-semibold shadow-lg">
+      <div class="flex items-center space-x-2">
+        <svg class="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z"/>
+        </svg>
+        <span>Audio muted by browser autoplay policy.</span>
+      </div>
+      <button id="quickUnmuteBtn" class="bg-white text-tokRed px-2.5 py-1 rounded-lg text-[11px] font-bold shadow hover:bg-slate-100 active:scale-95 transition">Unmute</button>
+    </div>
+
+    <!-- Long-press 2X Speed HUD Badge -->
+    <div id="speedBadge" class="absolute top-16 left-1/2 -translate-x-1/2 z-40 px-3.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-tokCyan/60 text-tokCyan text-xs font-bold tracking-wider flex items-center space-x-1.5 opacity-0 transition-opacity pointer-events-none shadow-lg">
+      <svg class="w-3.5 h-3.5 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M13 6l6 6-6 6V6zM5 6l6 6-6 6V6z"/></svg>
+      <span>2X SPEED</span>
+    </div>
+
+    <!-- Feed Scroller Container: Native Snap Scroll with Dynamic Video Slides -->
+    <div id="feedContainer" class="w-full h-full overflow-y-scroll snap-y-mandatory relative bg-black">
+      <!-- Slides will be rendered here dynamically via JavaScript -->
+    </div>
+
+    <!-- Empty State Placeholder (Visible only when feed is empty) -->
+    <div id="emptyFeedState" class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center p-6 text-center bg-slate-950">
+      <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 mb-4 shadow-inner">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <h3 class="text-lg font-bold mb-1">Playlist Kosong</h3>
+      <p class="text-xs text-slate-400 max-w-xs mb-5">Belum ada video di dalam playlist ini. Silakan impor playlist file lokal, JSON, atau URL langsung.</p>
+      <button id="emptyImportBtn" class="px-5 py-2.5 rounded-xl bg-tokRed hover:bg-rose-600 font-semibold text-xs shadow-lg active:scale-95 transition-all">
+        Buka Manajer Playlist
+      </button>
+    </div>
+
+    <!-- Floating Global Double-Tap Heart Template Container -->
+    <div id="heartsContainer" class="absolute inset-0 pointer-events-none z-30 overflow-hidden"></div>
+
+    <!-- Modal: Playlist Manager & Importer -->
+    <div id="playlistModal" class="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col justify-end sm:justify-center p-0 sm:p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+      <div class="w-full max-h-[90%] sm:max-h-[82%] bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden">
+        <!-- Modal Header -->
+        <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-tokRed animate-pulse"></div>
+            <h2 class="text-base font-bold">Manajer Playlist SimTok</h2>
+          </div>
+          <button id="closePlaylistModalBtn" class="p-1 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Import Mode Tabs -->
+        <div class="grid grid-cols-3 gap-1 p-2 bg-slate-950/60 border-b border-slate-800 text-xs font-semibold">
+          <button id="tabImportFiles" class="py-2 rounded-lg bg-slate-800 text-white transition">File Lokal</button>
+          <button id="tabImportUrls" class="py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition">URL MP4</button>
+          <button id="tabImportJSON" class="py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition">JSON Config</button>
+        </div>
+
+        <!-- Tab Body Content -->
+        <div class="p-4 overflow-y-auto space-y-4 text-xs">
+          <!-- Pane 1: Local Files -->
+          <div id="paneFiles" class="space-y-3">
+            <p class="text-slate-300">Pilih satu atau beberapa file video dari komputer / ponsel Anda (.mp4, .webm):</p>
+            <label class="border-2 border-dashed border-slate-700 hover:border-tokCyan rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer bg-slate-950/40 hover:bg-slate-900 transition-all text-center group">
+              <svg class="w-10 h-10 text-slate-500 group-hover:text-tokCyan transition-colors mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span class="font-semibold text-slate-200">Klik untuk jelajah atau drop file video</span>
+              <span class="text-[11px] text-slate-500 mt-1">Mendukung MP4, WebM, MOV</span>
+              <input type="file" id="localFileInput" multiple accept="video/mp4,video/webm,video/quicktime" class="hidden">
+            </label>
+          </div>
+
+          <!-- Pane 2: URLs List -->
+          <div id="paneUrls" class="hidden space-y-3">
+            <p class="text-slate-300">Masukkan tautan langsung video MP4 (satu URL per baris):</p>
+            <textarea id="rawUrlsInput" rows="5" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-tokCyan resize-none font-mono" placeholder="https://example.com/video1.mp4&#10;https://example.com/video2.mp4"></textarea>
+            <button id="loadUrlsBtn" class="w-full py-2.5 rounded-xl bg-tokRed hover:bg-rose-600 font-semibold text-white transition active:scale-95">Muat Daftar URL</button>
+          </div>
+
+          <!-- Pane 3: JSON Import & Export -->
+          <div id="paneJSON" class="hidden space-y-3">
+            <div class="flex justify-between items-center">
+              <p class="text-slate-300">Struktur Playlist JSON:</p>
+              <button id="exportJSONBtn" class="text-tokCyan hover:underline text-[11px] font-semibold">Ekspor JSON Saat Ini</button>
+            </div>
+            <textarea id="rawJsonInput" rows="5" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-[11px] text-slate-300 focus:outline-none focus:border-tokCyan resize-none font-mono" placeholder='[{"url":"...","author":"@creator","caption":"Sample #fyp","music":"Original Sound"}]'></textarea>
+            <button id="loadJsonBtn" class="w-full py-2.5 rounded-xl bg-tokRed hover:bg-rose-600 font-semibold text-white transition active:scale-95">Terapkan JSON</button>
+          </div>
+
+          <!-- Quick Curated Presets -->
+          <div class="pt-3 border-t border-slate-800">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">Preset Bawaan</span>
+              <button id="resetDemoBtn" class="text-[11px] text-tokRed hover:underline font-semibold">Kembalikan Default</button>
+            </div>
+            <div id="presetChips" class="flex flex-wrap gap-1.5">
+              <button data-preset="tech" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]">Teknologi & Urban</button>
+              <button data-preset="nature" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]">Alam & Wisata</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer Actions -->
+        <div class="p-3 bg-slate-950 border-t border-slate-800 flex justify-between items-center text-xs">
+          <span id="playlistStatsText" class="text-slate-400">Total Video: 0</span>
+          <button id="donePlaylistModalBtn" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition active:scale-95">Tutup</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Sheet: Interactive Comments Modal -->
+    <div id="commentsModal" class="absolute inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col justify-end opacity-0 pointer-events-none transition-opacity duration-200">
+      <div id="commentsSheet" class="w-full h-[65%] bg-slate-900 border-t border-slate-800 rounded-t-3xl flex flex-col shadow-2xl transform translate-y-full transition-transform duration-300 ease-out">
+        <!-- Header -->
+        <div class="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between">
+          <div class="w-6"></div>
+          <span id="commentSheetTitle" class="text-xs font-bold tracking-wide">0 Komentar</span>
+          <button id="closeCommentsBtn" class="p-1 rounded-full text-slate-400 hover:text-white transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Comments Feed List -->
+        <div id="commentsList" class="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
+          <!-- Comments will be populated here -->
+        </div>
+
+        <!-- Comment Input Field Bar -->
+        <form id="commentForm" class="p-3 bg-slate-950 border-t border-slate-800 flex items-center space-x-2">
+          <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-tokRed to-purple-500 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+            Me
+          </div>
+          <input id="commentInput" type="text" placeholder="Tambahkan komentar..." autocomplete="off" class="flex-1 bg-slate-900 border border-slate-800 rounded-full px-4 py-2 text-xs text-white focus:outline-none focus:border-tokRed/60">
+          <button type="submit" class="p-2 text-tokRed disabled:text-slate-600 font-bold transition hover:scale-105 active:scale-95">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Keyboard Shortcuts Cheat Sheet -->
+    <div id="shortcutsModal" class="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+      <div class="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 class="font-bold text-sm">Pintasan Keyboard</h3>
+          <button id="closeShortcutsBtn" class="text-slate-400 hover:text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="space-y-2.5 text-xs text-slate-300">
+          <div class="flex justify-between items-center"><span>Video Berikutnya</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono">↓ / J</kbd></div>
+          <div class="flex justify-between items-center"><span>Video Sebelumnya</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono">↑ / K</kbd></div>
+          <div class="flex justify-between items-center"><span>Play / Pause</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono">Space</kbd></div>
+          <div class="flex justify-between items-center"><span>Mute / Unmute</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono">M</kbd></div>
+          <div class="flex justify-between items-center"><span>Like Video</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono">L</kbd></div>
+          <div class="flex justify-between items-center"><span>Tahan Spasi / Klik</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono">2X Speed</kbd></div>
+        </div>
+        <button id="dismissShortcutsBtn" class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold text-xs transition">Tutup</button>
+      </div>
+    </div>
+
+    <!-- Toast Feedback Overlay -->
+    <div id="toastMessage" class="absolute bottom-16 inset-x-6 z-50 text-center py-2 px-4 rounded-xl bg-slate-900/90 text-white text-xs font-semibold shadow-2xl border border-white/10 opacity-0 pointer-events-none transition-all duration-300 transform translate-y-3">
+      Tautan disalin ke clipboard!
+    </div>
+
+  </main>
+
+  <script>
+    /* Global Application State */
+    const State = {
+      isGlobalMuted: true,
+      currentIndex: 0,
+      playlist: [],
+      playlistsCollection: {},
+      isFastForwarding: false,
+      longPressTimer: null,
+      commentsData: {},
+      likesData: {},
+    };
+
+    /* Built-in high-quality public domain / sample video streams */
+    const DEFAULT_PLAYLISTS = {
+      tech: [
+        {
+          id: 'v1',
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+          author: '@gadget_future',
+          caption: 'Chromecast generasi berikutnya dengan fitur ultra responsif! 🔥 Cek spek lengkapnya #tech #chromecast #gadget',
+          music: 'Synthwave Dreams - @techbeats',
+          likes: 42100,
+          commentsCount: 384,
+          shares: 1205
+        },
+        {
+          id: 'v2',
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+          author: '@wanderlust_id',
+          caption: 'Tempat pelarian terbaik saat penat dengan deadline kota. Siapa yang butuh liburan kayak gini? 🏔️🌊 #nature #escape #explore',
+          music: 'Acoustic Breeze - Calm Tones',
+          likes: 89300,
+          commentsCount: 712,
+          shares: 4320
+        },
+        {
+          id: 'v3',
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+          author: '@fun_vibes',
+          caption: 'Momen keseruan bareng squad pas akhir pekan kemarin! Tag teman kalian yang heboh begini 🎮🤣 #fyp #weekend #fun',
+          music: 'Electro Dance Party - DJ Pixel',
+          likes: 15400,
+          commentsCount: 195,
+          shares: 512
+        },
+        {
+          id: 'v4',
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+          author: '@cinema_gear',
+          caption: 'Color grading cinematic video pakai profil Log di smartphone modern! Gimana menurut kalian? 🎬🎥 #cinematography #videotips',
+          music: 'Cinematic Ambient Sound - Studio X',
+          likes: 67800,
+          commentsCount: 520,
+          shares: 3110
+        }
+      ],
+      nature: [
+        {
+          id: 'v5',
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+          author: '@roadtrip_asia',
+          caption: 'Edisi road trip lintas pulau paling berkesan tahun ini! Jalur pemandangannya juara banget 🚗💨 #roadtrip #touring #adventure',
+          music: 'Road Anthem - Rock Highway',
+          likes: 31200,
+          commentsCount: 248,
+          shares: 890
+        },
+        {
+          id: 'v6',
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+          author: '@outdoor_life',
+          caption: 'Sensasi api unggun dan langit berbintang di dataran tinggi. Tenang banget rasanya 🏕️✨ #camping #campvibes',
+          music: 'Night Cricket Ambience - Nature Beats',
+          likes: 45000,
+          commentsCount: 390,
+          shares: 1100
+        }
+      ]
+    };
+
+    // Load initial playlist
+    State.playlist = [...DEFAULT_PLAYLISTS.tech];
+
+    /* Sample Comments Generator */
+    function getMockComments(videoId) {
+      if (!State.commentsData[videoId]) {
+        State.commentsData[videoId] = [
+          { user: '@budi_santoso', text: 'Keren banget visualnya! Kameranya pakai apa ya kak?', time: '2j lalu', likes: 14 },
+          { user: '@siti_rahma', text: 'Wah wajib masuk bucket list liburan selanjutnya nih 🙌', time: '1j lalu', likes: 8 },
+          { user: '@fajar_drone', text: 'Transisinya rapi parah, audio mix-nya juga pas!', time: '35m lalu', likes: 21 },
+          { user: '@rina_travels', text: 'Udah pernah ke sini tahun lalu, pemandangan aslinya lebih magis!', time: '10m lalu', likes: 3 }
+        ];
+      }
+      return State.commentsData[videoId];
+    }
+
+    /* Helper: Format number (e.g., 42100 -> 42.1K) */
+    function formatNumber(num) {
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+      return num.toString();
+    }
+
+    /* Toast Helper (without alert) */
+    let toastTimeout = null;
+    function showToast(message) {
+      const toast = document.getElementById('toastMessage');
+      toast.textContent = message;
+      toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-3');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-3');
+      }, 2500);
+    }
+
+    const feedContainer = document.getElementById('feedContainer');
+    let videoElements = [];
+
+    function renderFeed() {
+      feedContainer.innerHTML = '';
+      videoElements = [];
+
+      if (!State.playlist || State.playlist.length === 0) {
+        document.getElementById('emptyFeedState').classList.remove('hidden');
+        document.getElementById('playlistStatsText').textContent = 'Total Video: 0';
+        return;
+      }
+
+      document.getElementById('emptyFeedState').classList.add('hidden');
+      document.getElementById('playlistStatsText').textContent = `Total Video: ${State.playlist.length}`;
+
+      State.playlist.forEach((item, index) => {
+        const slide = document.createElement('section');
+        slide.className = 'w-full h-full relative snap-child flex items-center justify-center bg-black overflow-hidden flex-shrink-0';
+        slide.dataset.index = index;
+
+        // Video Element
+        const video = document.createElement('video');
+        video.src = item.url;
+        video.className = 'w-full h-full object-cover pointer-events-none';
+        video.loop = true;
+        video.playsInline = true;
+        video.muted = State.isGlobalMuted;
+        video.preload = index === 0 ? 'auto' : 'metadata';
+
+        // Dark Gradient Overlay for legible text
+        const vignette = document.createElement('div');
+        vignette.className = 'absolute inset-0 vignette-overlay pointer-events-none';
+
+        // Play/Pause Center Indicator (Animates on tap)
+        const playIconCenter = document.createElement('div');
+        playIconCenter.className = 'absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-200 z-10';
+        playIconCenter.innerHTML = `
+          <div class="w-16 h-16 rounded-full bg-black/55 backdrop-blur-md flex items-center justify-center text-white/90 shadow-2xl scale-110">
+            <svg class="w-8 h-8 fill-current ml-1" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        `;
+
+        // Right Action Bar (Avatar, Like, Comment, Bookmark, Share, Vinyl)
+        const isLiked = !!State.likesData[item.id];
+        const currentLikes = (item.likes || 1000) + (isLiked ? 1 : 0);
+
+        const actionsBar = document.createElement('div');
+        actionsBar.className = 'absolute right-2 bottom-16 sm:right-3 sm:bottom-16 flex flex-col items-center space-y-4 z-20 pointer-events-auto';
+        actionsBar.innerHTML = `
+          <!-- Creator Avatar with Follow Plus -->
+          <div class="relative group cursor-pointer mb-1">
+            <div class="w-11 h-11 rounded-full p-0.5 border-2 border-tokCyan overflow-hidden bg-slate-800">
+              <img src="https://api.dicebear.com/7.x/bottts/svg?seed=${item.author}" alt="avatar" class="w-full h-full object-cover">
+            </div>
+            <button class="follow-btn absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-5 h-5 bg-tokRed rounded-full flex items-center justify-center text-white text-[11px] font-bold shadow hover:scale-110 transition active:scale-90">
+              +
+            </button>
+          </div>
+
+          <!-- Like Button -->
+          <div class="flex flex-col items-center">
+            <button class="like-btn p-2 rounded-full hover:bg-white/10 active:scale-75 transition-all text-white" data-id="${item.id}">
+              <svg class="w-8 h-8 transition-colors ${isLiked ? 'text-tokRed fill-tokRed scale-110' : 'fill-white/90 stroke-black stroke-[0.5]'}" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            </button>
+            <span class="like-count text-[11px] font-bold mt-0.5 drop-shadow">${formatNumber(currentLikes)}</span>
+          </div>
+
+          <!-- Comment Button -->
+          <div class="flex flex-col items-center">
+            <button class="comment-btn p-2 rounded-full hover:bg-white/10 active:scale-90 transition-all text-white" data-index="${index}">
+              <svg class="w-7 h-7 fill-white/90" viewBox="0 0 24 24">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+              </svg>
+            </button>
+            <span class="comment-count text-[11px] font-bold mt-0.5 drop-shadow">${formatNumber(item.commentsCount || 48)}</span>
+          </div>
+
+          <!-- Share Button -->
+          <div class="flex flex-col items-center">
+            <button class="share-btn p-2 rounded-full hover:bg-white/10 active:scale-90 transition-all text-white" data-id="${item.id}">
+              <svg class="w-7 h-7 fill-white/90" viewBox="0 0 24 24">
+                <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/>
+              </svg>
+            </button>
+            <span class="text-[11px] font-bold mt-0.5 drop-shadow">${formatNumber(item.shares || 120)}</span>
+          </div>
+
+          <!-- Spinning Vinyl Record Animation -->
+          <div class="relative pt-1 flex items-center justify-center">
+            <!-- Rising Music Note Particles -->
+            <div class="absolute -top-3 -left-2 text-white/80 animate-float-note pointer-events-none">
+              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            </div>
+            <div class="vinyl-disc w-10 h-10 rounded-full bg-slate-950 border-2 border-slate-700/80 p-1 flex items-center justify-center animate-spin-slow shadow-lg">
+              <div class="w-4 h-4 rounded-full bg-tokRed/90 border border-white/50"></div>
+            </div>
+          </div>
+        `;
+
+        // Bottom Left Info Overlay (Author, Caption, Sound Ticker)
+        const infoBar = document.createElement('div');
+        infoBar.className = 'absolute bottom-6 left-3 right-16 z-20 pointer-events-none flex flex-col space-y-1.5';
+        infoBar.innerHTML = `
+          <div class="flex items-center space-x-2 pointer-events-auto">
+            <span class="font-bold text-sm tracking-wide hover:underline cursor-pointer drop-shadow">${item.author || '@user'}</span>
+            <span class="bg-white/20 text-[10px] px-1.5 py-0.5 rounded font-semibold backdrop-blur-xs">Creator</span>
+          </div>
+          <p class="text-xs text-slate-100 font-normal line-clamp-2 leading-relaxed drop-shadow-md pointer-events-auto">
+            ${item.caption || ''}
+          </p>
+          <div class="flex items-center space-x-2 text-[11px] text-slate-300 font-medium overflow-hidden w-48">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            <div class="whitespace-nowrap overflow-hidden relative w-full">
+              <span class="inline-block animate-marquee">${item.music || 'Original Sound - SimTok Mix'} &nbsp;&bull;&nbsp; ${item.music || 'Original Sound - SimTok Mix'}</span>
+            </div>
+          </div>
+        `;
+
+        // Interactive Progress Bar (Bottom Edge Scrubber)
+        const scrubberContainer = document.createElement('div');
+        scrubberContainer.className = 'scrubber-container absolute bottom-0 inset-x-0 h-3 z-30 flex items-end cursor-pointer group';
+        scrubberContainer.innerHTML = `
+          <div class="w-full h-1 bg-white/20 relative group-hover:h-2 transition-all">
+            <div class="progress-fill absolute left-0 top-0 bottom-0 bg-white group-hover:bg-tokRed transition-all" style="width: 0%"></div>
+          </div>
+        `;
+
+        // Append sub-elements to slide
+        slide.appendChild(video);
+        slide.appendChild(vignette);
+        slide.appendChild(playIconCenter);
+        slide.appendChild(actionsBar);
+        slide.appendChild(infoBar);
+        slide.appendChild(scrubberContainer);
+
+        feedContainer.appendChild(slide);
+
+        // Store references for observers and scrubbing
+        videoElements.push({
+          slide,
+          video,
+          playIconCenter,
+          progressBar: scrubberContainer.querySelector('.progress-fill'),
+          data: item,
+          index
+        });
+      });
+
+      setupObserver();
+      attachSlideInteractions();
+    }
+
+    let intersectionObserver = null;
+
+    function setupObserver() {
+      if (intersectionObserver) intersectionObserver.disconnect();
+
+      const options = {
+        root: feedContainer,
+        threshold: 0.65 // Play when 65% in view
+      };
+
+      intersectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const index = parseInt(entry.target.dataset.index, 10);
+          const item = videoElements[index];
+          if (!item) return;
+
+          if (entry.isIntersecting) {
+            State.currentIndex = index;
+            playCurrentVideo(item);
+          } else {
+            pauseVideo(item);
+          }
+        });
+      }, options);
+
+      videoElements.forEach(item => {
+        intersectionObserver.observe(item.slide);
+      });
+    }
+
+    function playCurrentVideo(item) {
+      // Pause all other videos
+      videoElements.forEach(el => {
+        if (el !== item) {
+          el.video.pause();
+          el.video.currentTime = 0;
+          el.progressBar.style.width = '0%';
+        }
+      });
+
+      item.video.muted = State.isGlobalMuted;
+      item.video.playbackRate = State.isFastForwarding ? 2.0 : 1.0;
+      
+      const playPromise = item.video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Autoplay was prevented by browser policy
+          document.getElementById('unmuteToast').classList.remove('opacity-0', 'pointer-events-none');
+        });
+      }
+
+      // Track progress
+      item.video.ontimeupdate = () => {
+        if (item.video.duration) {
+          const percent = (item.video.currentTime / item.video.duration) * 100;
+          item.progressBar.style.width = `${percent}%`;
+        }
+      };
+    }
+
+    function pauseVideo(item) {
+      item.video.pause();
+    }
+
+    function togglePlayCurrent() {
+      const active = videoElements[State.currentIndex];
+      if (!active) return;
+
+      if (active.video.paused) {
+        active.video.play();
+        flashCenterIcon(active.playIconCenter, false);
+      } else {
+        active.video.pause();
+        flashCenterIcon(active.playIconCenter, true);
+      }
+    }
+
+    function flashCenterIcon(container, showPermanent) {
+      if (showPermanent) {
+        container.classList.remove('opacity-0');
+        container.classList.add('opacity-100');
+      } else {
+        container.classList.remove('opacity-100');
+        container.classList.add('opacity-0');
+      }
+    }
+
+    function attachSlideInteractions() {
+      videoElements.forEach((item) => {
+        const slide = item.slide;
+        const video = item.video;
+        let lastTap = 0;
+        let pressTimer = null;
+        let isLongPress = false;
+
+        // Double Tap / Single Tap / Long Press Event Management
+        const handleInteractionStart = (e) => {
+          // Don't interfere if clicked on action buttons or modals
+          if (e.target.closest('button') || e.target.closest('form') || e.target.closest('.scrubber-container')) return;
+
+          isLongPress = false;
+          clearTimeout(pressTimer);
+          pressTimer = setTimeout(() => {
+            isLongPress = true;
+            start2xSpeed(video);
+          }, 350); // 350ms hold triggers 2X speed
+        };
+
+        const handleInteractionEnd = (e) => {
+          if (e.target.closest('button') || e.target.closest('form') || e.target.closest('.scrubber-container')) return;
+
+          clearTimeout(pressTimer);
+          if (isLongPress) {
+            stop2xSpeed(video);
+            return;
+          }
+
+          const now = Date.now();
+          const DOUBLE_TAP_DELAY = 280;
+          const rect = slide.getBoundingClientRect();
+          const clientX = e.clientX || (e.changedTouches && e.changedTouches[0].clientX) || (rect.left + rect.width / 2);
+          const clientY = e.clientY || (e.changedTouches && e.changedTouches[0].clientY) || (rect.top + rect.height / 2);
+
+          if (now - lastTap < DOUBLE_TAP_DELAY) {
+            // DOUBLE TAP: Trigger Like Animation
+            triggerHeartExplosion(clientX, clientY);
+            handleLike(item.data.id, item.slide.querySelector('.like-btn'));
+            lastTap = 0;
+          } else {
+            lastTap = now;
+            setTimeout(() => {
+              if (lastTap !== 0 && Date.now() - lastTap >= DOUBLE_TAP_DELAY) {
+                // SINGLE TAP: Toggle Play/Pause
+                togglePlayCurrent();
+                lastTap = 0;
+              }
+            }, DOUBLE_TAP_DELAY);
+          }
+        };
+
+        slide.addEventListener('mousedown', handleInteractionStart);
+        slide.addEventListener('mouseup', handleInteractionEnd);
+        slide.addEventListener('touchstart', handleInteractionStart, { passive: true });
+        slide.addEventListener('touchend', handleInteractionEnd, { passive: true });
+
+        // Scrubber Seeking on Click
+        const scrubber = slide.querySelector('.scrubber-container');
+        scrubber.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const rect = scrubber.getBoundingClientRect();
+          const pos = (e.clientX - rect.left) / rect.width;
+          if (video.duration) {
+            video.currentTime = pos * video.duration;
+          }
+        });
+
+        // Like Button Click
+        const likeBtn = slide.querySelector('.like-btn');
+        likeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleLike(item.data.id, likeBtn);
+        });
+
+        // Comment Button Click
+        const commentBtn = slide.querySelector('.comment-btn');
+        commentBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openComments(item.data.id);
+        });
+
+        // Share Button Click
+        const shareBtn = slide.querySelector('.share-btn');
+        shareBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          copyShareLink(item.data.url);
+        });
+
+        // Follow Button Click
+        const followBtn = slide.querySelector('.follow-btn');
+        if (followBtn) {
+          followBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            followBtn.innerHTML = '✓';
+            followBtn.classList.replace('bg-tokRed', 'bg-slate-700');
+            showToast(`Mengikuti ${item.data.author}!`);
+          });
+        }
+      });
+    }
+
+    /* 2X Speed Feature (Like TikTok Long Press) */
+    function start2xSpeed(video) {
+      State.isFastForwarding = true;
+      if (video) video.playbackRate = 2.0;
+      const badge = document.getElementById('speedBadge');
+      badge.classList.remove('opacity-0');
+      badge.classList.add('opacity-100');
+    }
+
+    function stop2xSpeed(video) {
+      State.isFastForwarding = false;
+      if (video) video.playbackRate = 1.0;
+      const badge = document.getElementById('speedBadge');
+      badge.classList.remove('opacity-100');
+      badge.classList.add('opacity-0');
+    }
+
+    /* Floating Heart Effect on Double Tap */
+    function triggerHeartExplosion(x, y) {
+      const container = document.getElementById('heartsContainer');
+      const heart = document.createElement('div');
+      heart.className = 'absolute pointer-events-none animate-bounce-heart z-40';
+      heart.style.left = `${x - 40}px`;
+      heart.style.top = `${y - 40}px`;
+
+      // Random slight tilt
+      const randomRot = (Math.random() * 40 - 20).toFixed(1);
+      heart.innerHTML = `
+        <svg class="w-20 h-20 fill-tokRed drop-shadow-[0_8px_16px_rgba(254,44,85,0.7)]" style="transform: rotate(${randomRot}deg);" viewBox="0 0 24 24">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      `;
+
+      container.appendChild(heart);
+      setTimeout(() => heart.remove(), 800);
+    }
+
+    /* Like State Handler */
+    function handleLike(videoId, btnElement) {
+      const item = State.playlist.find(v => v.id === videoId);
+      if (!item) return;
+
+      const isLiked = !State.likesData[videoId];
+      State.likesData[videoId] = isLiked;
+
+      const svg = btnElement.querySelector('svg');
+      const countLabel = btnElement.parentElement.querySelector('.like-count');
+      const total = (item.likes || 1000) + (isLiked ? 1 : 0);
+
+      if (isLiked) {
+        svg.classList.remove('fill-white/90', 'stroke-black', 'stroke-[0.5]');
+        svg.classList.add('text-tokRed', 'fill-tokRed', 'scale-125');
+        setTimeout(() => svg.classList.remove('scale-125'), 200);
+      } else {
+        svg.classList.remove('text-tokRed', 'fill-tokRed', 'scale-125');
+        svg.classList.add('fill-white/90', 'stroke-black', 'stroke-[0.5]');
+      }
+      countLabel.textContent = formatNumber(total);
+    }
+
+    /* Copy Link to Clipboard without alert() */
+    function copyShareLink(url) {
+      const tempInput = document.createElement('input');
+      tempInput.value = url || window.location.href;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      try {
+        document.execCommand('copy');
+        showToast('Tautan video disalin ke clipboard!');
+      } catch (err) {
+        showToast('Gagal menyalin link.');
+      }
+      document.body.removeChild(tempInput);
+    }
+
+    /* Keyboard Navigation & Control */
+    window.addEventListener('keydown', (e) => {
+      // Ignore if typing inside input / textarea
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+      switch (e.code) {
+        case 'ArrowDown':
+        case 'KeyJ':
+          e.preventDefault();
+          scrollToNextVideo();
+          break;
+        case 'ArrowUp':
+        case 'KeyK':
+          e.preventDefault();
+          scrollToPrevVideo();
+          break;
+        case 'Space':
+          e.preventDefault();
+          togglePlayCurrent();
+          break;
+        case 'KeyM':
+          e.preventDefault();
+          toggleGlobalMute();
+          break;
+        case 'KeyL':
+          e.preventDefault();
+          const current = videoElements[State.currentIndex];
+          if (current) {
+            handleLike(current.data.id, current.slide.querySelector('.like-btn'));
+          }
+          break;
+      }
+    });
+
+    function scrollToNextVideo() {
+      if (State.currentIndex < videoElements.length - 1) {
+        videoElements[State.currentIndex + 1].slide.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function scrollToPrevVideo() {
+      if (State.currentIndex > 0) {
+        videoElements[State.currentIndex - 1].slide.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    /* Audio Management & Autoplay Handling */
+    function toggleGlobalMute() {
+      State.isGlobalMuted = !State.isGlobalMuted;
+      applyMuteState();
+    }
+
+    function applyMuteState() {
+      const volOn = document.getElementById('iconVolumeOn');
+      const volMuted = document.getElementById('iconVolumeMuted');
+      const toast = document.getElementById('unmuteToast');
+
+      videoElements.forEach(item => {
+        item.video.muted = State.isGlobalMuted;
+      });
+
+      if (State.isGlobalMuted) {
+        volOn.classList.add('hidden');
+        volMuted.classList.remove('hidden');
+      } else {
+        volOn.classList.remove('hidden');
+        volMuted.classList.add('hidden');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }
+    }
+
+    document.getElementById('globalAudioBtn').addEventListener('click', toggleGlobalMute);
+    document.getElementById('quickUnmuteBtn').addEventListener('click', () => {
+      State.isGlobalMuted = false;
+      applyMuteState();
+      const current = videoElements[State.currentIndex];
+      if (current && current.video.paused) {
+        current.video.play();
+      }
+    });
+
+    /* Comments Bottom Sheet Drawer Handling */
+    let activeCommentVideoId = null;
+    const commentsModal = document.getElementById('commentsModal');
+    const commentsSheet = document.getElementById('commentsSheet');
+
+    function openComments(videoId) {
+      activeCommentVideoId = videoId;
+      const list = document.getElementById('commentsList');
+      const comments = getMockComments(videoId);
+      
+      document.getElementById('commentSheetTitle').textContent = `${comments.length} Komentar`;
+      list.innerHTML = '';
+
+      comments.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'flex space-x-3 items-start group';
+        item.innerHTML = `
+          <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+            <img src="https://api.dicebear.com/7.x/identicon/svg?seed=${c.user}" alt="user" class="w-full h-full object-cover">
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center space-x-1.5">
+              <span class="font-bold text-slate-300 text-xs">${c.user}</span>
+              <span class="text-[10px] text-slate-500">${c.time}</span>
+            </div>
+            <p class="text-xs text-slate-200 mt-0.5 leading-relaxed">${c.text}</p>
+          </div>
+          <div class="flex flex-col items-center pt-1 text-slate-500 group-hover:text-slate-400">
+            <svg class="w-3.5 h-3.5 fill-current cursor-pointer hover:text-tokRed transition" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            <span class="text-[9px] mt-0.5">${c.likes || 0}</span>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+
+      commentsModal.classList.remove('opacity-0', 'pointer-events-none');
+      commentsSheet.classList.remove('translate-y-full');
+    }
+
+    function closeComments() {
+      commentsSheet.classList.add('translate-y-full');
+      commentsModal.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    document.getElementById('closeCommentsBtn').addEventListener('click', closeComments);
+    commentsModal.addEventListener('click', (e) => {
+      if (e.target === commentsModal) closeComments();
+    });
+
+    document.getElementById('commentForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('commentInput');
+      const val = input.value.trim();
+      if (!val || !activeCommentVideoId) return;
+
+      const comments = getMockComments(activeCommentVideoId);
+      comments.unshift({
+        user: '@kamu_user',
+        text: val,
+        time: 'Baru saja',
+        likes: 0
+      });
+
+      input.value = '';
+      openComments(activeCommentVideoId);
+      showToast('Komentar berhasil diposting!');
+    });
+
+    /* Playlist Modal Operations */
+    const playlistModal = document.getElementById('playlistModal');
+    const openPlaylistBtn = document.getElementById('openPlaylistModalBtn');
+    const closePlaylistBtn = document.getElementById('closePlaylistModalBtn');
+    const donePlaylistBtn = document.getElementById('donePlaylistModalBtn');
+
+    function togglePlaylistModal(show) {
+      if (show) {
+        playlistModal.classList.remove('opacity-0', 'pointer-events-none');
+        document.getElementById('rawJsonInput').value = JSON.stringify(State.playlist, null, 2);
+      } else {
+        playlistModal.classList.add('opacity-0', 'pointer-events-none');
+      }
+    }
+
+    openPlaylistBtn.addEventListener('click', () => togglePlaylistModal(true));
+    closePlaylistBtn.addEventListener('click', () => togglePlaylistModal(false));
+    donePlaylistBtn.addEventListener('click', () => togglePlaylistModal(false));
+    document.getElementById('emptyImportBtn').addEventListener('click', () => togglePlaylistModal(true));
+
+    // Tab switching inside modal
+    const tabs = [
+      { btn: document.getElementById('tabImportFiles'), pane: document.getElementById('paneFiles') },
+      { btn: document.getElementById('tabImportUrls'), pane: document.getElementById('paneUrls') },
+      { btn: document.getElementById('tabImportJSON'), pane: document.getElementById('paneJSON') },
+    ];
+
+    tabs.forEach(({ btn, pane }) => {
+      btn.addEventListener('click', () => {
+        tabs.forEach(t => {
+          t.btn.classList.remove('bg-slate-800', 'text-white');
+          t.btn.classList.add('text-slate-400');
+          t.pane.classList.add('hidden');
+        });
+        btn.classList.add('bg-slate-800', 'text-white');
+        btn.classList.remove('text-slate-400');
+        pane.classList.remove('hidden');
+      });
+    });
+
+    // 1. Local File Import with URL.createObjectURL()
+    document.getElementById('localFileInput').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+
+      const newItems = files.map((file, i) => ({
+        id: `local_${Date.now()}_${i}`,
+        url: URL.createObjectURL(file),
+        author: `@file_lokal`,
+        caption: `Memutar file lokal: ${file.name} 📹`,
+        music: 'Audio Asli Video Lokal',
+        likes: Math.floor(Math.random() * 500) + 50,
+        commentsCount: 2,
+        shares: 5
+      }));
+
+      State.playlist = [...newItems, ...State.playlist];
+      document.getElementById('playlistBadge').textContent = 'Custom Files';
+      document.getElementById('playlistBadge').classList.remove('hidden');
+      renderFeed();
+      togglePlaylistModal(false);
+      showToast(`${files.length} video lokal berhasil diimpor!`);
+    });
+
+    // 2. Direct Raw URLs list import
+    document.getElementById('loadUrlsBtn').addEventListener('click', () => {
+      const text = document.getElementById('rawUrlsInput').value.trim();
+      if (!text) {
+        showToast('Masukkan minimal satu tautan video!');
+        return;
+      }
+
+      const urls = text.split('\n').map(u => u.trim()).filter(u => u.length > 0);
+      if (!urls.length) return;
+
+      const newItems = urls.map((url, i) => ({
+        id: `url_${Date.now()}_${i}`,
+        url: url,
+        author: `@web_streamer`,
+        caption: `Streaming link: ${url.split('/').pop() || 'Video'} #simtok`,
+        music: 'Original Stream Audio',
+        likes: 1200,
+        commentsCount: 15,
+        shares: 45
+      }));
+
+      State.playlist = newItems;
+      document.getElementById('playlistBadge').textContent = 'Web Links';
+      document.getElementById('playlistBadge').classList.remove('hidden');
+      renderFeed();
+      togglePlaylistModal(false);
+      showToast(`${newItems.length} video URL dimuat!`);
+    });
+
+    // 3. JSON Config Import & Export
+    document.getElementById('loadJsonBtn').addEventListener('click', () => {
+      const jsonStr = document.getElementById('rawJsonInput').value.trim();
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          showToast('Format JSON harus berupa Array video!');
+          return;
+        }
+        State.playlist = parsed;
+        document.getElementById('playlistBadge').textContent = 'JSON Playlist';
+        document.getElementById('playlistBadge').classList.remove('hidden');
+        renderFeed();
+        togglePlaylistModal(false);
+        showToast('Playlist JSON berhasil diterapkan!');
+      } catch (err) {
+        showToast('Format JSON tidak valid!');
+      }
+    });
+
+    document.getElementById('exportJSONBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(State.playlist, null, 2)], { type: 'application/json' });
+      const dlUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = dlUrl;
+      a.download = `simtok_playlist_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(dlUrl);
+      showToast('File JSON playlist berhasil diunduh!');
+    });
+
+    // Preset Buttons
+    document.querySelectorAll('#presetChips button').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const key = chip.dataset.preset;
+        if (DEFAULT_PLAYLISTS[key]) {
+          State.playlist = [...DEFAULT_PLAYLISTS[key]];
+          document.getElementById('playlistBadge').textContent = chip.textContent;
+          document.getElementById('playlistBadge').classList.remove('hidden');
+          renderFeed();
+          togglePlaylistModal(false);
+          showToast(`Preset "${chip.textContent}" diterapkan!`);
+        }
+      });
+    });
+
+    document.getElementById('resetDemoBtn').addEventListener('click', () => {
+      State.playlist = [...DEFAULT_PLAYLISTS.tech];
+      document.getElementById('playlistBadge').textContent = 'Default';
+      renderFeed();
+      togglePlaylistModal(false);
+      showToast('Playlist default dipulihkan!');
+    });
+
+    /* Keyboard Shortcuts Modal Controls */
+    const shortcutsModal = document.getElementById('shortcutsModal');
+    const openShortcutsBtn = document.getElementById('openShortcutsBtn');
+    const closeShortcutsBtn = document.getElementById('closeShortcutsBtn');
+    const dismissShortcutsBtn = document.getElementById('dismissShortcutsBtn');
+
+    function toggleShortcuts(show) {
+      if (show) {
+        shortcutsModal.classList.remove('opacity-0', 'pointer-events-none');
+      } else {
+        shortcutsModal.classList.add('opacity-0', 'pointer-events-none');
+      }
+    }
+
+    openShortcutsBtn.addEventListener('click', () => toggleShortcuts(true));
+    closeShortcutsBtn.addEventListener('click', () => toggleShortcuts(false));
+    dismissShortcutsBtn.addEventListener('click', () => toggleShortcuts(false));
+    shortcutsModal.addEventListener('click', (e) => {
+      if (e.target === shortcutsModal) toggleShortcuts(false);
+    });
+
+    // Tab Bar Dummy Switch (FYP vs Following)
+    document.getElementById('tabFollowing').addEventListener('click', () => {
+      document.getElementById('tabFollowing').className = 'text-white border-b-2 border-white pb-0.5 font-bold transition-all';
+      document.getElementById('tabFYP').className = 'text-white/60 hover:text-white transition-colors py-1';
+      showToast('Menampilkan feed dari kreator yang Anda ikuti');
+    });
+
+    document.getElementById('tabFYP').addEventListener('click', () => {
+      document.getElementById('tabFYP').className = 'text-white border-b-2 border-white pb-0.5 font-bold transition-all';
+      document.getElementById('tabFollowing').className = 'text-white/60 hover:text-white transition-colors py-1';
+      showToast('Menampilkan feed For You Page (FYP)');
+    });
+
+    /* Bootstrap Application on Load */
+    window.addEventListener('DOMContentLoaded', () => {
+      renderFeed();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Block</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --cell-size: 56px;
+      --board-gap: 8px;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .game-font {
+      font-family: 'Fredoka', cursive, sans-serif;
+    }
+    /* Cell styling */
+    .board-cell {
+      position: relative;
+      background: rgba(30, 41, 59, 0.7);
+      border-radius: 10px;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      transition: background-color 0.15s ease, transform 0.12s ease;
+    }
+    .board-cell.highlight-valid {
+      background: rgba(34, 197, 94, 0.35) !important;
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.5), inset 0 0 0 2px rgba(34, 197, 94, 0.8) !important;
+    }
+    .board-cell.highlight-invalid {
+      background: rgba(239, 68, 68, 0.35) !important;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.5), inset 0 0 0 2px rgba(239, 68, 68, 0.8) !important;
+    }
+    /* Frenzy blocked cell pattern */
+    .cell-blocked {
+      background: repeating-linear-gradient(
+        45deg,
+        #1e1b4b,
+        #1e1b4b 8px,
+        #311042 8px,
+        #311042 16px
+      ) !important;
+      border: 2px dashed #e11d48 !important;
+      box-shadow: inset 0 0 10px rgba(225, 29, 72, 0.4) !important;
+    }
+    /* Block tile appearance */
+    .puzzle-tile {
+      border-radius: 9px;
+      position: absolute;
+      inset: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4), inset 0 -2px 3px rgba(0, 0, 0, 0.25);
+      transition: transform 0.12s ease, filter 0.15s ease;
+      cursor: grab;
+    }
+    .puzzle-tile:active {
+      cursor: grabbing;
+    }
+    .puzzle-tile.sliding {
+      transition: all 0.15s cubic-bezier(0.2, 0.9, 0.3, 1);
+    }
+    /* Draggable floating piece */
+    #drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      opacity: 0.92;
+      filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.6));
+      display: none;
+    }
+    /* Smooth bounce animations */
+    @keyframes bounceSuccess {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    .bounce-win {
+      animation: bounceSuccess 0.5s ease-in-out;
+    }
+    /* Glass panel effect */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    /* Custom scrollbar for piece tray */
+    .tray-scroll::-webkit-scrollbar {
+      height: 6px;
+    }
+    .tray-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 4px;
+    }
+    .tray-scroll::-webkit-scrollbar-thumb {
+      background: rgba(71, 85, 105, 0.6);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 overflow-y-auto lg:overflow-hidden select-none">
+
+  <!-- Top Navigation & Info Header -->
+  <header class="w-full max-w-4xl flex flex-col gap-2">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center shadow-lg shadow-rose-950">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="game-font text-2xl font-bold tracking-wider bg-gradient-to-r from-amber-300 via-rose-300 to-cyan-300 bg-clip-text text-transparent">
+            BLOCK
+          </h1>
+          <p id="mode-subtitle" class="text-xs text-slate-400 font-medium">Mode Isi: Penuhi semua kotak</p>
+        </div>
+      </div>
+
+      <!-- Action buttons (Rules & Sound) -->
+      <div class="flex items-center gap-2">
+        <button id="btn-sound" class="w-9 h-9 rounded-xl glass-panel hover:bg-slate-800 active:scale-95 flex items-center justify-center transition-all" title="Efek Suara">
+          <svg id="sound-icon-on" class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+          <svg id="sound-icon-off" class="w-4 h-4 text-slate-500 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+          </svg>
+        </button>
+
+        <button id="btn-info" class="w-9 h-9 rounded-xl glass-panel hover:bg-slate-800 active:scale-95 flex items-center justify-center transition-all" title="Panduan">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Status Dashboard -->
+    <div class="grid grid-cols-3 gap-2 text-center text-xs">
+      <div class="glass-panel p-2 rounded-xl">
+        <span class="text-slate-400 block text-[10px] uppercase font-semibold">Level</span>
+        <span id="level-display" class="game-font text-base text-amber-400 font-bold">1</span>
+      </div>
+      <div class="glass-panel p-2 rounded-xl">
+        <span class="text-slate-400 block text-[10px] uppercase font-semibold">Langkah</span>
+        <span id="moves-display" class="game-font text-base text-cyan-400 font-bold">0</span>
+      </div>
+      <div id="frenzy-badge-container" class="glass-panel p-2 rounded-xl border border-rose-900/40 relative overflow-hidden">
+        <span class="text-slate-400 block text-[10px] uppercase font-semibold">Frenzy</span>
+        <div class="flex items-center justify-center gap-1">
+          <span id="frenzy-icon" class="text-xs">⚡</span>
+          <span id="frenzy-display" class="game-font text-base text-rose-400 font-bold">0/8</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode and Grid Selection Toolbar -->
+    <div class="flex flex-wrap items-center justify-between gap-1.5 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800">
+      <!-- Gameplay Mode Switcher -->
+      <div class="flex bg-slate-950 p-1 rounded-xl text-xs font-medium">
+        <button id="mode-isi-btn" class="px-3 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold transition-all shadow-md">
+          Mode Isi
+        </button>
+        <button id="mode-geser-btn" class="px-3 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition-all font-semibold">
+          Mode Geser
+        </button>
+      </div>
+
+      <!-- Grid Dimension Selector -->
+      <div class="flex items-center gap-1 text-xs">
+        <span class="text-slate-400 text-[11px] font-semibold hidden sm:inline">Ukuran:</span>
+        <div class="inline-flex bg-slate-950 p-1 rounded-xl" id="grid-size-selector">
+          <button data-size="4x4" class="size-btn px-2 py-1 rounded-lg font-bold bg-indigo-600 text-white">4×4</button>
+          <button data-size="4x5" class="size-btn px-2 py-1 rounded-lg font-medium text-slate-400 hover:text-slate-200">4×5</button>
+          <button data-size="5x5" class="size-btn px-2 py-1 rounded-lg font-medium text-slate-400 hover:text-slate-200">5×5</button>
+          <button data-size="6x6" class="size-btn px-2 py-1 rounded-lg font-medium text-slate-400 hover:text-slate-200">6×6</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Playground: Side-by-side on Desktop (lg:), Stacked on Mobile -->
+  <div class="w-full max-w-4xl flex-1 flex flex-col lg:flex-row items-center lg:items-center justify-center gap-4 lg:gap-8 my-auto py-2">
+    
+    <!-- Left Sidebar: Piece Dock / Tray for Desktop, Bottom Bar on Mobile -->
+    <aside class="w-full lg:w-72 xl:w-80 order-2 lg:order-1 flex flex-col gap-2">
+      <div class="glass-panel p-3 rounded-2xl border border-slate-800 flex flex-col gap-2 lg:max-h-[460px] shadow-xl">
+        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold px-1">
+          <span id="tray-label" class="flex items-center gap-1.5 text-slate-200">
+            <span>🧩</span> Balok Tersedia
+          </span>
+          <span id="tray-count" class="text-amber-400 font-bold bg-amber-950/40 px-2 py-0.5 rounded-lg border border-amber-500/20">0 tersisa</span>
+        </div>
+        
+        <p class="text-[11px] text-cyan-300/80 px-1 flex items-center gap-1">
+          <span>💡</span> <span>Klik balok untuk memutar orientasi</span>
+        </p>
+
+        <!-- Tray Container: Horizontal scroll on mobile, 2-column grid on desktop -->
+        <div id="piece-tray" class="tray-scroll flex lg:grid lg:grid-cols-2 items-center lg:items-start justify-center lg:justify-items-center gap-3 overflow-x-auto lg:overflow-y-auto lg:overflow-x-hidden min-h-[86px] lg:h-[350px] py-2 px-1">
+          <!-- Pieces generated dynamically -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center/Right: Board and Action Controls -->
+    <section class="flex flex-col items-center justify-center gap-3 order-1 lg:order-2 w-full max-w-lg">
+      <!-- Main Game Board Container -->
+      <main class="relative p-3 rounded-3xl glass-panel shadow-2xl border border-slate-800 flex items-center justify-center">
+        <!-- Interactive Grid Board -->
+        <div id="board" class="grid gap-2 relative bg-slate-950/80 p-2.5 rounded-2xl shadow-inner border border-slate-900">
+          <!-- Cells generated by JavaScript -->
+        </div>
+
+        <!-- Mode Geser Tutorial Hint Overlay -->
+        <div id="slide-hint-toast" class="absolute -top-3 bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-[11px] font-semibold px-3 py-1 rounded-full shadow-lg border border-cyan-400/30 flex items-center gap-1.5 opacity-0 pointer-events-none transition-opacity duration-300">
+          <span>↔️</span>
+          <span>Geser balok dalam kotak untuk membuka ruang!</span>
+        </div>
+      </main>
+
+      <!-- Action & Utility Controls Toolbar -->
+      <div class="w-full flex items-center justify-between px-1">
+        <div class="flex items-center gap-2">
+          <button id="btn-undo" class="px-3.5 py-1.5 rounded-xl glass-panel hover:bg-slate-800 active:scale-95 text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:pointer-events-none text-slate-300">
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+            <span>Undo</span>
+          </button>
+
+          <button id="btn-reset" class="px-3.5 py-1.5 rounded-xl glass-panel hover:bg-slate-800 active:scale-95 text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-300">
+            <svg class="w-3.5 h-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Reset</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Auto Rotate Mode Switch -->
+          <label class="flex items-center gap-1.5 cursor-pointer glass-panel px-2.5 py-1.5 rounded-xl" title="Otomatis putar balok saat diarahkan ke celah yang pas">
+            <span class="text-[11px] font-semibold text-cyan-300 flex items-center gap-1">
+              <span>🔄</span> <span class="hidden sm:inline">Auto</span> Putar
+            </span>
+            <input type="checkbox" id="autorotate-toggle" checked class="sr-only peer">
+            <div class="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-cyan-500 relative"></div>
+          </label>
+
+          <!-- Frenzy Mode Switch -->
+          <label class="flex items-center gap-1.5 cursor-pointer glass-panel px-2.5 py-1.5 rounded-xl">
+            <span class="text-[11px] font-semibold text-rose-300">Frenzy</span>
+            <input type="checkbox" id="frenzy-toggle" checked class="sr-only peer">
+            <div class="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-rose-600 relative"></div>
+          </label>
+
+          <button id="btn-new-level" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 hover:brightness-110 active:scale-95 text-xs font-bold shadow-md shadow-amber-950/40 transition-all">
+            Level Baru
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Ghost Element for Piece Dragging -->
+  <div id="drag-ghost"></div>
+
+  <!-- Level Completed Modal -->
+  <div id="win-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-slate-900 border border-slate-700/80 max-w-sm w-full rounded-3xl p-6 text-center shadow-2xl relative transform scale-95 transition-transform duration-300" id="win-card">
+      <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-emerald-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-950/50">
+        <svg class="w-10 h-10 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+
+      <h2 class="game-font text-2xl font-bold text-white mb-1">Level Selesai! 🎉</h2>
+      <p id="win-summary" class="text-slate-400 text-xs mb-5">Kotak berhasil terisi sempurna dengan 8 langkah.</p>
+
+      <div class="grid grid-cols-2 gap-3 mb-5 text-left text-xs bg-slate-950/70 p-3 rounded-2xl border border-slate-800">
+        <div>
+          <span class="text-slate-500 block text-[10px] uppercase font-semibold">Mode</span>
+          <span id="win-mode" class="font-bold text-amber-400">Mode Isi</span>
+        </div>
+        <div>
+          <span class="text-slate-500 block text-[10px] uppercase font-semibold">Ukuran Grid</span>
+          <span id="win-grid" class="font-bold text-cyan-400">4×4</span>
+        </div>
+      </div>
+
+      <div class="flex gap-2.5">
+        <button id="btn-replay" class="flex-1 py-2.5 rounded-xl glass-panel text-slate-300 font-semibold text-xs hover:bg-slate-800 active:scale-95 transition-all">
+          Ulangi
+        </button>
+        <button id="btn-next-level" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-xs hover:brightness-110 active:scale-95 shadow-lg shadow-emerald-950/50 transition-all">
+          Level Berikutnya →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instruction & Info Modal -->
+  <div id="info-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-3xl p-6 text-left shadow-2xl relative">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="game-font text-xl font-bold text-white flex items-center gap-2">
+          <span>📖</span> Panduan Bermain
+        </h3>
+        <button id="btn-close-info" class="w-8 h-8 rounded-full glass-panel flex items-center justify-center text-slate-400 hover:text-white">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-300 leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
+        <div class="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+          <h4 class="font-bold text-amber-400 text-sm mb-1 flex items-center gap-1.5">
+            <span>🧩</span> 1. Mode Isi
+          </h4>
+          <p>Tarik balok dari baki ke dalam kotak hingga seluruh petak terisi penuh. Gunakan rotasi atau posisi yang tepat!</p>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20">
+          <h4 class="font-bold text-cyan-400 text-sm mb-1 flex items-center gap-1.5">
+            <span>↔️</span> 2. Mode Geser
+          </h4>
+          <p>Balok awal sudah berada di papan dengan beberapa ruang kosong. <b>Geser balok</b> secara horizontal atau vertikal di dalam papan untuk membentuk ruang pas bagi <b>1 balok sisa</b> di baki!</p>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+          <h4 class="font-bold text-rose-400 text-sm mb-1 flex items-center gap-1.5">
+            <span>🔥</span> 3. Mode Frenzy
+          </h4>
+          <p>Setiap kelipatan <b>10 level</b>, akan muncul petak rintangan merah bertanda gembok/silang (maksimal 8 rintangan). Petak ini tidak dapat diisi atau dilewati balok!</p>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/50">
+          <h4 class="font-bold text-emerald-400 text-sm mb-1 flex items-center gap-1.5">
+            <span>↩️</span> Undo & Reset
+          </h4>
+          <p>Salah geser atau taruh? Klik <b>Undo</b> untuk membatalkan langkah terakhir, atau <b>Reset</b> untuk kembali ke awal level.</p>
+        </div>
+      </div>
+
+      <button id="btn-got-it" class="w-full mt-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 text-white font-bold text-xs hover:brightness-110 active:scale-95 transition-all">
+        Mengerti, Ayo Main!
+      </button>
+    </div>
+  </div>
+
+  <!-- Confetti Canvas for Victory Celebrations -->
+  <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-40"></canvas>
+
+  <script>
+    /* =========================================================================
+     * 1. AUDIO SYNTHESIZER (Web Audio API - No External Files)
+     * ========================================================================= */
+    class SoundController {
+      constructor() {
+        this.enabled = true;
+        this.ctx = null;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTone(freq, type = 'sine', duration = 0.12, volume = 0.25) {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+          gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {
+          console.warn('Audio play failed', e);
+        }
+      }
+
+      playPick() {
+        this.playTone(392, 'triangle', 0.08, 0.2); // G4
+      }
+
+      playSnap() {
+        this.playTone(523.25, 'sine', 0.15, 0.3); // C5
+      }
+
+      playSlide() {
+        this.playTone(329.63, 'sine', 0.09, 0.15); // E4
+      }
+
+      playInvalid() {
+        this.playTone(180, 'sawtooth', 0.15, 0.2);
+      }
+
+      playUndo() {
+        this.playTone(440, 'triangle', 0.1, 0.2);
+      }
+
+      playRotate() {
+        this.playTone(587.33, 'triangle', 0.08, 0.25); // D5 chime
+      }
+
+      playWin() {
+        if (!this.enabled) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          setTimeout(() => {
+            this.playTone(freq, 'triangle', 0.25, 0.3);
+          }, idx * 110);
+        });
+      }
+    }
+
+    const sound = new SoundController();
+
+    /* =========================================================================
+     * 2. COLOR PALETTES & POLYOMINO SHAPE DEFINITIONS
+     * ========================================================================= */
+    const BLOCK_PALETTES = [
+      { bg: 'bg-emerald-500', hex: '#10b981', border: '#059669', name: 'emerald' },
+      { bg: 'bg-amber-500', hex: '#f59e0b', border: '#d97706', name: 'amber' },
+      { bg: 'bg-sky-500', hex: '#0ea5e9', border: '#0284c7', name: 'sky' },
+      { bg: 'bg-rose-500', hex: '#f43f5e', border: '#e11d48', name: 'rose' },
+      { bg: 'bg-purple-500', hex: '#a855f7', border: '#9333ea', name: 'purple' },
+      { bg: 'bg-indigo-500', hex: '#6366f1', border: '#4f46e5', name: 'indigo' },
+      { bg: 'bg-orange-500', hex: '#f97316', border: '#ea580c', name: 'orange' },
+      { bg: 'bg-teal-500', hex: '#14b8a6', border: '#0d9488', name: 'teal' },
+      { bg: 'bg-pink-500', hex: '#ec4899', border: '#db2777', name: 'pink' }
+    ];
+
+    // Standard polyomino prototypes normalized around (0,0)
+    const POLY_PROTOTYPES = [
+      // Monomino
+      { name: '1x1', coords: [[0, 0]] },
+      // Dominoes
+      { name: '1x2', coords: [[0, 0], [0, 1]] },
+      { name: '2x1', coords: [[0, 0], [1, 0]] },
+      // Trominoes
+      { name: '1x3', coords: [[0, 0], [0, 1], [0, 2]] },
+      { name: '3x1', coords: [[0, 0], [1, 0], [2, 0]] },
+      { name: 'L3_1', coords: [[0, 0], [1, 0], [1, 1]] },
+      { name: 'L3_2', coords: [[0, 0], [0, 1], [1, 0]] },
+      { name: 'L3_3', coords: [[0, 1], [1, 0], [1, 1]] },
+      { name: 'L3_4', coords: [[0, 0], [0, 1], [1, 1]] },
+      // Tetrominoes
+      { name: '2x2', coords: [[0, 0], [0, 1], [1, 0], [1, 1]] },
+      { name: '1x4', coords: [[0, 0], [0, 1], [0, 2], [0, 3]] },
+      { name: '4x1', coords: [[0, 0], [1, 0], [2, 0], [3, 0]] },
+      { name: 'T4', coords: [[0, 0], [0, 1], [0, 2], [1, 1]] },
+      { name: 'L4', coords: [[0, 0], [1, 0], [2, 0], [2, 1]] }
+    ];
+
+    /* =========================================================================
+     * 3. GAME STATE MANAGEMENT
+     * ========================================================================= */
+    const state = {
+      mode: 'isi', // 'isi' or 'geser'
+      gridSize: '4x4',
+      rows: 4,
+      cols: 4,
+      level: 1,
+      moves: 0,
+      frenzyEnabled: true,
+      autoRotateEnabled: true,
+      grid: [], // 2D array: 0: empty, -1: frenzy obstacle, >0: piece ID
+      placedPieces: new Map(), // id -> { id, coords, colorIndex, inTray: false }
+      trayPieces: [], // Array of piece objects
+      solutionGrid: [], // Backup for reverse solver
+      historyStack: [], // For undo
+      initialSnapshot: null, // For reset
+      isGameOver: false,
+      activeDrag: null, // Piece currently being dragged
+      activeSlide: null // Piece currently being slid
+    };
+
+    /* =========================================================================
+     * 4. PROCEDURAL TILING & LEVEL GENERATOR (GUARANTEED SOLVABILITY)
+     * ========================================================================= */
+    function calculateFrenzyBlockedCount() {
+      if (!state.frenzyEnabled) return 0;
+      // 1 blocked cell every 10 levels (max 8)
+      // Level 1-9: 0; Level 10-19: 1; Level 20-29: 2 ... Level 80+: 8
+      const rawCount = Math.floor(state.level / 10);
+      const maxAllowedByGrid = Math.floor((state.rows * state.cols) * 0.25);
+      return Math.min(8, Math.min(rawCount, maxAllowedByGrid));
+    }
+
+    // Generate a valid tiling partition on the grid
+    function generateSolvableTiling(rows, cols, blockedCount) {
+      let grid = Array.from({ length: rows }, () => Array(cols).fill(0));
+      
+      // 1. Place frenzy obstacle cells (-1)
+      const allCoords = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          allCoords.push([r, c]);
+        }
+      }
+      
+      // Shuffle coordinates to choose blocked spots
+      for (let i = allCoords.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allCoords[i], allCoords[j]] = [allCoords[j], allCoords[i]];
+      }
+
+      for (let i = 0; i < blockedCount; i++) {
+        const [br, bc] = allCoords[i];
+        grid[br][bc] = -1;
+      }
+
+      // 2. Partition all remaining 0 cells into polyominoes (size 2 to 4)
+      let freeCells = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (grid[r][c] === 0) freeCells.push(`${r},${c}`);
+        }
+      }
+
+      let pieceCounter = 1;
+      const pieces = [];
+
+      while (freeCells.length > 0) {
+        // Pick a random unvisited free cell
+        const startStr = freeCells[Math.floor(Math.random() * freeCells.length)];
+        const [sr, sc] = startStr.split(',').map(Number);
+
+        // Desired piece size: 2 to 4 cells (rarely 1)
+        const targetSize = Math.floor(Math.random() * 3) + 2; // 2, 3, or 4
+        const cluster = [[sr, sc]];
+        let visitedInCluster = new Set([startStr]);
+
+        // Grow cluster to adjacent free cells
+        while (cluster.length < targetSize) {
+          const neighbors = [];
+          for (const [cr, cc] of cluster) {
+            const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+            for (const [dr, dc] of directions) {
+              const nr = cr + dr;
+              const nc = cc + dc;
+              const key = `${nr},${nc}`;
+              if (
+                nr >= 0 && nr < rows &&
+                nc >= 0 && nc < cols &&
+                freeCells.includes(key) &&
+                !visitedInCluster.has(key)
+              ) {
+                neighbors.push([nr, nc]);
+              }
+            }
+          }
+
+          if (neighbors.length === 0) break; // Cannot grow further
+
+          const chosen = neighbors[Math.floor(Math.random() * neighbors.length)];
+          cluster.push(chosen);
+          visitedInCluster.add(`${chosen[0]},${chosen[1]}`);
+        }
+
+        // Normalize cluster to local coordinates (0,0)
+        let minR = Math.min(...cluster.map(p => p[0]));
+        let minC = Math.min(...cluster.map(p => p[1]));
+        const localCoords = cluster.map(p => [p[0] - minR, p[1] - minC]);
+
+        const pieceId = pieceCounter++;
+        const colorIndex = (pieceId - 1) % BLOCK_PALETTES.length;
+
+        // Mark grid
+        for (const [cr, cc] of cluster) {
+          grid[cr][cc] = pieceId;
+          freeCells = freeCells.filter(k => k !== `${cr},${cc}`);
+        }
+
+        pieces.push({
+          id: pieceId,
+          coords: localCoords, // relative
+          origin: [minR, minC], // absolute on board
+          cells: cluster, // absolute cells
+          colorIndex: colorIndex,
+          size: cluster.length
+        });
+      }
+
+      return { grid, pieces };
+    }
+
+    /* =========================================================================
+     * 5. REVERSE SCRAMBLING FOR MODE GESER
+     * ========================================================================= */
+    function scrambleBoardForSlideMode(solvedGrid, solvedPieces, rows, cols) {
+      // 1. Choose 1 piece to be the "Key Piece" removed from the board into the tray
+      // Prefer pieces with size >= 2 for interesting puzzles
+      const eligibleKeyPieces = solvedPieces.filter(p => p.size >= 2);
+      const keyPiece = eligibleKeyPieces.length > 0 
+        ? eligibleKeyPieces[Math.floor(Math.random() * eligibleKeyPieces.length)]
+        : solvedPieces[0];
+
+      // Clone current grid
+      let currentGrid = solvedGrid.map(row => [...row]);
+
+      // Remove keyPiece from grid (set its cells to 0)
+      for (const [r, c] of keyPiece.cells) {
+        currentGrid[r][c] = 0;
+      }
+
+      // Active pieces remaining on the board
+      let activePieces = solvedPieces.filter(p => p.id !== keyPiece.id);
+
+      // 2. Perform 5 to 14 random valid slide moves to scramble the remaining pieces
+      const scrambleSteps = Math.min(14, 5 + Math.floor(state.level * 0.7));
+      const directions = [
+        { dr: -1, dc: 0 }, // Up
+        { dr: 1, dc: 0 },  // Down
+        { dr: 0, dc: -1 }, // Left
+        { dr: 0, dc: 1 }   // Right
+      ];
+
+      for (let step = 0; step < scrambleSteps; step++) {
+        const validMoves = [];
+
+        for (const piece of activePieces) {
+          // Detect whether piece is strictly horizontal or vertical
+          const isHoriz = piece.cells.every(c => c[0] === piece.cells[0][0]);
+          const isVert = piece.cells.every(c => c[1] === piece.cells[0][1]);
+
+          for (const dir of directions) {
+            // Enforce axis lock: horizontal pieces can only slide L/R, vertical only U/D
+            if (isHoriz && dir.dr !== 0) continue;
+            if (isVert && dir.dc !== 0) continue;
+
+            let canMove = true;
+            for (const [r, c] of piece.cells) {
+              const nr = r + dir.dr;
+              const nc = c + dir.dc;
+              if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) {
+                canMove = false;
+                break;
+              }
+              const destVal = currentGrid[nr][nc];
+              if (destVal !== 0 && destVal !== piece.id) {
+                canMove = false;
+                break;
+              }
+            }
+
+            if (canMove) {
+              validMoves.push({ piece, dir });
+            }
+          }
+        }
+
+        if (validMoves.length === 0) break;
+
+        const move = validMoves[Math.floor(Math.random() * validMoves.length)];
+        for (const [r, c] of move.piece.cells) {
+          currentGrid[r][c] = 0;
+        }
+        move.piece.cells = move.piece.cells.map(([r, c]) => [r + move.dir.dr, c + move.dir.dc]);
+        for (const [r, c] of move.piece.cells) {
+          currentGrid[r][c] = move.piece.id;
+        }
+      }
+
+      return {
+        scrambledGrid: currentGrid,
+        keyPiece: keyPiece,
+        boardPieces: activePieces
+      };
+    }
+
+    /* =========================================================================
+     * 6. BOARD & PIECE RENDERING
+     * ========================================================================= */
+    const boardEl = document.getElementById('board');
+    const pieceTrayEl = document.getElementById('piece-tray');
+    const dragGhostEl = document.getElementById('drag-ghost');
+
+    function updateBoardDimensions() {
+      const [r, c] = state.gridSize.split('x').map(Number);
+      state.rows = r;
+      state.cols = c;
+
+      // Calculate dynamic cell size based on viewport & layout
+      const isDesktop = window.innerWidth >= 1024;
+      const screenWidth = isDesktop 
+        ? Math.min(window.innerWidth - 420, 500) 
+        : Math.min(window.innerWidth - 40, 440);
+      const screenHeight = isDesktop 
+        ? Math.min(window.innerHeight - 220, 500) 
+        : Math.min(window.innerHeight - 330, 440);
+      
+      const maxCellW = Math.floor((screenWidth - (c * 8) - 24) / c);
+      const maxCellH = Math.floor((screenHeight - (r * 8) - 24) / r);
+      const cellSize = Math.max(38, Math.min(70, Math.min(maxCellW, maxCellH)));
+
+      boardEl.style.gridTemplateColumns = `repeat(${c}, ${cellSize}px)`;
+      boardEl.style.gridTemplateRows = `repeat(${r}, ${cellSize}px)`;
+      document.documentElement.style.setProperty('--cell-size', `${cellSize}px`);
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = '';
+
+      for (let r = 0; r < state.rows; r++) {
+        for (let c = 0; c < state.cols; c++) {
+          const val = state.grid[r][c];
+          const cell = document.createElement('div');
+          cell.className = 'board-cell flex items-center justify-center';
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.id = `cell-${r}-${c}`;
+
+          if (val === -1) {
+            // Frenzy obstacle cell
+            cell.classList.add('cell-blocked');
+            cell.innerHTML = `
+              <div class="flex items-center justify-center opacity-80 text-rose-400">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+              </div>`;
+          } else if (val > 0) {
+            // Cell occupied by a placed or sliding piece
+            const pieceInfo = state.placedPieces.get(val);
+            if (pieceInfo) {
+              const pal = BLOCK_PALETTES[pieceInfo.colorIndex % BLOCK_PALETTES.length];
+              const tile = document.createElement('div');
+              tile.className = `puzzle-tile ${pal.bg} text-white`;
+              tile.dataset.pieceId = val;
+              tile.dataset.row = r;
+              tile.dataset.col = c;
+
+              // Find piece orientation to show helpful sliding arrows in Mode Geser
+              let arrowIcon = '<div class="w-2 h-2 rounded-full bg-white/30 shadow-inner"></div>';
+              if (state.mode === 'geser') {
+                const cells = [];
+                for (let tr = 0; tr < state.rows; tr++) {
+                  for (let tc = 0; tc < state.cols; tc++) {
+                    if (state.grid[tr][tc] === val) cells.push([tr, tc]);
+                  }
+                }
+                const isHoriz = cells.length > 1 && cells.every(pt => pt[0] === cells[0][0]);
+                const isVert = cells.length > 1 && cells.every(pt => pt[1] === cells[0][1]);
+
+                if (isHoriz) {
+                  arrowIcon = '<span class="text-[11px] font-bold text-white/70 select-none">↔</span>';
+                } else if (isVert) {
+                  arrowIcon = '<span class="text-[11px] font-bold text-white/70 select-none">↕</span>';
+                } else {
+                  arrowIcon = '<span class="text-[10px] font-bold text-white/60 select-none">✥</span>';
+                }
+              }
+
+              tile.innerHTML = arrowIcon;
+
+              // Mode Geser: Add slide interaction directly on board pieces
+              if (state.mode === 'geser') {
+                attachSlideHandlers(tile, val);
+              }
+
+              cell.appendChild(tile);
+            }
+          }
+
+          boardEl.appendChild(cell);
+        }
+      }
+    }
+
+    function rotateCoords(coords) {
+      // Rotate 90 degrees clockwise: (r, c) -> (c, -r)
+      const rotated = coords.map(([r, c]) => [c, -r]);
+      const minR = Math.min(...rotated.map(p => p[0]));
+      const minC = Math.min(...rotated.map(p => p[1]));
+      // Normalize to top-left (0,0) and sort coords
+      return rotated
+        .map(([r, c]) => [r - minR, c - minC])
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    }
+
+    function rotateTrayPiece(pieceId, event) {
+      if (event) event.stopPropagation();
+      const piece = state.trayPieces.find(p => p.id === pieceId);
+      if (!piece) return;
+
+      piece.coords = rotateCoords(piece.coords);
+      sound.playRotate();
+      renderTray();
+    }
+
+    function renderTray() {
+      pieceTrayEl.innerHTML = '';
+      const availablePieces = state.trayPieces.filter(p => p.inTray);
+
+      document.getElementById('tray-count').textContent = `${availablePieces.length} tersisa`;
+
+      if (availablePieces.length === 0) {
+        pieceTrayEl.innerHTML = `
+          <div class="text-xs text-slate-500 italic py-4 text-center lg:col-span-2">Semua balok telah dipasang di papan!</div>
+        `;
+        return;
+      }
+
+      availablePieces.forEach(piece => {
+        const pal = BLOCK_PALETTES[piece.colorIndex % BLOCK_PALETTES.length];
+        const pieceContainer = document.createElement('div');
+        pieceContainer.className = 'group relative flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800/80 active:scale-95 transition-all cursor-pointer shadow-md select-none';
+        pieceContainer.dataset.pieceId = piece.id;
+        pieceContainer.title = 'Klik untuk memutar 90°, atau tarik ke kotak';
+
+        // Subtle rotate indicator icon in corner
+        const rotateHint = document.createElement('div');
+        rotateHint.className = 'absolute top-1.5 right-1.5 text-[10px] text-slate-500 group-hover:text-cyan-300 opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none';
+        rotateHint.innerHTML = '🔄';
+        pieceContainer.appendChild(rotateHint);
+
+        // Mini preview grid for the polyomino
+        const maxR = Math.max(...piece.coords.map(c => c[0])) + 1;
+        const maxC = Math.max(...piece.coords.map(c => c[1])) + 1;
+        const miniGrid = document.createElement('div');
+        miniGrid.className = 'grid gap-1 pointer-events-none my-auto';
+        miniGrid.style.gridTemplateRows = `repeat(${maxR}, 20px)`;
+        miniGrid.style.gridTemplateColumns = `repeat(${maxC}, 20px)`;
+
+        // Fill mini grid cells
+        for (let r = 0; r < maxR; r++) {
+          for (let c = 0; c < maxC; c++) {
+            const blockDiv = document.createElement('div');
+            const isFilled = piece.coords.some(([pr, pc]) => pr === r && pc === c);
+            if (isFilled) {
+              blockDiv.className = `w-[20px] h-[20px] rounded-[5px] ${pal.bg} shadow-sm border border-white/20`;
+            } else {
+              blockDiv.className = 'w-[20px] h-[20px] opacity-0';
+            }
+            miniGrid.appendChild(blockDiv);
+          }
+        }
+
+        pieceContainer.appendChild(miniGrid);
+
+        // Tap/click piece to rotate (or drag if moved)
+        attachDragHandlers(pieceContainer, piece);
+        pieceTrayEl.appendChild(pieceContainer);
+      });
+    }
+
+    function attachDragHandlers(element, elementPiece) {
+      let moved = false;
+      let isDragging = false;
+      let startX = 0;
+      let startY = 0;
+
+      element.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        sound.init();
+        moved = false;
+        isDragging = false;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        state.activeDrag = {
+          piece: elementPiece,
+          startX: e.clientX,
+          startY: e.clientY,
+          lastTargetRow: -1,
+          lastTargetCol: -1
+        };
+
+        const moveHandler = (me) => {
+          const dist = Math.hypot(me.clientX - startX, me.clientY - startY);
+          // Only start actual drag when moved beyond threshold
+          if (dist > 7) {
+            if (!isDragging) {
+              isDragging = true;
+              moved = true;
+              sound.playPick();
+              buildGhostPiece(elementPiece);
+              dragGhostEl.style.display = 'grid';
+            }
+            onPointerMove(me);
+          }
+        };
+
+        const upHandler = (ue) => {
+          window.removeEventListener('pointermove', moveHandler);
+          window.removeEventListener('pointerup', upHandler);
+          window.removeEventListener('pointercancel', upHandler);
+
+          // If simply clicked/tapped without drag, trigger 90-degree rotation!
+          if (!moved || !isDragging) {
+            dragGhostEl.style.display = 'none';
+            state.activeDrag = null;
+            clearBoardHighlights();
+            rotateTrayPiece(elementPiece.id);
+            return;
+          }
+
+          onPointerUp(ue);
+        };
+
+        window.addEventListener('pointermove', moveHandler);
+        window.addEventListener('pointerup', upHandler);
+        window.addEventListener('pointercancel', upHandler);
+      });
+    }
+
+    function buildGhostPiece(piece) {
+      dragGhostEl.innerHTML = '';
+      const pal = BLOCK_PALETTES[piece.colorIndex % BLOCK_PALETTES.length];
+      const maxR = Math.max(...piece.coords.map(c => c[0])) + 1;
+      const maxC = Math.max(...piece.coords.map(c => c[1])) + 1;
+
+      const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size')) || 52;
+      const gap = 8;
+
+      dragGhostEl.style.display = 'grid';
+      dragGhostEl.style.gridTemplateRows = `repeat(${maxR}, ${cellSize}px)`;
+      dragGhostEl.style.gridTemplateColumns = `repeat(${maxC}, ${cellSize}px)`;
+      dragGhostEl.style.width = `${maxC * cellSize + (maxC - 1) * gap}px`;
+      dragGhostEl.style.height = `${maxR * cellSize + (maxR - 1) * gap}px`;
+      dragGhostEl.style.gap = `${gap}px`;
+
+      for (let r = 0; r < maxR; r++) {
+        for (let c = 0; c < maxC; c++) {
+          const block = document.createElement('div');
+          const isFilled = piece.coords.some(([pr, pc]) => pr === r && pc === c);
+          if (isFilled) {
+            block.className = `rounded-xl ${pal.bg} shadow-2xl border-2 border-white/50`;
+            block.style.width = `${cellSize}px`;
+            block.style.height = `${cellSize}px`;
+          } else {
+            block.className = 'opacity-0';
+          }
+          dragGhostEl.appendChild(block);
+        }
+      }
+    }
+
+    function positionGhost(clientX, clientY) {
+      dragGhostEl.style.left = `${clientX}px`;
+      dragGhostEl.style.top = `${clientY - 40}px`;
+    }
+
+    function onPointerMove(e) {
+      if (!state.activeDrag) return;
+      positionGhost(e.clientX, e.clientY);
+
+      const boardRect = boardEl.getBoundingClientRect();
+      const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size')) || 52;
+      const gap = 8;
+      const step = cellSize + gap;
+
+      const ghostTop = e.clientY - 40;
+      const ghostLeft = e.clientX;
+
+      let hoveredRow = Math.round((ghostTop - boardRect.top) / step);
+      let hoveredCol = Math.round((ghostLeft - boardRect.left) / step);
+
+      clearBoardHighlights();
+
+      if (
+        hoveredRow >= -1 && hoveredRow <= state.rows &&
+        hoveredCol >= -1 && hoveredCol <= state.cols
+      ) {
+        const piece = state.activeDrag.piece;
+        let canPlace = canPlacePiece(piece, hoveredRow, hoveredCol);
+
+        // Auto-Rotate Mode: Check if rotating fits the target opening
+        if (!canPlace && state.autoRotateEnabled) {
+          let testCoords = piece.coords;
+          for (let rot = 1; rot <= 3; rot++) {
+            testCoords = rotateCoords(testCoords);
+            const testPiece = { ...piece, coords: testCoords };
+            if (canPlacePiece(testPiece, hoveredRow, hoveredCol)) {
+              // Apply rotation automatically!
+              piece.coords = testCoords;
+              buildGhostPiece(piece);
+              sound.playRotate();
+              canPlace = true;
+              break;
+            }
+          }
+        }
+
+        highlightPlacement(piece, hoveredRow, hoveredCol);
+        state.activeDrag.lastTargetRow = hoveredRow;
+        state.activeDrag.lastTargetCol = hoveredCol;
+      } else {
+        state.activeDrag.lastTargetRow = -1;
+        state.activeDrag.lastTargetCol = -1;
+      }
+    }
+
+    function clearBoardHighlights() {
+      document.querySelectorAll('.board-cell').forEach(cell => {
+        cell.classList.remove('highlight-valid', 'highlight-invalid');
+      });
+    }
+
+    function highlightPlacement(piece, originR, originC) {
+      const isValid = canPlacePiece(piece, originR, originC);
+      const highlightClass = isValid ? 'highlight-valid' : 'highlight-invalid';
+
+      for (const [dr, dc] of piece.coords) {
+        const r = originR + dr;
+        const c = originC + dc;
+        if (r >= 0 && r < state.rows && c >= 0 && c < state.cols) {
+          const cell = document.getElementById(`cell-${r}-${c}`);
+          if (cell) cell.classList.add(highlightClass);
+        }
+      }
+    }
+
+    function canPlacePiece(piece, originR, originC) {
+      for (const [dr, dc] of piece.coords) {
+        const r = originR + dr;
+        const c = originC + dc;
+        // Check board boundary
+        if (r < 0 || r >= state.rows || c < 0 || c >= state.cols) {
+          return false;
+        }
+        // Must be empty (0); cannot be occupied or blocked (-1)
+        if (state.grid[r][c] !== 0) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function onPointerUp(e) {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+
+      dragGhostEl.style.display = 'none';
+      clearBoardHighlights();
+
+      if (!state.activeDrag) return;
+
+      const { piece, lastTargetRow, lastTargetCol } = state.activeDrag;
+      state.activeDrag = null;
+
+      if (lastTargetRow !== -1 && lastTargetCol !== -1 && canPlacePiece(piece, lastTargetRow, lastTargetCol)) {
+        // Valid Placement!
+        placePieceOnBoard(piece, lastTargetRow, lastTargetCol);
+      } else {
+        sound.playInvalid();
+      }
+    }
+
+    function placePieceOnBoard(piece, originR, originC) {
+      saveSnapshot('place');
+
+      // Update grid
+      for (const [dr, dc] of piece.coords) {
+        const r = originR + dr;
+        const c = originC + dc;
+        state.grid[r][c] = piece.id;
+      }
+
+      // Mark piece as placed
+      piece.inTray = false;
+      piece.origin = [originR, originC];
+      state.placedPieces.set(piece.id, piece);
+      state.moves++;
+
+      sound.playSnap();
+      updateDashboard();
+      renderBoard();
+      renderTray();
+
+      checkWinCondition();
+    }
+
+    /* =========================================================================
+     * 8. SLIDING MECHANICS (MODE GESER)
+     * ========================================================================= */
+    function attachSlideHandlers(tile, pieceId) {
+      let startX = 0;
+      let startY = 0;
+      let pieceCells = [];
+
+      tile.addEventListener('pointerdown', (e) => {
+        if (state.mode !== 'geser') return;
+        e.preventDefault();
+        sound.init();
+
+        startX = e.clientX;
+        startY = e.clientY;
+
+        // Find all cells occupied by this piece
+        pieceCells = [];
+        for (let r = 0; r < state.rows; r++) {
+          for (let c = 0; c < state.cols; c++) {
+            if (state.grid[r][c] === pieceId) {
+              pieceCells.push([r, c]);
+            }
+          }
+        }
+
+        // Calculate strictly locked axis (horizontal vs vertical)
+        const isHorizontalOnly = pieceCells.length > 1 && pieceCells.every(c => c[0] === pieceCells[0][0]);
+        const isVerticalOnly = pieceCells.length > 1 && pieceCells.every(c => c[1] === pieceCells[0][1]);
+
+        const handleMove = (moveEvt) => {
+          const dx = moveEvt.clientX - startX;
+          const dy = moveEvt.clientY - startY;
+          const threshold = 20;
+
+          if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+            window.removeEventListener('pointermove', handleMove);
+            window.removeEventListener('pointerup', handleEnd);
+
+            let dir = null;
+            if (isHorizontalOnly) {
+              // Strictly locked to Horizontal: only Left or Right allowed
+              dir = dx > 0 ? { dr: 0, dc: 1 } : { dr: 0, dc: -1 };
+            } else if (isVerticalOnly) {
+              // Strictly locked to Vertical: only Up or Down allowed
+              dir = dy > 0 ? { dr: 1, dc: 0 } : { dr: -1, dc: 0 };
+            } else {
+              // Square (2x2) or flexible piece: follows dominant swipe direction
+              if (Math.abs(dx) > Math.abs(dy)) {
+                dir = dx > 0 ? { dr: 0, dc: 1 } : { dr: 0, dc: -1 };
+              } else {
+                dir = dy > 0 ? { dr: 1, dc: 0 } : { dr: -1, dc: 0 };
+              }
+            }
+
+            attemptSlidePiece(pieceId, pieceCells, dir);
+          }
+        };
+
+        const handleEnd = () => {
+          window.removeEventListener('pointermove', handleMove);
+          window.removeEventListener('pointerup', handleEnd);
+        };
+
+        window.addEventListener('pointermove', handleMove);
+        window.addEventListener('pointerup', handleEnd);
+      });
+    }
+
+    function attemptSlidePiece(pieceId, pieceCells, dir) {
+      // Validate if piece can slide in this direction
+      let canSlide = true;
+
+      for (const [r, c] of pieceCells) {
+        const nr = r + dir.dr;
+        const nc = c + dir.dc;
+
+        if (nr < 0 || nr >= state.rows || nc < 0 || nc >= state.cols) {
+          canSlide = false;
+          break;
+        }
+
+        const targetVal = state.grid[nr][nc];
+        if (targetVal !== 0 && targetVal !== pieceId) {
+          canSlide = false;
+          break;
+        }
+      }
+
+      if (canSlide) {
+        saveSnapshot('slide');
+
+        // Clear current cells
+        for (const [r, c] of pieceCells) {
+          state.grid[r][c] = 0;
+        }
+
+        // Place at new cells
+        for (const [r, c] of pieceCells) {
+          state.grid[r + dir.dr][c + dir.dc] = pieceId;
+        }
+
+        state.moves++;
+        sound.playSlide();
+        updateDashboard();
+        renderBoard();
+        checkWinCondition();
+      } else {
+        sound.playInvalid();
+      }
+    }
+
+    /* =========================================================================
+     * 9. SNAPSHOTS, UNDO, RESET & WIN CONDITION
+     * ========================================================================= */
+    function saveSnapshot(actionType = 'action') {
+      const snap = {
+        grid: state.grid.map(row => [...row]),
+        trayPieces: JSON.parse(JSON.stringify(state.trayPieces)),
+        placedPieces: new Map(state.placedPieces),
+        moves: state.moves,
+        actionType
+      };
+      state.historyStack.push(snap);
+      document.getElementById('btn-undo').disabled = false;
+    }
+
+    function undoStep() {
+      if (state.historyStack.length === 0) return;
+
+      const previous = state.historyStack.pop();
+      state.grid = previous.grid.map(row => [...row]);
+      state.trayPieces = previous.trayPieces;
+      state.placedPieces = new Map(previous.placedPieces);
+      state.moves = previous.moves;
+
+      sound.playUndo();
+      updateDashboard();
+      renderBoard();
+      renderTray();
+
+      if (state.historyStack.length === 0) {
+        document.getElementById('btn-undo').disabled = true;
+      }
+    }
+
+    function resetLevel() {
+      if (!state.initialSnapshot) return;
+
+      state.grid = state.initialSnapshot.grid.map(row => [...row]);
+      state.trayPieces = JSON.parse(JSON.stringify(state.initialSnapshot.trayPieces));
+      state.placedPieces = new Map(state.initialSnapshot.placedPieces);
+      state.moves = 0;
+      state.historyStack = [];
+
+      document.getElementById('btn-undo').disabled = true;
+      sound.playUndo();
+      updateDashboard();
+      renderBoard();
+      renderTray();
+    }
+
+    function checkWinCondition() {
+      // Board is completed when NO non-obstacle cells (value 0) are left empty
+      let hasEmptyCell = false;
+      for (let r = 0; r < state.rows; r++) {
+        for (let c = 0; c < state.cols; c++) {
+          if (state.grid[r][c] === 0) {
+            hasEmptyCell = true;
+            break;
+          }
+        }
+        if (hasEmptyCell) break;
+      }
+
+      // Also ensure all required tray pieces are placed
+      const unplacedInTray = state.trayPieces.some(p => p.inTray);
+
+      if (!hasEmptyCell && !unplacedInTray) {
+        triggerWinCelebration();
+      }
+    }
+
+    function triggerWinCelebration() {
+      state.isGameOver = true;
+      sound.playWin();
+
+      // Launch Confetti animation
+      launchConfetti();
+
+      // Show win modal
+      document.getElementById('win-mode').textContent = state.mode === 'isi' ? 'Mode Isi' : 'Mode Geser';
+      document.getElementById('win-grid').textContent = state.gridSize;
+      document.getElementById('win-summary').textContent = `Kotak berhasil terisi penuh sempurna dalam ${state.moves} langkah!`;
+
+      const modal = document.getElementById('win-modal');
+      const card = document.getElementById('win-card');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      card.classList.remove('scale-95');
+      card.classList.add('scale-100');
+    }
+
+    function hideWinModal() {
+      const modal = document.getElementById('win-modal');
+      const card = document.getElementById('win-card');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      card.classList.remove('scale-100');
+      card.classList.add('scale-95');
+    }
+
+    /* =========================================================================
+     * 10. LEVEL INITIALIZATION & LIFECYCLE
+     * ========================================================================= */
+    function startLevel(incrementLevel = false) {
+      hideWinModal();
+
+      if (incrementLevel) {
+        state.level++;
+      }
+
+      state.moves = 0;
+      state.isGameOver = false;
+      state.historyStack = [];
+      document.getElementById('btn-undo').disabled = true;
+
+      const frenzyBlocked = calculateFrenzyBlockedCount();
+      updateDashboard();
+      updateBoardDimensions();
+
+      if (state.mode === 'isi') {
+        // Generate full solution
+        const tiling = generateSolvableTiling(state.rows, state.cols, frenzyBlocked);
+        
+        // Mode Isi: Grid starts completely empty of pieces (only frenzy blocked cells remain)
+        state.grid = Array.from({ length: state.rows }, () => Array(state.cols).fill(0));
+        for (let r = 0; r < state.rows; r++) {
+          for (let c = 0; c < state.cols; c++) {
+            if (tiling.grid[r][c] === -1) {
+              state.grid[r][c] = -1;
+            }
+          }
+        }
+
+        // All partitioned pieces go into the tray!
+        state.placedPieces.clear();
+        state.trayPieces = tiling.pieces.map(p => ({
+          ...p,
+          inTray: true
+        }));
+
+        document.getElementById('mode-subtitle').textContent = 'Mode Isi: Pasang semua balok hingga penuh';
+        document.getElementById('slide-hint-toast').style.opacity = '0';
+      } 
+      else {
+        // Mode Geser
+        const tiling = generateSolvableTiling(state.rows, state.cols, frenzyBlocked);
+        const scrambled = scrambleBoardForSlideMode(tiling.grid, tiling.pieces, state.rows, state.cols);
+
+        state.grid = scrambled.scrambledGrid;
+        state.placedPieces.clear();
+
+        // Register on-board pieces
+        scrambled.boardPieces.forEach(p => {
+          state.placedPieces.set(p.id, {
+            ...p,
+            inTray: false
+          });
+        });
+
+        // Key complementary piece goes into the tray
+        const singleTrayPiece = {
+          ...scrambled.keyPiece,
+          inTray: true
+        };
+        state.placedPieces.set(singleTrayPiece.id, singleTrayPiece);
+        state.trayPieces = [singleTrayPiece];
+
+        document.getElementById('mode-subtitle').textContent = 'Mode Geser: Geser balok lalu pasang 1 balok sisa';
+        
+        // Show brief hint toast
+        const hintToast = document.getElementById('slide-hint-toast');
+        hintToast.style.opacity = '1';
+        setTimeout(() => { hintToast.style.opacity = '0'; }, 3500);
+      }
+
+      // Save level initial snapshot for Reset
+      state.initialSnapshot = {
+        grid: state.grid.map(row => [...row]),
+        trayPieces: JSON.parse(JSON.stringify(state.trayPieces)),
+        placedPieces: new Map(state.placedPieces)
+      };
+
+      renderBoard();
+      renderTray();
+    }
+
+    function updateDashboard() {
+      document.getElementById('level-display').textContent = state.level;
+      document.getElementById('moves-display').textContent = state.moves;
+
+      const frenzyCount = calculateFrenzyBlockedCount();
+      document.getElementById('frenzy-display').textContent = `${frenzyCount}/8`;
+
+      const badge = document.getElementById('frenzy-badge-container');
+      if (frenzyCount > 0) {
+        badge.classList.add('border-rose-500', 'bg-rose-950/30');
+      } else {
+        badge.classList.remove('border-rose-500', 'bg-rose-950/30');
+      }
+    }
+
+    /* =========================================================================
+     * 11. CONFETTI CELEBRATION SYSTEM
+     * ========================================================================= */
+    const canvas = document.getElementById('confetti-canvas');
+    const ctx = canvas.getContext('2d');
+    let confettiParticles = [];
+    let confettiAnimationId = null;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      updateBoardDimensions();
+      renderBoard();
+    });
+    resizeCanvas();
+
+    function launchConfetti() {
+      confettiParticles = [];
+      const colors = ['#f59e0b', '#10b981', '#0ea5e9', '#ec4899', '#8b5cf6', '#f43f5e'];
+
+      for (let i = 0; i < 90; i++) {
+        confettiParticles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 14,
+          vy: (Math.random() - 0.7) * 16,
+          size: Math.random() * 8 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: Math.random() * 360,
+          vRot: (Math.random() - 0.5) * 12,
+          opacity: 1
+        });
+      }
+
+      if (confettiAnimationId) cancelAnimationFrame(confettiAnimationId);
+      animateConfetti();
+    }
+
+    function animateConfetti() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+
+      for (const p of confettiParticles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.35; // gravity
+        p.vx *= 0.98; // air drag
+        p.rotation += p.vRot;
+        p.opacity -= 0.012;
+
+        if (p.opacity > 0) {
+          alive = true;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate((p.rotation * Math.PI) / 180);
+          ctx.globalAlpha = p.opacity;
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+          ctx.restore();
+        }
+      }
+
+      if (alive) {
+        confettiAnimationId = requestAnimationFrame(animateConfetti);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    /* =========================================================================
+     * 12. EVENT LISTENERS & SETUP
+     * ========================================================================= */
+    // Mode Toggles
+    const modeIsiBtn = document.getElementById('mode-isi-btn');
+    const modeGeserBtn = document.getElementById('mode-geser-btn');
+
+    modeIsiBtn.addEventListener('click', () => {
+      if (state.mode === 'isi') return;
+      state.mode = 'isi';
+      modeIsiBtn.className = 'px-3 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold transition-all shadow-md';
+      modeGeserBtn.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition-all font-semibold';
+      startLevel(false);
+    });
+
+    modeGeserBtn.addEventListener('click', () => {
+      if (state.mode === 'geser') return;
+      state.mode = 'geser';
+      modeGeserBtn.className = 'px-3 py-1 rounded-lg bg-cyan-500 text-slate-950 font-bold transition-all shadow-md';
+      modeIsiBtn.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-slate-200 transition-all font-semibold';
+      startLevel(false);
+    });
+
+    // Grid Size Selector Buttons
+    document.querySelectorAll('.size-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.size-btn').forEach(b => {
+          b.className = 'size-btn px-2 py-1 rounded-lg font-medium text-slate-400 hover:text-slate-200';
+        });
+        btn.className = 'size-btn px-2 py-1 rounded-lg font-bold bg-indigo-600 text-white';
+        state.gridSize = btn.dataset.size;
+        startLevel(false);
+      });
+    });
+
+    // Frenzy Checkbox Toggle
+    const frenzyToggle = document.getElementById('frenzy-toggle');
+    frenzyToggle.addEventListener('change', (e) => {
+      state.frenzyEnabled = e.target.checked;
+      startLevel(false);
+    });
+
+    const autoRotateToggle = document.getElementById('autorotate-toggle');
+    if (autoRotateToggle) {
+      autoRotateToggle.addEventListener('change', (e) => {
+        state.autoRotateEnabled = e.target.checked;
+        sound.playSnap();
+      });
+    }
+
+    // Sound Button
+    const btnSound = document.getElementById('btn-sound');
+    btnSound.addEventListener('click', () => {
+      sound.enabled = !sound.enabled;
+      document.getElementById('sound-icon-on').classList.toggle('hidden', !sound.enabled);
+      document.getElementById('sound-icon-off').classList.toggle('hidden', sound.enabled);
+      if (sound.enabled) sound.playSnap();
+    });
+
+    // Information Modal
+    const infoModal = document.getElementById('info-modal');
+    document.getElementById('btn-info').addEventListener('click', () => {
+      infoModal.classList.remove('opacity-0', 'pointer-events-none');
+    });
+    document.getElementById('btn-close-info').addEventListener('click', () => {
+      infoModal.classList.add('opacity-0', 'pointer-events-none');
+    });
+    document.getElementById('btn-got-it').addEventListener('click', () => {
+      infoModal.classList.add('opacity-0', 'pointer-events-none');
+      sound.init();
+    });
+
+    // Controls
+    document.getElementById('btn-undo').addEventListener('click', undoStep);
+    document.getElementById('btn-reset').addEventListener('click', resetLevel);
+    document.getElementById('btn-new-level').addEventListener('click', () => startLevel(false));
+    document.getElementById('btn-next-level').addEventListener('click', () => startLevel(true));
+    document.getElementById('btn-replay').addEventListener('click', resetLevel);
+
+    // Initial Start on window load
+    window.addEventListener('load', () => {
+      startLevel(false);
+    });
+  </script>
+</body>
+</html>

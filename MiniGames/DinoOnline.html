@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DinoOnline</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;700&display=swap');
+
+        :root {
+            --bg-color: #1e1e24;
+            --text-color: #e5e5e5;
+            --primary: #4ade80;
+            --primary-hover: #22c55e;
+            --frenzy-color: #ef4444;
+            --frenzy-hover: #dc2626;
+            --canvas-border: #444;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            flex-direction: column;
+            color: var(--text-color);
+            overflow: hidden;
+            transition: background-color 0.5s, box-shadow 0.5s;
+        }
+
+        body.frenzy-active {
+            --bg-color: #2a1111;
+            --primary: #ef4444;
+            --canvas-border: #ef4444;
+        }
+
+        .game-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .score-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .mode-indicator {
+            color: var(--primary);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        canvas {
+            background-color: #111;
+            display: block;
+            border: 3px solid var(--canvas-border);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            aspect-ratio: 800 / 250;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 8px;
+            z-index: 10;
+            backdrop-filter: blur(3px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .overlay h1 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 24px;
+            margin-bottom: 10px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .overlay p {
+            font-size: 16px;
+            margin-bottom: 30px;
+            color: #aaa;
+            text-align: center;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        button {
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 16px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .btn-normal {
+            background-color: #4ade80;
+            color: #000;
+        }
+
+        .btn-normal:hover { background-color: #22c55e; transform: translateY(-2px); }
+
+        .btn-frenzy {
+            background-color: #ef4444;
+            color: #fff;
+        }
+
+        .btn-frenzy:hover { background-color: #dc2626; transform: translateY(-2px); }
+
+        .btn-restart {
+            background-color: var(--primary);
+            color: #000;
+            margin-top: 20px;
+        }
+
+        .btn-restart:hover { filter: brightness(1.1); transform: translateY(-2px); }
+
+        .controls-hint {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #888;
+            text-align: center;
+        }
+
+        .controls-hint span {
+            background: #333;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #fff;
+            margin: 0 4px;
+        }
+
+        /* Mobile touch zones indicator */
+        .touch-zones {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: none;
+            justify-content: space-between;
+            padding: 0 40px;
+            box-sizing: border-box;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .header { font-size: 10px; }
+            .overlay h1 { font-size: 18px; }
+            .controls-hint { display: none; }
+            .touch-zones { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-wrapper">
+        <div class="header">
+            <div class="mode-indicator" id="modeDisplay">MODE NORMAL</div>
+            <div class="score-container">
+                <div id="highScore">HI 00000</div>
+                <div id="score">00000</div>
+            </div>
+        </div>
+
+        <div style="position: relative; width: 100%;">
+            <canvas id="gameCanvas" width="800" height="250"></canvas>
+            
+            <!-- Start Screen Overlay -->
+            <div id="startScreen" class="overlay active">
+                <h1>DINOSAURUS<br>ONLINE</h1>
+                <p>Pilih Mode Permainan</p>
+                <div class="btn-group">
+                    <button class="btn-normal" onclick="initGame('normal')">NORMAL</button>
+                    <button class="btn-frenzy" onclick="initGame('frenzy')">FRENZY</button>
+                </div>
+            </div>
+
+            <!-- Game Over Overlay -->
+            <div id="gameOverScreen" class="overlay">
+                <h1>GAME OVER</h1>
+                <p id="finalScoreText">Skor Anda: 0</p>
+                <button class="btn-restart" id="btnRestart">MAIN LAGI (Spasi)</button>
+            </div>
+        </div>
+
+        <div class="controls-hint">
+            <span>Spasi / ↑</span> Lompat &nbsp;&nbsp;&nbsp; <span>↓</span> Merunduk
+        </div>
+        
+        <div class="touch-zones" id="touchZones">
+            <div>👈 Merunduk</div>
+            <div>Lompat 👉</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('highScore');
+        const modeDisplay = document.getElementById('modeDisplay');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreText = document.getElementById('finalScoreText');
+        const btnRestart = document.getElementById('btnRestart');
+
+        // Game Configuration
+        const CONFIG = {
+            normal: {
+                baseSpeed: 6,
+                maxSpeed: 16,
+                gravity: 0.6,
+                jumpPower: -11,
+                spawnMin: 60, // frames
+                spawnMax: 120
+            },
+            frenzy: {
+                baseSpeed: 10,
+                maxSpeed: 25,
+                gravity: 0.85,
+                jumpPower: -13.5,
+                spawnMin: 35,
+                spawnMax: 70
+            }
+        };
+
+        let currentMode = 'normal';
+        let highScores = {
+            normal: parseInt(localStorage.getItem('dinoHighScore_normal')) || 0,
+            frenzy: parseInt(localStorage.getItem('dinoHighScore_frenzy')) || 0
+        };
+
+        // Game State Variables
+        let state = 'MENU'; // MENU, PLAYING, GAMEOVER
+        let frameCount = 0;
+        let score = 0;
+        let gameSpeed = 0;
+        let spawnTimer = 0;
+        let animationId;
+        
+        const groundY = 200;
+
+        // Player Object
+        const player = {
+            x: 50,
+            y: groundY,
+            width: 40,
+            height: 44,
+            baseWidth: 40,
+            baseHeight: 44,
+            duckWidth: 56,
+            duckHeight: 26,
+            dy: 0,
+            isJumping: false,
+            isDucking: false,
+            
+            draw() {
+                ctx.fillStyle = "#e5e5e5";
+                
+                if (this.isDucking) {
+                    // Gambar Dino Nunduk
+                    ctx.fillRect(this.x, this.y - this.duckHeight, this.duckWidth, this.duckHeight);
+                    // Kepala maju
+                    ctx.fillRect(this.x + this.duckWidth, this.y - this.duckHeight, 16, 12);
+                    // Mata
+                    ctx.fillStyle = "#111";
+                    ctx.fillRect(this.x + this.duckWidth + 6, this.y - this.duckHeight + 2, 4, 4);
+                } else {
+                    // Gambar Dino Berdiri (Pixel Art Sederhana)
+                    // Badan
+                    ctx.fillRect(this.x, this.y - this.height, 24, 28);
+                    // Ekor
+                    ctx.fillRect(this.x - 10, this.y - this.height + 10, 10, 8);
+                    // Kepala
+                    ctx.fillRect(this.x + 16, this.y - this.height - 12, 24, 18);
+                    // Moncong
+                    ctx.fillRect(this.x + 24, this.y - this.height - 4, 16, 10);
+                    // Mata
+                    ctx.fillStyle = "#111";
+                    ctx.fillRect(this.x + 24, this.y - this.height - 8, 4, 4);
+                    
+                    ctx.fillStyle = "#e5e5e5";
+                    // Tangan
+                    ctx.fillRect(this.x + 26, this.y - this.height + 14, 8, 4);
+
+                    // Animasi Kaki
+                    if (state === 'PLAYING' && !this.isJumping) {
+                        if (Math.floor(frameCount / 5) % 2 === 0) {
+                            ctx.fillRect(this.x + 4, this.y - 16, 6, 16); // Kiri turun
+                            ctx.fillRect(this.x + 14, this.y - 12, 6, 12); // Kanan naik
+                        } else {
+                            ctx.fillRect(this.x + 4, this.y - 12, 6, 12); // Kiri naik
+                            ctx.fillRect(this.x + 14, this.y - 16, 6, 16); // Kanan turun
+                        }
+                    } else {
+                        // Kaki saat diam/lompat
+                        ctx.fillRect(this.x + 4, this.y - 16, 6, 16);
+                        ctx.fillRect(this.x + 14, this.y - 16, 6, 16);
+                    }
+                }
+            },
+            
+            update() {
+                // Terapkan gravitasi
+                if (this.isJumping) {
+                    this.dy += CONFIG[currentMode].gravity;
+                    this.y += this.dy;
+
+                    // Turun lebih cepat jika tombol nunduk ditekan saat di udara
+                    if (this.isDucking) {
+                        this.dy += CONFIG[currentMode].gravity * 2; 
+                    }
+
+                    if (this.y >= groundY) {
+                        this.y = groundY;
+                        this.isJumping = false;
+                        this.dy = 0;
+                    }
+                }
+
+                // Ubah hitbox saat nunduk
+                if (this.isDucking && !this.isJumping) {
+                    this.width = this.duckWidth;
+                    this.height = this.duckHeight;
+                } else {
+                    this.width = this.baseWidth;
+                    this.height = this.baseHeight;
+                }
+            },
+
+            jump() {
+                if (!this.isJumping) {
+                    this.isJumping = true;
+                    this.dy = CONFIG[currentMode].jumpPower;
+                }
+            }
+        };
+
+        let obstacles = [];
+
+        class Obstacle {
+            constructor(type) {
+                this.type = type; // 'cactus' or 'bird'
+                this.x = canvas.width;
+                this.markedForDeletion = false;
+
+                if (this.type === 'cactus') {
+                    // Variasi kaktus (Kecil, Besar, Berkelompok)
+                    this.width = Math.random() > 0.5 ? 20 : 40;
+                    this.height = Math.random() > 0.5 ? 40 : 55;
+                    this.y = groundY;
+                } else {
+                    // Burung
+                    this.width = 36;
+                    this.height = 24;
+                    // Tiga ketinggian burung: Bawah, Tengah, Atas
+                    const heights = [groundY - 20, groundY - 50, groundY - 85];
+                    this.y = heights[Math.floor(Math.random() * heights.length)];
+                    this.flapTimer = 0;
+                }
+            }
+
+            update() {
+                this.x -= gameSpeed;
+                if (this.x + this.width < 0) this.markedForDeletion = true;
+            }
+
+            draw() {
+                ctx.fillStyle = currentMode === 'frenzy' ? "#ff8888" : "#d8d8d8";
+                
+                if (this.type === 'cactus') {
+                    // Batang Utama
+                    ctx.fillRect(this.x, this.y - this.height, this.width * 0.4, this.height);
+                    // Cabang jika lebar
+                    if (this.width > 20) {
+                        ctx.fillRect(this.x + 10, this.y - this.height + 10, this.width * 0.4, this.height - 15);
+                        ctx.fillRect(this.x - 8, this.y - this.height + 15, 8, this.height - 25);
+                    }
+                } else {
+                    // Animasi sayap burung
+                    this.flapTimer++;
+                    let isWingUp = Math.floor(this.flapTimer / 10) % 2 === 0;
+                    
+                    // Badan
+                    ctx.fillRect(this.x, this.y - this.height, this.width, 10);
+                    // Kepala & Paruh
+                    ctx.fillRect(this.x - 8, this.y - this.height + 2, 8, 6);
+                    
+                    // Sayap
+                    if (isWingUp) {
+                        ctx.fillRect(this.x + 10, this.y - this.height - 12, 14, 12);
+                    } else {
+                        ctx.fillRect(this.x + 10, this.y - this.height + 10, 14, 12);
+                    }
+                }
+            }
+        }
+
+        // Helper Functions
+        function formatScore(num) {
+            return String(Math.floor(num)).padStart(5, '0');
+        }
+
+        function updateUIHighScore() {
+            highScoreEl.textContent = `HI ${formatScore(highScores[currentMode])}`;
+        }
+
+        // Draw Environment
+        function drawGround() {
+            ctx.strokeStyle = currentMode === 'frenzy' ? '#ef4444' : '#666';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(canvas.width, groundY);
+            ctx.stroke();
+
+            // Partikel debu di tanah
+            ctx.fillStyle = currentMode === 'frenzy' ? '#ef4444' : '#666';
+            for(let i=0; i<5; i++) {
+                let x = ((frameCount * (gameSpeed/2)) + (i * 150)) % canvas.width;
+                ctx.fillRect(canvas.width - x, groundY + 5 + (i%3)*4, 4, 2);
+            }
+        }
+
+        function handleSpawning() {
+            spawnTimer--;
+            if (spawnTimer <= 0) {
+                // Jangan spawn burung di awal game
+                const type = (score > 200 && Math.random() < 0.3) ? 'bird' : 'cactus';
+                obstacles.push(new Obstacle(type));
+                
+                const min = CONFIG[currentMode].spawnMin;
+                const max = CONFIG[currentMode].spawnMax;
+                // Jarak spawn berkurang seiring kecepatan meningkat
+                const speedFactor = (gameSpeed / CONFIG[currentMode].baseSpeed);
+                spawnTimer = Math.random() * (max - min) / speedFactor + min;
+            }
+        }
+
+        function checkCollision() {
+            // Toleransi hitbox (margin) agar game terasa lebih adil
+            const margin = 8; 
+
+            for (let obs of obstacles) {
+                let pX = player.x + margin;
+                let pY = player.y - player.height + margin;
+                let pW = player.width - (margin * 2);
+                let pH = player.height - (margin * 2);
+
+                let oX = obs.x;
+                let oY = obs.y - obs.height;
+                let oW = obs.width;
+                let oH = obs.height;
+
+                if (pX < oX + oW &&
+                    pX + pW > oX &&
+                    pY < oY + oH &&
+                    pY + pH > oY) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Main Game Loop
+        function loop() {
+            if (state !== 'PLAYING') return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update Game Logic
+            frameCount++;
+            gameSpeed += 0.001; // Kecepatan perlahan naik
+            if (gameSpeed > CONFIG[currentMode].maxSpeed) {
+                gameSpeed = CONFIG[currentMode].maxSpeed;
+            }
+
+            score += gameSpeed * 0.02;
+            scoreEl.textContent = formatScore(score);
+
+            if (score > highScores[currentMode]) {
+                highScores[currentMode] = Math.floor(score);
+                updateUIHighScore();
+            }
+
+            handleSpawning();
+
+            // Update entities
+            player.update();
+            
+            obstacles.forEach(obs => {
+                obs.update();
+                obs.draw();
+            });
+            obstacles = obstacles.filter(obs => !obs.markedForDeletion);
+
+            // Draw entities
+            drawGround();
+            player.draw();
+
+            // Collision Check
+            if (checkCollision()) {
+                gameOver();
+            } else {
+                animationId = requestAnimationFrame(loop);
+            }
+        }
+
+        // Game Controls Flow
+        window.initGame = function(mode) {
+            currentMode = mode;
+            document.body.className = mode === 'frenzy' ? 'frenzy-active' : '';
+            modeDisplay.textContent = mode === 'frenzy' ? 'MODE FRENZY' : 'MODE NORMAL';
+            modeDisplay.style.color = mode === 'frenzy' ? '#ef4444' : '#4ade80';
+            
+            updateUIHighScore();
+            startScreen.classList.remove('active');
+            gameOverScreen.classList.remove('active');
+            
+            resetGame();
+        };
+
+        function resetGame() {
+            state = 'PLAYING';
+            score = 0;
+            frameCount = 0;
+            gameSpeed = CONFIG[currentMode].baseSpeed;
+            obstacles = [];
+            spawnTimer = CONFIG[currentMode].spawnMax;
+            
+            player.y = groundY;
+            player.dy = 0;
+            player.isJumping = false;
+            player.isDucking = false;
+            
+            cancelAnimationFrame(animationId);
+            loop();
+        }
+
+        function gameOver() {
+            state = 'GAMEOVER';
+            localStorage.setItem(`dinoHighScore_${currentMode}`, highScores[currentMode]);
+            
+            // Efek getar saat mati
+            canvas.style.transform = 'translate(5px, 5px)';
+            setTimeout(() => canvas.style.transform = 'translate(-5px, -5px)', 50);
+            setTimeout(() => canvas.style.transform = 'translate(5px, -5px)', 100);
+            setTimeout(() => canvas.style.transform = 'translate(0, 0)', 150);
+
+            finalScoreText.textContent = `Skor Anda: ${Math.floor(score)}`;
+            gameOverScreen.classList.add('active');
+        }
+
+        // Input Listeners
+        function handleKeyDown(e) {
+            if (state === 'MENU') return;
+
+            if ((e.code === 'Space' || e.code === 'ArrowUp') && state === 'PLAYING') {
+                e.preventDefault();
+                player.jump();
+            } else if (e.code === 'ArrowDown' && state === 'PLAYING') {
+                e.preventDefault();
+                player.isDucking = true;
+            } else if ((e.code === 'Space' || e.code === 'Enter') && state === 'GAMEOVER') {
+                e.preventDefault();
+                gameOverScreen.classList.remove('active');
+                resetGame();
+            }
+        }
+
+        function handleKeyUp(e) {
+            if (e.code === 'ArrowDown') {
+                player.isDucking = false;
+            }
+        }
+
+        // Touch Controls untuk Mobile
+        function handleTouchStart(e) {
+            if (state === 'GAMEOVER') return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const screenWidth = window.innerWidth;
+
+            if (state === 'PLAYING') {
+                if (touch.clientX > screenWidth / 2) {
+                    player.jump(); // Tap Kanan = Lompat
+                } else {
+                    player.isDucking = true; // Tap Kiri = Nunduk
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            player.isDucking = false;
+        }
+
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
+        
+        // Mobile listeners
+        canvas.addEventListener('touchstart', handleTouchStart, {passive: false});
+        canvas.addEventListener('touchend', handleTouchEnd, {passive: false});
+        
+        btnRestart.addEventListener('click', () => {
+            gameOverScreen.classList.remove('active');
+            resetGame();
+        });
+
+        // Tampilkan frame awal di background menu
+        updateUIHighScore();
+        player.draw();
+        drawGround();
+
+    </script>
+</body>
+</html>

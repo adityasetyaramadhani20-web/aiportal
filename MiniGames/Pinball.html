@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pinball</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #090d16;
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+        }
+
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+
+        .hud-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .control-btn {
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .control-btn:active, .control-btn.active-press {
+            transform: translateY(2px) scale(0.98);
+            border-color: rgba(56, 189, 248, 0.7);
+            background: linear-gradient(180deg, rgba(14, 116, 144, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%);
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(250, 204, 21, 0.9); box-shadow: 0 0 15px rgba(250, 204, 21, 0.35); }
+            50% { border-color: rgba(250, 204, 21, 0.3); box-shadow: 0 0 4px rgba(250, 204, 21, 0.1); }
+        }
+
+        .frenzy-active-banner {
+            animation: pulse-border 1.2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="relative w-full h-full overflow-hidden">
+
+    <!-- Kanvas 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- Antarmuka Atas (HUD) -->
+    <header class="relative z-10 pointer-events-none w-full max-w-5xl mx-auto pt-3 px-3 sm:px-6 flex flex-col gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-900/85 backdrop-blur-md border border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-lg pointer-events-auto">
+            <!-- Skor & Menuju Frenzy -->
+            <div class="flex flex-col px-2 border-r border-slate-800/80">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Skor</span>
+                    <span id="ui-highscore" class="text-[10px] hud-mono text-slate-500" title="Skor Tertinggi">MAX: 0</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="ui-score" class="text-xl sm:text-2xl font-bold hud-mono text-white">0</span>
+                    <span id="ui-frenzy-progress" class="text-[11px] hud-mono text-amber-400/90">/ 1000</span>
+                </div>
+            </div>
+
+            <!-- Kesempatan Bola -->
+            <div class="flex flex-col px-2 sm:border-r border-slate-800/80">
+                <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Bola</span>
+                <div class="flex items-center gap-2 mt-0.5">
+                    <span id="ui-lives" class="text-lg sm:text-xl font-bold hud-mono text-sky-400">3</span>
+                    <span id="ui-active-balls" class="text-xs hud-mono px-1.5 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800/60">Aktif: 1</span>
+                </div>
+            </div>
+
+            <!-- Knock 'Em Up: Target Bos -->
+            <div class="flex flex-col px-2 border-r border-slate-800/80">
+                <div class="flex justify-between items-center">
+                    <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Target Bos</span>
+                    <span id="ui-kills" class="text-xs hud-mono text-rose-400 font-bold">0/50</span>
+                </div>
+                <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-1.5">
+                    <div id="ui-kill-bar" class="h-full bg-rose-500 transition-all duration-200" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Status Sesi / Frenzy -->
+            <div id="ui-frenzy-box" class="flex flex-col px-2 sm:border-r border-slate-800/80 rounded-lg transition-all">
+                <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Frenzy</span>
+                <div class="flex items-center justify-between mt-0.5">
+                    <span id="ui-frenzy-state" class="text-xs font-semibold text-slate-400">Siaga (Tiap 1000)</span>
+                    <span id="ui-frenzy-timer" class="text-sm font-bold hud-mono text-amber-400 hidden">60d</span>
+                </div>
+            </div>
+
+            <!-- Aksi Cepat & Audio -->
+            <div class="col-span-2 sm:col-span-1 flex items-center justify-end gap-1.5 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
+                <button id="btn-camera" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition" title="Ubah Sudut Kamera">
+                    Kamera
+                </button>
+                <button id="btn-sound" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition" title="Suara Aktif/Bisu">
+                    Suara: ON
+                </button>
+                <button id="btn-help" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition" title="Panduan Objek">
+                    Info
+                </button>
+            </div>
+        </div>
+
+        <!-- Bar HP Bos (Muncul hanya saat Bos Aktif) -->
+        <div id="ui-boss-banner" class="hidden bg-purple-950/90 backdrop-blur-md border border-purple-500/60 rounded-xl px-4 py-2 shadow-lg flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <span class="inline-block w-2.5 h-2.5 rounded-full bg-purple-400 animate-ping"></span>
+                <span class="text-xs sm:text-sm font-bold tracking-wide uppercase text-purple-200">Musuh Bos Aktif (10x Poin)</span>
+            </div>
+            <div class="flex items-center gap-3 flex-1 max-w-xs">
+                <div class="w-full h-2.5 bg-purple-900/80 rounded-full overflow-hidden border border-purple-700">
+                    <div id="ui-boss-hp-bar" class="h-full bg-gradient-to-r from-fuchsia-500 to-purple-400 transition-all duration-150" style="width: 100%"></div>
+                </div>
+                <span id="ui-boss-hp-text" class="text-xs hud-mono font-bold text-purple-200 whitespace-nowrap">10/10 HP</span>
+            </div>
+        </div>
+
+        <!-- Petunjuk Kontekstual (Pull to Start / Notifikasi Event) -->
+        <div class="flex justify-center">
+            <div id="ui-toast" class="bg-slate-900/90 border border-slate-700/80 text-slate-200 text-xs sm:text-sm font-medium px-4 py-1.5 rounded-full shadow-md transition-opacity duration-300">
+                Tarik bola ke belakang dan arahkan sasaran untuk meluncurkan!
+            </div>
+        </div>
+    </header>
+
+    <!-- Kontrol Bawah (Flipper Kiri, Guncang Meja, Flipper Kanan) -->
+    <footer class="fixed bottom-0 inset-x-0 z-10 pointer-events-none pb-4 pt-2 px-4 flex justify-center">
+        <div class="w-full max-w-xl flex items-center justify-between gap-3 pointer-events-auto">
+            <button id="btn-left-flipper" class="control-btn flex-1 py-3.5 sm:py-4 px-5 rounded-xl text-left flex items-center justify-between active:scale-95">
+                <div>
+                    <div class="text-xs text-slate-400 font-medium">Flipper Kiri</div>
+                    <div class="text-sm sm:text-base font-bold text-white hud-mono">[A] / [◄]</div>
+                </div>
+                <svg class="w-6 h-6 text-sky-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l12-6-3-4L4 16z"/>
+                </svg>
+            </button>
+
+            <button id="btn-nudge" class="control-btn py-3.5 sm:py-4 px-4 sm:px-5 rounded-xl flex flex-col items-center justify-center" title="Goyang meja jika bola tersangkut">
+                <span class="text-[11px] text-slate-400 font-medium">Goyang</span>
+                <span class="text-xs sm:text-sm font-bold text-amber-300 hud-mono">[Spasi]</span>
+            </button>
+
+            <button id="btn-right-flipper" class="control-btn flex-1 py-3.5 sm:py-4 px-5 rounded-xl text-right flex items-center justify-between active:scale-95">
+                <svg class="w-6 h-6 text-sky-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 16L8 10l3-4 9 10z"/>
+                </svg>
+                <div>
+                    <div class="text-xs text-slate-400 font-medium">Flipper Kanan</div>
+                    <div class="text-sm sm:text-base font-bold text-white hud-mono">[D] / [►]</div>
+                </div>
+            </button>
+        </div>
+    </footer>
+
+    <!-- Modal Info / Legenda Objek -->
+    <div id="modal-info" class="fixed inset-0 z-30 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl text-slate-200">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <h2 class="text-lg font-bold text-white">Panduan Permainan & Objek</h2>
+                <button id="btn-close-info" class="text-slate-400 hover:text-white px-2 py-1 rounded-lg text-sm font-semibold">Tutup</button>
+            </div>
+            <div class="space-y-3 text-xs sm:text-sm leading-relaxed">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div class="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                        <div class="font-bold text-amber-400">Pinball Klasik</div>
+                        <p class="text-slate-300 mt-0.5">Bumper Cyan (+1 poin), Bumper Abu (0 poin, membal), Koin Emas (+1 poin), Rintangan Statis. Kesempatan jatuh 3x.</p>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                        <div class="font-bold text-rose-400">Knock 'Em Up!</div>
+                        <p class="text-slate-300 mt-0.5">Musuh Merah (+1 poin) & Oranye (+2 poin). Tiap 50 musuh kalah, muncul Bos Ungu (10 HP, +15 poin).</p>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                        <div class="font-bold text-emerald-400">Pull To Start & Power-Up</div>
+                        <p class="text-slate-300 mt-0.5">Tarik & arahkan bola dari titik awal layaknya ketapel. Tabrak kapsul Hijau (Multi-Bola) atau bola Oranye-Hitam (Bom Area).</p>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                        <div class="font-bold text-yellow-300">Sesi Frenzy!</div>
+                        <p class="text-slate-300 mt-0.5">Tiap kelipatan 1.000 poin, gerbang utara terbuka ke Arena Tingkat Dua penuh koin selama 60 detik.</p>
+                    </div>
+                </div>
+                <p class="text-slate-400 text-xs pt-1">
+                    Tip: Anda juga dapat menggeser kamera dengan menahan klik kanan (atau dua jari) untuk melihat sudut meja 3D.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Permainan Berakhir (Game Over) -->
+    <div id="modal-gameover" class="fixed inset-0 z-30 hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl text-center">
+            <h2 class="text-2xl font-extrabold text-white tracking-tight">Permainan Selesai</h2>
+            <p class="text-slate-400 text-sm mt-1">Bola telah jatuh 3 kali</p>
+
+            <div class="grid grid-cols-2 gap-3 my-5">
+                <div class="bg-slate-800/70 border border-slate-700/70 rounded-xl p-3">
+                    <div class="text-xs text-slate-400 uppercase">Skor Akhir</div>
+                    <div id="go-score" class="text-2xl font-bold hud-mono text-amber-400 mt-0.5">0</div>
+                </div>
+                <div class="bg-slate-800/70 border border-slate-700/70 rounded-xl p-3">
+                    <div class="text-xs text-slate-400 uppercase">Musuh Tumbang</div>
+                    <div id="go-kills" class="text-2xl font-bold hud-mono text-rose-400 mt-0.5">0</div>
+                </div>
+            </div>
+
+            <button id="btn-restart" class="w-full py-3 px-5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm tracking-wide transition shadow-lg shadow-sky-500/20">
+                Main Lagi
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. SINTESIS AUDIO PROSEDURAL (Web Audio API)
+         * Menghasilkan suara pantulan, koin, ledakan bom, flipper, dan frenzy
+         * secara mandiri tanpa ketergantungan berkas audio eksternal.
+         * ============================================================================
+         */
+        class SoundController {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggle() {
+                this.enabled = !this.enabled;
+                return this.enabled;
+            }
+
+            playTone(freq, type, duration, gainVal = 0.12, slideFreq = null) {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, now);
+                    if (slideFreq) {
+                        osc.frequency.exponentialRampToValueAtTime(slideFreq, now + duration);
+                    }
+                    gain.gain.setValueAtTime(gainVal, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + duration);
+                } catch (e) {
+                    // Abaikan jika konteks audio belum diizinkan browser
+                }
+            }
+
+            flipper() {
+                this.playTone(140, 'triangle', 0.08, 0.14, 280);
+            }
+
+            launch() {
+                this.playTone(180, 'sawtooth', 0.25, 0.15, 620);
+            }
+
+            bumper(scored = true) {
+                if (scored) {
+                    this.playTone(520, 'sine', 0.11, 0.14, 880);
+                } else {
+                    this.playTone(260, 'triangle', 0.09, 0.1, 180);
+                }
+            }
+
+            coin() {
+                this.playTone(987.77, 'sine', 0.08, 0.1, 1318.51);
+            }
+
+            enemyHit(points = 1) {
+                const base = points > 1 ? 440 : 350;
+                this.playTone(base, 'square', 0.12, 0.11, base * 1.6);
+            }
+
+            bossHit() {
+                this.playTone(160, 'sawtooth', 0.14, 0.18, 95);
+            }
+
+            bossDefeat() {
+                this.playTone(220, 'sawtooth', 0.45, 0.2, 880);
+            }
+
+            bomb() {
+                this.playTone(110, 'sawtooth', 0.38, 0.24, 32);
+            }
+
+            multiball() {
+                this.playTone(440, 'sine', 0.18, 0.15, 880);
+                setTimeout(() => this.playTone(660, 'sine', 0.22, 0.15, 1100), 90);
+            }
+
+            frenzyStart() {
+                [523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => {
+                    setTimeout(() => this.playTone(f, 'triangle', 0.18, 0.16), idx * 80);
+                });
+            }
+
+            drain() {
+                this.playTone(240, 'sawtooth', 0.35, 0.15, 75);
+            }
+        }
+
+        const sfx = new SoundController();
+
+        /**
+         * ============================================================================
+         * 2. KONSTANTA GEOMETRI MEJA & KONFIGURASI FISIKA
+         * ============================================================================
+         * Koordinat Meja (Sumbu X = Lebar Kiri-Kanan, Sumbu Z = Panjang Utara-Selatan):
+         * - Arena Utama: X dalam [-15, 15], Z dalam [-22, 24]
+         * - Arena Tingkat Dua (Frenzy Upper Deck): X dalam [-14, 14], Z dalam [-46, -22]
+         * - Dinding Pembatas Frenzy: Z = -22 (Gerbang Tengah X dalam [-5.5, 5.5])
+         */
+        const TABLE = {
+            MAIN_MIN_X: -15,
+            MAIN_MAX_X: 15,
+            MAIN_MIN_Z: -22,
+            MAIN_MAX_Z: 24,
+            FRENZY_MIN_Z: -46,
+            GATE_HALF_WIDTH: 5.5,
+            BALL_RADIUS: 0.72,
+            GRAVITY_Z: 17.5,
+            MAX_SPEED: 46,
+            LAUNCH_POS: { x: 0, z: 13.8 },
+            FRENZY_THRESHOLD: 1000,
+            FRENZY_DURATION: 60
+        };
+
+        // Status Utama Permainan
+        const state = {
+            score: 0,
+            highScore: 0,
+            lives: 3,
+            enemyKills: 0,
+            nextBossAt: 50,
+            nextFrenzyScore: TABLE.FRENZY_THRESHOLD,
+            frenzyActive: false,
+            frenzyTimer: 0,
+            isGameOver: false,
+            waitingForPull: true,
+            isDraggingPull: false,
+            pullVector: { x: 0, z: 0 }, // Vektor lontaran hasil tarikan
+            leftFlipperDown: false,
+            rightFlipperDown: false,
+            nudgeCooldown: 0,
+            screenShake: 0,
+            cameraPreset: 0 // 0: Dinamis, 1: Atas, 2: Dekat
+        };
+
+        // Penyimpanan Skor Tertinggi (Aman terhadap pembatasan iframe)
+        try {
+            const savedMax = window.localStorage.getItem('pinball_max_score');
+            if (savedMax) state.highScore = parseInt(savedMax, 10) || 0;
+        } catch (e) {
+            state.highScore = 0;
+        }
+
+        /**
+         * ============================================================================
+         * 3. INISIALISASI THREE.JS SCENE & PENCAHAYAAN
+         * ============================================================================
+         */
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x070a12);
+        scene.fog = new THREE.FogExp2(0x070a12, 0.0085);
+
+        const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 200);
+        camera.position.set(0, 38, 33);
+        const cameraLookTarget = new THREE.Vector3(0, 0, 2);
+        camera.lookAt(cameraLookTarget);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Pencahayaan 3D
+        const ambientLight = new THREE.AmbientLight(0xcbd5e1, 0.55);
+        scene.add(ambientLight);
+
+        const mainDirLight = new THREE.DirectionalLight(0xf8fafc, 0.95);
+        mainDirLight.position.set(18, 42, 22);
+        mainDirLight.castShadow = true;
+        mainDirLight.shadow.mapSize.width = 2048;
+        mainDirLight.shadow.mapSize.height = 2048;
+        mainDirLight.shadow.camera.near = 5;
+        mainDirLight.shadow.camera.far = 110;
+        mainDirLight.shadow.camera.left = -26;
+        mainDirLight.shadow.camera.right = 26;
+        mainDirLight.shadow.camera.top = 52;
+        mainDirLight.shadow.camera.bottom = -32;
+        scene.add(mainDirLight);
+
+        const frenzyLight = new THREE.PointLight(0xfacc15, 0.2, 45);
+        frenzyLight.position.set(0, 10, -34);
+        scene.add(frenzyLight);
+
+        // Koleksi Material Bersama untuk Efisiensi GPU
+        const MATS = {
+            floorMain: new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.65, metalness: 0.2 }),
+            floorFrenzy: new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.5, metalness: 0.3 }),
+            wall: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.5 }),
+            wallAccent: new THREE.MeshStandardMaterial({ color: 0x0ea5e9, emissive: 0x0284c7, emissiveIntensity: 0.35 }),
+            gateClosed: new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xbe123c, emissiveIntensity: 0.4, roughness: 0.3 }),
+            gateOpen: new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x15803d, emissiveIntensity: 0.5, transparent: true, opacity: 0.35 }),
+            ballMain: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85, roughness: 0.12 }),
+            ballExtra: new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.3, metalness: 0.7, roughness: 0.18 }),
+            flipper: new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0x9a3412, emissiveIntensity: 0.25, roughness: 0.3 }),
+            bumperScored: new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x0891b2, emissiveIntensity: 0.45, roughness: 0.25 }),
+            bumperPlain: new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4, metalness: 0.4 }),
+            obstacleStatic: new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5, metalness: 0.3 }),
+            coin: new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.4, metalness: 0.8, roughness: 0.2 }),
+            enemy1: new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x991b1b, emissiveIntensity: 0.35, roughness: 0.3 }),
+            enemy2: new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xc2410c, emissiveIntensity: 0.4, roughness: 0.25 }),
+            boss: new THREE.MeshStandardMaterial({ color: 0xa855f7, emissive: 0x6b21a8, emissiveIntensity: 0.5, roughness: 0.2, metalness: 0.4 }),
+            powerMulti: new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x047857, emissiveIntensity: 0.5, roughness: 0.2 }),
+            powerBomb: new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xb45309, emissiveIntensity: 0.55, roughness: 0.3 })
+        };
+
+        /**
+         * ============================================================================
+         * 4. PEMBANGUNAN GEOMETRI MEJA, RINTANGAN, & ARENA TINGKAT DUA (FRENZY)
+         * ============================================================================
+         */
+        const wallSegments = []; // Daftar segmen garis {ax, az, bx, bz, restitution}
+        const staticCircles = []; // Rintangan bundar {x, z, r, restitution, scored, mesh, ringMesh, pulse}
+        const balls = [];
+        const coins = [];
+        const enemies = [];
+        const powerups = [];
+        const particles = [];
+        let bossEntity = null;
+        let gateMesh = null;
+
+        function addWallSegment(ax, az, bx, bz, height = 1.8, thickness = 0.6, mat = MATS.wall, restitution = 0.75, createVisual = true) {
+            wallSegments.push({ ax, az, bx, bz, r: thickness * 0.5, restitution, active: true });
+            if (!createVisual) return null;
+
+            const dx = bx - ax;
+            const dz = bz - az;
+            const len = Math.hypot(dx, dz);
+            const geo = new THREE.BoxGeometry(len, height, thickness);
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set((ax + bx) * 0.5, height * 0.5, (az + bz) * 0.5);
+            mesh.rotation.y = -Math.atan2(dz, dx);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            return mesh;
+        }
+
+        function buildPinballArena() {
+            // 1. Lantai Arena Utama
+            const mainFloorGeo = new THREE.BoxGeometry(30, 1, 46);
+            const mainFloor = new THREE.Mesh(mainFloorGeo, MATS.floorMain);
+            mainFloor.position.set(0, -0.5, 1);
+            mainFloor.receiveShadow = true;
+            scene.add(mainFloor);
+
+            // Grid halus di atas lantai utama
+            const gridMain = new THREE.GridHelper(30, 15, 0x1e293b, 0x1e293b);
+            gridMain.position.set(0, 0.02, 1);
+            scene.add(gridMain);
+
+            // 2. Lantai Arena Tingkat Dua (Frenzy Deck di Utara: Z dari -46 s/d -22)
+            const frenzyFloorGeo = new THREE.BoxGeometry(28, 1, 24);
+            const frenzyFloor = new THREE.Mesh(frenzyFloorGeo, MATS.floorFrenzy);
+            frenzyFloor.position.set(0, -0.45, -34);
+            frenzyFloor.receiveShadow = true;
+            scene.add(frenzyFloor);
+
+            const gridFrenzy = new THREE.GridHelper(28, 14, 0x4338ca, 0x312e81);
+            gridFrenzy.position.set(0, 0.06, -34);
+            scene.add(gridFrenzy);
+
+            // 3. Dinding Luar Arena Utama
+            addWallSegment(-15, -22, -15, 22, 2.0, 0.7, MATS.wall, 0.8); // Kiri
+            addWallSegment(15, -22, 15, 22, 2.0, 0.7, MATS.wall, 0.8);   // Kanan
+
+            // Sudut Miring Atas Arena Utama (Pengarah Bola)
+            addWallSegment(-15, -17, -10.5, -22, 2.0, 0.6, MATS.wallAccent, 0.85);
+            addWallSegment(15, -17, 10.5, -22, 2.0, 0.6, MATS.wallAccent, 0.85);
+
+            // Dinding Sekat antara Arena Utama & Arena Frenzy (Z = -22)
+            addWallSegment(-15, -22, -TABLE.GATE_HALF_WIDTH, -22, 2.0, 0.7, MATS.wall, 0.8);
+            addWallSegment(TABLE.GATE_HALF_WIDTH, -22, 15, -22, 2.0, 0.7, MATS.wall, 0.8);
+
+            // Gerbang Frenzy (Dapat Membuka & Menutup)
+            const gateLen = TABLE.GATE_HALF_WIDTH * 2;
+            const gateGeo = new THREE.BoxGeometry(gateLen, 1.9, 0.55);
+            gateMesh = new THREE.Mesh(gateGeo, MATS.gateClosed);
+            gateMesh.position.set(0, 0.95, -22);
+            gateMesh.castShadow = true;
+            scene.add(gateMesh);
+            // Segmen fisik gerbang disimpan di index khusus agar bisa diaktifkan/nonaktifkan
+            wallSegments.push({
+                ax: -TABLE.GATE_HALF_WIDTH,
+                az: -22,
+                bx: TABLE.GATE_HALF_WIDTH,
+                bz: -22,
+                r: 0.35,
+                restitution: 0.85,
+                active: true,
+                isFrenzyGate: true
+            });
+
+            // 4. Dinding Luar Arena Tingkat Dua (Frenzy Deck)
+            addWallSegment(-14, -46, -14, -22, 2.0, 0.7, MATS.wallAccent, 0.85);
+            addWallSegment(14, -46, 14, -22, 2.0, 0.7, MATS.wallAccent, 0.85);
+            addWallSegment(-14, -46, 14, -46, 2.0, 0.7, MATS.wallAccent, 0.9);
+            // Sudut Pemantul Atas Frenzy
+            addWallSegment(-14, -41, -9, -46, 2.0, 0.6, MATS.wallAccent, 0.95);
+            addWallSegment(14, -41, 9, -46, 2.0, 0.6, MATS.wallAccent, 0.95);
+            // Pengarah Turun dari Dek Frenzy ke Gerbang
+            addWallSegment(-14, -25, -TABLE.GATE_HALF_WIDTH, -22, 2.0, 0.6, MATS.wall, 0.75);
+            addWallSegment(14, -25, TABLE.GATE_HALF_WIDTH, -22, 2.0, 0.6, MATS.wall, 0.75);
+
+            // 5. Bahu Miring Menuju Flipper (Inlanes)
+            addWallSegment(-15, 13.5, -6.2, 18.5, 1.8, 0.65, MATS.wall, 0.65);
+            addWallSegment(15, 13.5, 6.2, 18.5, 1.8, 0.65, MATS.wall, 0.65);
+
+            // Dinding Slingshot Segitiga di atas Flipper
+            addWallSegment(-10.5, 11.5, -6.8, 15.2, 1.6, 0.5, MATS.wallAccent, 1.25);
+            addWallSegment(10.5, 11.5, 6.8, 15.2, 1.6, 0.5, MATS.wallAccent, 1.25);
+
+            // 6. Rintangan Biasa (Statis, 0 Poin, Pantulan Standar)
+            addWallSegment(-9.5, -3.5, -7.2, 2.5, 1.5, 0.55, MATS.obstacleStatic, 0.7);
+            addWallSegment(9.5, -3.5, 7.2, 2.5, 1.5, 0.55, MATS.obstacleStatic, 0.7);
+
+            const staticPostCoords = [
+                { x: -11.5, z: -9.5, r: 0.85 },
+                { x: 11.5, z: -9.5, r: 0.85 },
+                { x: 0, z: 4.8, r: 0.9 }
+            ];
+            staticPostCoords.forEach(p => {
+                const geo = new THREE.CylinderGeometry(p.r, p.r, 1.6, 20);
+                const mesh = new THREE.Mesh(geo, MATS.obstacleStatic);
+                mesh.position.set(p.x, 0.8, p.z);
+                mesh.castShadow = true;
+                scene.add(mesh);
+                staticCircles.push({
+                    x: p.x, z: p.z, r: p.r,
+                    restitution: 0.65,
+                    minBounceSpeed: 0,
+                    scored: false,
+                    type: 'static',
+                    mesh,
+                    pulse: 0
+                });
+            });
+
+            // 7. Bumper Membal Berpoin (+1 Poin tiap pantulan)
+            const scoredBumperCoords = [
+                { x: -4.8, z: -11.5, r: 1.35 },
+                { x: 4.8, z: -11.5, r: 1.35 },
+                { x: 0, z: -6.2, r: 1.45 },
+                // Bumper di Arena Frenzy Tingkat Dua
+                { x: -5.5, z: -34, r: 1.35 },
+                { x: 5.5, z: -34, r: 1.35 },
+                { x: 0, z: -40, r: 1.4 }
+            ];
+            scoredBumperCoords.forEach(b => {
+                const group = new THREE.Group();
+                const cylGeo = new THREE.CylinderGeometry(b.r, b.r * 0.88, 1.7, 24);
+                const cylMesh = new THREE.Mesh(cylGeo, MATS.bumperScored.clone());
+                cylMesh.position.y = 0.85;
+                cylMesh.castShadow = true;
+                group.add(cylMesh);
+
+                const ringGeo = new THREE.TorusGeometry(b.r * 1.08, 0.12, 12, 24);
+                const ringMesh = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x67e8f9 }));
+                ringMesh.rotation.x = Math.PI / 2;
+                ringMesh.position.y = 1.5;
+                group.add(ringMesh);
+
+                group.position.set(b.x, 0, b.z);
+                scene.add(group);
+
+                staticCircles.push({
+                    x: b.x, z: b.z, r: b.r,
+                    restitution: 1.35,
+                    minBounceSpeed: 21,
+                    scored: true,
+                    type: 'bumper_scored',
+                    mesh: group,
+                    pulse: 0
+                });
+            });
+
+            // 8. Bumper Membal Tanpa Poin (0 Poin, Pantulan Kuat)
+            const plainBumperCoords = [
+                { x: -8.2, z: -14.8, r: 1.15 },
+                { x: 8.2, z: -14.8, r: 1.15 },
+                { x: -5.5, z: 1.2, r: 1.1 },
+                { x: 5.5, z: 1.2, r: 1.1 }
+            ];
+            plainBumperCoords.forEach(b => {
+                const group = new THREE.Group();
+                const cylGeo = new THREE.CylinderGeometry(b.r, b.r * 0.9, 1.5, 20);
+                const cylMesh = new THREE.Mesh(cylGeo, MATS.bumperPlain.clone());
+                cylMesh.position.y = 0.75;
+                cylMesh.castShadow = true;
+                group.add(cylMesh);
+
+                group.position.set(b.x, 0, b.z);
+                scene.add(group);
+
+                staticCircles.push({
+                    x: b.x, z: b.z, r: b.r,
+                    restitution: 1.25,
+                    minBounceSpeed: 19,
+                    scored: false,
+                    type: 'bumper_plain',
+                    mesh: group,
+                    pulse: 0
+                });
+            });
+
+            // 9. Indikator Titik Peluncuran Ketapel (Pull To Start Pad)
+            const padGeo = new THREE.RingGeometry(0.85, 1.25, 24);
+            const padMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide });
+            const padMesh = new THREE.Mesh(padGeo, padMat);
+            padMesh.rotation.x = Math.PI / 2;
+            padMesh.position.set(TABLE.LAUNCH_POS.x, 0.06, TABLE.LAUNCH_POS.z);
+            scene.add(padMesh);
+        }
+
+        /**
+         * ============================================================================
+         * 5. FLIPPER KIRI & KANAN + INDIKATOR KETAPEL (PULL TO START)
+         * ============================================================================
+         */
+        const flippers = [
+            {
+                side: 'left',
+                pivotX: -6.2,
+                pivotZ: 18.5,
+                length: 4.5,
+                radius: 0.5,
+                restAngle: 0.42,     // Miring ke bawah
+                activeAngle: -0.52,  // Terangkat ke atas
+                angle: 0.42,
+                angularVelocity: 0,
+                mesh: null
+            },
+            {
+                side: 'right',
+                pivotX: 6.2,
+                pivotZ: 18.5,
+                length: 4.5,
+                radius: 0.5,
+                restAngle: Math.PI - 0.42,
+                activeAngle: Math.PI + 0.52,
+                angle: Math.PI - 0.42,
+                angularVelocity: 0,
+                mesh: null
+            }
+        ];
+
+        function buildFlippers() {
+            flippers.forEach(f => {
+                const group = new THREE.Group();
+                group.position.set(f.pivotX, 0.7, f.pivotZ);
+
+                // Poros Pangkal
+                const pivotGeo = new THREE.CylinderGeometry(f.radius * 1.1, f.radius * 1.1, 1.3, 16);
+                const pivotMesh = new THREE.Mesh(pivotGeo, MATS.flipper);
+                pivotMesh.castShadow = true;
+                group.add(pivotMesh);
+
+                // Batang Flipper
+                const armGeo = new THREE.BoxGeometry(f.length, 1.25, f.radius * 1.75);
+                const armMesh = new THREE.Mesh(armGeo, MATS.flipper);
+                armMesh.position.x = f.length * 0.5;
+                armMesh.castShadow = true;
+                group.add(armMesh);
+
+                // Ujung Bulat
+                const tipGeo = new THREE.CylinderGeometry(f.radius * 0.88, f.radius * 0.88, 1.25, 16);
+                const tipMesh = new THREE.Mesh(tipGeo, MATS.flipper);
+                tipMesh.position.x = f.length;
+                tipMesh.castShadow = true;
+                group.add(tipMesh);
+
+                group.rotation.y = -f.angle;
+                scene.add(group);
+                f.mesh = group;
+            });
+        }
+
+        // Visualisasi Ketapel (Garis Bidik Prediktif & Karet Tarikan)
+        const trajectoryPointsCount = 18;
+        const trajectoryDots = [];
+        const slingBandGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+        const slingBandLine = new THREE.Line(
+            slingBandGeo,
+            new THREE.LineBasicMaterial({ color: 0xf43f5e, linewidth: 2 })
+        );
+        slingBandLine.visible = false;
+        scene.add(slingBandLine);
+
+        function buildTrajectoryDots() {
+            const dotGeo = new THREE.SphereGeometry(0.24, 8, 8);
+            const dotMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            for (let i = 0; i < trajectoryPointsCount; i++) {
+                const dot = new THREE.Mesh(dotGeo, dotMat);
+                dot.visible = false;
+                scene.add(dot);
+                trajectoryDots.push(dot);
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 6. MANAJEMEN ENTITAS (Bola, Koin, Musuh, Bos, Power-up, & Partikel)
+         * ============================================================================
+         */
+        function spawnBall(x, z, vx = 0, vz = 0, isExtra = false) {
+            const geo = new THREE.SphereGeometry(TABLE.BALL_RADIUS, 24, 24);
+            const mesh = new THREE.Mesh(geo, isExtra ? MATS.ballExtra : MATS.ballMain);
+            mesh.position.set(x, TABLE.BALL_RADIUS, z);
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            const ballObj = {
+                x, z,
+                vx, vz,
+                r: TABLE.BALL_RADIUS,
+                isExtra,
+                mesh
+            };
+            balls.push(ballObj);
+            updateHUD();
+            return ballObj;
+        }
+
+        function spawnCoin(x, z, isFrenzyCoin = false) {
+            const geo = new THREE.CylinderGeometry(0.65, 0.65, 0.22, 16);
+            const mesh = new THREE.Mesh(geo, MATS.coin);
+            mesh.rotation.x = Math.PI / 2;
+            mesh.position.set(x, 0.75, z);
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            coins.push({
+                x, z,
+                r: 0.75,
+                isFrenzyCoin,
+                mesh
+            });
+        }
+
+        function spawnEnemy(x, z, tier = 1) {
+            // Tier 1 = 1 Poin (Octahedron Merah), Tier 2 = 2 Poin (Dodecahedron Oranye)
+            const r = tier === 2 ? 0.95 : 0.85;
+            const geo = tier === 2
+                ? new THREE.DodecahedronGeometry(r, 0)
+                : new THREE.OctahedronGeometry(r, 0);
+            const mesh = new THREE.Mesh(geo, tier === 2 ? MATS.enemy2 : MATS.enemy1);
+            mesh.position.set(x, 0.95, z);
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            enemies.push({
+                x, z, r,
+                points: tier,
+                baseY: 0.95,
+                phase: Math.random() * Math.PI * 2,
+                mesh
+            });
+        }
+
+        function spawnBoss() {
+            if (bossEntity) return;
+            const r = 2.25;
+            const group = new THREE.Group();
+
+            const coreGeo = new THREE.IcosahedronGeometry(r, 1);
+            const coreMesh = new THREE.Mesh(coreGeo, MATS.boss.clone());
+            coreMesh.castShadow = true;
+            group.add(coreMesh);
+
+            const auraGeo = new THREE.TorusGeometry(r * 1.22, 0.16, 12, 32);
+            const auraMesh = new THREE.Mesh(auraGeo, new THREE.MeshBasicMaterial({ color: 0xe879f9 }));
+            auraMesh.rotation.x = Math.PI / 2;
+            group.add(auraMesh);
+
+            group.position.set(0, 1.8, -1.8);
+            scene.add(group);
+
+            bossEntity = {
+                x: 0,
+                z: -1.8,
+                r,
+                hp: 10,
+                maxHp: 10,
+                points: 15, // 10x skala poin dasar (1.5 -> 15 poin)
+                hitCooldown: 0,
+                mesh: group,
+                coreMesh,
+                auraMesh
+            };
+
+            showToast('MUSUH BOS MUNCUL! Hantam 10x untuk mengalahkannya!');
+            updateHUD();
+        }
+
+        function spawnPowerUp(x, z, type) {
+            // type: 'multiball' | 'bomb'
+            const group = new THREE.Group();
+            if (type === 'multiball') {
+                const g1 = new THREE.SphereGeometry(0.55, 16, 16);
+                const m1 = new THREE.Mesh(g1, MATS.powerMulti);
+                m1.position.x = -0.32;
+                const m2 = new THREE.Mesh(g1, MATS.powerMulti);
+                m2.position.x = 0.32;
+                group.add(m1, m2);
+            } else {
+                const bombGeo = new THREE.SphereGeometry(0.78, 18, 18);
+                const bombMesh = new THREE.Mesh(bombGeo, MATS.powerBomb);
+                const fuseGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.55, 8);
+                const fuseMesh = new THREE.Mesh(fuseGeo, new THREE.MeshBasicMaterial({ color: 0xfef08a }));
+                fuseMesh.position.y = 0.85;
+                group.add(bombMesh, fuseMesh);
+            }
+
+            group.position.set(x, 0.85, z);
+            scene.add(group);
+
+            powerups.push({
+                x, z,
+                r: 0.9,
+                type,
+                mesh: group
+            });
+        }
+
+        function createBurstParticles(x, y, z, colorHex, count = 14, speedScale = 1) {
+            const geo = new THREE.BoxGeometry(0.28, 0.28, 0.28);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            for (let i = 0; i < count; i++) {
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(x, y, z);
+                const angle = Math.random() * Math.PI * 2;
+                const spd = (3 + Math.random() * 9) * speedScale;
+                scene.add(mesh);
+                particles.push({
+                    mesh,
+                    vx: Math.cos(angle) * spd,
+                    vy: 2 + Math.random() * 6,
+                    vz: Math.sin(angle) * spd,
+                    life: 0.45 + Math.random() * 0.3
+                });
+            }
+        }
+
+        // Mencari koordinat kosong di arena utama agar objek tidak saling tumpang tindih
+        function findFreeArenaSpot(minZ = -17, maxZ = 9.5) {
+            for (let attempt = 0; attempt < 35; attempt++) {
+                const x = (Math.random() - 0.5) * 22;
+                const z = minZ + Math.random() * (maxZ - minZ);
+
+                // Hindari area peluncuran ketapel
+                if (Math.hypot(x - TABLE.LAUNCH_POS.x, z - TABLE.LAUNCH_POS.z) < 3.6) continue;
+
+                // Hindari bumper & rintangan statis
+                let overlaps = false;
+                for (const c of staticCircles) {
+                    if (Math.hypot(x - c.x, z - c.z) < c.r + 1.8) {
+                        overlaps = true;
+                        break;
+                    }
+                }
+                if (overlaps) continue;
+
+                // Hindari bos jika ada
+                if (bossEntity && Math.hypot(x - bossEntity.x, z - bossEntity.z) < bossEntity.r + 2.2) continue;
+
+                // Hindari musuh/koin lain
+                for (const e of enemies) {
+                    if (Math.hypot(x - e.x, z - e.z) < 2.2) { overlaps = true; break; }
+                }
+                if (!overlaps) return { x, z };
+            }
+            return { x: (Math.random() - 0.5) * 16, z: -4 + (Math.random() - 0.5) * 8 };
+        }
+
+        function populateInitialWave() {
+            // Bersihkan entitas lama
+            coins.forEach(c => scene.remove(c.mesh));
+            enemies.forEach(e => scene.remove(e.mesh));
+            powerups.forEach(p => scene.remove(p.mesh));
+            coins.length = 0;
+            enemies.length = 0;
+            powerups.length = 0;
+
+            // 12 Koin di Arena Utama
+            for (let i = 0; i < 12; i++) {
+                const spot = findFreeArenaSpot(-18, 9);
+                spawnCoin(spot.x, spot.z, false);
+            }
+
+            // 9 Musuh di Arena Utama (Campuran 1 Poin & 2 Poin)
+            for (let i = 0; i < 9; i++) {
+                const spot = findFreeArenaSpot(-16, 8);
+                const tier = Math.random() < 0.38 ? 2 : 1;
+                spawnEnemy(spot.x, spot.z, tier);
+            }
+
+            // 2 Power-Up Awal (1 Multi-Bola, 1 Bom)
+            const spotMulti = findFreeArenaSpot(-13, 6);
+            spawnPowerUp(spotMulti.x, spotMulti.z, 'multiball');
+
+            const spotBomb = findFreeArenaSpot(-13, 6);
+            spawnPowerUp(spotBomb.x, spotBomb.z, 'bomb');
+        }
+
+        /**
+         * ============================================================================
+         * 7. MEKANIKA SKOR, FRENZY TINGKAT DUA (60 DETIK), & POWER-UP
+         * ============================================================================
+         */
+        function addScore(points) {
+            if (state.isGameOver || points <= 0) return;
+            state.score += points;
+
+            if (state.score > state.highScore) {
+                state.highScore = state.score;
+                try {
+                    window.localStorage.setItem('pinball_max_score', String(state.highScore));
+                } catch (e) {}
+            }
+
+            // Cek Pemicu Sesi Frenzy tiap kelipatan 1.000 poin
+            if (state.score >= state.nextFrenzyScore) {
+                while (state.nextFrenzyScore <= state.score) {
+                    state.nextFrenzyScore += TABLE.FRENZY_THRESHOLD;
+                }
+                startFrenzySession();
+            }
+
+            updateHUD();
+        }
+
+        function registerEnemyKill(points) {
+            addScore(points);
+            state.enemyKills += 1;
+
+            // Munculkan Bos setiap 50 musuh dijatuhkan
+            if (state.enemyKills >= state.nextBossAt) {
+                state.nextBossAt += 50;
+                spawnBoss();
+            }
+            updateHUD();
+        }
+
+        function startFrenzySession() {
+            state.frenzyActive = true;
+            state.frenzyTimer = TABLE.FRENZY_DURATION;
+            sfx.frenzyStart();
+
+            // Buka Gerbang Utara menuju Arena Tingkat Dua
+            const gateSeg = wallSegments.find(w => w.isFrenzyGate);
+            if (gateSeg) gateSeg.active = false;
+            if (gateMesh) {
+                gateMesh.material = MATS.gateOpen;
+                gateMesh.position.y = 0.25;
+            }
+            frenzyLight.intensity = 1.6;
+
+            // Isi Arena Tingkat Dua dengan Koin Melimpah (36 Koin)
+            coins.filter(c => c.isFrenzyCoin).forEach(c => scene.remove(c.mesh));
+            for (let i = coins.length - 1; i >= 0; i--) {
+                if (coins[i].isFrenzyCoin) coins.splice(i, 1);
+            }
+
+            for (let row = 0; row < 5; row++) {
+                for (let col = 0; col < 7; col++) {
+                    const cx = -10.5 + col * 3.5;
+                    const cz = -43 + row * 4.2;
+                    // Jangan menabrak bumper di dek atas
+                    let nearBumper = false;
+                    for (const b of staticCircles) {
+                        if (Math.hypot(cx - b.x, cz - b.z) < b.r + 1.1) {
+                            nearBumper = true;
+                            break;
+                        }
+                    }
+                    if (!nearBumper) spawnCoin(cx, cz, true);
+                }
+            }
+
+            // Dorong bola aktif menuju Arena Tingkat Dua agar pemain langsung merasakan Frenzy
+            balls.forEach(b => {
+                if (b.z > -20) {
+                    b.vx = (Math.random() - 0.5) * 8;
+                    b.vz = -34;
+                }
+            });
+
+            showToast('FRENZY! Pintu Arena Tingkat 2 Terbuka Selama 60 Detik!');
+            updateHUD();
+        }
+
+        function endFrenzySession() {
+            state.frenzyActive = false;
+            state.frenzyTimer = 0;
+
+            // Kembalikan bola yang masih di Arena Tingkat Dua ke Arena Utama sebelum gerbang ditutup
+            balls.forEach(b => {
+                if (b.z < TABLE.MAIN_MIN_Z + 1.2) {
+                    b.z = TABLE.MAIN_MIN_Z + 2.0;
+                    b.vz = Math.abs(b.vz) + 6;
+                }
+            });
+
+            const gateSeg = wallSegments.find(w => w.isFrenzyGate);
+            if (gateSeg) gateSeg.active = true;
+            if (gateMesh) {
+                gateMesh.material = MATS.gateClosed;
+                gateMesh.position.y = 0.95;
+            }
+            frenzyLight.intensity = 0.2;
+
+            showToast('Sesi Frenzy Selesai! Gerbang Tingkat 2 Kembali Tertutup.');
+            updateHUD();
+        }
+
+        function triggerBombExplosion(bx, bz) {
+            sfx.bomb();
+            state.screenShake = 0.45;
+            createBurstParticles(bx, 1.0, bz, 0xf97316, 28, 1.7);
+
+            const blastRadius = 11.5;
+            // Eliminasi musuh dalam jangkauan ledakan
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                if (Math.hypot(e.x - bx, e.z - bz) <= blastRadius) {
+                    createBurstParticles(e.x, 1.0, e.z, 0xef4444, 10, 1.1);
+                    scene.remove(e.mesh);
+                    enemies.splice(i, 1);
+                    registerEnemyKill(e.points);
+                }
+            }
+
+            // Jika Bos berada di dekat ledakan, kurangi 3 HP Bos
+            if (bossEntity && Math.hypot(bossEntity.x - bx, bossEntity.z - bz) <= blastRadius + bossEntity.r) {
+                damageBoss(3);
+            }
+
+            showToast('BOM MELEDAK! Musuh di area sekitar berhasil dijatuhkan!');
+        }
+
+        function damageBoss(amount = 1) {
+            if (!bossEntity) return;
+            bossEntity.hp = Math.max(0, bossEntity.hp - amount);
+            bossEntity.hitCooldown = 0.12;
+            sfx.bossHit();
+            state.screenShake = 0.25;
+            createBurstParticles(bossEntity.x, 1.8, bossEntity.z, 0xc084fc, 14, 1.2);
+
+            if (bossEntity.hp <= 0) {
+                sfx.bossDefeat();
+                createBurstParticles(bossEntity.x, 2.0, bossEntity.z, 0xe879f9, 36, 1.9);
+                const bossPoints = bossEntity.points;
+                scene.remove(bossEntity.mesh);
+                bossEntity = null;
+                addScore(bossPoints);
+                showToast(`BOS DIKALAHKAN! +${bossPoints} Poin Bonus!`);
+            }
+            updateHUD();
+        }
+
+        /**
+         * ============================================================================
+         * 8. MESIN FISIKA SUB-STEPPING PRESISI TINGGI (Anti-Tunneling)
+         * ============================================================================
+         */
+        function closestPointOnSegment(px, pz, ax, az, bx, bz) {
+            const abx = bx - ax;
+            const abz = bz - az;
+            const lenSq = abx * abx + abz * abz;
+            if (lenSq === 0) return { x: ax, z: az, t: 0 };
+            let t = ((px - ax) * abx + (pz - az) * abz) / lenSq;
+            t = Math.max(0, Math.min(1, t));
+            return {
+                x: ax + t * abx,
+                z: az + t * abz,
+                t
+            };
+        }
+
+        function stepPhysics(dt) {
+            // Update Sudut & Kecepatan Sudut Flipper
+            const flipperSpeedUp = 26.0;
+            const flipperSpeedDown = 16.0;
+
+            flippers.forEach(f => {
+                const prevAngle = f.angle;
+                const isPressed = (f.side === 'left' && state.leftFlipperDown) ||
+                                  (f.side === 'right' && state.rightFlipperDown);
+                const target = isPressed ? f.activeAngle : f.restAngle;
+                const diff = target - f.angle;
+                const speed = isPressed ? flipperSpeedUp : flipperSpeedDown;
+                const maxStep = speed * dt;
+
+                if (Math.abs(diff) <= maxStep) {
+                    f.angle = target;
+                } else {
+                    f.angle += Math.sign(diff) * maxStep;
+                }
+                f.angularVelocity = dt > 0 ? (f.angle - prevAngle) / dt : 0;
+                if (f.mesh) f.mesh.rotation.y = -f.angle;
+            });
+
+            // Jika sedang tahap Pull To Start (menunggu ditarik), tahan bola pertama di titik awal
+            if (state.waitingForPull && balls.length > 0) {
+                const b = balls[0];
+                b.x = TABLE.LAUNCH_POS.x;
+                b.z = TABLE.LAUNCH_POS.z;
+                b.vx = 0;
+                b.vz = 0;
+                b.mesh.position.set(b.x, b.r, b.z);
+                return;
+            }
+
+            // Sub-stepping fisika (8 langkah per frame) untuk mencegah bola menembus dinding/flipper
+            const SUBSTEPS = 8;
+            const subDt = dt / SUBSTEPS;
+
+            for (let step = 0; step < SUBSTEPS; step++) {
+                for (let bi = balls.length - 1; bi >= 0; bi--) {
+                    const b = balls[bi];
+
+                    // 1. Gravitasi Meja Miring & Gesekan Udara Ringan
+                    b.vz += TABLE.GRAVITY_Z * subDt;
+                    b.vx *= (1 - 0.06 * subDt);
+                    b.vz *= (1 - 0.06 * subDt);
+
+                    // 2. Perbarui Posisi
+                    b.x += b.vx * subDt;
+                    b.z += b.vz * subDt;
+
+                    // 3. Tumbukan dengan Dinding & Rintangan Garis
+                    for (let wi = 0; wi < wallSegments.length; wi++) {
+                        const w = wallSegments[wi];
+                        if (!w.active) continue;
+
+                        const cp = closestPointOnSegment(b.x, b.z, w.ax, w.az, w.bx, w.bz);
+                        const dx = b.x - cp.x;
+                        const dz = b.z - cp.z;
+                        const dist = Math.hypot(dx, dz);
+                        const minDist = b.r + w.r;
+
+                        if (dist < minDist && dist > 0.00001) {
+                            const nx = dx / dist;
+                            const nz = dz / dist;
+                            // Koreksi penetrasi
+                            b.x = cp.x + nx * minDist;
+                            b.z = cp.z + nz * minDist;
+
+                            const vn = b.vx * nx + b.vz * nz;
+                            if (vn < 0) {
+                                b.vx -= (1 + w.restitution) * vn * nx;
+                                b.vz -= (1 + w.restitution) * vn * nz;
+                            }
+                        }
+                    }
+
+                    // 4. Tumbukan dengan Flipper (Kiri & Kanan)
+                    for (let fi = 0; fi < flippers.length; fi++) {
+                        const f = flippers[fi];
+                        const endX = f.pivotX + Math.cos(f.angle) * f.length;
+                        const endZ = f.pivotZ + Math.sin(f.angle) * f.length;
+                        const cp = closestPointOnSegment(b.x, b.z, f.pivotX, f.pivotZ, endX, endZ);
+                        const dx = b.x - cp.x;
+                        const dz = b.z - cp.z;
+                        const dist = Math.hypot(dx, dz);
+                        const minDist = b.r + f.radius;
+
+                        if (dist < minDist && dist > 0.00001) {
+                            const nx = dx / dist;
+                            const nz = dz / dist;
+                            b.x = cp.x + nx * minDist;
+                            b.z = cp.z + nz * minDist;
+
+                            // Kecepatan titik kontak pada batang flipper akibat rotasi
+                            const radiusFromPivot = cp.t * f.length;
+                            const tangX = -Math.sin(f.angle) * (f.angularVelocity * radiusFromPivot);
+                            const tangZ = Math.cos(f.angle) * (f.angularVelocity * radiusFromPivot);
+
+                            const rvx = b.vx - tangX;
+                            const rvz = b.vz - tangZ;
+                            const relVn = rvx * nx + rvz * nz;
+
+                            if (relVn < 0) {
+                                const bounce = 0.82;
+                                b.vx = tangX + rvx - (1 + bounce) * relVn * nx;
+                                b.vz = tangZ + rvz - (1 + bounce) * relVn * nz;
+
+                                // Tambahan dorongan saat flipper sedang mengayun ke atas
+                                if (Math.abs(f.angularVelocity) > 2.5) {
+                                    b.vx += tangX * 0.45;
+                                    b.vz += tangZ * 0.45;
+                                }
+                            }
+                        }
+                    }
+
+                    // 5. Tumbukan dengan Bumper & Rintangan Statis Bundar
+                    for (let ci = 0; ci < staticCircles.length; ci++) {
+                        const c = staticCircles[ci];
+                        const dx = b.x - c.x;
+                        const dz = b.z - c.z;
+                        const dist = Math.hypot(dx, dz);
+                        const minDist = b.r + c.r;
+
+                        if (dist < minDist && dist > 0.00001) {
+                            const nx = dx / dist;
+                            const nz = dz / dist;
+                            b.x = c.x + nx * minDist;
+                            b.z = c.z + nz * minDist;
+
+                            const vn = b.vx * nx + b.vz * nz;
+                            if (vn < 0) {
+                                b.vx -= (1 + c.restitution) * vn * nx;
+                                b.vz -= (1 + c.restitution) * vn * nz;
+
+                                // Pastikan kecepatan pantul minimum untuk bumper aktif
+                                const curSpd = Math.hypot(b.vx, b.vz);
+                                if (c.minBounceSpeed > 0 && curSpd < c.minBounceSpeed) {
+                                    b.vx = nx * c.minBounceSpeed;
+                                    b.vz = nz * c.minBounceSpeed;
+                                }
+
+                                // Efek visual & Poin Bumper hanya dipicu pada step pertama tumbukan
+                                if (c.pulse <= 0.05) {
+                                    c.pulse = 1.0;
+                                    if (c.scored) {
+                                        addScore(1);
+                                        sfx.bumper(true);
+                                        createBurstParticles(c.x, 1.2, c.z, 0x22d3ee, 8, 0.8);
+                                    } else if (c.type === 'bumper_plain') {
+                                        sfx.bumper(false);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 6. Tumbukan dengan Musuh Bos (Jika Aktif)
+                    if (bossEntity) {
+                        const dx = b.x - bossEntity.x;
+                        const dz = b.z - bossEntity.z;
+                        const dist = Math.hypot(dx, dz);
+                        const minDist = b.r + bossEntity.r;
+
+                        if (dist < minDist && dist > 0.00001) {
+                            const nx = dx / dist;
+                            const nz = dz / dist;
+                            b.x = bossEntity.x + nx * minDist;
+                            b.z = bossEntity.z + nz * minDist;
+
+                            b.vx = nx * 24;
+                            b.vz = nz * 24;
+
+                            if (bossEntity.hitCooldown <= 0) {
+                                damageBoss(1);
+                            }
+                        }
+                    }
+
+                    // 7. Batasi Kecepatan Maksimum Bola (Clamping)
+                    const spd = Math.hypot(b.vx, b.vz);
+                    if (spd > TABLE.MAX_SPEED) {
+                        b.vx = (b.vx / spd) * TABLE.MAX_SPEED;
+                        b.vz = (b.vz / spd) * TABLE.MAX_SPEED;
+                    }
+                }
+
+                // 8. Tumbukan Antar Bola (Saat Multi-Bola Aktif)
+                for (let i = 0; i < balls.length; i++) {
+                    for (let j = i + 1; j < balls.length; j++) {
+                        const b1 = balls[i];
+                        const b2 = balls[j];
+                        const dx = b2.x - b1.x;
+                        const dz = b2.z - b1.z;
+                        const dist = Math.hypot(dx, dz);
+                        const minDist = b1.r + b2.r;
+
+                        if (dist < minDist && dist > 0.0001) {
+                            const nx = dx / dist;
+                            const nz = dz / dist;
+                            const overlap = (minDist - dist) * 0.5;
+                            b1.x -= nx * overlap;
+                            b1.z -= nz * overlap;
+                            b2.x += nx * overlap;
+                            b2.z += nz * overlap;
+
+                            const kx = b1.vx - b2.vx;
+                            const kz = b1.vz - b2.vz;
+                            const p = 2 * (nx * kx + nz * kz) / 2;
+                            b1.vx -= p * nx * 0.9;
+                            b1.vz -= p * nz * 0.9;
+                            b2.vx += p * nx * 0.9;
+                            b2.vz += p * nz * 0.9;
+                        }
+                    }
+                }
+            }
+
+            // Sinkronisasi Mesh Bola & Pemeriksaan Pengambilan Koin, Musuh, Power-Up, serta Jatuh (Drain)
+            for (let bi = balls.length - 1; bi >= 0; bi--) {
+                const b = balls[bi];
+                b.mesh.position.set(b.x, b.r, b.z);
+
+                // Cek Koin (+1 Poin)
+                for (let ci = coins.length - 1; ci >= 0; ci--) {
+                    const c = coins[ci];
+                    if (Math.hypot(b.x - c.x, b.z - c.z) < b.r + c.r) {
+                        sfx.coin();
+                        createBurstParticles(c.x, 0.8, c.z, 0xfacc15, 7, 0.7);
+                        scene.remove(c.mesh);
+                        coins.splice(ci, 1);
+                        addScore(1);
+                    }
+                }
+
+                // Cek Musuh Knock 'Em Up! (+1 atau +2 Poin)
+                for (let ei = enemies.length - 1; ei >= 0; ei--) {
+                    const e = enemies[ei];
+                    if (Math.hypot(b.x - e.x, b.z - e.z) < b.r + e.r) {
+                        sfx.enemyHit(e.points);
+                        createBurstParticles(e.x, 1.0, e.z, e.points > 1 ? 0xf97316 : 0xef4444, 12, 1.0);
+
+                        // Berikan sedikit pantulan balik saat menabrak musuh
+                        const dx = b.x - e.x;
+                        const dz = b.z - e.z;
+                        const d = Math.hypot(dx, dz) || 1;
+                        b.vx = (dx / d) * 16;
+                        b.vz = (dz / d) * 16;
+
+                        scene.remove(e.mesh);
+                        enemies.splice(ei, 1);
+                        registerEnemyKill(e.points);
+                    }
+                }
+
+                // Cek Power-Up (Multi-Bola & Bom)
+                for (let pi = powerups.length - 1; pi >= 0; pi--) {
+                    const p = powerups[pi];
+                    if (Math.hypot(b.x - p.x, b.z - p.z) < b.r + p.r) {
+                        const pType = p.type;
+                        const px = p.x;
+                        const pz = p.z;
+                        scene.remove(p.mesh);
+                        powerups.splice(pi, 1);
+
+                        if (pType === 'multiball') {
+                            sfx.multiball();
+                            createBurstParticles(px, 0.9, pz, 0x10b981, 16, 1.2);
+                            // Gandakan bola (+2 bola ekstra)
+                            if (balls.length < 6) {
+                                spawnBall(px - 0.6, pz, -9, -22, true);
+                                spawnBall(px + 0.6, pz, 9, -22, true);
+                            }
+                            showToast('MULTI-BOLA AKTIF! +2 Bola Tambahan di Meja!');
+                        } else if (pType === 'bomb') {
+                            triggerBombExplosion(px, pz);
+                        }
+                    }
+                }
+
+                // Cek apakah bola jatuh melewati bawah flipper (Drain: Z > 22.8)
+                if (b.z > 22.8) {
+                    scene.remove(b.mesh);
+                    balls.splice(bi, 1);
+                    sfx.drain();
+
+                    // Hanya mengurangi kesempatan jatuh jika semua bola di meja telah habis
+                    if (balls.length === 0) {
+                        state.lives -= 1;
+                        updateHUD();
+
+                        if (state.lives <= 0) {
+                            triggerGameOver();
+                        } else {
+                            // Siapkan bola baru dengan mekanisme Pull To Start
+                            state.waitingForPull = true;
+                            spawnBall(TABLE.LAUNCH_POS.x, TABLE.LAUNCH_POS.z, 0, 0, false);
+                            showToast(`Bola Jatuh! Sisa Kesempatan: ${state.lives}. Tarik bola untuk meluncurkan!`);
+                        }
+                    } else {
+                        updateHUD();
+                    }
+                }
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 9. PEMELIHARAAN POPULASI ARENA & ANIMASI VISUAL
+         * ============================================================================
+         */
+        let spawnCheckTimer = 0;
+
+        function updateArenaMaintenance(dt) {
+            // Animasi Koin Berputar
+            for (const c of coins) {
+                c.mesh.rotation.z += 2.6 * dt;
+            }
+
+            // Animasi Musuh Mengambang & Berputar
+            const now = performance.now() * 0.003;
+            for (const e of enemies) {
+                e.mesh.rotation.y += 1.8 * dt;
+                e.mesh.rotation.x += 0.9 * dt;
+                e.mesh.position.y = e.baseY + Math.sin(now + e.phase) * 0.18;
+            }
+
+            // Animasi Power-Up
+            for (const p of powerups) {
+                p.mesh.rotation.y += 2.4 * dt;
+            }
+
+            // Animasi Bos
+            if (bossEntity) {
+                bossEntity.coreMesh.rotation.y += 1.5 * dt;
+                bossEntity.coreMesh.rotation.z += 0.8 * dt;
+                bossEntity.auraMesh.rotation.z -= 2.2 * dt;
+                if (bossEntity.hitCooldown > 0) {
+                    bossEntity.hitCooldown = Math.max(0, bossEntity.hitCooldown - dt);
+                }
+            }
+
+            // Efek Denyut Bumper saat Terpantul
+            for (const c of staticCircles) {
+                if (c.pulse > 0) {
+                    c.pulse = Math.max(0, c.pulse - dt * 4.5);
+                    const s = 1 + c.pulse * 0.22;
+                    c.mesh.scale.set(s, 1, s);
+                }
+            }
+
+            // Update Partikel Ledakan
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.life -= dt;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                    continue;
+                }
+                p.vy -= 18 * dt;
+                p.mesh.position.x += p.vx * dt;
+                p.mesh.position.y = Math.max(0.1, p.mesh.position.y + p.vy * dt);
+                p.mesh.position.z += p.vz * dt;
+                p.mesh.scale.setScalar(Math.max(0.1, p.life * 2));
+            }
+
+            // Timer Sesi Frenzy (60 Detik)
+            if (state.frenzyActive) {
+                state.frenzyTimer -= dt;
+                // Isi ulang koin di Arena Tingkat Dua jika mulai habis selama Frenzy masih berjalan
+                const frenzyCoinCount = coins.filter(c => c.isFrenzyCoin).length;
+                if (frenzyCoinCount < 10 && state.frenzyTimer > 4) {
+                    for (let i = 0; i < 12; i++) {
+                        const cx = (Math.random() - 0.5) * 22;
+                        const cz = -44 + Math.random() * 19;
+                        spawnCoin(cx, cz, true);
+                    }
+                }
+
+                if (state.frenzyTimer <= 0) {
+                    endFrenzySession();
+                }
+                updateHUD();
+            }
+
+            // Cooldown Goyang Meja (Nudge)
+            if (state.nudgeCooldown > 0) {
+                state.nudgeCooldown = Math.max(0, state.nudgeCooldown - dt);
+            }
+
+            // Penjagaan Populasi Koin, Musuh, & Power-Up di Arena Utama
+            spawnCheckTimer += dt;
+            if (spawnCheckTimer >= 1.6) {
+                spawnCheckTimer = 0;
+
+                const mainCoins = coins.filter(c => !c.isFrenzyCoin).length;
+                if (mainCoins < 7) {
+                    const spot = findFreeArenaSpot(-17, 9);
+                    spawnCoin(spot.x, spot.z, false);
+                }
+
+                if (enemies.length < 7) {
+                    const spot = findFreeArenaSpot(-16, 8);
+                    const tier = Math.random() < 0.4 ? 2 : 1;
+                    spawnEnemy(spot.x, spot.z, tier);
+                }
+
+                if (powerups.length < 2 && Math.random() < 0.45) {
+                    const spot = findFreeArenaSpot(-14, 6);
+                    const type = Math.random() < 0.5 ? 'multiball' : 'bomb';
+                    spawnPowerUp(spot.x, spot.z, type);
+                }
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 10. SISTEM PULL TO START (Ketapel Bidik) & KONTROL KAMERA / INPUT
+         * ============================================================================
+         */
+        const raycaster = new THREE.Raycaster();
+        const pointerNDC = new THREE.Vector2();
+        const tablePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -TABLE.BALL_RADIUS);
+        const intersectPt = new THREE.Vector3();
+
+        let isOrbitDragging = false;
+        let prevOrbitPos = { x: 0, y: 0 };
+        let cameraYawOffset = 0;
+        let cameraPitchOffset = 0;
+
+        function getTablePointFromEvent(clientX, clientY) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(pointerNDC, camera);
+            raycaster.ray.intersectPlane(tablePlane, intersectPt);
+            return intersectPt;
+        }
+
+        function updatePullTrajectoryVisuals() {
+            if (!state.waitingForPull || !state.isDraggingPull) {
+                slingBandLine.visible = false;
+                trajectoryDots.forEach(d => (d.visible = false));
+                return;
+            }
+
+            const startX = TABLE.LAUNCH_POS.x;
+            const startZ = TABLE.LAUNCH_POS.z;
+            const pullBackX = startX - state.pullVector.x * 0.14;
+            const pullBackZ = startZ - state.pullVector.z * 0.14;
+
+            // Posisi bola sedikit tertarik mengikuti ketapel
+            if (balls[0]) {
+                balls[0].mesh.position.set(pullBackX, TABLE.BALL_RADIUS, pullBackZ);
+            }
+
+            // Garis Karet Ketapel
+            const posAttr = slingBandGeo.attributes.position;
+            posAttr.setXYZ(0, startX, 0.8, startZ);
+            posAttr.setXYZ(1, pullBackX, 0.8, pullBackZ);
+            posAttr.needsUpdate = true;
+            slingBandLine.visible = true;
+
+            // Simulasi titik-titik lintasan prediktif ke depan
+            let simX = startX;
+            let simZ = startZ;
+            let simVx = state.pullVector.x;
+            let simVz = state.pullVector.z;
+            const simDt = 0.032;
+
+            for (let i = 0; i < trajectoryPointsCount; i++) {
+                simVz += TABLE.GRAVITY_Z * simDt;
+                simX += simVx * simDt;
+                simZ += simVz * simDt;
+
+                // Pantulan sederhana terhadap dinding samping untuk pratinjau
+                if (simX < TABLE.MAIN_MIN_X + TABLE.BALL_RADIUS) {
+                    simX = TABLE.MAIN_MIN_X + TABLE.BALL_RADIUS;
+                    simVx = Math.abs(simVx) * 0.8;
+                } else if (simX > TABLE.MAIN_MAX_X - TABLE.BALL_RADIUS) {
+                    simX = TABLE.MAIN_MAX_X - TABLE.BALL_RADIUS;
+                    simVx = -Math.abs(simVx) * 0.8;
+                }
+
+                const dot = trajectoryDots[i];
+                dot.position.set(simX, 0.65, simZ);
+                dot.visible = true;
+            }
+        }
+
+        // Event Pointer pada Kanvas 3D
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            sfx.init();
+            if (state.isGameOver) return;
+
+            // Klik kanan atau tengah untuk menggeser sudut pandang kamera
+            if (e.button === 2 || e.button === 1) {
+                isOrbitDragging = true;
+                prevOrbitPos = { x: e.clientX, y: e.clientY };
+                return;
+            }
+
+            if (state.waitingForPull) {
+                state.isDraggingPull = true;
+                const pt = getTablePointFromEvent(e.clientX, e.clientY);
+                computePullVector(pt.x, pt.z);
+                updatePullTrajectoryVisuals();
+            } else {
+                // Saat permainan berlangsung, tap di sisi kiri/kanan layar juga menggerakkan flipper
+                if (e.clientX < window.innerWidth * 0.5) {
+                    setFlipper('left', true);
+                } else {
+                    setFlipper('right', true);
+                }
+            }
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (isOrbitDragging) {
+                const dx = e.clientX - prevOrbitPos.x;
+                const dy = e.clientY - prevOrbitPos.y;
+                prevOrbitPos = { x: e.clientX, y: e.clientY };
+                cameraYawOffset = Math.max(-0.55, Math.min(0.55, cameraYawOffset - dx * 0.004));
+                cameraPitchOffset = Math.max(-8, Math.min(10, cameraPitchOffset + dy * 0.05));
+                return;
+            }
+
+            if (state.waitingForPull && state.isDraggingPull) {
+                const pt = getTablePointFromEvent(e.clientX, e.clientY);
+                computePullVector(pt.x, pt.z);
+                updatePullTrajectoryVisuals();
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            isOrbitDragging = false;
+
+            if (state.waitingForPull && state.isDraggingPull) {
+                state.isDraggingPull = false;
+                const launchPower = Math.hypot(state.pullVector.x, state.pullVector.z);
+
+                if (launchPower > 8) {
+                    // Lepaskan ketapel & luncurkan bola!
+                    state.waitingForPull = false;
+                    if (balls[0]) {
+                        balls[0].x = TABLE.LAUNCH_POS.x;
+                        balls[0].z = TABLE.LAUNCH_POS.z;
+                        balls[0].vx = state.pullVector.x;
+                        balls[0].vz = state.pullVector.z;
+                    }
+                    sfx.launch();
+                    showToast('Pertahankan bola & hancurkan musuh!');
+                } else if (balls[0]) {
+                    balls[0].mesh.position.set(TABLE.LAUNCH_POS.x, TABLE.BALL_RADIUS, TABLE.LAUNCH_POS.z);
+                }
+                updatePullTrajectoryVisuals();
+            } else {
+                setFlipper('left', false);
+                setFlipper('right', false);
+            }
+        });
+
+        renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+        function computePullVector(pointerX, pointerZ) {
+            // Vektor tarik dari titik pointer menuju titik awal bola (seperti ketapel Angry Birds)
+            let dx = TABLE.LAUNCH_POS.x - pointerX;
+            let dz = TABLE.LAUNCH_POS.z - pointerZ;
+
+            // Pastikan arah tembakan selalu mengarah ke utara meja (dz negatif)
+            if (dz > -1.5) dz = -1.5;
+
+            const dist = Math.hypot(dx, dz);
+            const maxPullDist = 9.5;
+            const clampedDist = Math.min(maxPullDist, Math.max(1.5, dist));
+            const scale = (clampedDist / maxPullDist) * 40;
+
+            state.pullVector.x = (dx / (dist || 1)) * scale * 0.85;
+            state.pullVector.z = -Math.abs((dz / (dist || 1)) * scale);
+        }
+
+        /**
+         * ============================================================================
+         * 11. KONTROL TOMBOL, KEYBOARD, & PEMBARUAN ANTARMUKA (HUD)
+         * ============================================================================
+         */
+        const btnLeftFlipper = document.getElementById('btn-left-flipper');
+        const btnRightFlipper = document.getElementById('btn-right-flipper');
+        const btnNudge = document.getElementById('btn-nudge');
+
+        function setFlipper(side, isDown) {
+            if (side === 'left') {
+                if (isDown && !state.leftFlipperDown) sfx.flipper();
+                state.leftFlipperDown = isDown;
+                btnLeftFlipper.classList.toggle('active-press', isDown);
+            } else {
+                if (isDown && !state.rightFlipperDown) sfx.flipper();
+                state.rightFlipperDown = isDown;
+                btnRightFlipper.classList.toggle('active-press', isDown);
+            }
+        }
+
+        function triggerNudge() {
+            if (state.waitingForPull || state.isGameOver || state.nudgeCooldown > 0) return;
+            state.nudgeCooldown = 1.8;
+            state.screenShake = 0.22;
+            sfx.bumper(false);
+            balls.forEach(b => {
+                b.vx += (Math.random() - 0.5) * 14;
+                b.vz -= 7.5;
+            });
+            showToast('Meja digoyang!');
+        }
+
+        // Kontrol Keyboard
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+                setFlipper('left', true);
+            } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+                setFlipper('right', true);
+            } else if (e.code === 'Space') {
+                e.preventDefault();
+                triggerNudge();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+                setFlipper('left', false);
+            } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+                setFlipper('right', false);
+            }
+        });
+
+        // Tombol Layar Bawah
+        btnLeftFlipper.addEventListener('pointerdown', (e) => { e.stopPropagation(); sfx.init(); setFlipper('left', true); });
+        btnLeftFlipper.addEventListener('pointerup', (e) => { e.stopPropagation(); setFlipper('left', false); });
+        btnLeftFlipper.addEventListener('pointerleave', () => setFlipper('left', false));
+
+        btnRightFlipper.addEventListener('pointerdown', (e) => { e.stopPropagation(); sfx.init(); setFlipper('right', true); });
+        btnRightFlipper.addEventListener('pointerup', (e) => { e.stopPropagation(); setFlipper('right', false); });
+        btnRightFlipper.addEventListener('pointerleave', () => setFlipper('right', false));
+
+        btnNudge.addEventListener('click', (e) => { e.stopPropagation(); sfx.init(); triggerNudge(); });
+
+        // Tombol Header (Kamera, Suara, Info, Restart)
+        document.getElementById('btn-camera').addEventListener('click', () => {
+            state.cameraPreset = (state.cameraPreset + 1) % 3;
+            cameraYawOffset = 0;
+            cameraPitchOffset = 0;
+            const names = ['Dinamis', 'Sudut Atas', 'Sudut Dekat'];
+            showToast(`Sudut Kamera: ${names[state.cameraPreset]}`);
+        });
+
+        const btnSound = document.getElementById('btn-sound');
+        btnSound.addEventListener('click', () => {
+            const on = sfx.toggle();
+            btnSound.textContent = `Suara: ${on ? 'ON' : 'OFF'}`;
+        });
+
+        const modalInfo = document.getElementById('modal-info');
+        document.getElementById('btn-help').addEventListener('click', () => modalInfo.classList.remove('hidden'));
+        document.getElementById('btn-close-info').addEventListener('click', () => modalInfo.classList.add('hidden'));
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            resetGame();
+        });
+
+        // Fungsi Pembaruan HUD
+        let toastTimeout = null;
+        function showToast(msg) {
+            const el = document.getElementById('ui-toast');
+            el.textContent = msg;
+            el.style.opacity = '1';
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                if (!state.waitingForPull) el.style.opacity = '0.75';
+            }, 3500);
+        }
+
+        function updateHUD() {
+            document.getElementById('ui-score').textContent = state.score;
+            document.getElementById('ui-highscore').textContent = `MAX: ${state.highScore}`;
+            document.getElementById('ui-frenzy-progress').textContent = `/ ${state.nextFrenzyScore}`;
+            document.getElementById('ui-lives').textContent = state.lives;
+            document.getElementById('ui-active-balls').textContent = `Aktif: ${balls.length}`;
+
+            // Progress Menuju Bos (Tiap 50 Musuh)
+            const currentCycleKills = state.enemyKills % 50;
+            const displayKills = (bossEntity && currentCycleKills === 0) ? 50 : currentCycleKills;
+            document.getElementById('ui-kills').textContent = `${displayKills}/50`;
+            document.getElementById('ui-kill-bar').style.width = `${(displayKills / 50) * 100}%`;
+
+            // Status Frenzy
+            const frenzyBox = document.getElementById('ui-frenzy-box');
+            const frenzyStateEl = document.getElementById('ui-frenzy-state');
+            const frenzyTimerEl = document.getElementById('ui-frenzy-timer');
+
+            if (state.frenzyActive) {
+                frenzyBox.classList.add('frenzy-active-banner', 'bg-amber-950/50');
+                frenzyStateEl.textContent = 'AKTIF (Dek 2)';
+                frenzyStateEl.className = 'text-xs font-bold text-amber-300';
+                frenzyTimerEl.classList.remove('hidden');
+                frenzyTimerEl.textContent = `${Math.ceil(state.frenzyTimer)}d`;
+            } else {
+                frenzyBox.classList.remove('frenzy-active-banner', 'bg-amber-950/50');
+                const needed = Math.max(0, state.nextFrenzyScore - state.score);
+                frenzyStateEl.textContent = `-${needed} poin`;
+                frenzyStateEl.className = 'text-xs font-semibold text-slate-400';
+                frenzyTimerEl.classList.add('hidden');
+            }
+
+            // Banner HP Bos
+            const bossBanner = document.getElementById('ui-boss-banner');
+            if (bossEntity) {
+                bossBanner.classList.remove('hidden');
+                const pct = (bossEntity.hp / bossEntity.maxHp) * 100;
+                document.getElementById('ui-boss-hp-bar').style.width = `${pct}%`;
+                document.getElementById('ui-boss-hp-text').textContent = `${bossEntity.hp}/${bossEntity.maxHp} HP`;
+            } else {
+                bossBanner.classList.add('hidden');
+            }
+        }
+
+        function triggerGameOver() {
+            state.isGameOver = true;
+            document.getElementById('go-score').textContent = state.score;
+            document.getElementById('go-kills').textContent = state.enemyKills;
+            document.getElementById('modal-gameover').classList.remove('hidden');
+        }
+
+        function resetGame() {
+            document.getElementById('modal-gameover').classList.add('hidden');
+
+            // Hapus bola & bos sisa
+            balls.forEach(b => scene.remove(b.mesh));
+            balls.length = 0;
+            if (bossEntity) {
+                scene.remove(bossEntity.mesh);
+                bossEntity = null;
+            }
+
+            state.score = 0;
+            state.lives = 3;
+            state.enemyKills = 0;
+            state.nextBossAt = 50;
+            state.nextFrenzyScore = TABLE.FRENZY_THRESHOLD;
+            state.isGameOver = false;
+            state.waitingForPull = true;
+            state.isDraggingPull = false;
+
+            if (state.frenzyActive) {
+                endFrenzySession();
+            }
+
+            populateInitialWave();
+            spawnBall(TABLE.LAUNCH_POS.x, TABLE.LAUNCH_POS.z, 0, 0, false);
+            showToast('Tarik bola ke belakang dan arahkan sasaran untuk meluncurkan!');
+            updateHUD();
+        }
+
+        /**
+         * ============================================================================
+         * 12. PERGERAKAN KAMERA DINAMIS, RESIZE, & GAME LOOP UTAMA
+         * ============================================================================
+         */
+        function updateCamera(dt) {
+            // Cari Z minimum bola untuk melacak apabila bola naik ke Arena Tingkat Dua (Frenzy)
+            let minBallZ = 4;
+            if (balls.length > 0) {
+                minBallZ = Math.min(...balls.map(b => b.z));
+            }
+
+            const inUpperDeck = state.frenzyActive || minBallZ < -20;
+
+            let targetPos = new THREE.Vector3(0, 38, 33);
+            let targetLook = new THREE.Vector3(0, 0, 2);
+
+            if (state.cameraPreset === 1) {
+                // Sudut Pandang Atas (Top-Down)
+                targetPos.set(0, inUpperDeck ? 62 : 48, inUpperDeck ? -8 : 6);
+                targetLook.set(0, 0, inUpperDeck ? -14 : 0);
+            } else if (state.cameraPreset === 2) {
+                // Sudut Pandang Dekat Aksi
+                const focusZ = Math.max(-36, Math.min(12, minBallZ * 0.45));
+                targetPos.set(0, 29, focusZ + 26);
+                targetLook.set(0, 0, focusZ - 2);
+            } else {
+                // Sudut Pandang Dinamis (Default)
+                if (inUpperDeck) {
+                    targetPos.set(0, 44, 24);
+                    targetLook.set(0, 0, -11);
+                } else {
+                    targetPos.set(0, 37, 32);
+                    targetLook.set(0, 0, 1.5);
+                }
+            }
+
+            // Terapkan offset rotasi mouse/touch jika pengguna menggeser sudut pandang
+            targetPos.x += Math.sin(cameraYawOffset) * 18;
+            targetPos.y += cameraPitchOffset;
+
+            // Efek getar kamera (Screen Shake) saat bom meledak atau menghantam bos
+            if (state.screenShake > 0) {
+                state.screenShake = Math.max(0, state.screenShake - dt * 1.5);
+                targetPos.x += (Math.random() - 0.5) * state.screenShake * 3.2;
+                targetPos.z += (Math.random() - 0.5) * state.screenShake * 3.2;
+            }
+
+            camera.position.lerp(targetPos, Math.min(1, dt * 4.5));
+            cameraLookTarget.lerp(targetLook, Math.min(1, dt * 5.0));
+            camera.lookAt(cameraLookTarget);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        let lastTime = performance.now();
+
+        function gameLoop(now) {
+            requestAnimationFrame(gameLoop);
+
+            // Cegah lonjakan deltaTime saat pengguna berpindah tab browser
+            const rawDt = (now - lastTime) / 1000;
+            lastTime = now;
+            if (document.hidden) return;
+            const dt = Math.min(rawDt, 0.033);
+
+            if (!state.isGameOver) {
+                stepPhysics(dt);
+                updateArenaMaintenance(dt);
+            }
+
+            updateCamera(dt);
+            renderer.render(scene, camera);
+        }
+
+        // Inisialisasi saat halaman selesai dimuat
+        window.onload = function () {
+            buildPinballArena();
+            buildFlippers();
+            buildTrajectoryDots();
+            resetGame();
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>

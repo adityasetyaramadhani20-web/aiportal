@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reversi</title>
+    <!-- Tailwind CSS untuk styling cepat dan responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome untuk ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Animasi Kustom */
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            70% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .disc {
+            animation: popIn 0.3s ease-out forwards;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.4);
+        }
+
+        /* Efek 3D pada papan */
+        .board-shadow {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Highlight langkah yang valid */
+        .valid-move-indicator {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+            width: 30%;
+            height: 30%;
+            transition: all 0.2s;
+        }
+        
+        .cell:hover .valid-move-indicator {
+            background-color: rgba(0, 0, 0, 0.5);
+            transform: scale(1.5);
+            cursor: pointer;
+        }
+
+        /* Gradien background kayu/meja */
+        body {
+            background-color: #1a202c;
+            background-image: radial-gradient(#2d3748 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center text-white font-sans p-4">
+
+    <!-- Header & Skor -->
+    <div class="w-full max-w-md mb-6">
+        <h1 class="text-3xl font-bold text-center mb-2 text-emerald-400 drop-shadow-md">Reversi</h1>
+        <div class="flex justify-between items-center bg-gray-800 rounded-xl p-4 shadow-lg border border-gray-700">
+            <!-- Pemain Hitam (Manusia) -->
+            <div id="player-black" class="flex flex-col items-center p-2 rounded-lg transition-colors border-b-4 border-transparent active-turn">
+                <div class="w-8 h-8 bg-black rounded-full border border-gray-600 shadow mb-1"></div>
+                <span class="text-sm font-semibold">Anda (Hitam)</span>
+                <span id="score-black" class="text-2xl font-bold font-mono">2</span>
+            </div>
+
+            <!-- VS Badge -->
+            <div class="text-gray-500 font-bold">VS</div>
+
+            <!-- Pemain Putih (Komputer) -->
+            <div id="player-white" class="flex flex-col items-center p-2 rounded-lg transition-colors border-b-4 border-transparent">
+                <div class="w-8 h-8 bg-white rounded-full border border-gray-300 shadow mb-1"></div>
+                <span class="text-sm font-semibold">Komputer</span>
+                <span id="score-white" class="text-2xl font-bold font-mono">2</span>
+            </div>
+        </div>
+        
+        <!-- Status Pesan -->
+        <div id="message-area" class="mt-4 text-center h-8 text-yellow-300 font-medium animate-pulse">
+            Giliran Anda melangkah...
+        </div>
+    </div>
+
+    <!-- Papan Permainan -->
+    <div class="relative bg-emerald-900 p-2 sm:p-4 rounded-lg board-shadow border-4 border-emerald-800 w-full max-w-md aspect-square">
+        <!-- Grid 8x8 -->
+        <div id="game-board" class="grid grid-cols-8 grid-rows-8 gap-1 h-full w-full bg-emerald-800 border-2 border-emerald-900">
+            <!-- Cell akan digenerate oleh JavaScript -->
+        </div>
+    </div>
+
+    <!-- Kontrol -->
+    <div class="mt-8 flex gap-4">
+        <button onclick="restartGame()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-full font-bold shadow-lg transition transform hover:-translate-y-1 active:translate-y-0 flex items-center gap-2">
+            <i class="fas fa-redo"></i> Ulangi
+        </button>
+        <button id="pass-btn" onclick="passTurn()" class="hidden px-6 py-2 bg-orange-600 hover:bg-orange-700 rounded-full font-bold shadow-lg transition transform hover:-translate-y-1 active:translate-y-0">
+            Lewati Giliran
+        </button>
+    </div>
+
+    <!-- Modal Game Over -->
+    <div id="game-over-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center max-w-xs sm:max-w-sm w-full border border-gray-600 transform scale-100 transition-transform">
+            <h2 class="text-3xl font-bold mb-4 text-white">Permainan Selesai!</h2>
+            <div class="text-6xl mb-4">🏆</div>
+            <p id="winner-text" class="text-xl mb-6 text-emerald-400 font-semibold">Pemenangnya adalah...</p>
+            <div class="flex justify-center gap-4 text-lg mb-8">
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 bg-black rounded-full"></div>
+                    <span id="final-score-black">0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 bg-white rounded-full"></div>
+                    <span id="final-score-white">0</span>
+                </div>
+            </div>
+            <button onclick="closeModalAndRestart()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-lg shadow-lg transition">
+                Main Lagi
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Konstanta & Variabel Global ---
+        const BOARD_SIZE = 8;
+        const EMPTY = 0;
+        const BLACK = 1; // Pemain (Jalan duluan)
+        const WHITE = 2; // Komputer
+
+        let board = [];
+        let currentPlayer = BLACK;
+        let gameActive = true;
+        let validMoves = [];
+
+        // Arah pergerakan (Horizontal, Vertikal, Diagonal)
+        const DIRECTIONS = [
+            [-1, -1], [-1, 0], [-1, 1],
+            [0, -1],           [0, 1],
+            [1, -1],  [1, 0],  [1, 1]
+        ];
+
+        // --- Inisialisasi ---
+        function initGame() {
+            createBoardHTML();
+            // Perbaikan: Memanggil restartGame() untuk inisialisasi penuh
+            // alih-alih resetBoardState() + updateUI() yang menyebabkan error
+            restartGame();
+        }
+
+        function createBoardHTML() {
+            const boardElement = document.getElementById('game-board');
+            boardElement.innerHTML = '';
+            
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'bg-emerald-600 hover:bg-emerald-500 transition-colors flex items-center justify-center relative cell';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.onclick = () => handleCellClick(r, c);
+                    
+                    // Elemen indikator langkah
+                    const indicator = document.createElement('div');
+                    indicator.id = `indicator-${r}-${c}`;
+                    indicator.className = 'hidden valid-move-indicator';
+                    cell.appendChild(indicator);
+
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        function resetBoardState() {
+            // Reset array papan 8x8 dengan 0
+            board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(EMPTY));
+            
+            // Posisi awal Reversi
+            board[3][3] = WHITE;
+            board[3][4] = BLACK;
+            board[4][3] = BLACK;
+            board[4][4] = WHITE;
+
+            currentPlayer = BLACK;
+            gameActive = true;
+            document.getElementById('game-over-modal').classList.add('hidden');
+            document.getElementById('pass-btn').classList.add('hidden');
+        }
+
+        // --- Logika Inti Permainan ---
+
+        // Cek apakah langkah valid
+        function isValidMove(r, c, player) {
+            if (board[r][c] !== EMPTY) return false;
+
+            const opponent = player === BLACK ? WHITE : BLACK;
+            
+            for (let [dr, dc] of DIRECTIONS) {
+                let nr = r + dr;
+                let nc = c + dc;
+                let foundOpponent = false;
+
+                while (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                    if (board[nr][nc] === opponent) {
+                        foundOpponent = true;
+                        nr += dr;
+                        nc += dc;
+                    } else if (board[nr][nc] === player) {
+                        if (foundOpponent) return true; // Valid jika menutup lawan
+                        break;
+                    } else {
+                        break; // Kosong
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Dapatkan semua langkah valid untuk pemain saat ini
+        function getValidMoves(player) {
+            let moves = [];
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (isValidMove(r, c, player)) {
+                        moves.push({ r, c });
+                    }
+                }
+            }
+            return moves;
+        }
+
+        // Eksekusi langkah (membalik bidak)
+        function executeMove(r, c, player) {
+            board[r][c] = player;
+            const opponent = player === BLACK ? WHITE : BLACK;
+
+            for (let [dr, dc] of DIRECTIONS) {
+                let nr = r + dr;
+                let nc = c + dc;
+                let tilesToFlip = [];
+
+                while (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                    if (board[nr][nc] === opponent) {
+                        tilesToFlip.push({ r: nr, c: nc });
+                    } else if (board[nr][nc] === player) {
+                        // Balik bidak yang terkurung
+                        for (let tile of tilesToFlip) {
+                            board[tile.r][tile.c] = player;
+                        }
+                        break;
+                    } else {
+                        break;
+                    }
+                    nr += dr;
+                    nc += dc;
+                }
+            }
+        }
+
+        // --- Logika Interaksi & AI ---
+
+        function handleCellClick(r, c) {
+            if (!gameActive || currentPlayer !== BLACK) return; // Mencegah klik saat giliran komputer
+            
+            // Cek apakah langkah ada di daftar validMoves
+            const isValid = validMoves.some(m => m.r === r && m.c === c);
+            
+            if (isValid) {
+                processTurn(r, c);
+            }
+        }
+
+        function processTurn(r, c) {
+            executeMove(r, c, currentPlayer);
+            renderBoard(); // Render segera untuk melihat efek
+            
+            // Ganti giliran
+            currentPlayer = currentPlayer === BLACK ? WHITE : BLACK;
+            
+            // Cek kondisi langkah selanjutnya
+            checkNextTurn();
+        }
+
+        function checkNextTurn() {
+            updateScore();
+            validMoves = getValidMoves(currentPlayer);
+            
+            // Render ulang untuk update indikator langkah
+            renderBoard(); 
+
+            if (validMoves.length === 0) {
+                // Cek apakah lawan juga tidak punya langkah (Game Over)
+                const opponent = currentPlayer === BLACK ? WHITE : BLACK;
+                const opponentMoves = getValidMoves(opponent);
+                
+                if (opponentMoves.length === 0) {
+                    gameOver();
+                    return;
+                }
+
+                // Jika hanya pemain saat ini yang tidak bisa jalan (PASS)
+                const playerName = currentPlayer === BLACK ? "Anda" : "Komputer";
+                document.getElementById('message-area').innerText = `${playerName} tidak bisa jalan! Giliran dilewati.`;
+                
+                if (currentPlayer === BLACK) {
+                    // Tombol pass manual untuk user agar sadar
+                    document.getElementById('pass-btn').classList.remove('hidden');
+                } else {
+                    // Komputer pass otomatis setelah delay
+                    setTimeout(() => {
+                        currentPlayer = opponent;
+                        checkNextTurn();
+                    }, 2000);
+                }
+                return;
+            }
+
+            document.getElementById('pass-btn').classList.add('hidden');
+
+            if (currentPlayer === WHITE) {
+                document.getElementById('message-area').innerText = "Komputer sedang berpikir...";
+                setTimeout(computerMove, 1000); // Delay agar terasa natural
+            } else {
+                document.getElementById('message-area').innerText = "Giliran Anda (Hitam)";
+            }
+            
+            highlightActivePlayer();
+        }
+
+        function passTurn() {
+            currentPlayer = WHITE;
+            checkNextTurn();
+        }
+
+        // AI Sederhana dengan Bobot Posisi
+        function computerMove() {
+            if (!gameActive) return;
+
+            // Matriks bobot strategi: Sudut sangat berharga, sebelah sudut berbahaya
+            const weights = [
+                [100, -20, 10,  5,  5, 10, -20, 100],
+                [-20, -50, -2, -2, -2, -2, -50, -20],
+                [ 10,  -2,  5,  1,  1,  5,  -2,  10],
+                [  5,  -2,  1,  1,  1,  1,  -2,   5],
+                [  5,  -2,  1,  1,  1,  1,  -2,   5],
+                [ 10,  -2,  5,  1,  1,  5,  -2,  10],
+                [-20, -50, -2, -2, -2, -2, -50, -20],
+                [100, -20, 10,  5,  5, 10, -20, 100]
+            ];
+
+            let bestScore = -Infinity;
+            let bestMove = null;
+
+            // Cari langkah dengan nilai bobot tertinggi
+            for (let move of validMoves) {
+                let score = weights[move.r][move.c];
+                
+                // Sedikit pengacakan agar tidak terlalu robotik jika nilai sama
+                score += Math.random() * 2; 
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = move;
+                }
+            }
+
+            if (bestMove) {
+                processTurn(bestMove.r, bestMove.c);
+            }
+        }
+
+        // --- UI Rendering ---
+
+        function renderBoard() {
+            const cells = document.getElementById('game-board').children;
+            
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const index = r * 8 + c;
+                    const cell = cells[index];
+                    const value = board[r][c];
+                    
+                    // Bersihkan disc lama (tapi simpan indikator)
+                    const indicator = cell.querySelector('.valid-move-indicator');
+                    cell.innerHTML = ''; 
+                    cell.appendChild(indicator);
+
+                    // Render Bidak
+                    if (value !== EMPTY) {
+                        const disc = document.createElement('div');
+                        disc.className = `w-4/5 h-4/5 rounded-full disc ${value === BLACK ? 'bg-black border-2 border-gray-600' : 'bg-white border-2 border-gray-300'}`;
+                        
+                        // Tambahkan detail visual kilap pada bidak
+                        const shine = document.createElement('div');
+                        shine.className = 'w-1/3 h-1/3 rounded-full bg-white opacity-20 absolute top-2 left-2';
+                        disc.appendChild(shine);
+                        
+                        cell.appendChild(disc);
+                    }
+
+                    // Render Indikator Langkah (Hanya untuk pemain manusia)
+                    if (currentPlayer === BLACK && validMoves.some(m => m.r === r && m.c === c)) {
+                        indicator.classList.remove('hidden');
+                        indicator.classList.add('block');
+                    } else {
+                        indicator.classList.add('hidden');
+                        indicator.classList.remove('block');
+                    }
+                }
+            }
+        }
+
+        function updateScore() {
+            let blackScore = 0;
+            let whiteScore = 0;
+            
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === BLACK) blackScore++;
+                    if (board[r][c] === WHITE) whiteScore++;
+                }
+            }
+            
+            document.getElementById('score-black').innerText = blackScore;
+            document.getElementById('score-white').innerText = whiteScore;
+        }
+
+        function highlightActivePlayer() {
+            const pBlack = document.getElementById('player-black');
+            const pWhite = document.getElementById('player-white');
+            
+            if (currentPlayer === BLACK) {
+                pBlack.classList.add('bg-gray-700', 'border-emerald-500');
+                pBlack.classList.remove('border-transparent');
+                pWhite.classList.remove('bg-gray-700', 'border-emerald-500');
+                pWhite.classList.add('border-transparent');
+            } else {
+                pWhite.classList.add('bg-gray-700', 'border-emerald-500');
+                pWhite.classList.remove('border-transparent');
+                pBlack.classList.remove('bg-gray-700', 'border-emerald-500');
+                pBlack.classList.add('border-transparent');
+            }
+        }
+
+        function gameOver() {
+            gameActive = false;
+            let blackScore = parseInt(document.getElementById('score-black').innerText);
+            let whiteScore = parseInt(document.getElementById('score-white').innerText);
+            
+            document.getElementById('final-score-black').innerText = blackScore;
+            document.getElementById('final-score-white').innerText = whiteScore;
+            
+            const winnerText = document.getElementById('winner-text');
+            if (blackScore > whiteScore) {
+                winnerText.innerText = "Selamat! Anda Menang!";
+                winnerText.className = "text-xl mb-6 text-emerald-400 font-bold";
+            } else if (whiteScore > blackScore) {
+                winnerText.innerText = "Komputer Menang!";
+                winnerText.className = "text-xl mb-6 text-red-400 font-bold";
+            } else {
+                winnerText.innerText = "Seri!";
+                winnerText.className = "text-xl mb-6 text-gray-300 font-bold";
+            }
+            
+            document.getElementById('message-area').innerText = "Permainan Selesai.";
+            document.getElementById('game-over-modal').classList.remove('hidden');
+        }
+
+        function restartGame() {
+            resetBoardState();
+            // Kalkulasi langkah awal
+            validMoves = getValidMoves(BLACK);
+            renderBoard();
+            updateScore();
+            highlightActivePlayer();
+            document.getElementById('message-area').innerText = "Giliran Anda (Hitam)";
+        }
+
+        function closeModalAndRestart() {
+            restartGame();
+        }
+
+        // Jalankan saat load
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Merge</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-paper: #F5EFEB;
+      --card-bg: #EAE0D5;
+      --card-border: #D7C9BA;
+      --card-inner: #FDFCFA;
+      --primary-brown: #5E4A3F;
+      --accent-brown: #8D7363;
+      --light-brown: #BAA697;
+      --danger-line: #B85348;
+      --shadow-color: rgba(94, 74, 63, 0.08);
+      --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-paper);
+      color: var(--primary-brown);
+      font-family: var(--font-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px;
+      overflow-x: hidden;
+      touch-action: manipulation;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 580px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .paper-panel {
+      background: var(--card-inner);
+      border: 1.5px solid var(--card-border);
+      border-radius: 14px;
+      box-shadow: 0 4px 12px var(--shadow-color);
+      width: 100%;
+      padding: 12px 16px;
+    }
+
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .title-group h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--primary-brown);
+    }
+
+    .title-group p {
+      font-size: 0.72rem;
+      color: var(--accent-brown);
+      margin-top: 1px;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .stat-pill {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 4px 10px;
+      text-align: right;
+      min-width: 68px;
+    }
+
+    .stat-label {
+      font-size: 0.62rem;
+      color: var(--accent-brown);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .stat-value {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--primary-brown);
+      line-height: 1.1;
+    }
+
+    .controls-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .segmented-group {
+      display: inline-flex;
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 2.5px;
+      gap: 2px;
+      border: 1px solid var(--card-border);
+    }
+
+    .segment-btn {
+      background: transparent;
+      border: none;
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--accent-brown);
+      padding: 4px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .segment-btn.active {
+      background: var(--card-inner);
+      color: var(--primary-brown);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-icon-text {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--primary-brown);
+      font-family: inherit;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.15s ease;
+    }
+
+    .btn-icon-text:hover {
+      background: #dfd4c7;
+    }
+
+    .arena-viewport {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      position: relative;
+      margin: 2px auto;
+      background: var(--card-inner);
+      border: 1.5px solid var(--card-border);
+      border-radius: 16px;
+      padding: 10px 10px 14px 10px;
+      box-shadow: 0 6px 18px var(--shadow-color);
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .arena-top-info {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 8px 8px 8px;
+      font-size: 0.75rem;
+      color: var(--accent-brown);
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      margin: 0 auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      touch-action: none;
+      background: #faf6f0;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      overflow: hidden;
+    }
+
+    canvas#gameCanvas {
+      display: block;
+      background: transparent;
+      cursor: crosshair;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(70, 55, 45, 0.45);
+      backdrop-filter: blur(3px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 14px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--card-inner);
+      border: 1.5px solid var(--card-border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 490px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 10px;
+    }
+
+    .modal-header h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--primary-brown);
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      font-size: 1.3rem;
+      cursor: pointer;
+      color: var(--accent-brown);
+      padding: 2px 6px;
+      line-height: 1;
+    }
+
+    .custom-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 440px) {
+      .custom-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .custom-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+    }
+
+    .ball-preview-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid var(--card-border);
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--primary-brown);
+      flex-shrink: 0;
+      background-color: #fff;
+    }
+
+    .custom-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex-grow: 1;
+      min-width: 0;
+    }
+
+    .custom-meta span {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--primary-brown);
+    }
+
+    .custom-meta small {
+      font-size: 0.65rem;
+      color: var(--accent-brown);
+    }
+
+    .custom-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .mini-btn {
+      font-size: 0.68rem;
+      padding: 3px 6px;
+      border-radius: 5px;
+      border: 1px solid var(--card-border);
+      background: var(--card-inner);
+      color: var(--primary-brown);
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .mini-btn:hover {
+      background: #f0e6dc;
+    }
+
+    .game-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(245, 239, 235, 0.88);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      border-radius: 12px;
+      z-index: 10;
+    }
+
+    .game-overlay.active {
+      display: flex;
+    }
+
+    .overlay-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--primary-brown);
+    }
+
+    .overlay-score {
+      font-size: 1rem;
+      color: var(--accent-brown);
+    }
+
+    .primary-btn {
+      background: var(--primary-brown);
+      color: var(--bg-paper);
+      border: none;
+      padding: 9px 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.15s ease;
+    }
+
+    .primary-btn:hover {
+      opacity: 0.92;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Header panel -->
+    <header class="paper-panel">
+      <div class="header-bar">
+        <div class="title-group">
+          <h1>Merge</h1>
+          <p>Gabungkan bola angka 1 hingga 10</p>
+        </div>
+        <div class="stats-row">
+          <div class="stat-pill" id="frenzyTimeContainer" style="display: none;">
+            <div class="stat-label">Waktu</div>
+            <div class="stat-value" id="timeDisplay">60s</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-label">Skor</div>
+            <div class="stat-value" id="scoreDisplay">0</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-label">Terbaik</div>
+            <div class="stat-value" id="highScoreDisplay">0</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Settings and configuration strip -->
+    <section class="paper-panel" style="padding: 8px 14px;">
+      <div class="controls-strip">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 0.72rem; font-weight: 600; color: var(--accent-brown);">Mode:</span>
+          <div class="segmented-group" id="modeSelector">
+            <button class="segment-btn active" data-mode="normal">Normal</button>
+            <button class="segment-btn" data-mode="frenzy">Frenzy</button>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 0.72rem; font-weight: 600; color: var(--accent-brown);">Arena:</span>
+          <div class="segmented-group" id="arenaSelector">
+            <button class="segment-btn active" data-arena="easy">Mudah</button>
+            <button class="segment-btn" data-arena="medium">Sedang</button>
+            <button class="segment-btn" data-arena="hard">Sulit</button>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 6px;">
+          <button class="btn-icon-text" id="openCustomBtn" title="Kustomisasi Gambar">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Bola
+          </button>
+          <button class="btn-icon-text" id="toggleAudioBtn" title="Suara">
+            <span id="audioIcon">🔊</span>
+          </button>
+          <button class="btn-icon-text" id="restartBtn" title="Mulai Ulang">
+            ↺
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Canvas arena container -->
+    <main class="arena-viewport">
+      <div class="arena-top-info">
+        <span id="nextIndicator">Berikutnya: <strong id="nextBallText">#1</strong></span>
+        <span id="frenzyBonusNotice" style="color: #43845b; font-weight: 600; display: none;">+5s per Merge!</span>
+      </div>
+
+      <div class="canvas-wrapper" id="canvasWrapper">
+        <canvas id="gameCanvas" width="450" height="580"></canvas>
+
+        <!-- Game Over / End overlay -->
+        <div class="game-overlay" id="gameOverOverlay">
+          <div class="overlay-title" id="overlayTitle">Permainan Selesai</div>
+          <div class="overlay-score" id="overlayScoreText">Skor: 0</div>
+          <button class="primary-btn" id="overlayRestartBtn">Main Lagi</button>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <div class="modal-backdrop" id="customModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2>Kustomisasi Bola (1 - 10)</h2>
+          <p style="font-size: 0.72rem; color: var(--accent-brown); margin-top: 2px;">
+            Unggah gambar sendiri untuk setiap level bola.
+          </p>
+        </div>
+        <button class="modal-close" id="closeCustomBtn">&times;</button>
+      </div>
+
+      <div style="font-size: 0.72rem; color: var(--accent-brown); background: var(--card-bg); padding: 8px 10px; border-radius: 8px;">
+        Ukuran bola dihitung proporsional dari 0,4 cm (Level 1) hingga 4,0 cm (Level 10).
+      </div>
+
+      <div class="custom-grid" id="customItemsList">
+        <!-- Generated dynamically via JavaScript -->
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+        <button class="mini-btn" id="resetAllCustomBtn" style="padding: 6px 12px;">Reset Semua</button>
+        <button class="primary-btn" id="saveCustomDoneBtn" style="padding: 6px 16px;">Selesai</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for ball image uploads -->
+  <input type="file" id="fileUploader" accept="image/*" style="display: none;">
+
+  <script>
+    const AudioController = (() => {
+      let ctx = null;
+      let muted = false;
+
+      function getContext() {
+        if (!ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) ctx = new AudioContext();
+        }
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume();
+        }
+        return ctx;
+      }
+
+      return {
+        toggleMute() {
+          muted = !muted;
+          return muted;
+        },
+        isMuted() {
+          return muted;
+        },
+        playDrop() {
+          if (muted) return;
+          const c = getContext();
+          if (!c) return;
+          const osc = c.createOscillator();
+          const gain = c.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320, c.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(140, c.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.12, c.currentTime);
+          gain.gain.linearRampToValueAtTime(0.01, c.currentTime + 0.08);
+          osc.connect(gain);
+          gain.connect(c.destination);
+          osc.start();
+          osc.stop(c.currentTime + 0.08);
+        },
+        playMerge(level) {
+          if (muted) return;
+          const c = getContext();
+          if (!c) return;
+          const osc = c.createOscillator();
+          const gain = c.createGain();
+          const baseFreq = 260 + (level * 55);
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(baseFreq, c.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.45, c.currentTime + 0.14);
+          gain.gain.setValueAtTime(0.2, c.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.16);
+          osc.connect(gain);
+          gain.connect(c.destination);
+          osc.start();
+          osc.stop(c.currentTime + 0.16);
+        },
+        playBomb() {
+          if (muted) return;
+          const c = getContext();
+          if (!c) return;
+          const osc = c.createOscillator();
+          const gain = c.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(160, c.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(35, c.currentTime + 0.35);
+          gain.gain.setValueAtTime(0.3, c.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.35);
+          osc.connect(gain);
+          gain.connect(c.destination);
+          osc.start();
+          osc.stop(c.currentTime + 0.35);
+        },
+        playGameOver() {
+          if (muted) return;
+          const c = getContext();
+          if (!c) return;
+          const osc = c.createOscillator();
+          const gain = c.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(260, c.currentTime);
+          osc.frequency.linearRampToValueAtTime(110, c.currentTime + 0.4);
+          gain.gain.setValueAtTime(0.15, c.currentTime);
+          gain.gain.linearRampToValueAtTime(0.01, c.currentTime + 0.4);
+          osc.connect(gain);
+          gain.connect(c.destination);
+          osc.start();
+          osc.stop(c.currentTime + 0.4);
+        }
+      };
+    })();
+
+    // Diameter bola: Level 1 = 0.4 cm, Level 2 = 0.8 cm, ..., Level 10 = 4.0 cm
+    // Skala kanvas: 1 cm = 45 piksel (radius level n = n * 9 piksel)
+    const PIXELS_PER_CM = 45;
+    const BALL_TIERS = [
+      { level: 1,  cm: 0.4, radius: 9,   color: '#F4C5B3', label: '1', score: 2 },
+      { level: 2,  cm: 0.8, radius: 18,  color: '#E8B896', label: '2', score: 4 },
+      { level: 3,  cm: 1.2, radius: 27,  color: '#E3C89B', label: '3', score: 8 },
+      { level: 4,  cm: 1.6, radius: 36,  color: '#CED59E', label: '4', score: 16 },
+      { level: 5,  cm: 2.0, radius: 45,  color: '#A0CCA9', label: '5', score: 32 },
+      { level: 6,  cm: 2.4, radius: 54,  color: '#95C5C2', label: '6', score: 64 },
+      { level: 7,  cm: 2.8, radius: 63,  color: '#A7B9D8', label: '7', score: 128 },
+      { level: 8,  cm: 3.2, radius: 72,  color: '#C0A4CE', label: '8', score: 256 },
+      { level: 9,  cm: 3.6, radius: 81,  color: '#DF9DB5', label: '9', score: 512 },
+      { level: 10, cm: 4.0, radius: 90,  color: '#D08080', label: '10', score: 1024 }
+    ];
+
+    const BOMB_RADIUS = 26; // Radius bola bom
+    const BOMB_BLAST_RADIUS = 135; // Radius daya ledak bom
+
+    // Arena definitions: Mudah (Lebar penuh 450), Sedang (2/3 = 300), Sulit (1/3 = ~200)
+    // Catatan: Bola 10 berdiameter 180px, sehingga pada mode Sulit (200px) pemain dituntut presisi maksimal
+    const ARENA_CONFIGS = {
+      easy: { width: 450, height: 580, label: 'Mudah' },
+      medium: { width: 300, height: 580, label: 'Sedang' },
+      hard: { width: 200, height: 580, label: 'Sulit' }
+    };
+
+    const CustomImageStore = {
+      images: {},
+      loadedElements: {},
+
+      loadSaved() {
+        try {
+          const raw = localStorage.getItem('merge_game_custom_images');
+          if (raw) {
+            this.images = JSON.parse(raw);
+            Object.keys(this.images).forEach(lvl => {
+              this.cacheImageElement(lvl, this.images[lvl]);
+            });
+          }
+        } catch (e) {
+          console.warn('Storage read warning', e);
+        }
+      },
+
+      cacheImageElement(level, dataUrl) {
+        const img = new Image();
+        img.src = dataUrl;
+        this.loadedElements[level] = img;
+      },
+
+      saveImage(level, dataUrl) {
+        this.images[level] = dataUrl;
+        this.cacheImageElement(level, dataUrl);
+        try {
+          localStorage.setItem('merge_game_custom_images', JSON.stringify(this.images));
+        } catch (e) {
+          console.warn('Storage quota limit reached', e);
+        }
+      },
+
+      removeImage(level) {
+        delete this.images[level];
+        delete this.loadedElements[level];
+        try {
+          localStorage.setItem('merge_game_custom_images', JSON.stringify(this.images));
+        } catch (e) {
+          console.warn(e);
+        }
+      },
+
+      resetAll() {
+        this.images = {};
+        this.loadedElements = {};
+        localStorage.removeItem('merge_game_custom_images');
+      },
+
+      getImage(level) {
+        return this.loadedElements[level] || null;
+      }
+    };
+    CustomImageStore.loadSaved();
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const canvasWrapper = document.getElementById('canvasWrapper');
+
+    let currentMode = 'normal'; // 'normal' | 'frenzy'
+    let currentArenaKey = 'easy'; // 'easy' | 'medium' | 'hard'
+    let score = 0;
+    let highScore = parseInt(localStorage.getItem('merge_high_score') || '0', 10);
+    let frenzyTimeRemaining = 60;
+    let frenzyTimerInterval = null;
+    let isGameOver = false;
+
+    // Drop control state
+    let dropX = ARENA_CONFIGS.easy.width / 2;
+    let currentBallLevel = 1;
+    let currentIsBomb = false;
+    let nextBallLevel = 1;
+    let nextIsBomb = false;
+    let canDrop = true;
+    let dropCooldownTimer = 0;
+    const DROP_COOLDOWN = 600; // ms
+
+    // Matter.js engine instance
+    const { Engine, World, Bodies, Body, Events, Composite } = Matter;
+    let engine, world;
+    let wallLeft, wallRight, ground;
+
+    // Dead line and animations
+    const DEAD_LINE_Y = 100;
+    let deadLineOverflowTime = 0;
+    const OVERFLOW_LIMIT_MS = 2500;
+    let activeEffects = []; // Floating popups (+5s, points, blast rings)
+
+    function initPhysics() {
+      if (engine) {
+        World.clear(world);
+        Engine.clear(engine);
+      }
+
+      engine = Engine.create({
+        gravity: { x: 0, y: 1.45, scale: 0.001 }
+      });
+      world = engine.world;
+
+      setupArenaBounds();
+      setupCollisionListener();
+    }
+
+    function setupArenaBounds() {
+      const arena = ARENA_CONFIGS[currentArenaKey];
+      const wallThickness = 80;
+
+      // Adjust canvas resolution
+      canvas.width = arena.width;
+      canvas.height = arena.height;
+      canvasWrapper.style.width = arena.width + 'px';
+      canvasWrapper.style.height = arena.height + 'px';
+
+      if (wallLeft) Composite.remove(world, [wallLeft, wallRight, ground]);
+
+      // Static wall boundaries
+      wallLeft = Bodies.rectangle(
+        -wallThickness / 2,
+        arena.height / 2,
+        wallThickness,
+        arena.height * 2,
+        { isStatic: true, friction: 0.15, restitution: 0.2 }
+      );
+
+      wallRight = Bodies.rectangle(
+        arena.width + wallThickness / 2,
+        arena.height / 2,
+        wallThickness,
+        arena.height * 2,
+        { isStatic: true, friction: 0.15, restitution: 0.2 }
+      );
+
+      ground = Bodies.rectangle(
+        arena.width / 2,
+        arena.height + wallThickness / 2,
+        arena.width * 2,
+        wallThickness,
+        { isStatic: true, friction: 0.3, restitution: 0.1 }
+      );
+
+      World.add(world, [wallLeft, wallRight, ground]);
+      clampDropPosition();
+    }
+
+    function setupCollisionListener() {
+      Events.on(engine, 'collisionStart', (event) => {
+        if (isGameOver) return;
+        const pairs = event.pairs;
+
+        for (let i = 0; i < pairs.length; i++) {
+          const { bodyA, bodyB } = pairs[i];
+          const ballA = bodyA.gameBall;
+          const ballB = bodyB.gameBall;
+
+          // Check if either body is a bomb
+          if ((ballA && ballA.isBomb) || (ballB && ballB.isBomb)) {
+            triggerBombDetonation(ballA && ballA.isBomb ? bodyA : bodyB);
+            continue;
+          }
+
+          // Identical level merge rule (Level 1 to 9 merging into higher tier)
+          if (ballA && ballB && !ballA.isBomb && !ballB.isBomb) {
+            if (ballA.level === ballB.level && !ballA.isMerging && !ballB.isMerging) {
+              if (ballA.level < 10) {
+                ballA.isMerging = true;
+                ballB.isMerging = true;
+                executeMerge(bodyA, bodyB, ballA.level);
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function executeMerge(bodyA, bodyB, currentLvl) {
+      const nextLvl = currentLvl + 1;
+      const targetTier = BALL_TIERS[nextLvl - 1];
+
+      // Midpoint coordinate
+      const midX = (bodyA.position.x + bodyB.position.x) / 2;
+      const midY = (bodyA.position.y + bodyB.position.y) / 2;
+
+      // Remove previous bodies
+      Composite.remove(world, bodyA);
+      Composite.remove(world, bodyB);
+
+      // Create upgraded ball
+      const newBallBody = createBallBody(midX, midY, nextLvl, false);
+      World.add(world, newBallBody);
+
+      // Score bonus
+      addScore(targetTier.score);
+      AudioController.playMerge(nextLvl);
+
+      // Frenzy mode: +5 seconds bonus
+      if (currentMode === 'frenzy') {
+        frenzyTimeRemaining += 5;
+        document.getElementById('timeDisplay').innerText = `${frenzyTimeRemaining}s`;
+        spawnFloatingText(midX, midY - 20, '+5s', '#2e7d32');
+      }
+
+      spawnFloatingText(midX, midY, `+${targetTier.score}`, '#5E4A3F');
+      spawnMergeSparks(midX, midY, targetTier.color);
+    }
+
+    function triggerBombDetonation(bombBody) {
+      if (bombBody.detonated) return;
+      bombBody.detonated = true;
+
+      const posX = bombBody.position.x;
+      const posY = bombBody.position.y;
+
+      Composite.remove(world, bombBody);
+      AudioController.playBomb();
+
+      // Find nearby bodies within blast radius
+      const allBodies = Composite.allBodies(world);
+      const toRemove = [];
+
+      allBodies.forEach(b => {
+        if (!b.isStatic && b.gameBall && b !== bombBody) {
+          const dx = b.position.x - posX;
+          const dy = b.position.y - posY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < BOMB_BLAST_RADIUS) {
+            toRemove.push(b);
+          } else if (dist < BOMB_BLAST_RADIUS * 1.5) {
+            // Apply push impulse to surrounding balls
+            const forceMag = (1 - dist / (BOMB_BLAST_RADIUS * 1.5)) * 0.05;
+            Body.applyForce(b, b.position, {
+              x: (dx / dist) * forceMag,
+              y: (dy / dist) * forceMag - 0.02
+            });
+          }
+        }
+      });
+
+      toRemove.forEach(b => {
+        Composite.remove(world, b);
+        addScore(10);
+      });
+
+      // Visual blast circle and notification
+      activeEffects.push({
+        type: 'shockwave',
+        x: posX,
+        y: posY,
+        radius: 10,
+        maxRadius: BOMB_BLAST_RADIUS,
+        alpha: 0.9
+      });
+      spawnFloatingText(posX, posY - 25, 'BOOM!', '#B85348');
+    }
+
+    function createBallBody(x, y, level, isBomb = false) {
+      let radius = isBomb ? BOMB_RADIUS : BALL_TIERS[level - 1].radius;
+      
+      const body = Bodies.circle(x, y, radius, {
+        restitution: 0.22,
+        friction: 0.18,
+        density: 0.0012 + (level * 0.0003),
+        label: isBomb ? 'bomb' : `ball_${level}`
+      });
+
+      body.gameBall = {
+        level: level,
+        isBomb: isBomb,
+        isMerging: false,
+        radius: radius,
+        createdAt: Date.now()
+      };
+
+      return body;
+    }
+
+    function rollNextBallQueue() {
+      // In Frenzy mode, 10% chance of spawning a bomb ball
+      if (currentMode === 'frenzy' && Math.random() < 0.11) {
+        nextIsBomb = true;
+        nextBallLevel = 1;
+      } else {
+        nextIsBomb = false;
+        // Normal drop generates level 1 to 4
+        nextBallLevel = Math.floor(Math.random() * 4) + 1;
+      }
+      updateNextBallPreview();
+    }
+
+    function updateNextBallPreview() {
+      const nextText = document.getElementById('nextBallText');
+      if (nextIsBomb) {
+        nextText.innerText = '💣 Bom';
+        nextText.style.color = '#B85348';
+      } else {
+        nextText.innerText = `#${nextBallLevel} (${BALL_TIERS[nextBallLevel - 1].cm} cm)`;
+        nextText.style.color = 'var(--primary-brown)';
+      }
+    }
+
+    function dropActiveBall() {
+      if (!canDrop || isGameOver) return;
+
+      const arena = ARENA_CONFIGS[currentArenaKey];
+      const radius = currentIsBomb ? BOMB_RADIUS : BALL_TIERS[currentBallLevel - 1].radius;
+      const clampedX = Math.max(radius + 2, Math.min(arena.width - radius - 2, dropX));
+      const dropY = 45;
+
+      const ballBody = createBallBody(clampedX, dropY, currentBallLevel, currentIsBomb);
+      World.add(world, ballBody);
+
+      AudioController.playDrop();
+
+      canDrop = false;
+      dropCooldownTimer = Date.now() + DROP_COOLDOWN;
+
+      // Transfer next ball to current slot and generate next
+      currentBallLevel = nextBallLevel;
+      currentIsBomb = nextIsBomb;
+      rollNextBallQueue();
+
+      setTimeout(() => {
+        canDrop = true;
+      }, DROP_COOLDOWN);
+    }
+
+    function clampDropPosition() {
+      const arena = ARENA_CONFIGS[currentArenaKey];
+      const radius = currentIsBomb ? BOMB_RADIUS : BALL_TIERS[currentBallLevel - 1].radius;
+      dropX = Math.max(radius + 4, Math.min(arena.width - radius - 4, dropX));
+    }
+
+    function addScore(pts) {
+      score += pts;
+      document.getElementById('scoreDisplay').innerText = score;
+      if (score > highScore) {
+        highScore = score;
+        document.getElementById('highScoreDisplay').innerText = highScore;
+        localStorage.setItem('merge_high_score', highScore.toString());
+      }
+    }
+
+    function checkDeadlineStatus(dt) {
+      if (isGameOver) return;
+      const allBodies = Composite.allBodies(world);
+      let isTouchingDeadLine = false;
+
+      for (let i = 0; i < allBodies.length; i++) {
+        const b = allBodies[i];
+        if (!b.isStatic && b.gameBall) {
+          // Hanya hitung bola yang sudah dilepas lebih dari 1.2 detik
+          if (Date.now() - b.gameBall.createdAt > 1200) {
+            if (b.position.y - b.gameBall.radius < DEAD_LINE_Y) {
+              isTouchingDeadLine = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (isTouchingDeadLine) {
+        deadLineOverflowTime += dt;
+        if (deadLineOverflowTime >= OVERFLOW_LIMIT_MS) {
+          endGame('Arena Penuh!');
+        }
+      } else {
+        deadLineOverflowTime = Math.max(0, deadLineOverflowTime - dt * 1.5);
+      }
+    }
+
+    function startFrenzyTimer() {
+      clearInterval(frenzyTimerInterval);
+      frenzyTimeRemaining = 60;
+      document.getElementById('timeDisplay').innerText = `${frenzyTimeRemaining}s`;
+
+      frenzyTimerInterval = setInterval(() => {
+        if (isGameOver) return;
+        frenzyTimeRemaining--;
+        document.getElementById('timeDisplay').innerText = `${frenzyTimeRemaining}s`;
+
+        if (frenzyTimeRemaining <= 0) {
+          endGame('Waktu Habis!');
+        }
+      }, 1000);
+    }
+
+    function endGame(reason) {
+      isGameOver = true;
+      clearInterval(frenzyTimerInterval);
+      AudioController.playGameOver();
+
+      const overlay = document.getElementById('gameOverOverlay');
+      document.getElementById('overlayTitle').innerText = reason;
+      document.getElementById('overlayScoreText').innerText = `Skor Akhir: ${score}`;
+      overlay.classList.add('active');
+    }
+
+    function restartGame() {
+      isGameOver = false;
+      score = 0;
+      deadLineOverflowTime = 0;
+      document.getElementById('scoreDisplay').innerText = '0';
+      document.getElementById('gameOverOverlay').classList.remove('active');
+
+      initPhysics();
+
+      currentBallLevel = 1;
+      currentIsBomb = false;
+      rollNextBallQueue();
+
+      if (currentMode === 'frenzy') {
+        startFrenzyTimer();
+      } else {
+        clearInterval(frenzyTimerInterval);
+      }
+    }
+
+    function render() {
+      const arena = ARENA_CONFIGS[currentArenaKey];
+      ctx.clearRect(0, 0, arena.width, arena.height);
+
+      // Draw deadline dashed line
+      ctx.save();
+      const warningRatio = deadLineOverflowTime / OVERFLOW_LIMIT_MS;
+      ctx.strokeStyle = warningRatio > 0 ? `rgba(184, 83, 72, ${0.4 + warningRatio * 0.6})` : '#D7C9BA';
+      ctx.lineWidth = warningRatio > 0 ? 2.5 : 1.5;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(10, DEAD_LINE_Y);
+      ctx.lineTo(arena.width - 10, DEAD_LINE_Y);
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw drop guide and preview ball at top
+      if (!isGameOver) {
+        renderDropPreview(arena);
+      }
+
+      // Draw all physics bodies
+      const allBodies = Composite.allBodies(world);
+      allBodies.forEach(body => {
+        if (!body.isStatic && body.gameBall) {
+          drawGameBall(body);
+        }
+      });
+
+      // Draw dynamic visual effects (text, shockwaves)
+      renderEffects();
+
+      requestAnimationFrame(render);
+    }
+
+    function renderDropPreview(arena) {
+      const radius = currentIsBomb ? BOMB_RADIUS : BALL_TIERS[currentBallLevel - 1].radius;
+      const clampedX = Math.max(radius + 4, Math.min(arena.width - radius - 4, dropX));
+      const dropY = 45;
+
+      // Vertical aiming dashed line
+      ctx.save();
+      ctx.strokeStyle = 'rgba(94, 74, 63, 0.22)';
+      ctx.setLineDash([4, 5]);
+      ctx.beginPath();
+      ctx.moveTo(clampedX, dropY + radius);
+      ctx.lineTo(clampedX, arena.height - 10);
+      ctx.stroke();
+      ctx.restore();
+
+      // Preview ball
+      if (currentIsBomb) {
+        drawBombCircle(clampedX, dropY, BOMB_RADIUS, 0, canDrop ? 0.95 : 0.4);
+      } else {
+        drawBallCircle(clampedX, dropY, radius, currentBallLevel, 0, canDrop ? 0.95 : 0.4);
+      }
+    }
+
+    function drawGameBall(body) {
+      const { x, y } = body.position;
+      const angle = body.angle;
+      const { level, isBomb, radius } = body.gameBall;
+
+      if (isBomb) {
+        drawBombCircle(x, y, radius, angle, 1);
+      } else {
+        drawBallCircle(x, y, radius, level, angle, 1);
+      }
+    }
+
+    function drawBallCircle(x, y, radius, level, angle, alpha) {
+      const tier = BALL_TIERS[level - 1];
+      const customImg = CustomImageStore.getImage(level);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Ball shadow
+      ctx.shadowColor = 'rgba(94, 74, 63, 0.12)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 2;
+
+      // Circle clipping mask
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fillStyle = tier.color;
+      ctx.fill();
+
+      // Reset shadow for inner graphics
+      ctx.shadowColor = 'transparent';
+
+      if (customImg && customImg.complete && customImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.clip();
+        ctx.drawImage(customImg, -radius, -radius, radius * 2, radius * 2);
+        ctx.restore();
+      }
+
+      // Ball outer paper border
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#5E4A3F';
+      ctx.stroke();
+
+      // Level number badge in center
+      ctx.fillStyle = '#5E4A3F';
+      ctx.beginPath();
+      const badgeR = Math.max(7, Math.min(14, radius * 0.35));
+      ctx.arc(0, 0, badgeR, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(253, 252, 250, 0.88)';
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#5E4A3F';
+      ctx.font = `700 ${badgeR * 1.1}px var(--font-main)`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(tier.label, 0, 1);
+
+      ctx.restore();
+    }
+
+    function drawBombCircle(x, y, radius, angle, alpha) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      // Bomb body
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#4A3E3D';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#B85348';
+      ctx.stroke();
+
+      // Bomb fuse & flame icon
+      ctx.fillStyle = '#FAF6F0';
+      ctx.font = `${radius * 1.1}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('💣', 0, 0);
+
+      ctx.restore();
+    }
+
+    function spawnFloatingText(x, y, text, color) {
+      activeEffects.push({
+        type: 'text',
+        x: x,
+        y: y,
+        text: text,
+        color: color,
+        alpha: 1,
+        vy: -1.2,
+        life: 0
+      });
+    }
+
+    function spawnMergeSparks(x, y, color) {
+      for (let i = 0; i < 7; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 1.2 + Math.random() * 2.5;
+        activeEffects.push({
+          type: 'spark',
+          x: x,
+          y: y,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          color: color,
+          alpha: 1,
+          radius: 2 + Math.random() * 2.5
+        });
+      }
+    }
+
+    function renderEffects() {
+      for (let i = activeEffects.length - 1; i >= 0; i--) {
+        const ef = activeEffects[i];
+
+        if (ef.type === 'text') {
+          ef.y += ef.vy;
+          ef.alpha -= 0.022;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, ef.alpha);
+          ctx.font = '700 14px var(--font-main)';
+          ctx.fillStyle = ef.color;
+          ctx.textAlign = 'center';
+          ctx.fillText(ef.text, ef.x, ef.y);
+          ctx.restore();
+
+          if (ef.alpha <= 0) activeEffects.splice(i, 1);
+        } else if (ef.type === 'spark') {
+          ef.x += ef.vx;
+          ef.y += ef.vy;
+          ef.alpha -= 0.035;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, ef.alpha);
+          ctx.fillStyle = ef.color;
+          ctx.beginPath();
+          ctx.arc(ef.x, ef.y, ef.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          if (ef.alpha <= 0) activeEffects.splice(i, 1);
+        } else if (ef.type === 'shockwave') {
+          ef.radius += 6;
+          ef.alpha -= 0.04;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, ef.alpha);
+          ctx.strokeStyle = '#B85348';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(ef.x, ef.y, ef.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+
+          if (ef.alpha <= 0 || ef.radius >= ef.maxRadius) activeEffects.splice(i, 1);
+        }
+      }
+    }
+
+    function attachInputHandlers() {
+      function updatePointerX(clientX) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        dropX = (clientX - rect.left) * scaleX;
+        clampDropPosition();
+      }
+
+      canvas.addEventListener('mousemove', (e) => {
+        updatePointerX(e.clientX);
+      });
+
+      canvas.addEventListener('click', (e) => {
+        updatePointerX(e.clientX);
+        dropActiveBall();
+      });
+
+      canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 0) {
+          updatePointerX(e.touches[0].clientX);
+        }
+        e.preventDefault();
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', (e) => {
+        dropActiveBall();
+        e.preventDefault();
+      }, { passive: false });
+    }
+
+    const customModal = document.getElementById('customModal');
+    const customItemsList = document.getElementById('customItemsList');
+    const fileUploader = document.getElementById('fileUploader');
+    let uploadingTargetLevel = null;
+
+    function buildCustomizationUI() {
+      customItemsList.innerHTML = '';
+
+      BALL_TIERS.forEach(tier => {
+        const item = document.createElement('div');
+        item.className = 'custom-item';
+
+        const customSrc = CustomImageStore.images[tier.level];
+        const previewStyle = customSrc ? `background-image: url(${customSrc});` : `background-color: ${tier.color};`;
+
+        item.innerHTML = `
+          <div class="ball-preview-thumb" id="thumb_${tier.level}" style="${previewStyle}">
+            ${customSrc ? '' : tier.label}
+          </div>
+          <div class="custom-meta">
+            <span>Bola ${tier.label}</span>
+            <small>Diameter: ${tier.cm} cm</small>
+            <div class="custom-actions">
+              <button class="mini-btn" onclick="triggerUpload(${tier.level})">Pilih Gambar</button>
+              ${customSrc ? `<button class="mini-btn" onclick="removeBallImage(${tier.level})">Reset</button>` : ''}
+            </div>
+          </div>
+        `;
+        customItemsList.appendChild(item);
+      });
+    }
+
+    window.triggerUpload = function(level) {
+      uploadingTargetLevel = level;
+      fileUploader.value = '';
+      fileUploader.click();
+    };
+
+    window.removeBallImage = function(level) {
+      CustomImageStore.removeImage(level);
+      buildCustomizationUI();
+    };
+
+    fileUploader.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file || !uploadingTargetLevel) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const img = new Image();
+        img.onload = () => {
+          // Normalisasi gambar menjadi rasio persegi 256x256
+          const offCanvas = document.createElement('canvas');
+          offCanvas.width = 256;
+          offCanvas.height = 256;
+          const offCtx = offCanvas.getContext('2d');
+
+          const minDim = Math.min(img.width, img.height);
+          const sx = (img.width - minDim) / 2;
+          const sy = (img.height - minDim) / 2;
+
+          offCtx.drawImage(img, sx, sy, minDim, minDim, 0, 0, 256, 256);
+          const dataUrl = offCanvas.toDataURL('image/png', 0.85);
+
+          CustomImageStore.saveImage(uploadingTargetLevel, dataUrl);
+          buildCustomizationUI();
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('openCustomBtn').addEventListener('click', () => {
+      buildCustomizationUI();
+      customModal.classList.add('open');
+    });
+
+    document.getElementById('closeCustomBtn').addEventListener('click', () => {
+      customModal.classList.remove('open');
+    });
+
+    document.getElementById('saveCustomDoneBtn').addEventListener('click', () => {
+      customModal.classList.remove('open');
+    });
+
+    document.getElementById('resetAllCustomBtn').addEventListener('click', () => {
+      CustomImageStore.resetAll();
+      buildCustomizationUI();
+    });
+
+    // Mode Switcher (Normal / Frenzy)
+    document.querySelectorAll('#modeSelector .segment-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#modeSelector .segment-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMode = btn.dataset.mode;
+
+        const timeBox = document.getElementById('frenzyTimeContainer');
+        const bonusNotice = document.getElementById('frenzyBonusNotice');
+
+        if (currentMode === 'frenzy') {
+          timeBox.style.display = 'block';
+          bonusNotice.style.display = 'inline';
+        } else {
+          timeBox.style.display = 'none';
+          bonusNotice.style.display = 'none';
+        }
+        restartGame();
+      });
+    });
+
+    // Arena Switcher (Mudah / Sedang / Sulit)
+    document.querySelectorAll('#arenaSelector .segment-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#arenaSelector .segment-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentArenaKey = btn.dataset.arena;
+        setupArenaBounds();
+      });
+    });
+
+    // Audio Mute Toggle
+    document.getElementById('toggleAudioBtn').addEventListener('click', () => {
+      const isMuted = AudioController.toggleMute();
+      document.getElementById('audioIcon').innerText = isMuted ? '🔇' : '🔊';
+    });
+
+    // Restart Triggers
+    document.getElementById('restartBtn').addEventListener('click', restartGame);
+    document.getElementById('overlayRestartBtn').addEventListener('click', restartGame);
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('highScoreDisplay').innerText = highScore;
+
+      initPhysics();
+      attachInputHandlers();
+      rollNextBallQueue();
+
+      // Step physics engine at 60 FPS
+      let lastTime = performance.now();
+      function physicsLoop(now) {
+        const dt = Math.min(32, now - lastTime);
+        lastTime = now;
+
+        if (!isGameOver) {
+          Engine.update(engine, dt);
+          checkDeadlineStatus(dt);
+        }
+        requestAnimationFrame(physicsLoop);
+      }
+
+      requestAnimationFrame(physicsLoop);
+      requestAnimationFrame(render);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Petualangan Labirin</title>
+    <!-- Tailwind CSS untuk styling cepat -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome untuk ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            touch-action: none; /* Mencegah zoom/scroll pada mobile saat bermain */
+            background-color: #1a1a2e;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        #game-canvas {
+            background-color: #16213e;
+            border: 4px solid #0f3460;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            image-rendering: pixelated;
+        }
+
+        .btn-control {
+            background: #0f3460;
+            border: 2px solid #533483;
+            color: white;
+            border-radius: 12px;
+            touch-action: manipulation;
+            transition: transform 0.1s;
+        }
+
+        .btn-control:active {
+            transform: scale(0.95);
+            background: #16213e;
+        }
+
+        /* Modal Overlay Styles */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            backdrop-filter: blur(5px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center">
+
+    <!-- Header UI -->
+    <div class="w-full max-w-lg flex justify-between items-center p-4 absolute top-0 z-10">
+        <div class="text-yellow-400 pixel-font text-xs md:text-sm">
+            LVL: <span id="level-display">1</span>
+        </div>
+        <h1 class="text-xl md:text-2xl font-bold tracking-wider text-purple-400 pixel-font text-center shadow-text">LABIRIN</h1>
+        <div class="text-red-400 pixel-font text-xs md:text-sm">
+            <i class="fas fa-clock mr-1"></i> <span id="timer-display">--</span>
+        </div>
+    </div>
+
+    <!-- Canvas Container -->
+    <div class="relative flex items-center justify-center">
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- Mobile Controls (D-Pad) -->
+    <div class="md:hidden w-full max-w-xs mt-4 grid grid-cols-3 gap-2 px-6 pb-4 z-10">
+        <div></div>
+        <button class="btn-control h-14 text-2xl" id="btn-up"><i class="fas fa-arrow-up"></i></button>
+        <div></div>
+        <button class="btn-control h-14 text-2xl" id="btn-left"><i class="fas fa-arrow-left"></i></button>
+        <button class="btn-control h-14 text-2xl" id="btn-down"><i class="fas fa-arrow-down"></i></button>
+        <button class="btn-control h-14 text-2xl" id="btn-right"><i class="fas fa-arrow-right"></i></button>
+    </div>
+
+    <div class="hidden md:block mt-4 text-gray-500 text-sm">
+        Gunakan tombol PANAH atau WASD untuk bergerak
+    </div>
+
+    <!-- MAIN MENU OVERLAY -->
+    <div id="menu-overlay" class="overlay">
+        <h1 class="text-3xl md:text-5xl text-yellow-400 mb-8 pixel-font text-center leading-tight">PETUALANGAN<br>LABIRIN</h1>
+        <p class="text-gray-300 mb-6 text-center px-4">Cari jalan keluar dan capai trofi <span class="text-yellow-300">🏆</span> sebelum waktu habis!</p>
+        
+        <div class="flex flex-col gap-4 w-64">
+            <button onclick="startGame('easy')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded border-b-4 border-green-800 active:border-green-600 active:translate-y-1 transition-all">
+                Mudah (60 Detik)
+            </button>
+            <button onclick="startGame('medium')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded border-b-4 border-blue-800 active:border-blue-600 active:translate-y-1 transition-all">
+                Sedang (30 Detik)
+            </button>
+            <button onclick="startGame('hard')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded border-b-4 border-red-800 active:border-red-600 active:translate-y-1 transition-all">
+                Susah (15 Detik)
+            </button>
+        </div>
+    </div>
+
+    <!-- RESULT OVERLAY -->
+    <div id="result-overlay" class="overlay hidden">
+        <h2 id="result-title" class="text-4xl pixel-font mb-4 text-white">GAMEOVER</h2>
+        <p id="result-message" class="text-lg text-gray-300 mb-8 text-center px-4">Waktu habis!</p>
+        <button onclick="showMenu()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">
+            <i class="fas fa-home mr-2"></i> Menu Utama
+        </button>
+    </div>
+
+    <script>
+        // --- KONFIGURASI GAME ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Warna
+        const COLORS = {
+            wall: '#00d4ff', 
+            floor: '#16213e',
+            player: '#ffffff',
+            goal: '#f72585',
+            visited: '#1a1a2e'
+        };
+
+        // State Game Global
+        let gameState = {
+            mode: 'menu', // menu, playing, gameover, win
+            difficulty: 'easy',
+            timeLeft: 0,
+            timerInterval: null,
+            cols: 15, // Ukuran grid
+            rows: 15,
+            cellSize: 0,
+            maze: [],
+            player: { x: 0, y: 0 },
+            goal: { x: 0, y: 0 },
+            level: 1
+        };
+
+        // --- SETUP KANVAS ---
+        function resizeCanvas() {
+            // Mengatur ukuran canvas agar responsif tapi tetap kotak atau sesuai aspek rasio
+            let size = Math.min(window.innerWidth - 40, window.innerHeight - 200);
+            // Batasi ukuran maksimal desktop
+            if (size > 500) size = 500;
+            
+            // Pastikan ukuran kelipatan jumlah kolom agar rendering tajam
+            gameState.cellSize = Math.floor(size / gameState.cols);
+            canvas.width = gameState.cellSize * gameState.cols;
+            canvas.height = gameState.cellSize * gameState.rows;
+            
+            if (gameState.mode === 'playing') draw();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- ALGORITMA PEMBUAT LABIRIN (Recursive Backtracker) ---
+        class Cell {
+            constructor(c, r) {
+                this.c = c;
+                this.r = r;
+                this.walls = { top: true, right: true, bottom: true, left: true };
+                this.visited = false;
+            }
+
+            // Mendapatkan index tetangga yang valid
+            checkNeighbors(grid, cols, rows) {
+                let neighbors = [];
+                let top    = grid[index(this.c, this.r - 1, cols, rows)];
+                let right  = grid[index(this.c + 1, this.r, cols, rows)];
+                let bottom = grid[index(this.c, this.r + 1, cols, rows)];
+                let left   = grid[index(this.c - 1, this.r, cols, rows)];
+
+                if (top && !top.visited) neighbors.push(top);
+                if (right && !right.visited) neighbors.push(right);
+                if (bottom && !bottom.visited) neighbors.push(bottom);
+                if (left && !left.visited) neighbors.push(left);
+
+                if (neighbors.length > 0) {
+                    let r = Math.floor(Math.random() * neighbors.length);
+                    return neighbors[r];
+                } else {
+                    return undefined;
+                }
+            }
+        }
+
+        function index(c, r, cols, rows) {
+            if (c < 0 || r < 0 || c >= cols || r >= rows) return -1;
+            return c + r * cols;
+        }
+
+        function generateMaze() {
+            gameState.maze = [];
+            for (let r = 0; r < gameState.rows; r++) {
+                for (let c = 0; c < gameState.cols; c++) {
+                    gameState.maze.push(new Cell(c, r));
+                }
+            }
+
+            let current = gameState.maze[0];
+            current.visited = true;
+            let stack = [];
+
+            // Loop sampai stack kosong
+            while (true) {
+                let next = current.checkNeighbors(gameState.maze, gameState.cols, gameState.rows);
+                if (next) {
+                    next.visited = true;
+                    stack.push(current);
+                    removeWalls(current, next);
+                    current = next;
+                } else if (stack.length > 0) {
+                    current = stack.pop();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        function removeWalls(a, b) {
+            let x = a.c - b.c;
+            if (x === 1) { a.walls.left = false; b.walls.right = false; }
+            else if (x === -1) { a.walls.right = false; b.walls.left = false; }
+            
+            let y = a.r - b.r;
+            if (y === 1) { a.walls.top = false; b.walls.bottom = false; }
+            else if (y === -1) { a.walls.bottom = false; b.walls.top = false; }
+        }
+
+        // --- LOGIKA GAME ---
+        
+        // Helper untuk mendapatkan waktu berdasarkan kesulitan
+        function getInitialTime(difficulty) {
+            if (difficulty === 'easy') return 60;
+            if (difficulty === 'medium') return 30;
+            if (difficulty === 'hard') return 15;
+            return 60;
+        }
+
+        function startGame(difficulty) {
+            gameState.mode = 'playing';
+            gameState.difficulty = difficulty;
+            gameState.level = 1;
+            
+            // Setup Timer Updated
+            clearInterval(gameState.timerInterval);
+            gameState.timeLeft = getInitialTime(difficulty);
+            
+            document.getElementById('menu-overlay').classList.add('hidden');
+            document.getElementById('result-overlay').classList.add('hidden');
+            
+            updateUI();
+            startLevel();
+            
+            // Timer selalu aktif sekarang
+            gameState.timerInterval = setInterval(() => {
+                gameState.timeLeft--;
+                updateUI();
+                if (gameState.timeLeft <= 0) {
+                    endGame(false, "Waktu Habis!");
+                }
+            }, 1000);
+        }
+
+        function startLevel() {
+            // Set grid size sedikit lebih besar di mode susah jika mau, tapi kita tetapkan standar
+            gameState.cols = 10 + Math.floor(gameState.level / 2);
+            gameState.rows = 10 + Math.floor(gameState.level / 2);
+            if(gameState.cols > 20) gameState.cols = 20; // Batas max
+            if(gameState.rows > 20) gameState.rows = 20;
+
+            resizeCanvas();
+            generateMaze();
+            
+            // Posisi Pemain
+            gameState.player = { x: 0, y: 0 };
+            
+            // Posisi Goal (Pojok Kanan Bawah)
+            gameState.goal = { x: gameState.cols - 1, y: gameState.rows - 1 };
+
+            draw();
+            document.getElementById('level-display').innerText = gameState.level;
+        }
+
+        function showMenu() {
+            gameState.mode = 'menu';
+            clearInterval(gameState.timerInterval);
+            document.getElementById('result-overlay').classList.add('hidden');
+            document.getElementById('menu-overlay').classList.remove('hidden');
+        }
+
+        function endGame(win, message) {
+            gameState.mode = win ? 'win' : 'gameover';
+            clearInterval(gameState.timerInterval);
+            
+            const overlay = document.getElementById('result-overlay');
+            const title = document.getElementById('result-title');
+            const msg = document.getElementById('result-message');
+            
+            overlay.classList.remove('hidden');
+            
+            if (win) {
+                // Next Level Logic
+                title.innerText = "HEBAT!";
+                title.className = "text-4xl pixel-font mb-4 text-green-400";
+                msg.innerHTML = `Level ${gameState.level} Selesai!<br>Lanjut ke level berikutnya...`;
+                
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    gameState.level++;
+                    
+                    // PERBAIKAN BUG TIMER: Reset penuh waktu berdasarkan kesulitan
+                    // Agar setiap level dimulai dengan waktu yang adil
+                    gameState.timeLeft = getInitialTime(gameState.difficulty);
+                    
+                    // Opsional: Jika ingin memberi sedikit toleransi waktu tambahan untuk level tinggi (karena map makin besar)
+                    // bisa uncomment baris di bawah ini:
+                    // gameState.timeLeft += Math.floor((gameState.level - 1) * 2);
+
+                    gameState.mode = 'playing';
+                    
+                    // Restart timer dengan waktu yang sudah di-reset
+                    gameState.timerInterval = setInterval(() => {
+                        gameState.timeLeft--;
+                        updateUI();
+                        if (gameState.timeLeft <= 0) endGame(false, "Waktu Habis!");
+                    }, 1000);
+                    
+                    startLevel();
+                }, 2000);
+            } else {
+                // Game Over sungguhan
+                title.innerText = "GAME OVER";
+                title.className = "text-4xl pixel-font mb-4 text-red-500";
+                msg.innerText = message || "Kamu gagal mencapai tujuan.";
+            }
+        }
+
+        function updateUI() {
+            const timerEl = document.getElementById('timer-display');
+            timerEl.innerText = gameState.timeLeft + "s";
+            if (gameState.timeLeft <= 10) {
+                timerEl.parentElement.className = "text-red-500 pixel-font text-xs md:text-sm animate-pulse";
+            } else {
+                timerEl.parentElement.className = "text-white pixel-font text-xs md:text-sm";
+            }
+        }
+
+        function movePlayer(dx, dy) {
+            if (gameState.mode !== 'playing') return;
+
+            const cx = gameState.player.x;
+            const cy = gameState.player.y;
+            const currentCell = gameState.maze[index(cx, cy, gameState.cols, gameState.rows)];
+
+            // Cek Dinding
+            let canMove = false;
+            if (dx === 0 && dy === -1 && !currentCell.walls.top) canMove = true;
+            if (dx === 1 && dy === 0 && !currentCell.walls.right) canMove = true;
+            if (dx === 0 && dy === 1 && !currentCell.walls.bottom) canMove = true;
+            if (dx === -1 && dy === 0 && !currentCell.walls.left) canMove = true;
+
+            if (canMove) {
+                gameState.player.x += dx;
+                gameState.player.y += dy;
+                checkEvents();
+                draw();
+            }
+        }
+
+        function checkEvents() {
+            // Cek Menang
+            if (gameState.player.x === gameState.goal.x && gameState.player.y === gameState.goal.y) {
+                endGame(true);
+                return;
+            }
+        }
+
+        // --- RENDERING ---
+        function draw() {
+            // Bersihkan
+            ctx.fillStyle = COLORS.floor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const cs = gameState.cellSize;
+            const maze = gameState.maze;
+
+            // 1. Gambar Dinding
+            ctx.strokeStyle = COLORS.wall;
+            ctx.lineWidth = 2; // Tebalkan dinding sedikit
+            ctx.lineCap = "square"; // Ganti ke square agar sudut lebih tegas
+
+            for (let i = 0; i < maze.length; i++) {
+                let cell = maze[i];
+                let x = cell.c * cs;
+                let y = cell.r * cs;
+
+                ctx.beginPath();
+                if (cell.walls.top) { ctx.moveTo(x, y); ctx.lineTo(x + cs, y); }
+                if (cell.walls.right) { ctx.moveTo(x + cs, y); ctx.lineTo(x + cs, y + cs); }
+                if (cell.walls.bottom) { ctx.moveTo(x + cs, y + cs); ctx.lineTo(x, y + cs); }
+                if (cell.walls.left) { ctx.moveTo(x, y + cs); ctx.lineTo(x, y); }
+                ctx.stroke();
+            }
+
+            // 3. Gambar Goal - Trofi
+            ctx.font = `${cs * 0.7}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("🏆", gameState.goal.x * cs + cs/2, gameState.goal.y * cs + cs/2 + 2);
+
+            // 4. Gambar Player - Emoji Lari atau Kotak
+            ctx.font = `${cs * 0.65}px Arial`;
+            ctx.fillText("😎", gameState.player.x * cs + cs/2, gameState.player.y * cs + cs/2 + 2);
+        }
+
+        // --- INPUT HANDLERS ---
+
+        // Keyboard
+        window.addEventListener('keydown', (e) => {
+            if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].indexOf(e.code) > -1) {
+                e.preventDefault();
+            }
+            
+            switch (e.key) {
+                case 'ArrowUp': case 'w': case 'W': movePlayer(0, -1); break;
+                case 'ArrowRight': case 'd': case 'D': movePlayer(1, 0); break;
+                case 'ArrowDown': case 's': case 'S': movePlayer(0, 1); break;
+                case 'ArrowLeft': case 'a': case 'A': movePlayer(-1, 0); break;
+            }
+        });
+
+        // Touch Buttons
+        const btnUp = document.getElementById('btn-up');
+        const btnDown = document.getElementById('btn-down');
+        const btnLeft = document.getElementById('btn-left');
+        const btnRight = document.getElementById('btn-right');
+
+        // Gunakan touchstart untuk respons lebih cepat di mobile, click untuk fallback desktop
+        const addTouchClick = (elem, fn) => {
+            elem.addEventListener('touchstart', (e) => { e.preventDefault(); fn(); }, {passive: false});
+            elem.addEventListener('mousedown', (e) => { e.preventDefault(); fn(); });
+        };
+
+        addTouchClick(btnUp, () => movePlayer(0, -1));
+        addTouchClick(btnDown, () => movePlayer(0, 1));
+        addTouchClick(btnLeft, () => movePlayer(-1, 0));
+        addTouchClick(btnRight, () => movePlayer(1, 0));
+
+        // Init pertama kali (hanya untuk set ukuran)
+        resizeCanvas();
+
+    </script>
+</body>
+</html>

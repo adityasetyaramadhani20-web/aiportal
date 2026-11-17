@@ -1,0 +1,2506 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ShopSim</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            shopee: {
+              50: '#fef2f2',
+              100: '#fee2e2',
+              500: '#f97316',
+              600: '#ea580c',
+              primary: '#ee4d2d',
+              dark: '#d03b1d',
+              light: '#f53d2d',
+              subtle: '#fff5f1'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS for Logistics Tracking Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Font Awesome 6 Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Dexie.js for IndexedDB Offline Caching -->
+  <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .shopee-badge-mall {
+      background: linear-gradient(135deg, #d0011b 0%, #ee4d2d 100%);
+    }
+    .pulse-hub {
+      animation: hubPulse 2s infinite ease-in-out;
+    }
+    @keyframes hubPulse {
+      0% { transform: scale(0.95); opacity: 0.9; }
+      50% { transform: scale(1.35); opacity: 0; }
+      100% { transform: scale(0.95); opacity: 0; }
+    }
+    .scanner-line {
+      animation: scanAnim 2s infinite alternate ease-in-out;
+    }
+    @keyframes scanAnim {
+      0% { top: 10%; }
+      100% { top: 85%; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex justify-center min-h-screen antialiased selection:bg-shopee-primary selection:text-white">
+
+  <div id="appContainer" class="w-full max-w-md md:max-w-4xl lg:max-w-6xl bg-white min-h-screen shadow-2xl flex flex-col relative overflow-hidden md:flex-row">
+
+    <!-- Primary Screen Column -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
+
+      <!-- Top Marketplace Header (Shopee Style) -->
+      <header class="bg-shopee-primary text-white px-3.5 py-2.5 shadow-md flex flex-col gap-2 shrink-0 z-30">
+        <div class="flex items-center justify-between gap-2">
+          <!-- Logo & Geotag Target -->
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-white text-shopee-primary flex items-center justify-center font-black text-base shadow-sm">
+              <i class="fa-solid fa-bag-shopping"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-1.5">
+                <h1 class="text-base font-extrabold tracking-tight leading-tight">ShopSim</h1>
+                </div>
+              <p class="text-[11px] text-orange-100 flex items-center gap-1 cursor-pointer hover:underline" onclick="toggleGeotagModal()">
+                <i class="fa-solid fa-location-dot text-amber-300 text-[10px]"></i>
+                <span id="headerLocDisplay" class="truncate max-w-[140px] sm:max-w-xs">Pondok Indah, Jaksel</span>
+                <i class="fa-solid fa-chevron-down text-[8px]"></i>
+              </p>
+            </div>
+          </div>
+
+          <!-- Quick Actions & Simulation Control Pill -->
+          <div class="flex items-center gap-1.5">
+            <!-- Simulation Speed Controller -->
+            <button onclick="toggleSimSettingsModal()" class="bg-black/20 hover:bg-black/30 text-white text-[11px] px-2.5 py-1.5 rounded-full font-semibold flex items-center gap-1.5 transition">
+              <span id="headerSpeedIndicator" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span id="headerSpeedText">1x Speed</span>
+              <i class="fa-solid fa-sliders text-[10px]"></i>
+            </button>
+
+            <!-- Cart Trigger Button with badge -->
+            <button onclick="openCartModal()" class="relative p-2 rounded-full hover:bg-white/10 transition" title="Keranjang Belanja">
+              <i class="fa-solid fa-cart-shopping text-base"></i>
+              <span id="cartCountBadge" class="hidden absolute -top-1 -right-1 bg-white text-shopee-primary font-black text-[10px] w-4 h-4 rounded-full flex items-center justify-center shadow">0</span>
+            </button>
+
+            <!-- Seller Chat Trigger -->
+            <button onclick="openChatModal('seller')" class="relative p-2 rounded-full hover:bg-white/10 transition" title="Chat Penjual">
+              <i class="fa-regular fa-comment-dots text-base"></i>
+              <span id="chatSellerUnread" class="hidden absolute top-0 right-0 w-2 h-2 bg-amber-400 rounded-full"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Search Input Bar & ShopeePay Balance -->
+        <div class="flex items-center gap-2">
+          <div class="relative flex-1">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="productSearchInput" oninput="renderCatalogGrid()" placeholder="Cari headset gaming, kemeja, sneaker..."
+              class="w-full bg-white pl-8 pr-3 py-2 rounded-xl text-xs text-slate-800 focus:outline-none shadow-inner placeholder:text-slate-400" />
+          </div>
+          <!-- ShopSimPay Pill -->
+          <div onclick="openTopUpModal()" class="bg-white/15 hover:bg-white/25 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-orange-50 shrink-0">
+            <i class="fa-solid fa-wallet text-amber-300"></i>
+            <span id="shopSimPayBalance">Rp 500.000</span>
+            <i class="fa-solid fa-plus text-[9px] bg-white/20 p-0.5 rounded"></i>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content Viewport -->
+      <main class="flex-1 overflow-y-auto custom-scrollbar relative bg-slate-50 pb-20 md:pb-6" id="mainViewport">
+
+        <!-- TAB 1: Beranda & Katalog Shopee -->
+        <section id="catalogTab" class="p-3 sm:p-4 space-y-3.5">
+          <!-- Flash Sale Promotional Carousel Banner -->
+          <div class="bg-gradient-to-r from-shopee-primary via-orange-500 to-rose-600 rounded-2xl p-3.5 text-white shadow-sm flex items-center justify-between relative overflow-hidden">
+            <div class="space-y-1 z-10">
+              <div class="flex items-center gap-2">
+                <span class="bg-white text-shopee-primary text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                  <i class="fa-solid fa-bolt text-amber-500"></i> FLASH SALE
+                </span>
+                <div class="flex items-center gap-1 text-[11px] font-mono font-bold bg-black/20 px-2 py-0.5 rounded-lg">
+                  <span id="flashHours">02</span>:<span id="flashMinutes">45</span>:<span id="flashSeconds">19</span>
+                </div>
+              </div>
+              <h2 class="text-base sm:text-lg font-black leading-tight">Diskon Hingga 75% Hari Ini!</h2>
+              <p class="text-[11px] text-orange-100">Gratis ongkir tanpa minimum belanja ke seluruh simulator.</p>
+            </div>
+            <i class="fa-solid fa-tags text-6xl text-white/20 -rotate-12 absolute -right-3 -bottom-2 pointer-events-none"></i>
+          </div>
+
+          <!-- Quick Category Bar -->
+          <div class="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar text-xs font-semibold" id="categoryChips">
+            <!-- Populated via JavaScript -->
+          </div>
+
+          <!-- Sort Bar & Total Found -->
+          <div class="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-600 shadow-sm">
+            <div class="flex items-center gap-2 overflow-x-auto">
+              <span class="text-slate-400 font-medium">Urutkan:</span>
+              <button onclick="changeCatalogSort('popular')" id="sortPopular" class="font-bold text-shopee-primary">Terpopuler</button>
+              <button onclick="changeCatalogSort('cheapest')" id="sortCheapest" class="text-slate-600 hover:text-shopee-primary">Termurah</button>
+              <button onclick="changeCatalogSort('highest')" id="sortHighest" class="text-slate-600 hover:text-shopee-primary">Termahal</button>
+              <button onclick="changeCatalogSort('discount')" id="sortDiscount" class="text-slate-600 hover:text-shopee-primary">Diskon %</button>
+            </div>
+            <span id="catalogCountText" class="text-[11px] text-slate-400 hidden sm:inline">6 Produk</span>
+          </div>
+
+          <!-- Catalog Products Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3.5" id="productGridContainer">
+            <!-- Catalog Cards populated via JS -->
+          </div>
+        </section>
+
+        <!-- TAB 2: Live Tracking & Ekspedisi Logistik -->
+        <section id="trackingTab" class="hidden flex flex-col h-full bg-white">
+          <!-- Waybill Info Bar -->
+          <div class="p-3 bg-white border-b border-slate-200 shrink-0 flex flex-wrap items-center justify-between gap-2 shadow-sm z-10">
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-2">
+                <span class="bg-shopee-subtle text-shopee-primary border border-orange-200 text-[10px] font-extrabold px-2 py-0.5 rounded-full font-mono uppercase" id="trackingResiBadge">SPX-EXP-88910</span>
+                <span id="trackingStatusBadge" class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">Belum Ada Pengiriman</span>
+              </div>
+              <p class="text-xs font-bold text-slate-800 truncate" id="trackingHeadline">Lakukan checkout belanja untuk menyalakan simulasi rute antar-hub.</p>
+              <p class="text-[11px] text-slate-500 font-medium" id="trackingEtaText">Estimasi Waktu Sampai: --</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="recenterLogisticsMap()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center text-xs" title="Fokuskan Rute">
+                <i class="fa-solid fa-crosshairs"></i>
+              </button>
+              <button onclick="toggleGeotagModal()" class="px-2.5 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-shopee-primary text-xs font-bold flex items-center gap-1" title="Atur Pin Peta">
+                <i class="fa-solid fa-map-pin text-[11px]"></i> Geotag
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Leaflet Map -->
+          <div class="relative flex-1 min-h-[260px] w-full bg-slate-200">
+            <div id="logisticsMap" class="w-full h-full"></div>
+
+            <!-- Floating Multi-Stage Status Overlay -->
+            <div id="trackingOverlayCard" class="hidden absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur-md rounded-2xl p-3.5 shadow-xl border border-slate-100 z-[1000] space-y-2.5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                  <div class="w-10 h-10 rounded-full bg-orange-100 text-shopee-primary flex items-center justify-center font-bold text-base">
+                    <i id="overlayTransportIcon" class="fa-solid fa-truck-fast"></i>
+                  </div>
+                  <div>
+                    <h4 id="overlayCourierTitle" class="text-xs font-bold text-slate-800">SPX Express Reguler</h4>
+                    <p id="overlayCourierSubtitle" class="text-[11px] text-slate-500">Truk Logistik Armada #42 • Menuju DC Sortir</p>
+                  </div>
+                </div>
+                <button onclick="openChatModal('courier')" class="px-3 py-1.5 rounded-xl bg-shopee-primary hover:bg-shopee-dark text-white text-xs font-bold flex items-center gap-1.5 transition">
+                  <i class="fa-solid fa-comment-dots text-[11px]"></i> Chat Kurir
+                </button>
+              </div>
+
+              <!-- Animated Multi-Stage Timeline Bar -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[11px] font-semibold text-slate-600">
+                  <span id="overlayStageText">Paket dalam perjalanan...</span>
+                  <span id="overlayPercentText">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                  <div id="logisticsProgressBar" class="bg-shopee-primary h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tracking Waybill Timeline Log (Shopee Resi History) -->
+          <div class="h-44 sm:h-52 overflow-y-auto custom-scrollbar p-3.5 bg-slate-50 border-t border-slate-200 space-y-3 shrink-0">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-timeline text-shopee-primary"></i> Riwayat Pelacakan Paket
+            </h3>
+            <div id="timelineLogContainer" class="space-y-3 relative pl-4 border-l-2 border-slate-200 text-xs">
+              <!-- Logs inserted dynamically -->
+              <p class="text-slate-400 italic text-[11px]">Belum ada paket aktif yang terlacak.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: Riwayat Pesanan & Ulasan -->
+        <section id="ordersTab" class="hidden p-3.5 sm:p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="font-extrabold text-slate-800 text-base">Pesanan Saya</h2>
+              <p class="text-xs text-slate-500">Daftar transaksi, verifikasi bayar, dan rating produk.</p>
+            </div>
+            <button onclick="clearOrderHistory()" class="text-xs text-rose-500 font-semibold hover:underline">
+              Bersihkan Riwayat
+            </button>
+          </div>
+
+          <!-- Order Status Pills -->
+          <div class="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto text-xs font-semibold">
+            <button onclick="filterOrdersTab('all')" class="order-filter-btn text-shopee-primary border-b-2 border-shopee-primary pb-1" data-status="all">Semua</button>
+            <button onclick="filterOrdersTab('Dikirim')" class="order-filter-btn text-slate-500 hover:text-slate-800 pb-1" data-status="Dikirim">Dikirim</button>
+            <button onclick="filterOrdersTab('Selesai')" class="order-filter-btn text-slate-500 hover:text-slate-800 pb-1" data-status="Selesai">Selesai</button>
+          </div>
+
+          <!-- Order List Container -->
+          <div id="orderHistoryList" class="space-y-3">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </section>
+
+        <!-- TAB 4: Admin & Pengaturan Skenario -->
+        <section id="adminTab" class="hidden p-3.5 sm:p-4 space-y-4">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+            <div>
+              <h2 class="font-extrabold text-slate-800 text-base">Katalog & Manajemen Skenario</h2>
+              <p class="text-xs text-slate-500">Tambah produk, atur flash sale, ekspor skenario JSON.</p>
+            </div>
+            <button onclick="openProductFormModal()" class="bg-shopee-primary hover:bg-shopee-dark text-white text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Tambah Produk
+            </button>
+          </div>
+
+          <!-- Backup & Import Skenario Box -->
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Penyimpanan & Skenario Caching</h3>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <button onclick="exportScenarioJSON()" class="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold flex items-center justify-center gap-1.5 transition">
+                <i class="fa-solid fa-file-export text-shopee-primary"></i> Ekspor JSON
+              </button>
+              <label class="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer text-center transition">
+                <i class="fa-solid fa-file-import text-amber-600"></i> Impor JSON
+                <input type="file" id="importScenarioInput" onchange="importScenarioJSON(event)" accept=".json" class="hidden" />
+              </label>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="restoreDefaultCatalog()" class="flex-1 text-xs text-slate-600 hover:text-shopee-primary py-1.5 font-semibold bg-slate-50 rounded-xl border border-slate-200 transition">
+                <i class="fa-solid fa-rotate-left mr-1"></i> Pulihkan Produk Default
+              </button>
+              <button onclick="resetShopSimDatabase()" class="text-xs text-rose-600 hover:text-rose-700 px-3 py-1.5 font-semibold bg-rose-50 rounded-xl border border-rose-200 transition">
+                <i class="fa-solid fa-trash-can mr-1"></i> Bersihkan Cache
+              </button>
+            </div>
+          </div>
+
+          <!-- Admin Product List -->
+          <div class="space-y-2">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Daftar Produk Aktif</h3>
+            <div id="adminProductList" class="space-y-2">
+              <!-- Admin cards loaded via JS -->
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Bottom Navigation Bar (Shopee App Style) -->
+      <nav class="bg-white border-t border-slate-200 px-3 py-2 flex items-center justify-around shrink-0 z-30 shadow-lg">
+        <button onclick="switchTab('catalogTab')" id="navCatalog" class="flex flex-col items-center gap-0.5 text-shopee-primary transition">
+          <i class="fa-solid fa-house text-lg"></i>
+          <span class="text-[10px] font-bold">Beranda</span>
+        </button>
+
+        <button onclick="switchTab('trackingTab')" id="navTracking" class="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-600 transition relative">
+          <i class="fa-solid fa-truck-fast text-lg"></i>
+          <span class="text-[10px] font-bold">Pengiriman</span>
+          <span id="navTrackingBadge" class="hidden absolute top-0 right-1 w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+        </button>
+
+        <button onclick="switchTab('ordersTab')" id="navOrders" class="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-600 transition">
+          <i class="fa-solid fa-receipt text-lg"></i>
+          <span class="text-[10px] font-bold">Pesanan</span>
+        </button>
+
+        <button onclick="switchTab('adminTab')" id="navAdmin" class="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-600 transition">
+          <i class="fa-solid fa-boxes-packing text-lg"></i>
+          <span class="text-[10px] font-bold">Katalog</span>
+        </button>
+      </nav>
+
+    </div>
+
+  </div>
+
+  <!-- MODAL 1: Keranjang Belanja & Checkout Drawer -->
+  <div id="cartModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200">
+      
+      <!-- Cart Header -->
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-shopee-subtle">
+        <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2">
+          <i class="fa-solid fa-cart-shopping text-shopee-primary"></i> Keranjang & Checkout
+        </h3>
+        <button onclick="closeCartModal()" class="w-8 h-8 rounded-full bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center shadow-sm">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Cart Body Scrollable Area -->
+      <div class="p-4 overflow-y-auto custom-scrollbar space-y-4 flex-1 text-xs">
+        
+        <!-- Shipping Route & Geotag Banner -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Rute Ekspedisi</span>
+            <button onclick="toggleGeotagModal()" class="text-xs text-shopee-primary font-bold hover:underline flex items-center gap-1">
+              <i class="fa-solid fa-location-dot"></i> Ubah Lokasi
+            </button>
+          </div>
+          <div class="space-y-1.5">
+            <div class="flex items-start gap-2">
+              <span class="w-2 h-2 rounded-full bg-amber-500 mt-1 shrink-0"></span>
+              <div>
+                <p class="font-bold text-slate-800" id="cartOriginName">Gudang Official ShopSim (Cakung DC)</p>
+                <p class="text-[10px] text-slate-400" id="cartOriginCoord">-6.1850, 106.9450</p>
+              </div>
+            </div>
+            <div class="border-l-2 border-dashed border-slate-300 ml-1 h-3"></div>
+            <div class="flex items-start gap-2">
+              <span class="w-2 h-2 rounded-full bg-shopee-primary mt-1 shrink-0"></span>
+              <div>
+                <p class="font-bold text-slate-800" id="cartDestinationName">Alamat Pengantaran Pembeli</p>
+                <p class="text-[10px] text-slate-400" id="cartDestinationCoord">-6.2650, 106.7840</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selected Items in Cart -->
+        <div class="space-y-2">
+          <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Daftar Produk Terpilih</span>
+          <div id="cartItemsList" class="space-y-2">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <!-- Shipping Service Picker (Reguler, Instant, Kargo) -->
+        <div class="space-y-1.5">
+          <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Opsi Pengiriman</span>
+          <div class="grid grid-cols-3 gap-2 text-[11px] font-semibold">
+            <label class="p-2 rounded-xl border border-slate-200 bg-white cursor-pointer has-[:checked]:border-shopee-primary has-[:checked]:bg-shopee-subtle text-center">
+              <input type="radio" name="shippingSpeed" value="reguler" checked onchange="calculateCartTotals()" class="hidden" />
+              <p class="font-bold text-slate-800">Reguler</p>
+              <p class="text-[10px] text-slate-500">2-3 Hari Sim</p>
+            </label>
+            <label class="p-2 rounded-xl border border-slate-200 bg-white cursor-pointer has-[:checked]:border-shopee-primary has-[:checked]:bg-shopee-subtle text-center">
+              <input type="radio" name="shippingSpeed" value="instant" onchange="calculateCartTotals()" class="hidden" />
+              <p class="font-bold text-slate-800">Instant SPX</p>
+              <p class="text-[10px] text-slate-500">Hitungan Jam</p>
+            </label>
+            <label class="p-2 rounded-xl border border-slate-200 bg-white cursor-pointer has-[:checked]:border-shopee-primary has-[:checked]:bg-shopee-subtle text-center">
+              <input type="radio" name="shippingSpeed" value="kargo" onchange="calculateCartTotals()" class="hidden" />
+              <p class="font-bold text-slate-800">Hemat Kargo</p>
+              <p class="text-[10px] text-slate-500">Biaya Ekonomis</p>
+            </label>
+          </div>
+        </div>
+
+        <!-- Voucher Shopee Klaim Section -->
+        <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-ticket text-amber-600"></i> Voucher Toko & Diskon
+            </span>
+            <span id="activeVoucherBadge" class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full hidden">Terpakai</span>
+          </div>
+          <div class="flex gap-2">
+            <select id="voucherSelect" onchange="applyVoucher()" class="flex-1 bg-white p-2 rounded-xl border border-amber-300 text-xs font-medium outline-none">
+              <option value="none">Pilih Voucher Belanja...</option>
+              <option value="ONGKIR0">Gratis Ongkir s/d Rp 20.000</option>
+              <option value="DISKON20">Diskon Belanja 20% (Max 50rb)</option>
+              <option value="CASHBACK">Cashback Koin Rp 15.000</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Metode Pembayaran -->
+        <div class="space-y-1.5">
+          <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Metode Pembayaran</span>
+          <div class="grid grid-cols-2 gap-2 font-medium">
+            <label class="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center gap-2 cursor-pointer has-[:checked]:border-shopee-primary has-[:checked]:bg-shopee-subtle">
+              <input type="radio" name="cartPayMethod" value="shopsimpay" checked class="accent-shopee-primary" />
+              <span><i class="fa-solid fa-wallet text-amber-500 mr-1"></i> ShopSimPay</span>
+            </label>
+            <label class="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center gap-2 cursor-pointer has-[:checked]:border-shopee-primary has-[:checked]:bg-shopee-subtle">
+              <input type="radio" name="cartPayMethod" value="qris" class="accent-shopee-primary" />
+              <span><i class="fa-solid fa-qrcode text-emerald-600 mr-1"></i> QRIS Sim</span>
+            </label>
+            <label class="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center gap-2 cursor-pointer has-[:checked]:border-shopee-primary has-[:checked]:bg-shopee-subtle">
+              <input type="radio" name="cartPayMethod" value="va" class="accent-shopee-primary" />
+              <span><i class="fa-solid fa-building-columns text-blue-500 mr-1"></i> Virtual Acc</span>
+            </label>
+            <label class="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center gap-2 cursor-pointer has-[:checked]:border-shopee-primary has-[:checked]:bg-shopee-subtle">
+              <input type="radio" name="cartPayMethod" value="cod" class="accent-shopee-primary" />
+              <span><i class="fa-solid fa-hand-holding-dollar text-orange-500 mr-1"></i> COD Tunai</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Cost Breakdown Calculation -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-1.5">
+          <div class="flex justify-between text-slate-600">
+            <span>Subtotal Produk</span>
+            <span id="billSubtotalText">Rp 0</span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span id="billShippingLabel">Ongkos Kirim (0 km)</span>
+            <span id="billShippingFeeText">Rp 0</span>
+          </div>
+          <div class="flex justify-between text-emerald-600" id="voucherDiscountRow">
+            <span>Potongan Voucher</span>
+            <span id="billDiscountText">-Rp 0</span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Biaya Layanan & Asuransi</span>
+            <span>Rp 1.000</span>
+          </div>
+          <div class="border-t border-slate-200 pt-1.5 flex justify-between font-black text-sm text-slate-800">
+            <span>Total Pembayaran</span>
+            <span id="billGrandTotalText" class="text-shopee-primary">Rp 0</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Checkout Execute Button -->
+      <div class="p-4 border-t border-slate-100 shrink-0 bg-white">
+        <button onclick="executeOrderCheckout()" class="w-full bg-shopee-primary hover:bg-shopee-dark active:scale-[0.99] text-white py-3 rounded-2xl font-black text-sm shadow-md transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-shield-halved text-xs"></i> Buat Pesanan Sekarang
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL 2: Gerbang Pembayaran Simulasi (QRIS, VA, ShopSimPay) -->
+  <div id="paymentModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200">
+      
+      <!-- Title & Subtitle -->
+      <div class="space-y-1">
+        <div id="payModalIcon" class="w-12 h-12 rounded-2xl bg-orange-50 text-shopee-primary mx-auto flex items-center justify-center text-2xl shadow-inner">
+          <i class="fa-solid fa-qrcode"></i>
+        </div>
+        <h3 class="font-extrabold text-slate-800 text-lg" id="payModalTitle">Pembayaran QRIS</h3>
+        <p class="text-xs text-slate-500" id="payModalSubtitle">Pindai QR code ini di aplikasi perbankan Anda</p>
+      </div>
+
+      <!-- QRIS View Area -->
+      <div id="payAreaQris" class="space-y-2">
+        <div class="relative bg-slate-50 p-4 rounded-2xl border border-slate-200 inline-block shadow-inner overflow-hidden">
+          <canvas id="proceduralQrisCanvas" width="190" height="190" class="mx-auto rounded-lg"></canvas>
+          <div class="scanner-line absolute left-4 right-4 h-0.5 bg-shopee-primary opacity-80 shadow-md"></div>
+        </div>
+        <p class="text-[10px] text-slate-400 font-mono tracking-wider">NMID: SHOPEESIM-ID-49201948</p>
+      </div>
+
+      <!-- Virtual Account View Area -->
+      <div id="payAreaVA" class="hidden bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2 text-left">
+        <p class="text-[11px] text-slate-500 font-semibold">Nomor Virtual Account Bank Mandiri / BCA:</p>
+        <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200">
+          <span id="vaNumberDisplay" class="font-mono font-black text-sm text-slate-800 tracking-wider">8921 0812 9482 1092</span>
+          <button onclick="copyVaNumber()" class="text-xs text-shopee-primary font-bold hover:underline">Salin</button>
+        </div>
+        <p class="text-[10px] text-amber-700 bg-amber-50 p-2 rounded-lg">Waktu bayar tersisa: <span id="vaCountdown" class="font-mono font-bold">14:59</span></p>
+      </div>
+
+      <!-- Total Billing Tag -->
+      <div class="space-y-0.5">
+        <span class="text-[11px] text-slate-400 font-medium">Total Tagihan</span>
+        <p id="payModalAmountText" class="text-xl font-black text-shopee-primary font-mono">Rp 0</p>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="pt-2 flex gap-2">
+        <button onclick="confirmPaymentSuccess()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-circle-check"></i> Konfirmasi Bayar
+        </button>
+        <button onclick="closePaymentModal()" class="px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition">
+          Batal
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Kontrol Timer & Simulasi Ekspedisi -->
+  <div id="simSettingsModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-4">
+      
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-orange-100 text-shopee-primary flex items-center justify-center font-bold text-sm">
+            <i class="fa-solid fa-gauge-high"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-800 text-base">Kontrol Simulator Logistik</h3>
+            <p class="text-xs text-slate-500">Atur akselerasi waktu & kondisi cuaca kurir.</p>
+          </div>
+        </div>
+        <button onclick="toggleSimSettingsModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Acceleration Buttons -->
+      <div class="space-y-2">
+        <label class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Kecepatan Timer Simulasi</label>
+        <div class="grid grid-cols-5 gap-1.5 text-xs font-bold">
+          <button onclick="setSimulationSpeed(1)" class="sim-speed-btn py-2 rounded-xl border border-shopee-primary bg-shopee-subtle text-shopee-primary" data-speed="1">1x</button>
+          <button onclick="setSimulationSpeed(2)" class="sim-speed-btn py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600" data-speed="2">2x</button>
+          <button onclick="setSimulationSpeed(5)" class="sim-speed-btn py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600" data-speed="5">5x</button>
+          <button onclick="setSimulationSpeed(10)" class="sim-speed-btn py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600" data-speed="10">10x</button>
+          <button onclick="setSimulationSpeed(50)" class="sim-speed-btn py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600" data-speed="50">50x</button>
+        </div>
+      </div>
+
+      <!-- Logistics Environment Modifier -->
+      <div class="space-y-2">
+        <label class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Kondisi Lalu Lintas & Cuaca</label>
+        <select id="simEnvironmentSelect" onchange="updateSimEnvironment()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold focus:ring-2 focus:ring-shopee-primary outline-none">
+          <option value="normal">Normal: Cuaca Cerah & Jalan Raya Lancar</option>
+          <option value="rain">Hujan Ringan: Kecepatan Berkurang (+25% Durasi)</option>
+          <option value="traffic">Macet Jam Sibuk / Rush Hour (+60% Durasi)</option>
+          <option value="storm">Badai Hujan & Hambatan Hub (+100% Durasi)</option>
+        </select>
+      </div>
+
+      <!-- Pause & Reset Controls -->
+      <div class="pt-2 flex gap-2">
+        <button onclick="toggleSimulationPause()" id="pauseSimBtn" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition">
+          <i class="fa-solid fa-pause"></i> <span>Jeda Simulasi</span>
+        </button>
+        <button onclick="resetActiveDeliverySimulation()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition">
+          <i class="fa-solid fa-rotate-left"></i> Reset Pengiriman
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL 4: Geotagging Titik Gudang & Alamat Pembeli -->
+  <div id="geotagModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-3xl p-5 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+      
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-orange-100 text-shopee-primary flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-location-crosshairs"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-800 text-base">Atur Geotagging Titik Logistik</h3>
+            <p class="text-xs text-slate-500">Sesuaikan koordinat toko, sorting DC, dan rumah pembeli.</p>
+          </div>
+        </div>
+        <button onclick="toggleGeotagModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 flex-1 overflow-y-auto custom-scrollbar text-xs">
+        <!-- Warehouse Coordinates -->
+        <div class="p-3 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-warehouse"></i> Gudang Toko (Cakung DC)
+            </span>
+            <button onclick="setPresetCoord('warehouse', -6.1850, 106.9450, 'Gudang Official Cakung')" class="text-[10px] text-amber-700 underline font-semibold">Cakung</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-[10px] text-slate-500 font-semibold">Latitude</label>
+              <input type="number" step="0.0001" id="geoWarehouseLat" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 font-semibold">Longitude</label>
+              <input type="number" step="0.0001" id="geoWarehouseLng" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Sorting Center Hub -->
+        <div class="p-3 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-blue-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-boxes-stacked"></i> Sorting Center Hub (Kuningan DC)
+            </span>
+            <button onclick="setPresetCoord('hub', -6.2240, 106.8280, 'Hub Transit Kuningan')" class="text-[10px] text-blue-700 underline font-semibold">Kuningan</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-[10px] text-slate-500 font-semibold">Latitude</label>
+              <input type="number" step="0.0001" id="geoHubLat" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 font-semibold">Longitude</label>
+              <input type="number" step="0.0001" id="geoHubLng" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Destination Buyer Address -->
+        <div class="p-3 bg-orange-50/70 rounded-2xl border border-orange-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-shopee-primary flex items-center gap-1.5">
+              <i class="fa-solid fa-house-chimney"></i> Alamat Pembeli (Drop-off)
+            </span>
+            <button onclick="useCurrentGeolocation()" class="text-[10px] text-shopee-primary font-bold underline flex items-center gap-1">
+              <i class="fa-solid fa-location-arrow"></i> Gunakan GPS Saya
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-[10px] text-slate-500 font-semibold">Latitude</label>
+              <input type="number" step="0.0001" id="geoBuyerLat" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 font-semibold">Longitude</label>
+              <input type="number" step="0.0001" id="geoBuyerLng" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+          </div>
+        </div>
+
+        <p class="text-[11px] text-slate-400 italic">
+          * Anda juga dapat menggeser (drag) ikon marker langsung pada peta tracking.
+        </p>
+      </div>
+
+      <div class="pt-2 shrink-0 flex gap-2">
+        <button onclick="saveGeotagCoordinates()" class="flex-1 bg-shopee-primary hover:bg-shopee-dark text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition">
+          Simpan Titik & Refresh Jalur
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL 5: Chat Dua Arah (Penjual & Kurir) -->
+  <div id="chatModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+      
+      <!-- Chat Header -->
+      <div class="p-3 bg-shopee-primary text-white flex items-center justify-between shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <div class="relative">
+            <img id="chatPartnerAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop" class="w-9 h-9 rounded-full border border-white object-cover" alt="Chat Partner" />
+            <span class="w-2 h-2 rounded-full bg-emerald-400 absolute bottom-0 right-0 border border-white"></span>
+          </div>
+          <div>
+            <h4 id="chatPartnerName" class="text-xs font-bold leading-tight">Official Store ShopSim</h4>
+            <p id="chatPartnerRole" class="text-[10px] text-orange-100 flex items-center gap-1">
+              Online • Siap Menjawab Pertanyaan
+            </p>
+          </div>
+        </div>
+        <button onclick="closeChatModal()" class="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center text-xs">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Message History View -->
+      <div id="chatHistoryContainer" class="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-2.5 bg-slate-50 text-xs">
+        <!-- Chat bubbles rendered here -->
+      </div>
+
+      <!-- Quick Message Chips -->
+      <div class="px-3 py-1.5 bg-slate-100 flex items-center gap-1.5 overflow-x-auto text-[10px] shrink-0 custom-scrollbar">
+        <button onclick="quickSendChat('Barang ready warna apa kak?')" class="bg-white px-2 py-1 rounded-full border border-slate-200 whitespace-nowrap text-slate-700">Ready warna apa?</button>
+        <button onclick="quickSendChat('Kira-kira paket dikirim hari ini?')" class="bg-white px-2 py-1 rounded-full border border-slate-200 whitespace-nowrap text-slate-700">Dikirim hari ini?</button>
+        <button onclick="quickSendChat('Tolong titip di pos sekuriti ya Pak')" class="bg-white px-2 py-1 rounded-full border border-slate-200 whitespace-nowrap text-slate-700">Titip di sekuriti</button>
+      </div>
+
+      <!-- Chat Input Field -->
+      <div class="p-3 bg-white border-t border-slate-100 flex items-center gap-2 shrink-0">
+        <input type="text" id="chatInputMessage" onkeypress="if(event.key==='Enter') sendChatMessage()" placeholder="Tulis pesan Anda..."
+          class="flex-1 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-shopee-primary" />
+        <button onclick="sendChatMessage()" class="w-9 h-9 rounded-xl bg-shopee-primary hover:bg-shopee-dark text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL 6: Detail & Varian Produk -->
+  <div id="productDetailModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200">
+      
+      <div class="relative h-64 bg-slate-100 shrink-0">
+        <img id="detailProductImage" src="" class="w-full h-full object-cover" alt="Product Image" />
+        <button onclick="closeProductDetailModal()" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+        <span id="detailBadgeMall" class="absolute top-3 left-3 shopee-badge-mall text-white text-[10px] font-black px-2 py-0.5 rounded shadow">
+          Shopee Mall
+        </span>
+      </div>
+
+      <div class="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-3 text-xs">
+        <div class="space-y-1">
+          <div class="flex items-baseline gap-2">
+            <span id="detailProductPrice" class="text-xl font-black text-shopee-primary font-mono">Rp 0</span>
+            <span id="detailProductOldPrice" class="text-xs text-slate-400 line-through">Rp 0</span>
+            <span id="detailProductDiscount" class="bg-orange-100 text-shopee-primary text-[10px] font-extrabold px-1.5 py-0.5 rounded">0% OFF</span>
+          </div>
+          <h2 id="detailProductName" class="text-sm font-bold text-slate-800 leading-snug">Nama Produk</h2>
+          <div class="flex items-center gap-3 text-[11px] text-slate-500 pt-0.5">
+            <span class="flex items-center text-amber-500 font-bold"><i class="fa-solid fa-star mr-1"></i> <span id="detailProductRating">4.9</span></span>
+            <span>•</span>
+            <span id="detailProductSold">1.4rb Terjual</span>
+            <span>•</span>
+            <span id="detailProductStock" class="text-emerald-600 font-semibold">Stok: 45</span>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-2.5 space-y-1.5">
+          <h4 class="font-bold text-slate-700">Pilihan Varian:</h4>
+          <div class="flex flex-wrap gap-2 text-xs" id="detailVariantContainer">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-2.5 space-y-1">
+          <h4 class="font-bold text-slate-700">Deskripsi Produk:</h4>
+          <p id="detailProductDesc" class="text-slate-600 leading-relaxed text-[11px]">Deskripsi lengkap produk...</p>
+        </div>
+      </div>
+
+      <div class="p-3 border-t border-slate-100 bg-white flex items-center gap-2 shrink-0">
+        <button onclick="chatAboutCurrentProduct()" class="px-4 py-2.5 rounded-xl border border-shopee-primary text-shopee-primary hover:bg-shopee-subtle font-bold text-xs flex items-center gap-1.5 transition">
+          <i class="fa-regular fa-comment-dots text-sm"></i> Chat
+        </button>
+        <button onclick="addCurrentDetailToCart()" class="flex-1 bg-shopee-subtle border border-shopee-primary hover:bg-orange-100 text-shopee-primary py-2.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-cart-plus"></i> + Keranjang
+        </button>
+        <button onclick="buyCurrentDetailNow()" class="flex-1 bg-shopee-primary hover:bg-shopee-dark text-white py-2.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-md">
+          Beli Sekarang
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL 7: Rating & Ulasan Bintang Pasca-Pesanan -->
+  <div id="ratingModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200">
+      <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto shadow-inner">
+        <i class="fa-solid fa-box-open"></i>
+      </div>
+      <div>
+        <h3 class="font-extrabold text-slate-800 text-lg">Pesanan Diterima!</h3>
+        <p class="text-xs text-slate-500">Berikan penilaian untuk penjual dan kurir ShopSim.</p>
+      </div>
+
+      <!-- Star Container -->
+      <div class="flex justify-center items-center gap-2 text-2xl text-amber-400" id="ratingStarBox">
+        <button onclick="setReviewRating(1)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+        <button onclick="setReviewRating(2)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+        <button onclick="setReviewRating(3)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+        <button onclick="setReviewRating(4)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+        <button onclick="setReviewRating(5)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+      </div>
+
+      <!-- Review Tag Badges -->
+      <div class="flex flex-wrap justify-center gap-1.5 text-[11px]">
+        <button onclick="toggleReviewTagPill(this)" class="review-tag-pill px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-medium">Kualitas Bagus</button>
+        <button onclick="toggleReviewTagPill(this)" class="review-tag-pill px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-medium">Pengiriman Cepat</button>
+        <button onclick="toggleReviewTagPill(this)" class="review-tag-pill px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-medium">Kemasan Aman</button>
+        <button onclick="toggleReviewTagPill(this)" class="review-tag-pill px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-medium">Kurir Ramah</button>
+      </div>
+
+      <textarea id="reviewCommentText" rows="2" placeholder="Bagikan ulasan Anda tentang kepuasan berbelanja..."
+        class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-shopee-primary outline-none"></textarea>
+
+      <button onclick="submitProductReview()" class="w-full bg-shopee-primary hover:bg-shopee-dark text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition">
+        Kirim Penilaian
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL 8: Form Tambah/Ubah Produk (Admin) -->
+  <div id="productFormModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-3 max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2 shrink-0">
+        <h3 id="productFormModalTitle" class="font-extrabold text-slate-800 text-base">Tambah Produk Baru</h3>
+        <button onclick="closeProductFormModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="crudProductForm" onsubmit="handleProductFormSubmit(event)" class="space-y-3 overflow-y-auto custom-scrollbar flex-1 text-xs">
+        <input type="hidden" id="formProductId" />
+        
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Nama Produk</label>
+          <input type="text" id="formProductName" required placeholder="Contoh: Keyboard Mechanical RGB" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-shopee-primary" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Kategori</label>
+            <select id="formProductCategory" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-shopee-primary font-semibold">
+              <option value="Elektronik">Elektronik</option>
+              <option value="Fashion">Fashion</option>
+              <option value="Gadget">Gadget</option>
+              <option value="Hobi">Hobi</option>
+              <option value="Makanan">Makanan</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Harga (Rp)</label>
+            <input type="number" id="formProductPrice" required min="500" step="500" placeholder="150000" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-shopee-primary" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Diskon (%)</label>
+            <input type="number" id="formProductDiscount" min="0" max="95" placeholder="15" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-shopee-primary" />
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Stok Awal</label>
+            <input type="number" id="formProductStock" min="1" placeholder="50" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-shopee-primary" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Deskripsi Singkat</label>
+          <textarea id="formProductDesc" rows="2" placeholder="Spesifikasi garansi, kelengkapan..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-shopee-primary"></textarea>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Gambar Produk (URL atau Upload)</label>
+          <div class="flex gap-2">
+            <input type="url" id="formProductImageUrl" placeholder="https://..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-shopee-primary" />
+            <label class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl cursor-pointer flex items-center justify-center font-bold">
+              <i class="fa-solid fa-camera mr-1"></i> File
+              <input type="file" id="formProductFileInput" onchange="handleProductFilePick(event)" accept="image/*" class="hidden" />
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-2 flex gap-2 shrink-0">
+          <button type="submit" class="flex-1 bg-shopee-primary hover:bg-shopee-dark text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition">
+            Simpan Produk
+          </button>
+          <button type="button" onclick="closeProductFormModal()" class="px-4 bg-slate-100 text-slate-600 rounded-xl font-semibold">
+            Batal
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification System (No alert() used) -->
+  <div id="appToast" class="fixed top-5 right-5 z-[9999] transition-all transform duration-300 opacity-0 pointer-events-none translate-y-[-10px] bg-slate-900 text-white text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 border border-slate-700">
+    <i id="toastStatusIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toastStatusMsg">Notifikasi ShopSim</span>
+  </div>
+
+  <script>
+    /* Database Layer with Dexie.js */
+    const db = new Dexie("ShopSimDatabase");
+    db.version(1).stores({
+      products: "++id, name, category, price, discount, stock",
+      orders: "++id, resi, timestamp, status, total",
+      settings: "key"
+    });
+
+    // Default Seed Catalog Data
+    const defaultProductSeeds = [
+      {
+        name: "Wireless ANC Gaming Headset Pro 7.1",
+        category: "Gadget",
+        price: 349000,
+        discount: 25,
+        stock: 38,
+        rating: 4.9,
+        soldCount: "2.1rb",
+        variants: ["Matte Black", "Snow White", "Cyber Pink"],
+        desc: "Headset gaming nirkabel latensi rendah 20ms dengan driver 50mm dynamic bass, surround 7.1 dan noise cancelling mikrofon.",
+        image: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=400&auto=format&fit=crop"
+      },
+      {
+        name: "Mechanical Keyboard 75% Gasket RGB Hot-Swap",
+        category: "Elektronik",
+        price: 489000,
+        discount: 30,
+        stock: 19,
+        rating: 4.9,
+        soldCount: "1.4rb",
+        variants: ["Yellow Switch", "Red Switch", "Brown Switch"],
+        desc: "Keyboard mechanical gasket mount empuk, keycaps PBT doubleshot, konektivitas Bluetooth 5.0, 2.4Ghz dongle dan type-C kabel.",
+        image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&auto=format&fit=crop"
+      },
+      {
+        name: "Oversized Heavyweight Cotton T-Shirt Casual",
+        category: "Fashion",
+        price: 119000,
+        discount: 40,
+        stock: 65,
+        rating: 4.8,
+        soldCount: "5.8rb",
+        variants: ["Hitam", "Off-White", "Sage Green", "Charcoal"],
+        desc: "Kaos pria/wanita bahan cotton combed 20s gramasi 240 gsm tebal, tidak nerawang, adem, dan potongan boxy kekinian.",
+        image: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400&auto=format&fit=crop"
+      },
+      {
+        name: "Sneakers Retro Chunky Sol Tebal Cushion",
+        category: "Fashion",
+        price: 299000,
+        discount: 20,
+        stock: 24,
+        rating: 4.7,
+        soldCount: "890",
+        variants: ["Size 40", "Size 41", "Size 42", "Size 43"],
+        desc: "Sepatu sneakers aesthetic material breathable mesh dengan bantalan busa empuk insole MemoryFoam tahan guncangan seharian.",
+        image: "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&auto=format&fit=crop"
+      },
+      {
+        name: "Smart Watch AMOLED Always-On GPS HeartRate",
+        category: "Gadget",
+        price: 599000,
+        discount: 15,
+        stock: 15,
+        rating: 4.9,
+        soldCount: "1.1rb",
+        variants: ["Space Gray", "Starlight Gold"],
+        desc: "Smartwatch layar jernih AMOLED 1.43 inch, sensor denyut nadi, SpO2, waterproof 5ATM, dan baterai tahan hingga 14 hari.",
+        image: "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=400&auto=format&fit=crop"
+      },
+      {
+        name: "Kopi Arabika Gayo Specialty Artisan Roast 250gr",
+        category: "Makanan",
+        price: 75000,
+        discount: 10,
+        stock: 90,
+        rating: 4.9,
+        soldCount: "3.5rb",
+        variants: ["Biji Utuh", "Giling Kasar", "Giling Halus"],
+        desc: "Single origin Arabika Gayo Aceh grade 1 washed process. Tasting notes: brown sugar, clean citrus, floral jasmine aroma.",
+        image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400&auto=format&fit=crop"
+      }
+    ];
+
+    /* Reactive App State */
+    const AppState = {
+      cart: {}, // { productId: { product, qty, variant } }
+      activeTab: 'catalogTab',
+      selectedCategory: 'Semua',
+      catalogSort: 'popular',
+      
+      // Coordinates: Cakung DC -> Kuningan DC -> Buyer House
+      warehouseLoc: { lat: -6.1850, lng: 106.9450, name: "Gudang Official Cakung DC" },
+      hubLoc: { lat: -6.2240, lng: 106.8280, name: "Sorting Center Hub Kuningan" },
+      buyerLoc: { lat: -6.2650, lng: 106.7840, name: "Alamat Pembeli (Pondok Indah)" },
+      
+      simSpeed: 1,
+      simEnvironment: 'normal',
+      isSimPaused: false,
+      activeOrder: null,
+      
+      routeWaypoints: [], // Calculated route coordinates
+      deliveryProgress: 0,
+      trackingTimerId: null,
+      lastTimestamp: 0,
+      
+      shopSimPayBalance: 500000,
+      appliedVoucher: 'none',
+      selectedDetailProduct: null,
+      selectedReviewRating: 5,
+      chatMode: 'seller', // 'seller' | 'courier'
+      sellerChat: [
+        { sender: 'partner', text: 'Halo! Selamat datang di Toko Official ShopSim. Ada produk yang bisa kami bantu jelaskan?', time: '09:00' }
+      ],
+      courierChat: [
+        { sender: 'partner', text: 'Halo Kak, paket sedang saya proses antar ke alamat tujuan ya.', time: 'Baru saja' }
+      ]
+    };
+
+    /* Procedural Sound Synthesizer (No external audio files required) */
+    const SoundBox = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+      },
+      play(type = 'click') {
+        try {
+          this.init();
+          const ctx = this.ctx;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          const t = ctx.currentTime;
+
+          if (type === 'click') {
+            osc.frequency.setValueAtTime(600, t);
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+            osc.start(t);
+            osc.stop(t + 0.08);
+          } else if (type === 'cart') {
+            osc.frequency.setValueAtTime(523.25, t); // C5
+            osc.frequency.setValueAtTime(659.25, t + 0.08); // E5
+            gain.gain.setValueAtTime(0.15, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+            osc.start(t);
+            osc.stop(t + 0.25);
+          } else if (type === 'success') {
+            osc.frequency.setValueAtTime(523.25, t); // C5
+            osc.frequency.setValueAtTime(659.25, t + 0.1); // E5
+            osc.frequency.setValueAtTime(783.99, t + 0.2); // G5
+            osc.frequency.setValueAtTime(1046.50, t + 0.3); // C6
+            gain.gain.setValueAtTime(0.2, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+            osc.start(t);
+            osc.stop(t + 0.55);
+          }
+        } catch (e) {
+          console.debug("Audio play skipped:", e);
+        }
+      }
+    };
+
+    /* Leaflet Logistics Map Implementation */
+    let logisticsMapInstance = null;
+    let warehouseMarker = null;
+    let hubMarker = null;
+    let buyerMarker = null;
+    let transportMarker = null;
+    let logisticsPolyline = null;
+
+    function initLogisticsMap() {
+      if (logisticsMapInstance) return;
+
+      logisticsMapInstance = L.map('logisticsMap', {
+        zoomControl: false
+      }).setView([AppState.hubLoc.lat, AppState.hubLoc.lng], 12);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(logisticsMapInstance);
+
+      // Custom DivIcons
+      const warehouseIcon = L.divIcon({
+        className: 'custom-warehouse-pin',
+        html: `<div class="w-8 h-8 rounded-xl bg-amber-600 text-white shadow-lg flex items-center justify-center border-2 border-white text-xs font-bold">
+                 <i class="fa-solid fa-warehouse"></i>
+               </div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      const hubIcon = L.divIcon({
+        className: 'custom-hub-pin',
+        html: `<div class="relative flex items-center justify-center">
+                 <div class="absolute w-8 h-8 rounded-full bg-blue-400 opacity-60 pulse-hub"></div>
+                 <div class="w-8 h-8 rounded-xl bg-blue-600 text-white shadow-lg flex items-center justify-center border-2 border-white text-xs font-bold z-10">
+                   <i class="fa-solid fa-boxes-stacked"></i>
+                 </div>
+               </div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      const buyerIcon = L.divIcon({
+        className: 'custom-buyer-pin',
+        html: `<div class="w-8 h-8 rounded-xl bg-shopee-primary text-white shadow-lg flex items-center justify-center border-2 border-white text-xs font-bold">
+                 <i class="fa-solid fa-house-user"></i>
+               </div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      const transportIcon = L.divIcon({
+        className: 'custom-transport-pin',
+        html: `<div class="w-9 h-9 rounded-full bg-emerald-600 text-white shadow-xl flex items-center justify-center border-2 border-white text-sm font-bold animate-bounce">
+                 <i id="mapTransportIcon" class="fa-solid fa-truck-fast"></i>
+               </div>`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
+      });
+
+      // Bind markers with draggable event
+      warehouseMarker = L.marker([AppState.warehouseLoc.lat, AppState.warehouseLoc.lng], {
+        icon: warehouseIcon,
+        draggable: true
+      }).addTo(logisticsMapInstance).bindPopup("<b>Gudang Toko Cakung</b><br>Asal Pengemasan");
+
+      hubMarker = L.marker([AppState.hubLoc.lat, AppState.hubLoc.lng], {
+        icon: hubIcon,
+        draggable: true
+      }).addTo(logisticsMapInstance).bindPopup("<b>Sorting Center Kuningan DC</b><br>Pusat Sortir");
+
+      buyerMarker = L.marker([AppState.buyerLoc.lat, AppState.buyerLoc.lng], {
+        icon: buyerIcon,
+        draggable: true
+      }).addTo(logisticsMapInstance).bindPopup("<b>Alamat Anda</b><br>Tujuan Akhir");
+
+      transportMarker = L.marker([AppState.warehouseLoc.lat, AppState.warehouseLoc.lng], {
+        icon: transportIcon
+      });
+
+      // Draggable event triggers
+      warehouseMarker.on('dragend', (e) => {
+        const c = e.target.getLatLng();
+        AppState.warehouseLoc.lat = c.lat;
+        AppState.warehouseLoc.lng = c.lng;
+        recalculateLogisticsRoute();
+      });
+
+      hubMarker.on('dragend', (e) => {
+        const c = e.target.getLatLng();
+        AppState.hubLoc.lat = c.lat;
+        AppState.hubLoc.lng = c.lng;
+        recalculateLogisticsRoute();
+      });
+
+      buyerMarker.on('dragend', (e) => {
+        const c = e.target.getLatLng();
+        AppState.buyerLoc.lat = c.lat;
+        AppState.buyerLoc.lng = c.lng;
+        recalculateLogisticsRoute();
+      });
+
+      recalculateLogisticsRoute();
+    }
+
+    /* Haversine Distance & Route Calculation */
+    function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
+
+    async function recalculateLogisticsRoute() {
+      const p1 = AppState.warehouseLoc;
+      const p2 = AppState.hubLoc;
+      const p3 = AppState.buyerLoc;
+
+      // Update Geotag Modal Coordinates
+      document.getElementById('geoWarehouseLat').value = p1.lat.toFixed(4);
+      document.getElementById('geoWarehouseLng').value = p1.lng.toFixed(4);
+      document.getElementById('geoHubLat').value = p2.lat.toFixed(4);
+      document.getElementById('geoHubLng').value = p2.lng.toFixed(4);
+      document.getElementById('geoBuyerLat').value = p3.lat.toFixed(4);
+      document.getElementById('geoBuyerLng').value = p3.lng.toFixed(4);
+
+      document.getElementById('cartOriginCoord').textContent = `${p1.lat.toFixed(4)}, ${p1.lng.toFixed(4)}`;
+      document.getElementById('cartDestinationCoord').textContent = `${p3.lat.toFixed(4)}, ${p3.lng.toFixed(4)}`;
+
+      // Try fetching OSRM Route (Leg 1: Warehouse -> Hub, Leg 2: Hub -> Buyer)
+      try {
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${p1.lng},${p1.lat};${p2.lng},${p2.lat};${p3.lng},${p3.lat}?overview=full&geometries=geojson`;
+        const resp = await fetch(osrmUrl);
+        const data = await resp.json();
+
+        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          AppState.routeWaypoints = route.geometry.coordinates.map(c => [c[1], c[0]]);
+          const distKm = (route.distance / 1000).toFixed(1);
+          renderRouteOnMap(distKm);
+          return;
+        }
+      } catch (err) {
+        console.debug("OSRM network fallback used:", err);
+      }
+
+      // Smooth Interpolation Fallback (Warehouse -> Hub -> Buyer)
+      const points = [];
+      const stepsPerLeg = 20;
+
+      // Leg 1
+      for (let i = 0; i <= stepsPerLeg; i++) {
+        const r = i / stepsPerLeg;
+        const curve = Math.sin(r * Math.PI) * 0.003;
+        points.push([p1.lat + (p2.lat - p1.lat) * r + curve, p1.lng + (p2.lng - p1.lng) * r + curve]);
+      }
+      // Leg 2
+      for (let i = 0; i <= stepsPerLeg; i++) {
+        const r = i / stepsPerLeg;
+        const curve = Math.sin(r * Math.PI) * -0.003;
+        points.push([p2.lat + (p3.lat - p2.lat) * r + curve, p2.lng + (p3.lng - p2.lng) * r + curve]);
+      }
+
+      AppState.routeWaypoints = points;
+      const totalDist = (haversineDistanceKm(p1.lat, p1.lng, p2.lat, p2.lng) + haversineDistanceKm(p2.lat, p2.lng, p3.lat, p3.lng)).toFixed(1);
+      renderRouteOnMap(totalDist);
+    }
+
+    function renderRouteOnMap(distKm) {
+      if (logisticsPolyline) {
+        logisticsMapInstance.removeLayer(logisticsPolyline);
+      }
+
+      logisticsPolyline = L.polyline(AppState.routeWaypoints, {
+        color: '#ee4d2d',
+        weight: 5,
+        opacity: 0.85,
+        dashArray: '6, 8'
+      }).addTo(logisticsMapInstance);
+
+      if (AppState.routeWaypoints.length > 0) {
+        logisticsMapInstance.fitBounds(logisticsPolyline.getBounds(), { padding: [40, 40] });
+      }
+
+      AppState.calculatedDistanceKm = parseFloat(distKm);
+      calculateCartTotals();
+    }
+
+    function recenterLogisticsMap() {
+      if (logisticsMapInstance && logisticsPolyline) {
+        logisticsMapInstance.fitBounds(logisticsPolyline.getBounds(), { padding: [40, 40] });
+      }
+    }
+
+    /* Catalog & Product Management */
+    async function initCatalogData() {
+      const count = await db.products.count();
+      if (count === 0) {
+        await db.products.bulkAdd(defaultProductSeeds);
+      }
+      renderCategoryChips();
+      renderCatalogGrid();
+      renderAdminProductList();
+      renderOrderHistory();
+      updateShopSimPayDisplay();
+      startFlashSaleCountdown();
+    }
+
+    async function renderCategoryChips() {
+      const items = await db.products.toArray();
+      const categories = ['Semua', ...new Set(items.map(p => p.category))];
+      const container = document.getElementById('categoryChips');
+      
+      container.innerHTML = categories.map(cat => `
+        <button onclick="selectCategory('${cat}')"
+          class="px-3 py-1.5 rounded-full whitespace-nowrap transition ${
+            AppState.selectedCategory === cat
+              ? 'bg-shopee-primary text-white font-bold shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }">
+          ${cat}
+        </button>
+      `).join('');
+    }
+
+    function selectCategory(cat) {
+      AppState.selectedCategory = cat;
+      renderCategoryChips();
+      renderCatalogGrid();
+    }
+
+    function changeCatalogSort(sortKey) {
+      AppState.catalogSort = sortKey;
+      ['popular', 'cheapest', 'highest', 'discount'].forEach(k => {
+        const el = document.getElementById(`sort${k.charAt(0).toUpperCase() + k.slice(1)}`);
+        if (k === sortKey) {
+          el.className = "font-bold text-shopee-primary";
+        } else {
+          el.className = "text-slate-600 hover:text-shopee-primary";
+        }
+      });
+      renderCatalogGrid();
+    }
+
+    async function renderCatalogGrid() {
+      const query = document.getElementById('productSearchInput').value.toLowerCase();
+      let items = await db.products.toArray();
+
+      if (AppState.selectedCategory !== 'Semua') {
+        items = items.filter(p => p.category === AppState.selectedCategory);
+      }
+      if (query) {
+        items = items.filter(p => p.name.toLowerCase().includes(query) || (p.desc && p.desc.toLowerCase().includes(query)));
+      }
+
+      // Sorting
+      if (AppState.catalogSort === 'cheapest') items.sort((a, b) => a.price - b.price);
+      else if (AppState.catalogSort === 'highest') items.sort((a, b) => b.price - a.price);
+      else if (AppState.catalogSort === 'discount') items.sort((a, b) => (b.discount || 0) - (a.discount || 0));
+      else items.sort((a, b) => (b.rating || 4.8) - (a.rating || 4.8));
+
+      document.getElementById('catalogCountText').textContent = `${items.length} Produk`;
+      const grid = document.getElementById('productGridContainer');
+
+      if (items.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full py-16 text-center text-slate-400 space-y-2">
+            <i class="fa-solid fa-box-open text-4xl"></i>
+            <p class="text-xs">Produk tidak ditemukan dalam pencarian.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = items.map(p => {
+        const discountedPrice = p.discount ? Math.round(p.price * (1 - p.discount / 100)) : p.price;
+        return `
+          <div onclick="openProductDetailModal(${p.id})" class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between cursor-pointer group">
+            <div>
+              <div class="relative h-36 sm:h-40 w-full bg-slate-100 overflow-hidden">
+                <img src="${p.image || 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=400'}"
+                     alt="${p.name}"
+                     class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                     onerror="this.src='https://placehold.co/400x300/f1f5f9/94a3b8?text=ShopSim'" />
+                <span class="absolute top-2 left-2 shopee-badge-mall text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow">Mall</span>
+                ${p.discount ? `<span class="absolute top-2 right-2 bg-amber-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow">-${p.discount}%</span>` : ''}
+                <span class="absolute bottom-2 left-2 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded backdrop-blur">
+                  ${p.category}
+                </span>
+              </div>
+              <div class="p-2.5 space-y-1">
+                <h3 class="font-bold text-slate-800 text-xs line-clamp-2 leading-tight">${p.name}</h3>
+                <div class="flex items-baseline gap-1.5">
+                  <span class="text-xs font-black text-shopee-primary font-mono">Rp ${discountedPrice.toLocaleString('id-ID')}</span>
+                  ${p.discount ? `<span class="text-[10px] text-slate-400 line-through">Rp ${p.price.toLocaleString('id-ID')}</span>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div class="p-2.5 pt-0 flex items-center justify-between text-[10px] text-slate-500">
+              <span class="flex items-center text-amber-500 font-bold"><i class="fa-solid fa-star text-[9px] mr-0.5"></i> ${p.rating || '4.9'}</span>
+              <span>${p.soldCount || '500+'} terjual</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /* Cart & Checkout Logic */
+    async function openProductDetailModal(id) {
+      const p = await db.products.get(id);
+      if (!p) return;
+      AppState.selectedDetailProduct = p;
+
+      document.getElementById('detailProductName').textContent = p.name;
+      const discountedPrice = p.discount ? Math.round(p.price * (1 - p.discount / 100)) : p.price;
+      document.getElementById('detailProductPrice').textContent = `Rp ${discountedPrice.toLocaleString('id-ID')}`;
+      document.getElementById('detailProductOldPrice').textContent = p.discount ? `Rp ${p.price.toLocaleString('id-ID')}` : '';
+      document.getElementById('detailProductDiscount').textContent = p.discount ? `${p.discount}% OFF` : 'Best Price';
+      document.getElementById('detailProductRating').textContent = p.rating || '4.9';
+      document.getElementById('detailProductSold').textContent = `${p.soldCount || '500+'} Terjual`;
+      document.getElementById('detailProductStock').textContent = `Stok: ${p.stock || 20}`;
+      document.getElementById('detailProductDesc').textContent = p.desc || 'Produk pilihan bergaransi resmi ShopSim.';
+      document.getElementById('detailProductImage').src = p.image || 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=400';
+
+      // Variant Buttons
+      const variantContainer = document.getElementById('detailVariantContainer');
+      const variants = p.variants && p.variants.length > 0 ? p.variants : ['Standar'];
+      AppState.selectedDetailVariant = variants[0];
+
+      variantContainer.innerHTML = variants.map((v, i) => `
+        <button onclick="setDetailVariant('${v}', this)" class="variant-pill px-3 py-1 rounded-xl border ${i === 0 ? 'border-shopee-primary bg-shopee-subtle text-shopee-primary font-bold' : 'border-slate-200 text-slate-600'}">
+          ${v}
+        </button>
+      `).join('');
+
+      document.getElementById('productDetailModal').classList.remove('hidden');
+    }
+
+    function closeProductDetailModal() {
+      document.getElementById('productDetailModal').classList.add('hidden');
+    }
+
+    function setDetailVariant(variant, btn) {
+      AppState.selectedDetailVariant = variant;
+      document.querySelectorAll('.variant-pill').forEach(b => {
+        b.className = "variant-pill px-3 py-1 rounded-xl border border-slate-200 text-slate-600";
+      });
+      btn.className = "variant-pill px-3 py-1 rounded-xl border border-shopee-primary bg-shopee-subtle text-shopee-primary font-bold";
+    }
+
+    function addCurrentDetailToCart() {
+      const p = AppState.selectedDetailProduct;
+      if (!p) return;
+      const key = `${p.id}_${AppState.selectedDetailVariant}`;
+
+      if (!AppState.cart[key]) {
+        AppState.cart[key] = { product: p, qty: 1, variant: AppState.selectedDetailVariant };
+      } else {
+        AppState.cart[key].qty += 1;
+      }
+
+      SoundBox.play('cart');
+      updateCartBadge();
+      showToast(`Dimasukkan ke keranjang (${AppState.selectedDetailVariant})`, "success");
+      closeProductDetailModal();
+    }
+
+    function buyCurrentDetailNow() {
+      addCurrentDetailToCart();
+      openCartModal();
+    }
+
+    function updateCartBadge() {
+      const items = Object.values(AppState.cart);
+      const totalQty = items.reduce((acc, curr) => acc + curr.qty, 0);
+      const badge = document.getElementById('cartCountBadge');
+      if (totalQty > 0) {
+        badge.textContent = totalQty;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    function openCartModal() {
+      renderCartItemList();
+      calculateCartTotals();
+      document.getElementById('cartModal').classList.remove('hidden');
+    }
+
+    function closeCartModal() {
+      document.getElementById('cartModal').classList.add('hidden');
+    }
+
+    function renderCartItemList() {
+      const container = document.getElementById('cartItemsList');
+      const items = Object.entries(AppState.cart);
+
+      if (items.length === 0) {
+        container.innerHTML = `
+          <div class="py-8 text-center text-slate-400 space-y-1">
+            <i class="fa-solid fa-bag-shopping text-3xl"></i>
+            <p class="text-xs font-semibold">Keranjang masih kosong.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = items.map(([key, entry]) => {
+        const price = entry.product.discount 
+          ? Math.round(entry.product.price * (1 - entry.product.discount / 100)) 
+          : entry.product.price;
+        return `
+          <div class="bg-white p-2.5 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 text-xs">
+            <img src="${entry.product.image}" class="w-12 h-12 rounded-xl object-cover bg-slate-100 shrink-0" />
+            <div class="flex-1">
+              <h4 class="font-bold text-slate-800 line-clamp-1">${entry.product.name}</h4>
+              <p class="text-[10px] text-slate-400">${entry.variant} • Rp ${price.toLocaleString('id-ID')}</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-black text-slate-800 text-xs mr-1">Rp ${(price * entry.qty).toLocaleString('id-ID')}</span>
+              <button onclick="modifyCartQty('${key}', -1)" class="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-bold flex items-center justify-center">-</button>
+              <span class="font-bold text-xs px-1">${entry.qty}</span>
+              <button onclick="modifyCartQty('${key}', 1)" class="w-6 h-6 rounded-lg bg-shopee-primary text-white font-bold flex items-center justify-center">+</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function modifyCartQty(key, delta) {
+      if (!AppState.cart[key]) return;
+      AppState.cart[key].qty += delta;
+      if (AppState.cart[key].qty <= 0) {
+        delete AppState.cart[key];
+      }
+      updateCartBadge();
+      renderCartItemList();
+      calculateCartTotals();
+    }
+
+    function calculateCartTotals() {
+      const items = Object.values(AppState.cart);
+      let subtotal = 0;
+
+      items.forEach(e => {
+        const p = e.product.discount ? Math.round(e.product.price * (1 - e.product.discount / 100)) : e.product.price;
+        subtotal += p * e.qty;
+      });
+
+      const distKm = AppState.calculatedDistanceKm || 12.5;
+      const speedChoice = document.querySelector('input[name="shippingSpeed"]:checked')?.value || 'reguler';
+
+      // Distance Fee Formula
+      let baseRate = 9000;
+      let kmMultiplier = 2000;
+      if (speedChoice === 'instant') { baseRate = 18000; kmMultiplier = 3500; }
+      else if (speedChoice === 'kargo') { baseRate = 7000; kmMultiplier = 1200; }
+
+      let shippingFee = subtotal > 0 ? Math.round(baseRate + (distKm * kmMultiplier)) : 0;
+
+      // Voucher Application
+      let discountAmount = 0;
+      const v = AppState.appliedVoucher;
+      if (v === 'ONGKIR0' && shippingFee > 0) {
+        discountAmount = Math.min(shippingFee, 20000);
+      } else if (v === 'DISKON20' && subtotal > 0) {
+        discountAmount = Math.min(Math.round(subtotal * 0.20), 50000);
+      } else if (v === 'CASHBACK' && subtotal > 0) {
+        discountAmount = 15000;
+      }
+
+      const serviceFee = subtotal > 0 ? 1000 : 0;
+      const grandTotal = Math.max(0, subtotal + shippingFee - discountAmount + serviceFee);
+
+      document.getElementById('billSubtotalText').textContent = `Rp ${subtotal.toLocaleString('id-ID')}`;
+      document.getElementById('billShippingLabel').textContent = `Ongkos Kirim (${distKm} km • ${speedChoice.toUpperCase()})`;
+      document.getElementById('billShippingFeeText').textContent = `Rp ${shippingFee.toLocaleString('id-ID')}`;
+      document.getElementById('billDiscountText').textContent = `-Rp ${discountAmount.toLocaleString('id-ID')}`;
+      document.getElementById('billGrandTotalText').textContent = `Rp ${grandTotal.toLocaleString('id-ID')}`;
+
+      AppState.currentOrderCalculation = {
+        subtotal,
+        shippingFee,
+        discountAmount,
+        grandTotal,
+        speedChoice,
+        distanceKm: distKm
+      };
+    }
+
+    function applyVoucher() {
+      AppState.appliedVoucher = document.getElementById('voucherSelect').value;
+      const badge = document.getElementById('activeVoucherBadge');
+      if (AppState.appliedVoucher !== 'none') {
+        badge.classList.remove('hidden');
+        showToast("Voucher berhasil diklaim!", "success");
+      } else {
+        badge.classList.add('hidden');
+      }
+      calculateCartTotals();
+    }
+
+    /* Checkout & Payment Workflow */
+    function executeOrderCheckout() {
+      if (Object.keys(AppState.cart).length === 0) {
+        showToast("Keranjang belanja Anda masih kosong!", "warning");
+        return;
+      }
+
+      const payMethod = document.querySelector('input[name="cartPayMethod"]:checked').value;
+      const calc = AppState.currentOrderCalculation;
+      closeCartModal();
+
+      if (payMethod === 'shopsimpay') {
+        if (AppState.shopSimPayBalance < calc.grandTotal) {
+          showToast("Saldo ShopSimPay tidak mencukupi! Silakan Top Up.", "warning");
+          openTopUpModal();
+          return;
+        }
+        AppState.shopSimPayBalance -= calc.grandTotal;
+        updateShopSimPayDisplay();
+        finalizeOrderPayment('ShopSimPay');
+      } else if (payMethod === 'qris') {
+        openPaymentGatewayModal('qris', calc.grandTotal);
+      } else if (payMethod === 'va') {
+        openPaymentGatewayModal('va', calc.grandTotal);
+      } else {
+        // COD
+        finalizeOrderPayment('COD (Bayar Tunai)');
+      }
+    }
+
+    function openPaymentGatewayModal(method, amount) {
+      const modal = document.getElementById('paymentModal');
+      const qrisArea = document.getElementById('payAreaQris');
+      const vaArea = document.getElementById('payAreaVA');
+      document.getElementById('payModalAmountText').textContent = `Rp ${amount.toLocaleString('id-ID')}`;
+
+      if (method === 'qris') {
+        document.getElementById('payModalTitle').textContent = "Pembayaran QRIS Sim";
+        document.getElementById('payModalSubtitle').textContent = "Pindai kode QRIS dinamis di bawah ini";
+        document.getElementById('payModalIcon').innerHTML = `<i class="fa-solid fa-qrcode text-emerald-600"></i>`;
+        qrisArea.classList.remove('hidden');
+        vaArea.classList.add('hidden');
+        drawProceduralQris();
+      } else {
+        document.getElementById('payModalTitle').textContent = "Virtual Account";
+        document.getElementById('payModalSubtitle').textContent = "Transfer ke rekening virtual resmi sebelum batas waktu";
+        document.getElementById('payModalIcon').innerHTML = `<i class="fa-solid fa-building-columns text-blue-600"></i>`;
+        qrisArea.classList.add('hidden');
+        vaArea.classList.remove('hidden');
+        document.getElementById('vaNumberDisplay').textContent = `8921 ${Math.floor(1000 + Math.random() * 9000)} ${Math.floor(1000 + Math.random() * 9000)} ${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closePaymentModal() {
+      document.getElementById('paymentModal').classList.add('hidden');
+    }
+
+    function copyVaNumber() {
+      const text = document.getElementById('vaNumberDisplay').textContent.replace(/\s+/g, '');
+      const tempInput = document.createElement("input");
+      tempInput.value = text;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand("copy");
+      document.body.removeChild(tempInput);
+      showToast("Nomor Virtual Account disalin!", "success");
+    }
+
+    function confirmPaymentSuccess() {
+      closePaymentModal();
+      finalizeOrderPayment('Digital Gateway');
+    }
+
+    // Canvas Procedural QR Code Rendering
+    function drawProceduralQris() {
+      const canvas = document.getElementById('proceduralQrisCanvas');
+      const ctx = canvas.getContext('2d');
+      const size = 190;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, size, size);
+
+      function drawCorner(x, y) {
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(x, y, 42, 42);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x + 7, y + 7, 28, 28);
+        ctx.fillStyle = "#ee4d2d";
+        ctx.fillRect(x + 14, y + 14, 14, 14);
+      }
+
+      drawCorner(15, 15);
+      drawCorner(size - 57, 15);
+      drawCorner(15, size - 57);
+
+      // Randomised Pattern
+      ctx.fillStyle = "#1e293b";
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 15; c++) {
+          if ((r < 5 && c < 5) || (r < 5 && c > 9) || (r > 9 && c < 5)) continue;
+          if ((r * 3 + c * 7) % 2 === 0 || (r + c) % 3 === 0) {
+            ctx.fillRect(20 + c * 10, 20 + r * 10, 7, 7);
+          }
+        }
+      }
+
+      // Middle Logo
+      ctx.fillStyle = "#ee4d2d";
+      ctx.fillRect(size / 2 - 16, size / 2 - 16, 32, 32);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 10px Inter";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("QRIS", size / 2, size / 2);
+    }
+
+    /* Multi-Hub Logistics & Live Tracking Engine */
+    async function finalizeOrderPayment(payMethodName) {
+      SoundBox.play('success');
+      showToast("Pesanan Berhasil Dibayar & Masuk Logistik!", "success");
+
+      const calc = AppState.currentOrderCalculation;
+      const resi = `SPX-${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+      const newOrder = {
+        resi,
+        timestamp: Date.now(),
+        dateStr: new Date().toLocaleString('id-ID'),
+        items: Object.values(AppState.cart),
+        total: calc.grandTotal,
+        subtotal: calc.subtotal,
+        shippingFee: calc.shippingFee,
+        discount: calc.discountAmount,
+        paymentMethod: payMethodName,
+        status: 'Dikirim',
+        courier: {
+          name: "Slamet Raharjo",
+          armada: "Armada SPX Pickup • B 6192 SOZ",
+          rating: "4.9 ★"
+        },
+        timeline: [
+          { time: new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}), desc: "Pesanan berhasil dibayar & sedang disiapkan oleh Gudang Toko." }
+        ]
+      };
+
+      const orderId = await db.orders.add(newOrder);
+      newOrder.id = orderId;
+      AppState.activeOrder = newOrder;
+
+      // Reset Shopping Cart
+      AppState.cart = {};
+      updateCartBadge();
+      renderCatalogGrid();
+      renderOrderHistory();
+
+      // Switch to Logistics Map Tab and Start Live Run
+      switchTab('trackingTab');
+      startLiveLogisticsSimulation();
+    }
+
+    function startLiveLogisticsSimulation() {
+      if (!transportMarker || !AppState.routeWaypoints || AppState.routeWaypoints.length < 3) return;
+
+      document.getElementById('trackingOverlayCard').classList.remove('hidden');
+      document.getElementById('navTrackingBadge').classList.remove('hidden');
+      document.getElementById('trackingResiBadge').textContent = AppState.activeOrder.resi;
+      document.getElementById('trackingStatusBadge').textContent = "Dalam Pengiriman";
+      document.getElementById('trackingStatusBadge').className = "bg-orange-100 text-shopee-primary text-[10px] font-bold px-2 py-0.5 rounded-full";
+
+      // Place transport at start (Warehouse)
+      transportMarker.setLatLng(AppState.warehouseLoc).addTo(logisticsMapInstance);
+
+      AppState.deliveryProgress = 0.0;
+      AppState.lastTimestamp = performance.now();
+
+      if (AppState.trackingTimerId) cancelAnimationFrame(AppState.trackingTimerId);
+      runLogisticsSimulationLoop();
+    }
+
+    function runLogisticsSimulationLoop(now) {
+      if (!AppState.activeOrder) return;
+
+      if (!AppState.isSimPaused && now) {
+        const deltaSec = (now - AppState.lastTimestamp) / 1000;
+        AppState.lastTimestamp = now;
+
+        // Base completion takes 40 seconds at 1x speed
+        let speedMult = AppState.simSpeed;
+        if (AppState.simEnvironment === 'rain') speedMult *= 0.8;
+        if (AppState.simEnvironment === 'traffic') speedMult *= 0.6;
+        if (AppState.simEnvironment === 'storm') speedMult *= 0.5;
+
+        const progressInc = (deltaSec / 45) * speedMult;
+        AppState.deliveryProgress = Math.min(1.0, AppState.deliveryProgress + progressInc);
+        updateLogisticsUI(AppState.deliveryProgress);
+      } else {
+        AppState.lastTimestamp = now || performance.now();
+      }
+
+      if (AppState.deliveryProgress < 1.0) {
+        AppState.trackingTimerId = requestAnimationFrame(runLogisticsSimulationLoop);
+      } else {
+        finishLogisticsDelivery();
+      }
+    }
+
+    /* Live Stage Tracking & Timeline Update */
+    function updateLogisticsUI(progress) {
+      const pct = Math.round(progress * 100);
+      document.getElementById('logisticsProgressBar').style.width = `${pct}%`;
+      document.getElementById('overlayPercentText').textContent = `${pct}%`;
+
+      const totalWaypoints = AppState.routeWaypoints.length;
+      const overlayText = document.getElementById('overlayStageText');
+      const headline = document.getElementById('trackingHeadline');
+      const transIcon = document.getElementById('overlayTransportIcon');
+      const mapIcon = document.getElementById('mapTransportIcon');
+
+      // Stage 1: Packing & Picked Up from Warehouse (0% - 25%)
+      if (progress < 0.25) {
+        headline.textContent = "Pesanan sedang dikemas dan dijemput oleh armada logistik.";
+        overlayText.textContent = "Tahap 1: Pengambilan dari Gudang Cakung";
+        transIcon.className = "fa-solid fa-boxes-packing";
+        if (mapIcon) mapIcon.className = "fa-solid fa-boxes-packing";
+        transportMarker.setLatLng(AppState.warehouseLoc);
+        addTimelineLogIfNotExists("Paket telah di-pickup dari Gudang Cakung DC.");
+      }
+      // Stage 2: Moving from Warehouse to Sorting Hub (25% - 60%)
+      else if (progress >= 0.25 && progress < 0.60) {
+        headline.textContent = "Paket sedang dalam perjalanan truk transit menuju Sorting Hub.";
+        overlayText.textContent = "Tahap 2: Truk Ekspedisi Menuju Hub Kuningan";
+        transIcon.className = "fa-solid fa-truck-fast";
+        if (mapIcon) mapIcon.className = "fa-solid fa-truck-fast";
+
+        const travelRatio = (progress - 0.25) / 0.35;
+        const targetIdx = Math.min(Math.floor(totalWaypoints * 0.5), Math.floor(travelRatio * (totalWaypoints * 0.5)));
+        if (AppState.routeWaypoints[targetIdx]) {
+          transportMarker.setLatLng(AppState.routeWaypoints[targetIdx]);
+        }
+        addTimelineLogIfNotExists("Paket tiba di Sorting Hub Kuningan DC & dipilah.");
+      }
+      // Stage 3: Last-Mile Courier Delivery to Home (60% - 100%)
+      else {
+        headline.textContent = "Kurir motor sedang menuju alamat penerima.";
+        overlayText.textContent = "Tahap 3: Kurir Last-Mile Menuju Rumah Anda";
+        transIcon.className = "fa-solid fa-motorcycle";
+        if (mapIcon) mapIcon.className = "fa-solid fa-motorcycle";
+
+        const travelRatio = (progress - 0.60) / 0.40;
+        const startIdx = Math.floor(totalWaypoints * 0.5);
+        const remainingIdx = totalWaypoints - startIdx;
+        const targetIdx = Math.min(totalWaypoints - 1, startIdx + Math.floor(travelRatio * remainingIdx));
+        if (AppState.routeWaypoints[targetIdx]) {
+          transportMarker.setLatLng(AppState.routeWaypoints[targetIdx]);
+        }
+        addTimelineLogIfNotExists("Kurir membawa paket untuk diantar ke alamat tujuan.");
+      }
+
+      // Dynamic ETA Calculation
+      const remainingSec = Math.max(0, Math.round((1 - progress) * 45 / AppState.simSpeed));
+      document.getElementById('trackingEtaText').textContent = `Estimasi Tiba: ~${remainingSec} detik lagi (Simulasi)`;
+    }
+
+    function addTimelineLogIfNotExists(msg) {
+      if (!AppState.activeOrder) return;
+      const exists = AppState.activeOrder.timeline.some(t => t.desc === msg);
+      if (!exists) {
+        const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        AppState.activeOrder.timeline.unshift({ time: timeStr, desc: msg });
+        renderTrackingTimeline();
+      }
+    }
+
+    function renderTrackingTimeline() {
+      const container = document.getElementById('timelineLogContainer');
+      if (!AppState.activeOrder) {
+        container.innerHTML = `<p class="text-slate-400 italic text-[11px]">Belum ada paket aktif yang terlacak.</p>`;
+        return;
+      }
+
+      container.innerHTML = AppState.activeOrder.timeline.map((item, idx) => `
+        <div class="relative pl-3">
+          <span class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full ${idx === 0 ? 'bg-shopee-primary ring-4 ring-orange-100' : 'bg-slate-300'}"></span>
+          <p class="font-bold text-slate-800 ${idx === 0 ? 'text-shopee-primary' : ''}">${item.desc}</p>
+          <span class="text-[10px] text-slate-400">${item.time}</span>
+        </div>
+      `).join('');
+    }
+
+    function finishLogisticsDelivery() {
+      SoundBox.play('success');
+      showToast("Paket Berhasil Diterima di Tujuan!", "success");
+
+      document.getElementById('trackingStatusBadge').textContent = "Selesai Diterima";
+      document.getElementById('trackingStatusBadge').className = "bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full";
+      document.getElementById('trackingHeadline').textContent = "Paket telah sampai di alamat tujuan Anda. Terima kasih!";
+      document.getElementById('trackingOverlayCard').classList.add('hidden');
+      document.getElementById('navTrackingBadge').classList.add('hidden');
+
+      if (AppState.activeOrder) {
+        AppState.activeOrder.status = 'Selesai';
+        addTimelineLogIfNotExists("Paket telah diterima oleh penerima yang bersangkutan.");
+        db.orders.update(AppState.activeOrder.id, {
+          status: 'Selesai',
+          timeline: AppState.activeOrder.timeline
+        });
+      }
+
+      renderOrderHistory();
+
+      // Open Rating Modal after brief moment
+      setTimeout(() => {
+        openRatingModal();
+      }, 800);
+    }
+
+    /* Simulation Speed & Pause Management */
+    function setSimulationSpeed(speed) {
+      AppState.simSpeed = speed;
+      document.getElementById('headerSpeedText').textContent = `${speed}x Speed`;
+      document.querySelectorAll('.sim-speed-btn').forEach(btn => {
+        if (parseInt(btn.getAttribute('data-speed')) === speed) {
+          btn.className = "sim-speed-btn py-2 rounded-xl border border-shopee-primary bg-shopee-subtle text-shopee-primary font-bold";
+        } else {
+          btn.className = "sim-speed-btn py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold";
+        }
+      });
+      showToast(`Kecepatan simulasi: ${speed}x`, "info");
+    }
+
+    function toggleSimulationPause() {
+      AppState.isSimPaused = !AppState.isSimPaused;
+      const btn = document.getElementById('pauseSimBtn');
+      if (AppState.isSimPaused) {
+        btn.innerHTML = `<i class="fa-solid fa-play"></i> <span>Lanjutkan Simulasi</span>`;
+        showToast("Simulasi kurir dijeda.", "warning");
+      } else {
+        btn.innerHTML = `<i class="fa-solid fa-pause"></i> <span>Jeda Simulasi</span>`;
+        AppState.lastTimestamp = performance.now();
+        showToast("Simulasi kurir dilanjutkan.", "info");
+      }
+    }
+
+    function resetActiveDeliverySimulation() {
+      if (AppState.trackingTimerId) cancelAnimationFrame(AppState.trackingTimerId);
+      AppState.activeOrder = null;
+      AppState.deliveryProgress = 0;
+      if (transportMarker && logisticsMapInstance) logisticsMapInstance.removeLayer(transportMarker);
+      document.getElementById('trackingOverlayCard').classList.add('hidden');
+      document.getElementById('navTrackingBadge').classList.add('hidden');
+      document.getElementById('trackingStatusBadge').textContent = "Belum Ada Pengiriman";
+      document.getElementById('trackingStatusBadge').className = "bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full";
+      document.getElementById('trackingHeadline').textContent = "Lakukan checkout belanja untuk menyalakan simulasi rute antar-hub.";
+      document.getElementById('timelineLogContainer').innerHTML = `<p class="text-slate-400 italic text-[11px]">Belum ada paket aktif yang terlacak.</p>`;
+      toggleSimSettingsModal();
+      showToast("Simulasi pengiriman direset.", "info");
+    }
+
+    function updateSimEnvironment() {
+      AppState.simEnvironment = document.getElementById('simEnvironmentSelect').value;
+      showToast("Kondisi lingkungan simulasi diperbarui.", "info");
+    }
+
+    // Prevention of time drift during background browser tab switching
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && !AppState.isSimPaused) {
+        AppState.lastTimestamp = performance.now();
+      }
+    });
+
+    /* Geotagging & Geolocation */
+    function toggleGeotagModal() {
+      const m = document.getElementById('geotagModal');
+      m.classList.toggle('hidden');
+    }
+
+    function setPresetCoord(type, lat, lng, name) {
+      if (type === 'warehouse') {
+        document.getElementById('geoWarehouseLat').value = lat;
+        document.getElementById('geoWarehouseLng').value = lng;
+      } else if (type === 'hub') {
+        document.getElementById('geoHubLat').value = lat;
+        document.getElementById('geoHubLng').value = lng;
+      }
+    }
+
+    function useCurrentGeolocation() {
+      if (!navigator.geolocation) {
+        showToast("Geolocation tidak didukung pada browser ini.", "warning");
+        return;
+      }
+      showToast("Mengakses sensor GPS...", "info");
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          document.getElementById('geoBuyerLat').value = pos.coords.latitude.toFixed(4);
+          document.getElementById('geoBuyerLng').value = pos.coords.longitude.toFixed(4);
+          showToast("Lokasi GPS Anda berhasil dimasukkan!", "success");
+        },
+        err => {
+          showToast("Akses GPS ditolak atau butuh izin HTTPS.", "warning");
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    }
+
+    function saveGeotagCoordinates() {
+      const wLat = parseFloat(document.getElementById('geoWarehouseLat').value);
+      const wLng = parseFloat(document.getElementById('geoWarehouseLng').value);
+      const hLat = parseFloat(document.getElementById('geoHubLat').value);
+      const hLng = parseFloat(document.getElementById('geoHubLng').value);
+      const bLat = parseFloat(document.getElementById('geoBuyerLat').value);
+      const bLng = parseFloat(document.getElementById('geoBuyerLng').value);
+
+      if (isNaN(wLat) || isNaN(wLng) || isNaN(hLat) || isNaN(hLng) || isNaN(bLat) || isNaN(bLng)) {
+        showToast("Mohon masukkan angka koordinat yang valid!", "warning");
+        return;
+      }
+
+      AppState.warehouseLoc = { lat: wLat, lng: wLng, name: "Gudang Cakung DC" };
+      AppState.hubLoc = { lat: hLat, lng: hLng, name: "Sorting Hub Kuningan" };
+      AppState.buyerLoc = { lat: bLat, lng: bLng, name: "Alamat Pembeli Custom" };
+
+      if (warehouseMarker) warehouseMarker.setLatLng([wLat, wLng]);
+      if (hubMarker) hubMarker.setLatLng([hLat, hLng]);
+      if (buyerMarker) buyerMarker.setLatLng([bLat, bLng]);
+
+      recalculateLogisticsRoute();
+      toggleGeotagModal();
+      showToast("Koordinat geotagging disimpan & rute diperbarui!", "success");
+    }
+
+    /* Dual-Chat Simulator (Seller & Courier) */
+    function openChatModal(mode = 'seller') {
+      AppState.chatMode = mode;
+      const avatar = document.getElementById('chatPartnerAvatar');
+      const name = document.getElementById('chatPartnerName');
+      const role = document.getElementById('chatPartnerRole');
+
+      if (mode === 'seller') {
+        avatar.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
+        name.textContent = "Official Store ShopSim";
+        role.textContent = "Online • Penjual Terpercaya";
+      } else {
+        avatar.src = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop";
+        name.textContent = AppState.activeOrder?.courier?.name || "Kurir SPX Express";
+        role.textContent = "Dalam Perjalanan • Kurir Pengantar";
+      }
+
+      renderChatMessages();
+      document.getElementById('chatModal').classList.remove('hidden');
+    }
+
+    function closeChatModal() {
+      document.getElementById('chatModal').classList.add('hidden');
+    }
+
+    function chatAboutCurrentProduct() {
+      const p = AppState.selectedDetailProduct;
+      if (!p) return;
+      closeProductDetailModal();
+      openChatModal('seller');
+      quickSendChat(`Halo kak, saya tertarik dengan produk ${p.name}. Apakah stoknya siap dikirim?`);
+    }
+
+    function renderChatMessages() {
+      const container = document.getElementById('chatHistoryContainer');
+      const history = AppState.chatMode === 'seller' ? AppState.sellerChat : AppState.courierChat;
+
+      container.innerHTML = history.map(c => `
+        <div class="flex ${c.sender === 'user' ? 'justify-end' : 'justify-start'}">
+          <div class="max-w-[78%] p-2.5 rounded-2xl ${
+            c.sender === 'user' 
+              ? 'bg-shopee-primary text-white rounded-br-none' 
+              : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none shadow-sm'
+          }">
+            <p>${c.text}</p>
+            <span class="text-[9px] block mt-0.5 opacity-70 text-right">${c.time}</span>
+          </div>
+        </div>
+      `).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function quickSendChat(text) {
+      document.getElementById('chatInputMessage').value = text;
+      sendChatMessage();
+    }
+
+    function sendChatMessage() {
+      const input = document.getElementById('chatInputMessage');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const history = AppState.chatMode === 'seller' ? AppState.sellerChat : AppState.courierChat;
+      history.push({ sender: 'user', text, time: timeStr });
+      input.value = '';
+      renderChatMessages();
+      SoundBox.play('click');
+
+      // Automated Mock Response
+      setTimeout(() => {
+        let reply = "";
+        if (AppState.chatMode === 'seller') {
+          const replies = [
+            "Halo Kak, barang ready stok original 100%! Bisa langsung checkout ya.",
+            "Pesanan yang masuk sebelum jam 16.00 langsung dikirim ke sorting hub hari ini juga kak.",
+            "Semua varian yang ada di etalase sudah kami pastikan lolos quality control ya kak."
+          ];
+          reply = replies[Math.floor(Math.random() * replies.length)];
+        } else {
+          const replies = [
+            "Siap Kak, paketnya aman di dalam box pengaman motor.",
+            "Sudah dekat dengan komplek perumahan Kak, sekitar 3 menit lagi sampai.",
+            "Baik Kak, nanti saya titipkan ke pos sekuriti sesuai instruksi."
+          ];
+          reply = replies[Math.floor(Math.random() * replies.length)];
+        }
+        history.push({ sender: 'partner', text: reply, time: 'Baru saja' });
+        SoundBox.play('cart');
+        renderChatMessages();
+      }, 1200);
+    }
+
+    /* Rating & Review Modal Logic */
+    function openRatingModal() {
+      setReviewRating(5);
+      document.getElementById('ratingModal').classList.remove('hidden');
+    }
+
+    function setReviewRating(stars) {
+      AppState.selectedReviewRating = stars;
+      const starBtns = document.querySelectorAll('#ratingStarBox button i');
+      starBtns.forEach((btn, idx) => {
+        if (idx < stars) {
+          btn.className = "fa-solid fa-star text-amber-400";
+        } else {
+          btn.className = "fa-regular fa-star text-slate-300";
+        }
+      });
+    }
+
+    function toggleReviewTagPill(btn) {
+      btn.classList.toggle('bg-orange-50');
+      btn.classList.toggle('border-shopee-primary');
+      btn.classList.toggle('text-shopee-primary');
+    }
+
+    async function submitProductReview() {
+      const comment = document.getElementById('reviewCommentText').value.trim();
+      if (AppState.activeOrder) {
+        await db.orders.update(AppState.activeOrder.id, {
+          rating: AppState.selectedReviewRating,
+          reviewComment: comment
+        });
+      }
+
+      document.getElementById('ratingModal').classList.add('hidden');
+      SoundBox.play('success');
+      showToast("Penilaian berhasil dikirim. Terima kasih!", "success");
+      renderOrderHistory();
+      switchTab('ordersTab');
+    }
+
+    async function renderOrderHistory() {
+      const orders = await db.orders.reverse().toArray();
+      const container = document.getElementById('orderHistoryList');
+
+      if (orders.length === 0) {
+        container.innerHTML = `
+          <div class="py-16 text-center text-slate-400 space-y-2">
+            <i class="fa-solid fa-receipt text-4xl"></i>
+            <p class="text-xs font-semibold">Belum ada transaksi riwayat pesanan.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = orders.map(ord => `
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-2.5 text-xs">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div>
+              <p class="font-extrabold text-slate-800">No. Resi: ${ord.resi}</p>
+              <p class="text-[10px] text-slate-400">${ord.dateStr || 'Baru saja'} • ${ord.paymentMethod}</p>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+              ord.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-shopee-primary'
+            }">
+              ${ord.status}
+            </span>
+          </div>
+
+          <div class="space-y-1.5">
+            ${(ord.items || []).map(i => `
+              <div class="flex justify-between items-center text-slate-600">
+                <span class="font-medium truncate max-w-[200px]">${i.qty}x ${i.product.name} (${i.variant})</span>
+                <span class="font-semibold text-slate-800">Rp ${(i.qty * i.product.price).toLocaleString('id-ID')}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="flex items-center justify-between pt-1 border-t border-slate-100 font-extrabold text-slate-800">
+            <span>Total Pembayaran</span>
+            <span class="text-shopee-primary font-mono text-sm">Rp ${Number(ord.total).toLocaleString('id-ID')}</span>
+          </div>
+
+          ${ord.rating ? `
+            <div class="bg-amber-50/70 p-2 rounded-xl text-[11px] text-amber-900 flex items-center justify-between">
+              <span>Ulasan Anda:</span>
+              <span class="font-bold text-amber-600">${'★'.repeat(ord.rating)} (${ord.rating}/5)</span>
+            </div>
+          ` : `
+            <div class="pt-1 flex justify-end">
+              <button onclick="openRatingModal()" class="px-3 py-1 rounded-xl bg-shopee-subtle text-shopee-primary border border-shopee-primary font-bold text-[11px] hover:bg-orange-100 transition">
+                Beri Penilaian
+              </button>
+            </div>
+          `}
+        </div>
+      `).join('');
+    }
+
+    async function clearOrderHistory() {
+      await db.orders.clear();
+      renderOrderHistory();
+      showToast("Seluruh riwayat pesanan dibersihkan.", "info");
+    }
+
+    /* Admin Product CRUD & JSON Scenario Portability */
+    function openProductFormModal(isEdit = false) {
+      document.getElementById('productFormModalTitle').textContent = isEdit ? "Ubah Detail Produk" : "Tambah Produk Baru";
+      if (!isEdit) {
+        document.getElementById('crudProductForm').reset();
+        document.getElementById('formProductId').value = '';
+      }
+      document.getElementById('productFormModal').classList.remove('hidden');
+    }
+
+    function closeProductFormModal() {
+      document.getElementById('productFormModal').classList.add('hidden');
+    }
+
+    async function renderAdminProductList() {
+      const items = await db.products.toArray();
+      const container = document.getElementById('adminProductList');
+
+      container.innerHTML = items.map(p => `
+        <div class="bg-white p-2.5 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 text-xs shadow-sm">
+          <img src="${p.image || 'https://placehold.co/100'}" class="w-12 h-12 rounded-xl object-cover bg-slate-100 shrink-0" />
+          <div class="flex-1">
+            <h4 class="font-bold text-slate-800 line-clamp-1">${p.name}</h4>
+            <p class="text-[11px] text-slate-500">${p.category} • Rp ${Number(p.price).toLocaleString('id-ID')} (Stok: ${p.stock || 20})</p>
+          </div>
+          <div class="flex gap-1">
+            <button onclick="editAdminProduct(${p.id})" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700">
+              <i class="fa-solid fa-pen text-xs"></i>
+            </button>
+            <button onclick="deleteAdminProduct(${p.id})" class="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600">
+              <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function editAdminProduct(id) {
+      const p = await db.products.get(id);
+      if (!p) return;
+
+      document.getElementById('formProductId').value = p.id;
+      document.getElementById('formProductName').value = p.name;
+      document.getElementById('formProductCategory').value = p.category;
+      document.getElementById('formProductPrice').value = p.price;
+      document.getElementById('formProductDiscount').value = p.discount || 0;
+      document.getElementById('formProductStock').value = p.stock || 25;
+      document.getElementById('formProductDesc').value = p.desc || '';
+      document.getElementById('formProductImageUrl').value = p.image || '';
+
+      openProductFormModal(true);
+    }
+
+    async function handleProductFormSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('formProductId').value;
+      const data = {
+        name: document.getElementById('formProductName').value.trim(),
+        category: document.getElementById('formProductCategory').value,
+        price: parseInt(document.getElementById('formProductPrice').value),
+        discount: parseInt(document.getElementById('formProductDiscount').value) || 0,
+        stock: parseInt(document.getElementById('formProductStock').value) || 20,
+        desc: document.getElementById('formProductDesc').value.trim(),
+        image: document.getElementById('formProductImageUrl').value.trim() || "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=400",
+        rating: 4.9,
+        soldCount: "Baru",
+        variants: ["Default"]
+      };
+
+      if (id) {
+        await db.products.update(parseInt(id), data);
+        showToast("Produk berhasil diperbarui!", "success");
+      } else {
+        await db.products.add(data);
+        showToast("Produk baru berhasil ditambahkan!", "success");
+      }
+
+      closeProductFormModal();
+      renderCatalogGrid();
+      renderAdminProductList();
+      renderCategoryChips();
+    }
+
+    async function deleteAdminProduct(id) {
+      await db.products.delete(id);
+      showToast("Produk dihapus dari katalog.", "info");
+      renderCatalogGrid();
+      renderAdminProductList();
+      renderCategoryChips();
+    }
+
+    function handleProductFilePick(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        document.getElementById('formProductImageUrl').value = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Export Scenario JSON
+    async function exportScenarioJSON() {
+      const products = await db.products.toArray();
+      const scenario = {
+        app: "ShopSim",
+        version: "2.0",
+        exportedAt: new Date().toISOString(),
+        warehouseLoc: AppState.warehouseLoc,
+        hubLoc: AppState.hubLoc,
+        buyerLoc: AppState.buyerLoc,
+        catalog: products
+      };
+
+      const blob = new Blob([JSON.stringify(scenario, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ShopSim_Scenario_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Skenario berhasil diekspor ke file JSON!", "success");
+    }
+
+    // Import Scenario JSON
+    function importScenarioJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const scenario = JSON.parse(e.target.result);
+          if (scenario.catalog && Array.isArray(scenario.catalog)) {
+            await db.products.clear();
+            await db.products.bulkAdd(scenario.catalog);
+          }
+          if (scenario.warehouseLoc) AppState.warehouseLoc = scenario.warehouseLoc;
+          if (scenario.hubLoc) AppState.hubLoc = scenario.hubLoc;
+          if (scenario.buyerLoc) AppState.buyerLoc = scenario.buyerLoc;
+
+          renderCatalogGrid();
+          renderAdminProductList();
+          renderCategoryChips();
+          recalculateLogisticsRoute();
+          showToast("Skenario berhasil diimpor!", "success");
+        } catch (err) {
+          showToast("Format file skenario JSON tidak valid!", "warning");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    async function restoreDefaultCatalog() {
+      await db.products.clear();
+      await db.products.bulkAdd(defaultProductSeeds);
+      renderCatalogGrid();
+      renderAdminProductList();
+      renderCategoryChips();
+      showToast("Katalog produk bawaan berhasil dipulihkan!", "success");
+    }
+
+    async function resetShopSimDatabase() {
+      await db.products.clear();
+      await db.orders.clear();
+      await db.products.bulkAdd(defaultProductSeeds);
+      AppState.cart = {};
+      updateCartBadge();
+      renderCatalogGrid();
+      renderAdminProductList();
+      renderCategoryChips();
+      renderOrderHistory();
+      showToast("Penyimpanan cache database berhasil direset!", "success");
+    }
+
+    /* Utility Functions */
+    function openTopUpModal() {
+      AppState.shopSimPayBalance += 100000;
+      updateShopSimPayDisplay();
+      SoundBox.play('success');
+      showToast("Top up berhasil! +Rp 100.000 saldo ShopSimPay.", "success");
+    }
+
+    function updateShopSimPayDisplay() {
+      document.getElementById('shopSimPayBalance').textContent = `Rp ${AppState.shopSimPayBalance.toLocaleString('id-ID')}`;
+    }
+
+    function startFlashSaleCountdown() {
+      let secondsLeft = 2 * 3600 + 45 * 60 + 19;
+      setInterval(() => {
+        if (secondsLeft > 0) {
+          secondsLeft--;
+          const h = Math.floor(secondsLeft / 3600);
+          const m = Math.floor((secondsLeft % 3600) / 60);
+          const s = secondsLeft % 60;
+          document.getElementById('flashHours').textContent = String(h).padStart(2, '0');
+          document.getElementById('flashMinutes').textContent = String(m).padStart(2, '0');
+          document.getElementById('flashSeconds').textContent = String(s).padStart(2, '0');
+        }
+      }, 1000);
+    }
+
+    function toggleSimSettingsModal() {
+      document.getElementById('simSettingsModal').classList.toggle('hidden');
+    }
+
+    function switchTab(targetTabId) {
+      AppState.activeTab = targetTabId;
+      const tabs = ['catalogTab', 'trackingTab', 'ordersTab', 'adminTab'];
+      tabs.forEach(t => {
+        const el = document.getElementById(t);
+        if (t === targetTabId) {
+          el.classList.remove('hidden');
+        } else {
+          el.classList.add('hidden');
+        }
+      });
+
+      const navMap = {
+        catalogTab: 'navCatalog',
+        trackingTab: 'navTracking',
+        ordersTab: 'navOrders',
+        adminTab: 'navAdmin'
+      };
+
+      Object.entries(navMap).forEach(([tKey, nId]) => {
+        const btn = document.getElementById(nId);
+        if (tKey === targetTabId) {
+          btn.className = "flex flex-col items-center gap-0.5 text-shopee-primary transition";
+        } else {
+          btn.className = "flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-600 transition";
+        }
+      });
+
+      if (targetTabId === 'trackingTab' && logisticsMapInstance) {
+        setTimeout(() => {
+          logisticsMapInstance.invalidateSize();
+          recenterLogisticsMap();
+        }, 150);
+      }
+    }
+
+    function showToast(msg, type = 'info') {
+      const toast = document.getElementById('appToast');
+      const text = document.getElementById('toastStatusMsg');
+      const icon = document.getElementById('toastStatusIcon');
+
+      text.textContent = msg;
+      if (type === 'success') {
+        icon.className = "fa-solid fa-circle-check text-emerald-400";
+      } else if (type === 'warning') {
+        icon.className = "fa-solid fa-triangle-exclamation text-amber-400";
+      } else {
+        icon.className = "fa-solid fa-circle-info text-blue-400";
+      }
+
+      toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-[-10px]');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-[-10px]');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 3000);
+    }
+
+    /* Application Bootstrapping */
+    window.onload = function() {
+      initCatalogData();
+      initLogisticsMap();
+    };
+  </script>
+</body>
+</html>

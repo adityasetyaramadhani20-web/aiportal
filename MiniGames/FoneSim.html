@@ -1,0 +1,2453 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoneSim</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=VT323&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --lcd-bg: #98b894;
+      --lcd-text: #172b15;
+      --lcd-dim: rgba(23, 43, 21, 0.2);
+    }
+    
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .font-mono-retro {
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .font-pixel {
+      font-family: 'VT323', monospace;
+    }
+
+    /* Screen LCD scanline overlay */
+    .lcd-screen {
+      background-color: var(--lcd-bg);
+      color: var(--lcd-text);
+      position: relative;
+      box-shadow: inset 0 3px 10px rgba(0,0,0,0.5), inset 0 0 4px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+
+    .lcd-screen::before {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.08) 50%);
+      background-size: 100% 3px;
+      z-index: 40;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
+    /* Tactile Hardware Buttons */
+    .phone-btn {
+      transition: all 0.08s ease;
+      box-shadow: 0 4px 0 #1e293b, 0 6px 8px rgba(0,0,0,0.35);
+    }
+
+    .phone-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #1e293b, 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .phone-btn-green {
+      background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+      box-shadow: 0 4px 0 #065f46, 0 6px 8px rgba(0,0,0,0.35);
+    }
+    .phone-btn-green:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #065f46;
+    }
+
+    .phone-btn-red {
+      background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+      box-shadow: 0 4px 0 #991b1b, 0 6px 8px rgba(0,0,0,0.35);
+    }
+    .phone-btn-red:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #991b1b;
+    }
+
+    .d-pad-btn:active {
+      background-color: #334155;
+    }
+
+    /* Custom Scrollbar for Phone Display */
+    .phone-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .phone-scroll::-webkit-scrollbar-thumb {
+      background: rgba(23, 43, 21, 0.4);
+      border-radius: 4px;
+    }
+
+    /* Glow & Shimmer */
+    .lcd-backlight-active {
+      filter: brightness(1.05) contrast(1.02);
+    }
+
+    @keyframes pulseRing {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .animate-ring {
+      animation: pulseRing 1.2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-3 md:p-6 antialiased selection:bg-emerald-500 selection:text-white">
+
+  <div class="w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8">
+    
+    <!-- Left: Desktop Fast Simulation & Guide Panel -->
+    <div class="w-full lg:w-80 flex flex-col gap-4 order-2 lg:order-1">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300">Pusat Simulasi Cepat</h2>
+        </div>
+        <p class="text-xs text-slate-400 mb-4">Uji fitur telepon masuk dan pesan tanpa harus menunggu timer ponsel.</p>
+
+        <!-- Quick Trigger Call -->
+        <div class="space-y-3">
+          <button onclick="triggerQuickCall()" class="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-xs font-semibold rounded-xl flex items-center justify-between transition">
+            <span>📞 Panggil Telepon Sekarang</span>
+            <span class="text-[10px] bg-emerald-800 px-1.5 py-0.5 rounded">Simulasi</span>
+          </button>
+          
+          <button onclick="triggerQuickSMS()" class="w-full py-2.5 px-3 bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-xs font-semibold rounded-xl flex items-center justify-between transition">
+            <span>💬 Kirim SMS Sekarang</span>
+            <span class="text-[10px] bg-cyan-800 px-1.5 py-0.5 rounded">Simulasi</span>
+          </button>
+
+          <button onclick="toggleAudioEngine()" id="btn-audio-state" class="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-medium rounded-xl flex items-center justify-between text-slate-300 border border-slate-700 transition">
+            <span>🔊 Suara Nada & Keypad: <b id="lbl-audio-state" class="text-emerald-400">ON</b></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Instructions & Keyboard Bindings Card -->
+      <div class="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 text-xs text-slate-400 space-y-2">
+        <h3 class="text-xs font-bold uppercase text-slate-300 tracking-wider">Kontrol Keyboard Komputer</h3>
+        <ul class="space-y-1.5 list-disc pl-4 text-[11px] leading-relaxed">
+          <li><b class="text-slate-200">Numpad / Angka 0-9</b>: Input angka & Multi-tap SMS</li>
+          <li><b class="text-slate-200">Panah Atas / Bawah / Kiri / Kanan</b>: Navigasi D-Pad</li>
+          <li><b class="text-slate-200">Enter / Spasi</b>: Tombol OK (Pilih)</li>
+          <li><b class="text-slate-200">Backspace / Esc</b>: Softkey Kanan (Kembali / Hapus)</li>
+          <li><b class="text-slate-200">C</b>: Tombol Hijau (Panggil)</li>
+          <li><b class="text-slate-200">End / E</b>: Tombol Merah (Tutup / Home)</li>
+        </ul>
+      </div>
+
+      <!-- Quick Skin Selector -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+        <span class="text-xs font-medium text-slate-300">Warna Casing:</span>
+        <div class="flex gap-2">
+          <button onclick="changeChassisSkin('silver')" title="Silver Classic" class="w-6 h-6 rounded-full bg-slate-300 border-2 border-white/50 focus:scale-110 transition"></button>
+          <button onclick="changeChassisSkin('blue')" title="Cyber Blue" class="w-6 h-6 rounded-full bg-blue-600 border-2 border-white/50 focus:scale-110 transition"></button>
+          <button onclick="changeChassisSkin('black')" title="Matte Dark" class="w-6 h-6 rounded-full bg-neutral-900 border-2 border-white/50 focus:scale-110 transition"></button>
+          <button onclick="changeChassisSkin('pink')" title="Neon Ruby" class="w-6 h-6 rounded-full bg-pink-500 border-2 border-white/50 focus:scale-110 transition"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Physical Retro Phone Hardware Mockup -->
+    <div id="phone-chassis" class="relative w-[340px] sm:w-[360px] bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 p-5 rounded-[48px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_0_8px_#0f172a,0_0_0_12px_#334155] border-t-2 border-white/60 transition-all duration-300 order-1 lg:order-2">
+      
+      <!-- Top Speaker Grille & Brand -->
+      <div class="flex flex-col items-center mb-3">
+        <div class="w-16 h-1.5 bg-slate-700/80 rounded-full shadow-inner flex items-center justify-center gap-1.5">
+          <span class="w-1 h-1 bg-black/40 rounded-full"></span>
+          <span class="w-1 h-1 bg-black/40 rounded-full"></span>
+          <span class="w-1 h-1 bg-black/40 rounded-full"></span>
+        </div>
+        <div class="text-[11px] font-black tracking-[0.25em] text-slate-600/90 mt-1 uppercase select-none">
+          FONESIM <span class="text-[9px] text-slate-500 font-normal font-mono-retro">T-9</span>
+        </div>
+      </div>
+
+      <!-- LCD Screen Outer Bezel Frame -->
+      <div class="bg-neutral-900 p-3 rounded-[24px] shadow-[inset_0_4px_10px_rgba(0,0,0,0.9)] border border-neutral-700/50">
+        
+        <!-- Interactive Screen Viewport (240x320 feel) -->
+        <div id="lcd-screen" class="lcd-screen w-full h-[320px] rounded-[14px] flex flex-col justify-between p-2.5 relative select-none">
+          
+          <!-- System Status Bar -->
+          <div id="status-bar" class="w-full flex items-center justify-between text-[11px] font-mono-retro border-b border-black/15 pb-1 z-30">
+            <!-- Signal and Operator -->
+            <div class="flex items-center gap-1.5">
+              <div class="flex items-end gap-0.5 h-3" title="Sinyal Seluler">
+                <span class="w-1 h-1 bg-current rounded-none"></span>
+                <span class="w-1 h-1.5 bg-current rounded-none"></span>
+                <span class="w-1 h-2 bg-current rounded-none"></span>
+                <span class="w-1 h-3 bg-current rounded-none"></span>
+              </div>
+              <span id="stat-operator" class="font-bold tracking-tight uppercase truncate max-w-[85px]">INDOSIM</span>
+            </div>
+
+            <!-- Icons: SMS / Lock / Audio -->
+            <div class="flex items-center gap-1.5 text-[10px]">
+              <span id="stat-lock-icon" class="hidden">🔒</span>
+              <span id="stat-msg-icon" class="hidden animate-bounce">✉️</span>
+              <span id="stat-alarm-icon" class="hidden">⏰</span>
+            </div>
+
+            <!-- Battery and Clock -->
+            <div class="flex items-center gap-1.5">
+              <span id="stat-clock" class="font-bold">12:00</span>
+              <div class="w-4 h-2 border border-current p-[1px] flex items-center" title="Baterai">
+                <div id="stat-battery-bar" class="h-full bg-current w-3/4"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Main Content Area inside LCD -->
+          <div id="screen-container" class="relative flex-1 w-full h-[245px] overflow-hidden phone-scroll py-1">
+            
+            <!-- VIEW 1: HOME SCREEN -->
+            <div id="view-home" class="screen-view h-full flex flex-col justify-between text-center relative z-10">
+              <!-- Wallpaper overlay container -->
+              <div id="home-wallpaper-bg" class="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none rounded"></div>
+
+              <div class="mt-4 z-10">
+                <div id="home-time-display" class="font-pixel text-4xl font-bold tracking-wider leading-none">12:00</div>
+                <div id="home-date-display" class="font-mono-retro text-[11px] opacity-80 mt-1 uppercase">MIN, 06 SEP 2026</div>
+                <div id="home-unread-badge" class="hidden mt-2 inline-block bg-black/80 text-emerald-300 font-mono-retro text-[10px] px-2 py-0.5 rounded-full border border-black/40 animate-pulse">
+                  1 Pesan Baru
+                </div>
+              </div>
+
+              <!-- Quick Center Widget (Classic Retro Mascot / Logo) -->
+              <div class="my-auto z-10 flex flex-col items-center opacity-70">
+                <div class="w-12 h-12 border-2 border-dashed border-current rounded-full flex items-center justify-center font-pixel text-2xl font-black">
+                  📶
+                </div>
+                <span class="text-[10px] font-mono-retro tracking-widest uppercase mt-1">Siap Digunakan</span>
+              </div>
+
+              <div class="z-10 text-[9px] font-mono-retro opacity-60">
+                Tekan <b class="border-b border-current">Menu</b> untuk Mulai
+              </div>
+            </div>
+
+            <!-- VIEW 2: LOCK SCREEN -->
+            <div id="view-lockscreen" class="screen-view hidden h-full flex flex-col items-center justify-between text-center z-20">
+              <div class="mt-3">
+                <div class="text-2xl font-mono-retro">🔒</div>
+                <div class="text-xs font-bold tracking-wider uppercase font-mono-retro mt-1">Telepon Terkunci</div>
+              </div>
+              <div class="my-auto">
+                <div id="lock-time-display" class="font-pixel text-4xl">12:00</div>
+                <p class="text-[10px] font-mono-retro opacity-75 mt-1">Tekan Buka & Masukkan PIN</p>
+              </div>
+              <!-- PIN input box if active -->
+              <div id="lock-pin-box" class="hidden bg-black/20 p-2 rounded w-4/5 mx-auto mb-2 border border-black/30">
+                <div class="text-[10px] font-mono-retro mb-1">Ketik PIN:</div>
+                <div id="lock-pin-digits" class="font-mono-retro text-base tracking-[0.3em] font-bold">----</div>
+              </div>
+              <div class="text-[9px] font-mono-retro opacity-60">
+                PIN Bawaan: <span class="font-bold">1234</span>
+              </div>
+            </div>
+
+            <!-- VIEW 3: MAIN MENU (9-Grid Icons) -->
+            <div id="view-menu" class="screen-view hidden h-full flex flex-col z-10">
+              <div class="text-[11px] font-mono-retro font-bold border-b border-black/20 pb-0.5 mb-1 flex justify-between items-center">
+                <span>MENU UTAMA</span>
+                <span id="menu-index-label" class="text-[9px]">1/9</span>
+              </div>
+              <div id="menu-grid" class="grid grid-cols-3 gap-1 flex-1 py-1">
+                <!-- 9 Menu Apps -->
+                <div data-app="dialer" class="menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent cursor-pointer">
+                  <span class="text-lg">📞</span>
+                  <span class="text-[9px] font-mono-retro truncate">Panggilan</span>
+                </div>
+                <div data-app="messages" class="menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent cursor-pointer">
+                  <span class="text-lg">✉️</span>
+                  <span class="text-[9px] font-mono-retro truncate">Pesan</span>
+                </div>
+                <div data-app="contacts" class="menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent cursor-pointer">
+                  <span class="text-lg">👥</span>
+                  <span class="text-[9px] font-mono-retro truncate">Kontak</span>
+                </div>
+                <div data-app="media" class="menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent cursor-pointer">
+                  <span class="text-lg">🎵</span>
+                  <span class="text-[9px] font-mono-retro truncate">Media</span>
+                </div>
+                <div data-app="calc" class="menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent cursor-pointer">
+                  <span class="text-lg">🔢</span>
+                  <span class="text-[9px] font-mono-retro truncate">Kalkulator</span>
+                </div>
+                <div data-app="calendar" class="menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent cursor-pointer">
+                  <span class="text-lg">📅</span>
+                  <span class="text-[9px] font-mono-retro truncate">Kalender</span>
+                </div>
+                <div data-app="clock" class="menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent cursor-pointer">
+                  <span class="text-lg">⏱️</span>
+                  <span class="text-[9px] font-mono-retro truncate">Jam & Waktu</span>
+                </div>
+                <div data-app="snake" class="menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent cursor-pointer">
+                  <span class="text-lg">🐍</span>
+                  <span class="text-[9px] font-mono-retro truncate">Snake</span>
+                </div>
+                <div data-app="settings" class="menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent cursor-pointer">
+                  <span class="text-lg">⚙️</span>
+                  <span class="text-[9px] font-mono-retro truncate">Pengaturan</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- VIEW 4: DIALER & CALL SCREEN -->
+            <div id="view-dialer" class="screen-view hidden h-full flex flex-col justify-between z-10 font-mono-retro">
+              <div class="text-[11px] font-bold border-b border-black/20 pb-0.5">PANGGIL NOMOR</div>
+              
+              <div class="my-auto bg-black/10 p-2 rounded border border-black/20 text-right">
+                <div id="dialer-digits" class="text-xl font-bold tracking-wider overflow-x-auto whitespace-nowrap min-h-[30px] flex items-center justify-end"></div>
+                <div class="text-[9px] opacity-70 mt-1">Tekan [Panggil] atau [Hapus]</div>
+              </div>
+
+              <!-- Call history list mini -->
+              <div class="text-[10px] text-left border-t border-black/20 pt-1">
+                <div class="font-bold opacity-80 text-[9px] mb-0.5">RIWAYAT TERAKHIR:</div>
+                <div id="dialer-history" class="space-y-0.5 text-[9px] max-h-16 overflow-y-auto">
+                  <div class="opacity-60 italic">Belum ada panggilan</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- VIEW 5: ACTIVE CALL & INCOMING CALL SCREEN -->
+            <div id="view-call-screen" class="screen-view hidden h-full flex flex-col justify-between items-center text-center z-20 font-mono-retro py-2">
+              <div id="call-status-heading" class="text-xs font-bold uppercase tracking-wider animate-pulse">Menghubungi...</div>
+              
+              <div class="my-auto space-y-2">
+                <div class="w-14 h-14 mx-auto rounded-full border-2 border-current flex items-center justify-center text-2xl animate-ring">
+                  👤
+                </div>
+                <div id="call-target-name" class="font-bold text-sm">Budi Santoso</div>
+                <div id="call-target-number" class="text-xs opacity-75">081234567890</div>
+                <div id="call-duration-timer" class="font-pixel text-2xl font-bold tracking-widest hidden">00:00</div>
+              </div>
+
+              <div id="call-action-notice" class="text-[10px] opacity-80">
+                Tekan [Tutup] untuk Mengakhiri
+              </div>
+            </div>
+
+            <!-- VIEW 6: SMS & NOTES APPLICATION -->
+            <div id="view-messages" class="screen-view hidden h-full flex flex-col z-10 font-mono-retro">
+              <!-- Sub-view 1: SMS Menu (Inbox, Compose, Archive) -->
+              <div id="msg-sub-menu" class="h-full flex flex-col justify-between">
+                <div>
+                  <div class="text-[11px] font-bold border-b border-black/20 pb-0.5 mb-1">PESAN & CATATAN</div>
+                  <div class="space-y-1 mt-2 text-xs">
+                    <div id="msg-opt-compose" class="p-1.5 rounded bg-black/15 font-bold cursor-pointer flex justify-between items-center">
+                      <span>1. Tulis Pesan Baru</span>
+                      <span>✏️</span>
+                    </div>
+                    <div id="msg-opt-inbox" class="p-1.5 rounded hover:bg-black/10 cursor-pointer flex justify-between items-center">
+                      <span>2. Kotak Masuk (<span id="msg-inbox-count">0</span>)</span>
+                      <span>📥</span>
+                    </div>
+                    <div id="msg-opt-sent" class="p-1.5 rounded hover:bg-black/10 cursor-pointer flex justify-between items-center">
+                      <span>3. Pesan Terkirim (<span id="msg-sent-count">0</span>)</span>
+                      <span>📤</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="text-[9px] opacity-70 border-t border-black/20 pt-1">
+                  SMS dapat dipakai sebagai catatan pribadi.
+                </div>
+              </div>
+
+              <!-- Sub-view 2: Compose SMS -->
+              <div id="msg-sub-compose" class="hidden h-full flex flex-col justify-between">
+                <div class="text-[11px] font-bold border-b border-black/20 pb-0.5">TULIS PESAN</div>
+                <div class="space-y-1.5 my-auto">
+                  <div>
+                    <label class="text-[9px] block font-bold opacity-80">Tujuan (No/Nama):</label>
+                    <input id="sms-to-input" type="text" placeholder="Ketik nomor..." class="w-full bg-black/10 border border-black/30 rounded px-1.5 py-0.5 text-xs font-mono-retro outline-none text-current">
+                  </div>
+                  <div>
+                    <label class="text-[9px] block font-bold opacity-80">Pesan / Catatan:</label>
+                    <textarea id="sms-body-input" rows="3" placeholder="Tulis isi pesan..." class="w-full bg-black/10 border border-black/30 rounded px-1.5 py-0.5 text-xs font-mono-retro outline-none text-current resize-none"></textarea>
+                  </div>
+                  <div class="flex justify-between text-[9px] opacity-70">
+                    <span id="sms-char-counter">0/160</span>
+                    <span class="italic">Multi-tap T9 aktif</span>
+                  </div>
+                </div>
+                <div class="text-[9px] text-center opacity-80">
+                  Tekan [Kirim] untuk simpan & kirim
+                </div>
+              </div>
+
+              <!-- Sub-view 3: SMS List (Inbox / Sent) -->
+              <div id="msg-sub-list" class="hidden h-full flex flex-col">
+                <div id="sms-list-title" class="text-[11px] font-bold border-b border-black/20 pb-0.5 mb-1">KOTAK MASUK</div>
+                <div id="sms-items-container" class="flex-1 overflow-y-auto space-y-1 text-xs pr-1">
+                  <!-- Generated SMS List items -->
+                </div>
+              </div>
+
+              <!-- Sub-view 4: SMS Detail Read -->
+              <div id="msg-sub-read" class="hidden h-full flex flex-col justify-between">
+                <div class="text-[11px] font-bold border-b border-black/20 pb-0.5 flex justify-between">
+                  <span id="sms-read-from">Dari: ...</span>
+                  <span id="sms-read-date" class="text-[9px] opacity-70">00:00</span>
+                </div>
+                <div class="my-auto flex-1 overflow-y-auto py-2 pr-1">
+                  <p id="sms-read-body" class="text-xs leading-relaxed whitespace-pre-wrap">Isi pesan...</p>
+                </div>
+                <div class="border-t border-black/20 pt-1 flex justify-between items-center text-[9px]">
+                  <button onclick="deleteCurrentSms()" class="text-red-900 font-bold underline">Hapus Pesan</button>
+                  <span class="opacity-70">Tekan [Kembali]</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- VIEW 7: CONTACTS (Buku Kontak) -->
+            <div id="view-contacts" class="screen-view hidden h-full flex flex-col z-10 font-mono-retro">
+              <div class="text-[11px] font-bold border-b border-black/20 pb-0.5 mb-1 flex justify-between">
+                <span>BUKU KONTAK</span>
+                <span id="contacts-count-label">0 Kontak</span>
+              </div>
+              <div id="contacts-list" class="flex-1 overflow-y-auto space-y-1 text-xs pr-1">
+                <!-- Dynamically populated contacts -->
+              </div>
+              <div class="border-t border-black/20 pt-1 flex justify-between text-[9px]">
+                <button onclick="promptAddContact()" class="font-bold underline">+ Tambah Kontak</button>
+                <span class="opacity-70">[Pilih] Hubungi</span>
+              </div>
+            </div>
+
+            <!-- VIEW 8: MEDIA PLAYER (Audio & Video) -->
+            <div id="view-media" class="screen-view hidden h-full flex flex-col justify-between z-10 font-mono-retro">
+              <div class="text-[11px] font-bold border-b border-black/20 pb-0.5 flex justify-between items-center">
+                <span>MEDIA RETRO</span>
+                <div class="flex gap-1 text-[9px]">
+                  <button id="media-tab-audio" onclick="switchMediaTab('audio')" class="px-1.5 py-0.5 rounded bg-black/20 font-bold">Audio</button>
+                  <button id="media-tab-video" onclick="switchMediaTab('video')" class="px-1.5 py-0.5 rounded opacity-60">Video</button>
+                </div>
+              </div>
+
+              <!-- Audio Mode Pane -->
+              <div id="media-pane-audio" class="flex-1 flex flex-col justify-between py-1">
+                <div class="text-center my-auto">
+                  <div class="text-2xl animate-pulse">📻</div>
+                  <div id="media-track-title" class="text-xs font-bold mt-1 truncate">Poly Retro Chiptune.mid</div>
+                  <div class="text-[9px] opacity-70">Synthesized 8-Bit Lo-Fi</div>
+                  
+                  <!-- Retro Audio Spectrum Visualizer Bars -->
+                  <div class="flex items-end justify-center gap-1 h-8 mt-2">
+                    <span id="spec-bar-1" class="w-1.5 bg-current h-2 transition-all duration-75"></span>
+                    <span id="spec-bar-2" class="w-1.5 bg-current h-5 transition-all duration-75"></span>
+                    <span id="spec-bar-3" class="w-1.5 bg-current h-7 transition-all duration-75"></span>
+                    <span id="spec-bar-4" class="w-1.5 bg-current h-4 transition-all duration-75"></span>
+                    <span id="spec-bar-5" class="w-1.5 bg-current h-6 transition-all duration-75"></span>
+                    <span id="spec-bar-6" class="w-1.5 bg-current h-3 transition-all duration-75"></span>
+                  </div>
+                </div>
+
+                <div class="space-y-1">
+                  <!-- Audio controls -->
+                  <div class="flex justify-center gap-3 text-xs">
+                    <button onclick="toggleRetroMusic()" id="btn-retro-play" class="font-bold underline">▶ PUTAR</button>
+                    <label class="cursor-pointer font-bold underline text-[10px]">
+                      📂 Ganti MP3
+                      <input type="file" id="audio-file-input" accept="audio/*" class="hidden" onchange="loadCustomAudio(event)">
+                    </label>
+                  </div>
+                  <audio id="html5-audio" class="hidden" loop></audio>
+                </div>
+              </div>
+
+              <!-- Video Mode Pane -->
+              <div id="media-pane-video" class="hidden flex-1 flex flex-col justify-between py-1">
+                <div class="relative w-full h-32 bg-black/40 rounded border border-black/30 overflow-hidden flex items-center justify-center">
+                  <video id="html5-video" class="w-full h-full object-cover hidden" playsinline loop></video>
+                  <!-- Canvas simulated retro monochrome video when no file -->
+                  <canvas id="retro-video-canvas" width="200" height="120" class="w-full h-full"></canvas>
+                </div>
+                <div class="flex justify-between items-center text-[9px] pt-1">
+                  <button onclick="toggleVideoPlayback()" id="btn-video-play" class="font-bold underline">▶ PLAY VIDEO</button>
+                  <label class="cursor-pointer underline font-bold">
+                    📂 Load MP4
+                    <input type="file" id="video-file-input" accept="video/*" class="hidden" onchange="loadCustomVideo(event)">
+                  </label>
+                </div>
+              </div>
+
+              <div class="text-[9px] opacity-70 text-center border-t border-black/20 pt-1">
+                Gunakan file dari memori perangkat
+              </div>
+            </div>
+
+            <!-- VIEW 9: CALCULATOR -->
+            <div id="view-calc" class="screen-view hidden h-full flex flex-col justify-between z-10 font-mono-retro">
+              <div class="text-[11px] font-bold border-b border-black/20 pb-0.5">KALKULATOR</div>
+              
+              <div class="my-auto space-y-2">
+                <div class="bg-black/15 p-2 rounded border border-black/25 text-right">
+                  <div id="calc-formula" class="text-[10px] opacity-70 min-h-[14px]"></div>
+                  <div id="calc-display" class="text-2xl font-bold font-pixel tracking-wider truncate">0</div>
+                </div>
+
+                <div class="grid grid-cols-4 gap-1 text-center text-xs font-bold">
+                  <button onclick="calcPress('C')" class="p-1 rounded bg-black/10">C</button>
+                  <button onclick="calcPress('/')" class="p-1 rounded bg-black/10">÷</button>
+                  <button onclick="calcPress('*')" class="p-1 rounded bg-black/10">×</button>
+                  <button onclick="calcPress('-')" class="p-1 rounded bg-black/10">-</button>
+                  <button onclick="calcPress('7')" class="p-1 rounded bg-black/5">7</button>
+                  <button onclick="calcPress('8')" class="p-1 rounded bg-black/5">8</button>
+                  <button onclick="calcPress('9')" class="p-1 rounded bg-black/5">9</button>
+                  <button onclick="calcPress('+')" class="p-1 rounded bg-black/10">+</button>
+                  <button onclick="calcPress('4')" class="p-1 rounded bg-black/5">4</button>
+                  <button onclick="calcPress('5')" class="p-1 rounded bg-black/5">5</button>
+                  <button onclick="calcPress('6')" class="p-1 rounded bg-black/5">6</button>
+                  <button onclick="calcPress('=')" class="row-span-2 p-1 rounded bg-black/20 flex items-center justify-center">=</button>
+                  <button onclick="calcPress('1')" class="p-1 rounded bg-black/5">1</button>
+                  <button onclick="calcPress('2')" class="p-1 rounded bg-black/5">2</button>
+                  <button onclick="calcPress('3')" class="p-1 rounded bg-black/5">3</button>
+                  <button onclick="calcPress('0')" class="col-span-2 p-1 rounded bg-black/5">0</button>
+                  <button onclick="calcPress('.')" class="p-1 rounded bg-black/5">.</button>
+                </div>
+              </div>
+
+              <div class="text-[9px] opacity-70 text-center">
+                Gunakan keypad atau klik tombol layar
+              </div>
+            </div>
+
+            <!-- VIEW 10: CALENDAR (Kalender Bulanan) -->
+            <div id="view-calendar" class="screen-view hidden h-full flex flex-col justify-between z-10 font-mono-retro">
+              <div class="flex items-center justify-between border-b border-black/20 pb-0.5 text-[11px] font-bold">
+                <button onclick="calendarChangeMonth(-1)" class="px-1 hover:bg-black/10 rounded">◀</button>
+                <span id="calendar-month-year">SEPTEMBER 2026</span>
+                <button onclick="calendarChangeMonth(1)" class="px-1 hover:bg-black/10 rounded">▶</button>
+              </div>
+
+              <!-- Day Names Header -->
+              <div class="grid grid-cols-7 text-[9px] text-center font-bold opacity-80 border-b border-black/15 py-1">
+                <span>MG</span><span>SN</span><span>SL</span><span>RB</span><span>KM</span><span>JM</span><span>SB</span>
+              </div>
+
+              <!-- Calendar Dates Grid -->
+              <div id="calendar-days-grid" class="grid grid-cols-7 text-[10px] text-center gap-y-1 flex-1 py-1 content-start">
+                <!-- Dynamically generated days -->
+              </div>
+
+              <div class="border-t border-black/20 pt-1 text-[9px] flex justify-between">
+                <span id="calendar-today-label">Hari ini: 6 Sep</span>
+                <span class="opacity-70">Gunakan ◀ ▶</span>
+              </div>
+            </div>
+
+            <!-- VIEW 11: JAM, STOPWATCH & TIMER -->
+            <div id="view-clock" class="screen-view hidden h-full flex flex-col justify-between z-10 font-mono-retro">
+              <div class="flex justify-between items-center border-b border-black/20 pb-0.5 text-[11px] font-bold">
+                <span>WAKTU & ALAT</span>
+                <div class="flex gap-1 text-[9px]">
+                  <button id="clock-tab-sw" onclick="switchClockTool('stopwatch')" class="px-1.5 py-0.5 rounded bg-black/20 font-bold">Stopwatch</button>
+                  <button id="clock-tab-tm" onclick="switchClockTool('timer')" class="px-1.5 py-0.5 rounded opacity-60">Timer</button>
+                </div>
+              </div>
+
+              <!-- Stopwatch Tool Subview -->
+              <div id="clock-pane-stopwatch" class="flex-1 flex flex-col justify-between py-1">
+                <div class="text-center my-auto">
+                  <div class="text-[10px] opacity-75 uppercase">Stopwatch Presisi</div>
+                  <div id="sw-display" class="font-pixel text-4xl font-bold tracking-wider my-1">00:00.0</div>
+                  <div class="flex justify-center gap-2 text-xs font-bold mt-1">
+                    <button onclick="toggleStopwatch()" id="btn-sw-toggle" class="px-2 py-0.5 rounded bg-black/15 border border-black/30">MULAI</button>
+                    <button onclick="lapStopwatch()" id="btn-sw-lap" class="px-2 py-0.5 rounded bg-black/10 border border-black/30">LAP</button>
+                    <button onclick="resetStopwatch()" class="px-2 py-0.5 rounded bg-black/10 border border-black/30">RESET</button>
+                  </div>
+                </div>
+
+                <!-- Lap Records -->
+                <div class="border-t border-black/20 pt-1 max-h-16 overflow-y-auto text-[9px]">
+                  <div class="font-bold opacity-75 mb-0.5">CATATAN LAP:</div>
+                  <div id="sw-lap-list" class="space-y-0.5">
+                    <div class="opacity-50 italic">Belum ada lap</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Timer Tool Subview -->
+              <div id="clock-pane-timer" class="hidden flex-1 flex flex-col justify-between py-1 text-center">
+                <div class="my-auto">
+                  <div class="text-[10px] opacity-75 uppercase">Hitung Mundur</div>
+                  <div id="timer-display" class="font-pixel text-4xl font-bold tracking-wider my-1">01:00</div>
+                  
+                  <!-- Set Timer Adjust Buttons -->
+                  <div class="flex justify-center gap-2 text-[10px] mb-2">
+                    <button onclick="adjustTimerDuration(-60)" class="px-1.5 py-0.5 rounded bg-black/10 border border-black/20">-1m</button>
+                    <button onclick="adjustTimerDuration(-10)" class="px-1.5 py-0.5 rounded bg-black/10 border border-black/20">-10s</button>
+                    <button onclick="adjustTimerDuration(10)" class="px-1.5 py-0.5 rounded bg-black/10 border border-black/20">+10s</button>
+                    <button onclick="adjustTimerDuration(60)" class="px-1.5 py-0.5 rounded bg-black/10 border border-black/20">+1m</button>
+                  </div>
+
+                  <div class="flex justify-center gap-2 text-xs font-bold">
+                    <button onclick="toggleCountdownTimer()" id="btn-timer-toggle" class="px-3 py-1 rounded bg-black/15 border border-black/30">MULAI</button>
+                    <button onclick="resetCountdownTimer()" class="px-3 py-1 rounded bg-black/10 border border-black/30">RESET</button>
+                  </div>
+                </div>
+                <div id="timer-alarm-banner" class="hidden text-[10px] font-bold text-red-900 animate-bounce">
+                  ⏰ WAKTU HABIS! ALARM BERBUNYI
+                </div>
+              </div>
+            </div>
+
+            <!-- VIEW 12: RETRO SNAKE ARCADE GAME -->
+            <div id="view-snake" class="screen-view hidden h-full flex flex-col justify-between z-10 font-mono-retro">
+              <div class="flex justify-between items-center text-[10px] font-bold border-b border-black/20 pb-0.5">
+                <span>SKOR: <b id="snake-score">0</b></span>
+                <span>TERBAIK: <b id="snake-highscore">0</b></span>
+              </div>
+
+              <!-- Snake Canvas -->
+              <div class="relative w-full flex-1 flex items-center justify-center my-0.5">
+                <canvas id="snake-canvas" width="180" height="150" class="border border-black/30 bg-black/10 rounded"></canvas>
+                <!-- Snake Game Over Overlay -->
+                <div id="snake-overlay" class="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center p-2 rounded">
+                  <div class="font-pixel text-2xl font-bold mb-1">GAME OVER</div>
+                  <p class="text-[9px] mb-2">Tekan [Pilih] untuk Main Lagi</p>
+                  <button onclick="startSnakeGame()" class="px-2 py-0.5 rounded bg-black/40 font-bold border border-current text-[10px]">MAIN LAGI</button>
+                </div>
+              </div>
+
+              <div class="text-[9px] text-center opacity-80 border-t border-black/20 pt-0.5">
+                Gunakan D-Pad atau angka 2, 4, 6, 8
+              </div>
+            </div>
+
+            <!-- VIEW 13: SETTINGS & PERSONALIZATION -->
+            <div id="view-settings" class="screen-view hidden h-full flex flex-col justify-between z-10 font-mono-retro">
+              <div class="text-[11px] font-bold border-b border-black/20 pb-0.5">PENGATURAN</div>
+              
+              <div class="flex-1 overflow-y-auto space-y-2 py-1 pr-1 text-xs">
+                <!-- Wallpaper -->
+                <div class="bg-black/10 p-1.5 rounded">
+                  <span class="font-bold text-[10px] block mb-1">1. Wallpaper Layar:</span>
+                  <div class="flex items-center gap-2">
+                    <label class="px-2 py-0.5 rounded bg-black/15 border border-black/30 text-[9px] font-bold cursor-pointer">
+                      Pilih Gambar
+                      <input type="file" id="wallpaper-file-input" accept="image/*" class="hidden" onchange="loadCustomWallpaper(event)">
+                    </label>
+                    <button onclick="resetWallpaper()" class="text-[9px] underline opacity-70">Hapus</button>
+                  </div>
+                </div>
+
+                <!-- Operator Name -->
+                <div class="bg-black/10 p-1.5 rounded">
+                  <span class="font-bold text-[10px] block mb-1">2. Nama Operator:</span>
+                  <input id="input-operator-name" type="text" maxlength="12" value="INDOSIM" oninput="updateOperatorName(this.value)" class="w-full bg-black/10 border border-black/20 rounded px-1.5 py-0.5 text-[10px] font-mono-retro outline-none uppercase text-current">
+                </div>
+
+                <!-- Security / Passcode -->
+                <div class="bg-black/10 p-1.5 rounded">
+                  <span class="font-bold text-[10px] block mb-1">3. Kunci PIN Telepon:</span>
+                  <div class="flex items-center justify-between text-[10px]">
+                    <span>PIN Saat Ini: <b id="settings-pin-label">1234</b></span>
+                    <button onclick="promptChangePIN()" class="underline font-bold">Ubah PIN</button>
+                  </div>
+                </div>
+
+                <!-- Simulated Scheduled Inbound Calls -->
+                <div class="bg-black/10 p-1.5 rounded">
+                  <span class="font-bold text-[10px] block mb-1">4. Jadwal Panggilan Masuk:</span>
+                  <div class="grid grid-cols-2 gap-1 text-[9px] mb-1">
+                    <input id="sched-call-caller" type="text" placeholder="Nama / No" value="Bos Kantor" class="bg-black/10 border border-black/20 rounded px-1 py-0.5 outline-none text-current">
+                    <input id="sched-call-delay" type="number" placeholder="Detik (mis. 5)" value="5" min="1" class="bg-black/10 border border-black/20 rounded px-1 py-0.5 outline-none text-current">
+                  </div>
+                  <button onclick="scheduleIncomingCall()" class="w-full py-0.5 bg-black/20 rounded text-[9px] font-bold border border-black/25">Jadwalkan Telepon</button>
+                </div>
+
+                <!-- Simulated Scheduled Inbound SMS -->
+                <div class="bg-black/10 p-1.5 rounded">
+                  <span class="font-bold text-[10px] block mb-1">5. Jadwal SMS Masuk:</span>
+                  <div class="space-y-1 text-[9px] mb-1">
+                    <div class="grid grid-cols-2 gap-1">
+                      <input id="sched-sms-sender" type="text" placeholder="Pengirim" value="BANK INFO" class="bg-black/10 border border-black/20 rounded px-1 py-0.5 outline-none text-current">
+                      <input id="sched-sms-delay" type="number" placeholder="Detik (mis. 5)" value="5" min="1" class="bg-black/10 border border-black/20 rounded px-1 py-0.5 outline-none text-current">
+                    </div>
+                    <input id="sched-sms-text" type="text" placeholder="Isi pesan SMS..." value="Kode OTP Anda adalah 829102." class="w-full bg-black/10 border border-black/20 rounded px-1 py-0.5 outline-none text-current">
+                  </div>
+                  <button onclick="scheduleIncomingSMS()" class="w-full py-0.5 bg-black/20 rounded text-[9px] font-bold border border-black/25">Jadwalkan SMS</button>
+                </div>
+              </div>
+
+              <div class="text-[9px] opacity-70 text-center border-t border-black/20 pt-1">
+                Data tersimpan dalam sesi memori aktif.
+              </div>
+            </div>
+
+            <!-- GENERIC RETRO MODAL & TOAST DIALOG (No Alert Rule) -->
+            <div id="phone-modal" class="hidden absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-3 font-mono-retro">
+              <div class="bg-stone-200 text-stone-900 border-2 border-stone-800 rounded-lg p-3 w-full shadow-2xl text-center">
+                <div id="modal-title" class="font-bold text-xs uppercase mb-1">KONFIRMASI</div>
+                <p id="modal-desc" class="text-[10px] leading-tight mb-3">Pesan keterangan konfirmasi...</p>
+                <div id="modal-buttons" class="flex justify-center gap-2 text-[10px]">
+                  <button id="modal-btn-ok" class="px-2.5 py-1 bg-emerald-700 text-white rounded font-bold">OK</button>
+                  <button id="modal-btn-cancel" class="px-2.5 py-1 bg-stone-500 text-white rounded font-bold">Batal</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Reto In-Screen Toast Notification -->
+            <div id="phone-toast" class="hidden absolute top-7 left-2 right-2 bg-black/90 text-white border border-stone-400/40 rounded px-2 py-1 text-center font-mono-retro text-[10px] z-40 transition-all">
+              Pemberitahuan
+            </div>
+
+          </div>
+
+          <!-- LCD Bottom Softkeys Context Bar -->
+          <div id="softkey-bar" class="w-full flex items-center justify-between font-mono-retro text-[10px] font-bold border-t border-black/20 pt-1 px-1 z-30">
+            <span id="label-lsk" class="uppercase">Menu</span>
+            <span id="label-csk" class="text-[9px] opacity-60">OK</span>
+            <span id="label-rsk" class="uppercase">Kontak</span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Physical Phone Keypad Controls Section -->
+      <div class="mt-4 space-y-3 select-none">
+        
+        <!-- Navigation Row: LSK, 5-Way D-Pad, RSK -->
+        <div class="flex items-center justify-between px-1">
+          <!-- Left Soft Key (LSK) -->
+          <button id="hw-btn-lsk" onclick="handleLSK()" class="phone-btn w-12 h-8 rounded-xl bg-gradient-to-b from-slate-700 to-slate-800 text-white font-bold text-xs border-t border-slate-600 flex items-center justify-center active:bg-slate-900">
+            —
+          </button>
+
+          <!-- 5-Way Directional Pad (D-Pad) -->
+          <div class="relative w-24 h-24 bg-gradient-to-b from-slate-700 to-slate-800 rounded-full p-1.5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),0_4px_8px_rgba(0,0,0,0.5)] flex items-center justify-center">
+            <!-- Up -->
+            <button onclick="handleDPad('up')" class="d-pad-btn absolute top-1.5 left-1/2 -translate-x-1/2 w-7 h-5 text-slate-400 hover:text-white flex items-center justify-center text-[10px] font-bold">▲</button>
+            <!-- Down -->
+            <button onclick="handleDPad('down')" class="d-pad-btn absolute bottom-1.5 left-1/2 -translate-x-1/2 w-7 h-5 text-slate-400 hover:text-white flex items-center justify-center text-[10px] font-bold">▼</button>
+            <!-- Left -->
+            <button onclick="handleDPad('left')" class="d-pad-btn absolute left-1.5 top-1/2 -translate-y-1/2 w-5 h-7 text-slate-400 hover:text-white flex items-center justify-center text-[10px] font-bold">◀</button>
+            <!-- Right -->
+            <button onclick="handleDPad('right')" class="d-pad-btn absolute right-1.5 top-1/2 -translate-y-1/2 w-5 h-7 text-slate-400 hover:text-white flex items-center justify-center text-[10px] font-bold">▶</button>
+            <!-- Center OK / Select Button -->
+            <button onclick="handleCenterKey()" class="w-8 h-8 rounded-full bg-gradient-to-b from-slate-200 to-slate-400 active:from-slate-400 active:to-slate-500 shadow-md flex items-center justify-center text-[10px] font-black text-slate-800">
+              OK
+            </button>
+          </div>
+
+          <!-- Right Soft Key (RSK) -->
+          <button id="hw-btn-rsk" onclick="handleRSK()" class="phone-btn w-12 h-8 rounded-xl bg-gradient-to-b from-slate-700 to-slate-800 text-white font-bold text-xs border-t border-slate-600 flex items-center justify-center active:bg-slate-900">
+            —
+          </button>
+        </div>
+
+        <!-- Action Row: Call (Green) & End/Power (Red) Buttons -->
+        <div class="flex items-center justify-between px-2 pt-0.5">
+          <button onclick="handleCallButton()" class="phone-btn phone-btn-green w-16 h-8 rounded-xl text-white font-bold text-sm flex items-center justify-center">
+            📞
+          </button>
+
+          <!-- Middle Lock Shortcut Button -->
+          <button onclick="togglePhoneLock()" class="phone-btn w-14 h-7 rounded-lg bg-slate-600 text-[10px] font-bold text-slate-300 flex items-center justify-center border-t border-slate-500">
+            🔒 Kunci
+          </button>
+
+          <button onclick="handleEndButton()" class="phone-btn phone-btn-red w-16 h-8 rounded-xl text-white font-bold text-sm flex items-center justify-center">
+            📵
+          </button>
+        </div>
+
+        <!-- 3x4 Alphanumeric Keypad Grid -->
+        <div class="grid grid-cols-3 gap-2 px-1 pt-1">
+          <!-- Key 1 -->
+          <button onclick="handleKeypad('1')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">1</span>
+            <span class="text-[8px] text-slate-400 leading-none">. , !</span>
+          </button>
+
+          <!-- Key 2 -->
+          <button onclick="handleKeypad('2')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">2</span>
+            <span class="text-[8px] text-slate-400 leading-none">ABC</span>
+          </button>
+
+          <!-- Key 3 -->
+          <button onclick="handleKeypad('3')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">3</span>
+            <span class="text-[8px] text-slate-400 leading-none">DEF</span>
+          </button>
+
+          <!-- Key 4 -->
+          <button onclick="handleKeypad('4')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">4</span>
+            <span class="text-[8px] text-slate-400 leading-none">GHI</span>
+          </button>
+
+          <!-- Key 5 -->
+          <button onclick="handleKeypad('5')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">5</span>
+            <span class="text-[8px] text-slate-400 leading-none">JKL</span>
+          </button>
+
+          <!-- Key 6 -->
+          <button onclick="handleKeypad('6')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">6</span>
+            <span class="text-[8px] text-slate-400 leading-none">MNO</span>
+          </button>
+
+          <!-- Key 7 -->
+          <button onclick="handleKeypad('7')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">7</span>
+            <span class="text-[8px] text-slate-400 leading-none">PQRS</span>
+          </button>
+
+          <!-- Key 8 -->
+          <button onclick="handleKeypad('8')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">8</span>
+            <span class="text-[8px] text-slate-400 leading-none">TUV</span>
+          </button>
+
+          <!-- Key 9 -->
+          <button onclick="handleKeypad('9')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">9</span>
+            <span class="text-[8px] text-slate-400 leading-none">WXYZ</span>
+          </button>
+
+          <!-- Key * -->
+          <button onclick="handleKeypad('*')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">*</span>
+            <span class="text-[8px] text-slate-400 leading-none">🔒</span>
+          </button>
+
+          <!-- Key 0 -->
+          <button onclick="handleKeypad('0')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">0</span>
+            <span class="text-[8px] text-slate-400 leading-none">SPASI / +</span>
+          </button>
+
+          <!-- Key # -->
+          <button onclick="handleKeypad('#')" class="phone-btn h-10 rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 text-white border-t border-slate-700 flex flex-col items-center justify-center">
+            <span class="text-sm font-bold leading-none">#</span>
+            <span class="text-[8px] text-slate-400 leading-none">⇧ / 🔇</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // --- NATIVE WEB AUDIO API SYNTHESIZER ---
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function toggleAudioEngine() {
+      soundEnabled = !soundEnabled;
+      const stateLbl = document.getElementById('lbl-audio-state');
+      if (stateLbl) {
+        stateLbl.textContent = soundEnabled ? 'ON' : 'OFF';
+        stateLbl.className = soundEnabled ? 'text-emerald-400' : 'text-red-400';
+      }
+      showPhoneToast(`Suara nada: ${soundEnabled ? 'Aktif' : 'Senyap'}`);
+    }
+
+    // Standard DTMF dual frequencies for classic phones
+    const dtmfFrequencies = {
+      '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
+      '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
+      '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
+      '*': [941, 1209], '0': [941, 1336], '#': [941, 1477]
+    };
+
+    function playKeypadTone(key) {
+      if (!soundEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+
+      const freqs = dtmfFrequencies[key] || [1200, 1500];
+      const now = audioCtx.currentTime;
+      const duration = 0.12;
+
+      freqs.forEach(freq => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + duration);
+      });
+    }
+
+    function playShortClick() {
+      if (!soundEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(900, now);
+      gain.gain.setValueAtTime(0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.04);
+    }
+
+    // Polyphonic Nokia retro ringtone synthesis
+    let ringtoneInterval = null;
+    function startRingtoneLoop() {
+      if (!soundEnabled) return;
+      initAudio();
+      stopRingtoneLoop();
+
+      const melody = [
+        { f: 659.25, d: 0.14 }, // E5
+        { f: 587.33, d: 0.14 }, // D5
+        { f: 369.99, d: 0.28 }, // F#4
+        { f: 415.30, d: 0.28 }, // G#4
+        { f: 554.37, d: 0.14 }, // C#5
+        { f: 493.88, d: 0.14 }, // B4
+        { f: 293.66, d: 0.28 }, // D4
+        { f: 329.63, d: 0.28 }, // E4
+        { f: 493.88, d: 0.14 }, // B4
+        { f: 440.00, d: 0.14 }, // A4
+        { f: 277.18, d: 0.28 }, // C#4
+        { f: 329.63, d: 0.28 }, // E4
+        { f: 440.00, d: 0.55 }, // A4
+      ];
+
+      const playMelodyOnce = () => {
+        if (!audioCtx) return;
+        let timeOffset = audioCtx.currentTime;
+        melody.forEach(note => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(note.f, timeOffset);
+
+          gain.gain.setValueAtTime(0.06, timeOffset);
+          gain.gain.exponentialRampToValueAtTime(0.0001, timeOffset + note.d - 0.02);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start(timeOffset);
+          osc.stop(timeOffset + note.d);
+          timeOffset += note.d;
+        });
+      };
+
+      playMelodyOnce();
+      ringtoneInterval = setInterval(playMelodyOnce, 3200);
+    }
+
+    function stopRingtoneLoop() {
+      if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+      }
+    }
+
+    // --- STATE MANAGEMENT ---
+    const phoneState = {
+      isLocked: false,
+      passcode: '1234',
+      enteredPin: '',
+      activeScreen: 'home', // 'home'|'lockscreen'|'menu'|'dialer'|'call'|'messages'|'contacts'|'media'|'calc'|'calendar'|'clock'|'snake'|'settings'
+      screenStack: ['home'],
+      selectedMenuIndex: 0,
+      menuApps: ['dialer', 'messages', 'contacts', 'media', 'calc', 'calendar', 'clock', 'snake', 'settings'],
+      operatorName: 'INDOSIM',
+      batteryLevel: 88,
+      contacts: [
+        { id: 1, name: 'Budi Santoso', phone: '081234567890' },
+        { id: 2, name: 'Siti Rahma', phone: '085678901234' },
+        { id: 3, name: 'Layanan Darurat', phone: '112' }
+      ],
+      smsInbox: [
+        { id: 1, from: 'INDOSIM', text: 'Selamat datang di FoneSim! Gunakan ponsel fitur ini untuk telepon, SMS, kalkulator, dan bermain.', date: '10:15', read: true, type: 'inbox' },
+        { id: 2, from: 'Budi Santoso', text: 'Nanti malam kumpul di warkop jam 8 ya?', date: '11:42', read: false, type: 'inbox' }
+      ],
+      smsSent: [],
+      currentReadingSmsId: null,
+      call: {
+        active: false,
+        isIncoming: false,
+        callerName: '',
+        callerNumber: '',
+        duration: 0,
+        intervalId: null
+      },
+      callHistory: [
+        { name: 'Budi Santoso', number: '081234567890', type: 'Masuk', time: 'Kemarin' }
+      ]
+    };
+
+    // Navigation and screen switching
+    function navigateTo(screenName) {
+      if (phoneState.isLocked && screenName !== 'lockscreen') {
+        showPhoneToast('Buka kunci ponsel dahulu!');
+        return;
+      }
+      phoneState.screenStack.push(screenName);
+      renderCurrentScreen();
+    }
+
+    function navigateBack() {
+      if (phoneState.screenStack.length > 1) {
+        phoneState.screenStack.pop();
+      } else {
+        phoneState.screenStack = ['home'];
+      }
+      renderCurrentScreen();
+    }
+
+    function renderCurrentScreen() {
+      const current = phoneState.isLocked ? 'lockscreen' : phoneState.screenStack[phoneState.screenStack.length - 1];
+      phoneState.activeScreen = current;
+
+      // Hide all views
+      document.querySelectorAll('.screen-view').forEach(el => el.classList.add('hidden'));
+
+      // Update softkey action labels
+      const lskLabel = document.getElementById('label-lsk');
+      const rskLabel = document.getElementById('label-rsk');
+      const cskLabel = document.getElementById('label-csk');
+
+      const targetEl = document.getElementById(`view-${current}`);
+      if (targetEl) targetEl.classList.remove('hidden');
+
+      // Update context-specific labels
+      switch (current) {
+        case 'lockscreen':
+          lskLabel.textContent = 'Buka';
+          rskLabel.textContent = 'Darurat';
+          cskLabel.textContent = 'OK';
+          break;
+        case 'home':
+          lskLabel.textContent = 'Menu';
+          rskLabel.textContent = 'Kontak';
+          cskLabel.textContent = 'OK';
+          break;
+        case 'menu':
+          lskLabel.textContent = 'Pilih';
+          rskLabel.textContent = 'Kembali';
+          cskLabel.textContent = 'Buka';
+          highlightMenuItem(phoneState.selectedMenuIndex);
+          break;
+        case 'dialer':
+          lskLabel.textContent = 'Panggil';
+          rskLabel.textContent = 'Hapus';
+          cskLabel.textContent = 'Panggil';
+          break;
+        case 'call-screen':
+          if (phoneState.call.isIncoming) {
+            lskLabel.textContent = 'Jawab';
+            rskLabel.textContent = 'Tolak';
+            cskLabel.textContent = 'Jawab';
+          } else {
+            lskLabel.textContent = 'Mute';
+            rskLabel.textContent = 'Tutup';
+            cskLabel.textContent = 'Tutup';
+          }
+          break;
+        case 'messages':
+          updateMessagesViewHeader(lskLabel, rskLabel, cskLabel);
+          break;
+        case 'contacts':
+          lskLabel.textContent = 'Panggil';
+          rskLabel.textContent = 'Kembali';
+          cskLabel.textContent = 'Pilih';
+          renderContactsList();
+          break;
+        case 'calc':
+          lskLabel.textContent = 'Hitung';
+          rskLabel.textContent = 'Kembali';
+          cskLabel.textContent = '=';
+          break;
+        case 'calendar':
+          lskLabel.textContent = 'Bulan-';
+          rskLabel.textContent = 'Kembali';
+          cskLabel.textContent = 'Bulan+';
+          renderCalendar();
+          break;
+        case 'clock':
+          lskLabel.textContent = 'Mulai';
+          rskLabel.textContent = 'Kembali';
+          cskLabel.textContent = 'Set';
+          break;
+        case 'snake':
+          lskLabel.textContent = 'Mulai';
+          rskLabel.textContent = 'Keluar';
+          cskLabel.textContent = 'Putar';
+          break;
+        case 'media':
+          lskLabel.textContent = 'Putar';
+          rskLabel.textContent = 'Kembali';
+          cskLabel.textContent = 'Mode';
+          break;
+        case 'settings':
+          lskLabel.textContent = 'Pilih';
+          rskLabel.textContent = 'Kembali';
+          cskLabel.textContent = 'OK';
+          break;
+        default:
+          lskLabel.textContent = 'Pilih';
+          rskLabel.textContent = 'Kembali';
+          cskLabel.textContent = 'OK';
+      }
+
+      updateStatusBadges();
+    }
+
+    function highlightMenuItem(index) {
+      const items = document.querySelectorAll('.menu-item');
+      items.forEach((item, i) => {
+        if (i === index) {
+          item.className = 'menu-item flex flex-col items-center justify-center p-1 rounded border-2 border-black bg-black/20 font-bold';
+        } else {
+          item.className = 'menu-item flex flex-col items-center justify-center p-1 rounded border border-transparent';
+        }
+      });
+      const lbl = document.getElementById('menu-index-label');
+      if (lbl) lbl.textContent = `${index + 1}/9`;
+    }
+
+    function updateStatusBadges() {
+      const lockIcon = document.getElementById('stat-lock-icon');
+      if (lockIcon) lockIcon.className = phoneState.isLocked ? '' : 'hidden';
+
+      const unreadCount = phoneState.smsInbox.filter(s => !s.read).length;
+      const msgIcon = document.getElementById('stat-msg-icon');
+      const homeUnread = document.getElementById('home-unread-badge');
+      if (msgIcon) msgIcon.className = unreadCount > 0 ? 'animate-bounce' : 'hidden';
+      if (homeUnread) {
+        if (unreadCount > 0) {
+          homeUnread.classList.remove('hidden');
+          homeUnread.textContent = `${unreadCount} Pesan Baru`;
+        } else {
+          homeUnread.classList.add('hidden');
+        }
+      }
+    }
+
+    // --- T9 MULTI-TAP ENGINE ---
+    const t9Mapping = {
+      '1': ['.', ',', '!', '?', '1', '@'],
+      '2': ['a', 'b', 'c', '2', 'A', 'B', 'C'],
+      '3': ['d', 'e', 'f', '3', 'D', 'E', 'F'],
+      '4': ['g', 'h', 'i', '4', 'G', 'H', 'I'],
+      '5': ['j', 'k', 'l', '5', 'J', 'K', 'L'],
+      '6': ['m', 'n', 'o', '6', 'M', 'N', 'O'],
+      '7': ['p', 'q', 'r', 's', '7', 'P', 'Q', 'R', 'S'],
+      '8': ['t', 'u', 'v', '8', 'T', 'U', 'V'],
+      '9': ['w', 'x', 'y', 'z', '9', 'W', 'X', 'Y', 'Z'],
+      '0': [' ', '0', '+', '\n']
+    };
+
+    let t9LastKey = null;
+    let t9Index = 0;
+    let t9Timeout = null;
+    let activeInputTarget = null;
+
+    function handleT9Key(key) {
+      if (!activeInputTarget) return;
+
+      const charList = t9Mapping[key];
+      if (!charList) return;
+
+      if (t9LastKey === key) {
+        t9Index = (t9Index + 1) % charList.length;
+        // Replace last character
+        activeInputTarget.value = activeInputTarget.value.slice(0, -1) + charList[t9Index];
+      } else {
+        t9LastKey = key;
+        t9Index = 0;
+        activeInputTarget.value += charList[t9Index];
+      }
+
+      clearTimeout(t9Timeout);
+      t9Timeout = setTimeout(() => {
+        t9LastKey = null;
+        t9Index = 0;
+      }, 850);
+
+      // Trigger standard input event
+      activeInputTarget.dispatchEvent(new Event('input'));
+    }
+
+    // --- CALL & DIALER ENGINE ---
+    let dialBuffer = '';
+
+    function dialNumber(char) {
+      if (dialBuffer.length < 18) {
+        dialBuffer += char;
+        updateDialerDisplay();
+      }
+    }
+
+    function backspaceDial() {
+      if (dialBuffer.length > 0) {
+        dialBuffer = dialBuffer.slice(0, -1);
+        updateDialerDisplay();
+      } else {
+        navigateBack();
+      }
+    }
+
+    function updateDialerDisplay() {
+      const disp = document.getElementById('dialer-digits');
+      if (disp) disp.textContent = dialBuffer || '';
+    }
+
+    function initiateOutgoingCall(targetNum) {
+      const numberToCall = targetNum || dialBuffer;
+      if (!numberToCall) {
+        showPhoneToast('Masukkan nomor telepon dahulu!');
+        return;
+      }
+
+      phoneState.call.active = true;
+      phoneState.call.isIncoming = false;
+      phoneState.call.callerNumber = numberToCall;
+
+      // Check contact match
+      const matched = phoneState.contacts.find(c => c.phone === numberToCall);
+      phoneState.call.callerName = matched ? matched.name : 'Nomor Tidak Dikenal';
+      phoneState.call.duration = 0;
+
+      // Update in-call screen UI
+      document.getElementById('call-status-heading').textContent = 'Menghubungi...';
+      document.getElementById('call-status-heading').className = 'text-xs font-bold uppercase tracking-wider animate-pulse';
+      document.getElementById('call-target-name').textContent = phoneState.call.callerName;
+      document.getElementById('call-target-number').textContent = numberToCall;
+      document.getElementById('call-duration-timer').classList.add('hidden');
+      document.getElementById('call-action-notice').textContent = 'Menunggu jawaban penerima...';
+
+      phoneState.screenStack.push('call-screen');
+      renderCurrentScreen();
+
+      // Play ringing line tones
+      playKeypadTone('1');
+
+      // Auto connect after 2.5 seconds
+      setTimeout(() => {
+        if (!phoneState.call.active) return;
+        document.getElementById('call-status-heading').textContent = 'Panggilan Terhubung';
+        document.getElementById('call-status-heading').className = 'text-xs font-bold uppercase tracking-wider text-emerald-900';
+        document.getElementById('call-duration-timer').classList.remove('hidden');
+        document.getElementById('call-action-notice').textContent = 'Panggilan sedang berlangsung';
+
+        phoneState.call.intervalId = setInterval(() => {
+          phoneState.call.duration++;
+          const m = String(Math.floor(phoneState.call.duration / 60)).padStart(2, '0');
+          const s = String(phoneState.call.duration % 60).padStart(2, '0');
+          document.getElementById('call-duration-timer').textContent = `${m}:${s}`;
+        }, 1000);
+      }, 2500);
+    }
+
+    function answerIncomingCall() {
+      stopRingtoneLoop();
+      phoneState.call.isIncoming = false;
+      document.getElementById('call-status-heading').textContent = 'Panggilan Terhubung';
+      document.getElementById('call-status-heading').className = 'text-xs font-bold uppercase tracking-wider text-emerald-900';
+      document.getElementById('call-duration-timer').classList.remove('hidden');
+      document.getElementById('call-action-notice').textContent = 'Panggilan sedang berlangsung';
+
+      phoneState.call.duration = 0;
+      phoneState.call.intervalId = setInterval(() => {
+        phoneState.call.duration++;
+        const m = String(Math.floor(phoneState.call.duration / 60)).padStart(2, '0');
+        const s = String(phoneState.call.duration % 60).padStart(2, '0');
+        document.getElementById('call-duration-timer').textContent = `${m}:${s}`;
+      }, 1000);
+
+      renderCurrentScreen();
+    }
+
+    function endCall() {
+      stopRingtoneLoop();
+      if (phoneState.call.intervalId) {
+        clearInterval(phoneState.call.intervalId);
+        phoneState.call.intervalId = null;
+      }
+
+      if (phoneState.call.active) {
+        // Record call history
+        phoneState.callHistory.unshift({
+          name: phoneState.call.callerName,
+          number: phoneState.call.callerNumber,
+          type: phoneState.call.isIncoming ? 'Panggilan Masuk' : 'Panggilan Keluar',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+        renderCallHistory();
+      }
+
+      phoneState.call.active = false;
+      phoneState.call.isIncoming = false;
+      dialBuffer = '';
+      updateDialerDisplay();
+
+      // Return to home or dialer
+      if (phoneState.screenStack.includes('call-screen')) {
+        phoneState.screenStack = phoneState.screenStack.filter(s => s !== 'call-screen');
+      }
+      if (phoneState.screenStack.length === 0) phoneState.screenStack = ['home'];
+      renderCurrentScreen();
+      showPhoneToast('Panggilan Diakhiri');
+    }
+
+    function triggerIncomingCallSimulation(callerName, callerNumber) {
+      if (phoneState.call.active) return;
+      phoneState.call.active = true;
+      phoneState.call.isIncoming = true;
+      phoneState.call.callerName = callerName || 'Keluarga';
+      phoneState.call.callerNumber = callerNumber || '081299990000';
+      phoneState.call.duration = 0;
+
+      document.getElementById('call-status-heading').textContent = 'Panggilan Masuk...';
+      document.getElementById('call-status-heading').className = 'text-xs font-bold uppercase tracking-wider animate-bounce';
+      document.getElementById('call-target-name').textContent = phoneState.call.callerName;
+      document.getElementById('call-target-number').textContent = phoneState.call.callerNumber;
+      document.getElementById('call-duration-timer').classList.add('hidden');
+      document.getElementById('call-action-notice').textContent = 'Tekan [Jawab] atau [Tolak]';
+
+      phoneState.screenStack.push('call-screen');
+      renderCurrentScreen();
+      startRingtoneLoop();
+    }
+
+    function renderCallHistory() {
+      const container = document.getElementById('dialer-history');
+      if (!container) return;
+      if (phoneState.callHistory.length === 0) {
+        container.innerHTML = '<div class="opacity-60 italic">Belum ada panggilan</div>';
+        return;
+      }
+      container.innerHTML = phoneState.callHistory.slice(0, 5).map(item => `
+        <div class="flex justify-between items-center bg-black/5 px-1 py-0.5 rounded">
+          <span class="truncate max-w-[110px] font-bold">${item.name}</span>
+          <span class="text-[8px] opacity-70">${item.type} (${item.time})</span>
+        </div>
+      `).join('');
+    }
+
+    // --- SMS & NOTES APPLICATION ---
+    let currentSmsSub = 'menu'; // 'menu'|'compose'|'inbox'|'sent'|'read'
+
+    function updateMessagesViewHeader(lsk, rsk, csk) {
+      const subMenu = document.getElementById('msg-sub-menu');
+      const subCompose = document.getElementById('msg-sub-compose');
+      const subList = document.getElementById('msg-sub-list');
+      const subRead = document.getElementById('msg-sub-read');
+
+      [subMenu, subCompose, subList, subRead].forEach(el => el.classList.add('hidden'));
+
+      if (currentSmsSub === 'menu') {
+        subMenu.classList.remove('hidden');
+        lsk.textContent = 'Buka';
+        rsk.textContent = 'Kembali';
+        csk.textContent = 'Pilih';
+        document.getElementById('msg-inbox-count').textContent = phoneState.smsInbox.length;
+        document.getElementById('msg-sent-count').textContent = phoneState.smsSent.length;
+      } else if (currentSmsSub === 'compose') {
+        subCompose.classList.remove('hidden');
+        lsk.textContent = 'Kirim';
+        rsk.textContent = 'Batal';
+        csk.textContent = 'Kirim';
+        activeInputTarget = document.getElementById('sms-body-input');
+      } else if (currentSmsSub === 'inbox' || currentSmsSub === 'sent') {
+        subList.classList.remove('hidden');
+        lsk.textContent = 'Baca';
+        rsk.textContent = 'Kembali';
+        csk.textContent = 'Baca';
+        renderSmsList(currentSmsSub);
+      } else if (currentSmsSub === 'read') {
+        subRead.classList.remove('hidden');
+        lsk.textContent = 'Balas';
+        rsk.textContent = 'Kembali';
+        csk.textContent = 'Hapus';
+      }
+    }
+
+    function renderSmsList(type) {
+      const container = document.getElementById('sms-items-container');
+      const title = document.getElementById('sms-list-title');
+      const items = type === 'inbox' ? phoneState.smsInbox : phoneState.smsSent;
+
+      title.textContent = type === 'inbox' ? 'KOTAK MASUK' : 'PESAN TERKIRIM';
+
+      if (items.length === 0) {
+        container.innerHTML = '<div class="opacity-60 italic text-center py-4">Kotak pesan kosong</div>';
+        return;
+      }
+
+      container.innerHTML = items.map((msg, i) => `
+        <div onclick="openSmsDetail(${msg.id})" class="p-1.5 rounded ${msg.read ? 'bg-black/5' : 'bg-black/20 font-bold'} border border-black/10 cursor-pointer flex justify-between items-center">
+          <div class="truncate max-w-[130px]">
+            <div class="text-[10px] font-bold">${type === 'inbox' ? msg.from : 'Ke: ' + msg.to}</div>
+            <div class="text-[9px] opacity-80 truncate">${msg.text}</div>
+          </div>
+          <span class="text-[8px] opacity-70">${msg.date}</span>
+        </div>
+      `).join('');
+    }
+
+    function openSmsDetail(id) {
+      const msg = [...phoneState.smsInbox, ...phoneState.smsSent].find(m => m.id === id);
+      if (!msg) return;
+
+      msg.read = true;
+      phoneState.currentReadingSmsId = id;
+      currentSmsSub = 'read';
+
+      document.getElementById('sms-read-from').textContent = msg.from ? `Dari: ${msg.from}` : `Ke: ${msg.to}`;
+      document.getElementById('sms-read-date').textContent = msg.date;
+      document.getElementById('sms-read-body').textContent = msg.text;
+
+      renderCurrentScreen();
+      updateStatusBadges();
+    }
+
+    function sendCurrentSms() {
+      const toInput = document.getElementById('sms-to-input');
+      const bodyInput = document.getElementById('sms-body-input');
+      const to = toInput.value.trim();
+      const text = bodyInput.value.trim();
+
+      if (!to) {
+        showPhoneToast('Masukkan tujuan nomor/nama!');
+        return;
+      }
+      if (!text) {
+        showPhoneToast('Isi pesan tidak boleh kosong!');
+        return;
+      }
+
+      const newMsg = {
+        id: Date.now(),
+        to: to,
+        text: text,
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        read: true,
+        type: 'sent'
+      };
+
+      phoneState.smsSent.unshift(newMsg);
+      toInput.value = '';
+      bodyInput.value = '';
+      showPhoneToast('Pesan Berhasil Terkirim!');
+      currentSmsSub = 'menu';
+      renderCurrentScreen();
+    }
+
+    function deleteCurrentSms() {
+      if (!phoneState.currentReadingSmsId) return;
+      showPhoneModal('Hapus Pesan', 'Apakah Anda yakin ingin menghapus pesan ini?', () => {
+        phoneState.smsInbox = phoneState.smsInbox.filter(m => m.id !== phoneState.currentReadingSmsId);
+        phoneState.smsSent = phoneState.smsSent.filter(m => m.id !== phoneState.currentReadingSmsId);
+        showPhoneToast('Pesan telah dihapus');
+        currentSmsSub = 'menu';
+        renderCurrentScreen();
+      });
+    }
+
+    function triggerIncomingSmsSimulation(sender, text) {
+      const newMsg = {
+        id: Date.now(),
+        from: sender || '085700001111',
+        text: text || 'Halo! Ini adalah pesan simulasi FoneSim.',
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        read: false,
+        type: 'inbox'
+      };
+      phoneState.smsInbox.unshift(newMsg);
+      updateStatusBadges();
+      playShortClick();
+      showPhoneToast(`Pesan Masuk dari: ${newMsg.from}`);
+    }
+
+    // Attach counter to SMS Body input
+    document.getElementById('sms-body-input')?.addEventListener('input', function() {
+      const counter = document.getElementById('sms-char-counter');
+      if (counter) counter.textContent = `${this.value.length}/160`;
+    });
+
+    // Submenu click events for SMS
+    document.getElementById('msg-opt-compose')?.addEventListener('click', () => {
+      currentSmsSub = 'compose';
+      renderCurrentScreen();
+    });
+    document.getElementById('msg-opt-inbox')?.addEventListener('click', () => {
+      currentSmsSub = 'inbox';
+      renderCurrentScreen();
+    });
+    document.getElementById('msg-opt-sent')?.addEventListener('click', () => {
+      currentSmsSub = 'sent';
+      renderCurrentScreen();
+    });
+
+    // --- MEDIA PLAYER MODULE ---
+    let activeMediaTab = 'audio';
+    let isPlayingAudio = false;
+    let retroSynthAudioTimer = null;
+
+    function switchMediaTab(tab) {
+      activeMediaTab = tab;
+      const paneAudio = document.getElementById('media-pane-audio');
+      const paneVideo = document.getElementById('media-pane-video');
+      const tabAudioBtn = document.getElementById('media-tab-audio');
+      const tabVideoBtn = document.getElementById('media-tab-video');
+
+      if (tab === 'audio') {
+        paneAudio.classList.remove('hidden');
+        paneVideo.classList.add('hidden');
+        tabAudioBtn.className = 'px-1.5 py-0.5 rounded bg-black/20 font-bold';
+        tabVideoBtn.className = 'px-1.5 py-0.5 rounded opacity-60';
+        document.getElementById('html5-video').pause();
+      } else {
+        paneAudio.classList.add('hidden');
+        paneVideo.classList.remove('hidden');
+        tabAudioBtn.className = 'px-1.5 py-0.5 rounded opacity-60';
+        tabVideoBtn.className = 'px-1.5 py-0.5 rounded bg-black/20 font-bold';
+        drawRetroVideoStatic();
+      }
+    }
+
+    function toggleRetroMusic() {
+      const audioEl = document.getElementById('html5-audio');
+      const playBtn = document.getElementById('btn-retro-play');
+
+      // If user loaded external audio file
+      if (audioEl.src && audioEl.src !== window.location.href) {
+        if (audioEl.paused) {
+          audioEl.play().catch(() => showPhoneToast('Gagal memutar audio'));
+          playBtn.textContent = '⏸ JEDA';
+          startVisualizerAnimation();
+        } else {
+          audioEl.pause();
+          playBtn.textContent = '▶ PUTAR';
+          stopVisualizerAnimation();
+        }
+        return;
+      }
+
+      // Default synthetic chiptune looper
+      isPlayingAudio = !isPlayingAudio;
+      if (isPlayingAudio) {
+        playBtn.textContent = '⏸ JEDA';
+        startVisualizerAnimation();
+        startChiptuneLoop();
+        showPhoneToast('Memutar Retro Chiptune');
+      } else {
+        playBtn.textContent = '▶ PUTAR';
+        stopVisualizerAnimation();
+        stopChiptuneLoop();
+      }
+    }
+
+    let chiptuneInterval = null;
+    function startChiptuneLoop() {
+      initAudio();
+      stopChiptuneLoop();
+      const notes = [261.63, 329.63, 392.00, 523.25, 392.00, 329.63];
+      let step = 0;
+
+      chiptuneInterval = setInterval(() => {
+        if (!soundEnabled || !audioCtx) return;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(notes[step % notes.length], now);
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+        step++;
+      }, 180);
+    }
+
+    function stopChiptuneLoop() {
+      if (chiptuneInterval) {
+        clearInterval(chiptuneInterval);
+        chiptuneInterval = null;
+      }
+    }
+
+    let visualizerTimer = null;
+    function startVisualizerAnimation() {
+      stopVisualizerAnimation();
+      visualizerTimer = setInterval(() => {
+        for (let i = 1; i <= 6; i++) {
+          const bar = document.getElementById(`spec-bar-${i}`);
+          if (bar) {
+            const h = Math.floor(Math.random() * 26) + 4;
+            bar.style.height = `${h}px`;
+          }
+        }
+      }, 90);
+    }
+
+    function stopVisualizerAnimation() {
+      if (visualizerTimer) {
+        clearInterval(visualizerTimer);
+        visualizerTimer = null;
+      }
+      for (let i = 1; i <= 6; i++) {
+        const bar = document.getElementById(`spec-bar-${i}`);
+        if (bar) bar.style.height = '4px';
+      }
+    }
+
+    function loadCustomAudio(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const audioEl = document.getElementById('html5-audio');
+      const trackTitle = document.getElementById('media-track-title');
+      const url = URL.createObjectURL(file);
+      audioEl.src = url;
+      trackTitle.textContent = file.name;
+      showPhoneToast(`Audio dimuat: ${file.name}`);
+      toggleRetroMusic();
+    }
+
+    // Video Handling
+    function loadCustomVideo(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const videoEl = document.getElementById('html5-video');
+      const canvasEl = document.getElementById('retro-video-canvas');
+      const url = URL.createObjectURL(file);
+      videoEl.src = url;
+      videoEl.classList.remove('hidden');
+      canvasEl.classList.add('hidden');
+      videoEl.play();
+      document.getElementById('btn-video-play').textContent = '⏸ PAUSE VIDEO';
+      showPhoneToast(`Video dimuat: ${file.name}`);
+    }
+
+    function toggleVideoPlayback() {
+      const videoEl = document.getElementById('html5-video');
+      const btn = document.getElementById('btn-video-play');
+      if (videoEl.src) {
+        if (videoEl.paused) {
+          videoEl.play();
+          btn.textContent = '⏸ PAUSE VIDEO';
+        } else {
+          videoEl.pause();
+          btn.textContent = '▶ PLAY VIDEO';
+        }
+      } else {
+        showPhoneToast('Muat file MP4 dari perangkat!');
+      }
+    }
+
+    // Simulated retro TV noise / wireframe for video canvas
+    function drawRetroVideoStatic() {
+      const canvas = document.getElementById('retro-video-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let frame = 0;
+      function renderNoise() {
+        if (activeMediaTab !== 'video' || !document.getElementById('html5-video').classList.contains('hidden')) return;
+        ctx.fillStyle = '#172b15';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#98b894';
+        
+        // Draw retro spinning cube / geometry
+        frame += 0.04;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const r = 25;
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+          const angle = frame + (i * Math.PI / 2);
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.font = '10px Share Tech Mono';
+        ctx.fillText('VIDEO STREAM SIM', cx - 48, cy + 42);
+        requestAnimationFrame(renderNoise);
+      }
+      renderNoise();
+    }
+
+    // --- CALCULATOR ENGINE ---
+    let calcExpression = '';
+    function calcPress(val) {
+      playShortClick();
+      const disp = document.getElementById('calc-display');
+      const formula = document.getElementById('calc-formula');
+
+      if (val === 'C') {
+        calcExpression = '';
+        disp.textContent = '0';
+        formula.textContent = '';
+        return;
+      }
+
+      if (val === '=') {
+        try {
+          if (!calcExpression) return;
+          // Clean math expression safe evaluation
+          const sanitized = calcExpression.replace(/[^0-9+\-*/.]/g, '');
+          const result = Function(`'use strict'; return (${sanitized})`)();
+          formula.textContent = calcExpression + ' =';
+          calcExpression = String(result);
+          disp.textContent = calcExpression;
+        } catch (e) {
+          disp.textContent = 'Error';
+          calcExpression = '';
+        }
+        return;
+      }
+
+      calcExpression += val;
+      disp.textContent = calcExpression;
+    }
+
+    // --- CALENDAR ENGINE ---
+    let currentCalendarDate = new Date(2026, 8, 6); // Sep 6, 2026 default
+
+    function renderCalendar() {
+      const monthYearLabel = document.getElementById('calendar-month-year');
+      const grid = document.getElementById('calendar-days-grid');
+      if (!grid) return;
+
+      const year = currentCalendarDate.getFullYear();
+      const month = currentCalendarDate.getMonth();
+      const monthNames = ['JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI', 'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER'];
+      
+      monthYearLabel.textContent = `${monthNames[month]} ${year}`;
+
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const totalDays = new Date(year, month + 1, 0).getDate();
+
+      let html = '';
+      // Empty padding slots
+      for (let i = 0; i < firstDayIndex; i++) {
+        html += `<span class="opacity-20">-</span>`;
+      }
+      // Day numbers
+      for (let d = 1; d <= totalDays; d++) {
+        const isSelected = d === 6 && month === 8 && year === 2026;
+        if (isSelected) {
+          html += `<span class="font-bold bg-black/30 rounded text-current border border-current">${d}</span>`;
+        } else {
+          html += `<span>${d}</span>`;
+        }
+      }
+      grid.innerHTML = html;
+    }
+
+    function calendarChangeMonth(delta) {
+      playShortClick();
+      currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+      renderCalendar();
+    }
+
+    // --- STOPWATCH & TIMER ENGINES ---
+    let activeClockTool = 'stopwatch';
+
+    function switchClockTool(tool) {
+      activeClockTool = tool;
+      const swPane = document.getElementById('clock-pane-stopwatch');
+      const tmPane = document.getElementById('clock-pane-timer');
+      const swTab = document.getElementById('clock-tab-sw');
+      const tmTab = document.getElementById('clock-tab-tm');
+
+      if (tool === 'stopwatch') {
+        swPane.classList.remove('hidden');
+        tmPane.classList.add('hidden');
+        swTab.className = 'px-1.5 py-0.5 rounded bg-black/20 font-bold';
+        tmTab.className = 'px-1.5 py-0.5 rounded opacity-60';
+      } else {
+        swPane.classList.add('hidden');
+        tmPane.classList.remove('hidden');
+        swTab.className = 'px-1.5 py-0.5 rounded opacity-60';
+        tmTab.className = 'px-1.5 py-0.5 rounded bg-black/20 font-bold';
+      }
+    }
+
+    // Stopwatch Logic
+    let swRunning = false;
+    let swStartTime = 0;
+    let swElapsed = 0;
+    let swInterval = null;
+    let swLaps = [];
+
+    function toggleStopwatch() {
+      playShortClick();
+      const btn = document.getElementById('btn-sw-toggle');
+      if (swRunning) {
+        clearInterval(swInterval);
+        swElapsed += Date.now() - swStartTime;
+        swRunning = false;
+        btn.textContent = 'LANJUT';
+      } else {
+        swStartTime = Date.now();
+        swInterval = setInterval(updateStopwatchUI, 50);
+        swRunning = true;
+        btn.textContent = 'JEDA';
+      }
+    }
+
+    function updateStopwatchUI() {
+      const now = swElapsed + (Date.now() - swStartTime);
+      const totalSeconds = Math.floor(now / 1000);
+      const ms = Math.floor((now % 1000) / 100);
+      const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+      const s = String(totalSeconds % 60).padStart(2, '0');
+      document.getElementById('sw-display').textContent = `${m}:${s}.${ms}`;
+    }
+
+    function lapStopwatch() {
+      if (!swRunning) return;
+      playShortClick();
+      const current = document.getElementById('sw-display').textContent;
+      swLaps.unshift(current);
+      const container = document.getElementById('sw-lap-list');
+      container.innerHTML = swLaps.slice(0, 4).map((lap, i) => `
+        <div class="flex justify-between bg-black/5 px-1 rounded">
+          <span>Lap ${swLaps.length - i}</span>
+          <span class="font-bold">${lap}</span>
+        </div>
+      `).join('');
+    }
+
+    function resetStopwatch() {
+      playShortClick();
+      clearInterval(swInterval);
+      swRunning = false;
+      swElapsed = 0;
+      swLaps = [];
+      document.getElementById('btn-sw-toggle').textContent = 'MULAI';
+      document.getElementById('sw-display').textContent = '00:00.0';
+      document.getElementById('sw-lap-list').innerHTML = '<div class="opacity-50 italic">Belum ada lap</div>';
+    }
+
+    // Timer Logic
+    let timerDuration = 60; // 60s default
+    let timerRemaining = 60;
+    let timerInterval = null;
+    let timerRunning = false;
+
+    function adjustTimerDuration(delta) {
+      if (timerRunning) return;
+      playShortClick();
+      timerDuration = Math.max(10, timerDuration + delta);
+      timerRemaining = timerDuration;
+      renderTimerUI();
+    }
+
+    function renderTimerUI() {
+      const m = String(Math.floor(timerRemaining / 60)).padStart(2, '0');
+      const s = String(timerRemaining % 60).padStart(2, '0');
+      document.getElementById('timer-display').textContent = `${m}:${s}`;
+    }
+
+    function toggleCountdownTimer() {
+      playShortClick();
+      const btn = document.getElementById('btn-timer-toggle');
+      if (timerRunning) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        btn.textContent = 'LANJUT';
+      } else {
+        document.getElementById('timer-alarm-banner').classList.add('hidden');
+        timerInterval = setInterval(() => {
+          if (timerRemaining > 0) {
+            timerRemaining--;
+            renderTimerUI();
+          } else {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            btn.textContent = 'MULAI';
+            document.getElementById('timer-alarm-banner').classList.remove('hidden');
+            startRingtoneLoop();
+            showPhoneToast('⏰ ALARM TIMER BERBUNYI!');
+          }
+        }, 1000);
+        timerRunning = true;
+        btn.textContent = 'JEDA';
+      }
+    }
+
+    function resetCountdownTimer() {
+      playShortClick();
+      clearInterval(timerInterval);
+      stopRingtoneLoop();
+      timerRunning = false;
+      timerRemaining = timerDuration;
+      renderTimerUI();
+      document.getElementById('btn-timer-toggle').textContent = 'MULAI';
+      document.getElementById('timer-alarm-banner').classList.add('hidden');
+    }
+
+    // --- CLASSIC SNAKE RETRO GAME ---
+    let snakeCanvas, snakeCtx;
+    const snakeGridSize = 10;
+    let snake = [{ x: 8, y: 7 }, { x: 7, y: 7 }, { x: 6, y: 7 }];
+    let snakeDirection = { x: 1, y: 0 };
+    let snakeFood = { x: 12, y: 7 };
+    let snakeScore = 0;
+    let snakeHighScore = 0;
+    let snakeGameInterval = null;
+    let snakeIsRunning = false;
+
+    function initSnakeCanvas() {
+      snakeCanvas = document.getElementById('snake-canvas');
+      if (snakeCanvas) snakeCtx = snakeCanvas.getContext('2d');
+    }
+
+    function startSnakeGame() {
+      initSnakeCanvas();
+      document.getElementById('snake-overlay').classList.add('hidden');
+      snake = [{ x: 8, y: 7 }, { x: 7, y: 7 }, { x: 6, y: 7 }];
+      snakeDirection = { x: 1, y: 0 };
+      snakeScore = 0;
+      document.getElementById('snake-score').textContent = '0';
+      spawnSnakeFood();
+      snakeIsRunning = true;
+
+      if (snakeGameInterval) clearInterval(snakeGameInterval);
+      snakeGameInterval = setInterval(gameLoopSnake, 130);
+    }
+
+    function spawnSnakeFood() {
+      const maxX = Math.floor(snakeCanvas.width / snakeGridSize);
+      const maxY = Math.floor(snakeCanvas.height / snakeGridSize);
+      snakeFood = {
+        x: Math.floor(Math.random() * maxX),
+        y: Math.floor(Math.random() * maxY)
+      };
+    }
+
+    function gameLoopSnake() {
+      if (!snakeIsRunning) return;
+
+      const head = { x: snake[0].x + snakeDirection.x, y: snake[0].y + snakeDirection.y };
+      const maxX = Math.floor(snakeCanvas.width / snakeGridSize);
+      const maxY = Math.floor(snakeCanvas.height / snakeGridSize);
+
+      // Wall collision
+      if (head.x < 0 || head.x >= maxX || head.y < 0 || head.y >= maxY) {
+        return handleSnakeGameOver();
+      }
+
+      // Self collision
+      if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+        return handleSnakeGameOver();
+      }
+
+      snake.unshift(head);
+
+      // Eat food
+      if (head.x === snakeFood.x && head.y === snakeFood.y) {
+        snakeScore += 10;
+        document.getElementById('snake-score').textContent = snakeScore;
+        if (snakeScore > snakeHighScore) {
+          snakeHighScore = snakeScore;
+          document.getElementById('snake-highscore').textContent = snakeHighScore;
+        }
+        playKeypadTone('9');
+        spawnSnakeFood();
+      } else {
+        snake.pop();
+      }
+
+      // Render graphics
+      snakeCtx.fillStyle = '#172b15';
+      snakeCtx.fillRect(0, 0, snakeCanvas.width, snakeCanvas.height);
+
+      // Render Food
+      snakeCtx.fillStyle = '#98b894';
+      snakeCtx.fillRect(snakeFood.x * snakeGridSize, snakeFood.y * snakeGridSize, snakeGridSize - 1, snakeGridSize - 1);
+
+      // Render Snake Body
+      snake.forEach((segment, i) => {
+        if (i === 0) {
+          snakeCtx.fillStyle = '#10b981'; // Head
+        } else {
+          snakeCtx.fillStyle = '#98b894';
+        }
+        snakeCtx.fillRect(segment.x * snakeGridSize, segment.y * snakeGridSize, snakeGridSize - 1, snakeGridSize - 1);
+      });
+    }
+
+    function handleSnakeGameOver() {
+      snakeIsRunning = false;
+      clearInterval(snakeGameInterval);
+      document.getElementById('snake-overlay').classList.remove('hidden');
+      playKeypadTone('*');
+    }
+
+    function changeSnakeDirection(dir) {
+      if (dir === 'up' && snakeDirection.y === 0) snakeDirection = { x: 0, y: -1 };
+      if (dir === 'down' && snakeDirection.y === 0) snakeDirection = { x: 0, y: 1 };
+      if (dir === 'left' && snakeDirection.x === 0) snakeDirection = { x: -1, y: 0 };
+      if (dir === 'right' && snakeDirection.x === 0) snakeDirection = { x: 1, y: 0 };
+    }
+
+    // --- PHONE HARDWARE INTERACTIONS ---
+    function handleLSK() {
+      playShortClick();
+      const current = phoneState.activeScreen;
+
+      if (phoneState.isLocked) {
+        // Unlock prompt
+        togglePhoneLock();
+        return;
+      }
+
+      if (current === 'home') {
+        phoneState.screenStack.push('menu');
+        renderCurrentScreen();
+      } else if (current === 'menu') {
+        const selectedApp = phoneState.menuApps[phoneState.selectedMenuIndex];
+        navigateTo(selectedApp);
+      } else if (current === 'dialer') {
+        initiateOutgoingCall();
+      } else if (current === 'call-screen') {
+        if (phoneState.call.isIncoming) {
+          answerIncomingCall();
+        } else {
+          showPhoneToast('Mikrofon dimatikan (Mute)');
+        }
+      } else if (current === 'messages') {
+        if (currentSmsSub === 'compose') {
+          sendCurrentSms();
+        } else if (currentSmsSub === 'read') {
+          // Reply
+          const msg = [...phoneState.smsInbox, ...phoneState.smsSent].find(m => m.id === phoneState.currentReadingSmsId);
+          currentSmsSub = 'compose';
+          renderCurrentScreen();
+          if (msg) document.getElementById('sms-to-input').value = msg.from || msg.to;
+        } else if (currentSmsSub === 'menu') {
+          currentSmsSub = 'compose';
+          renderCurrentScreen();
+        }
+      } else if (current === 'contacts') {
+        // Call first contact
+        if (phoneState.contacts.length > 0) {
+          initiateOutgoingCall(phoneState.contacts[0].phone);
+        }
+      } else if (current === 'media') {
+        toggleRetroMusic();
+      } else if (current === 'calc') {
+        calcPress('=');
+      } else if (current === 'calendar') {
+        calendarChangeMonth(-1);
+      } else if (current === 'clock') {
+        if (activeClockTool === 'stopwatch') toggleStopwatch();
+        else toggleCountdownTimer();
+      } else if (current === 'snake') {
+        startSnakeGame();
+      }
+    }
+
+    function handleRSK() {
+      playShortClick();
+      const current = phoneState.activeScreen;
+
+      if (current === 'dialer') {
+        backspaceDial();
+      } else if (current === 'home') {
+        navigateTo('contacts');
+      } else if (current === 'call-screen') {
+        endCall();
+      } else if (current === 'messages') {
+        if (currentSmsSub !== 'menu') {
+          currentSmsSub = 'menu';
+          renderCurrentScreen();
+        } else {
+          navigateBack();
+        }
+      } else {
+        navigateBack();
+      }
+    }
+
+    function handleCenterKey() {
+      playShortClick();
+      const current = phoneState.activeScreen;
+
+      if (phoneState.isLocked) {
+        togglePhoneLock();
+        return;
+      }
+
+      if (current === 'home') {
+        phoneState.screenStack.push('menu');
+        renderCurrentScreen();
+      } else if (current === 'menu') {
+        const selectedApp = phoneState.menuApps[phoneState.selectedMenuIndex];
+        navigateTo(selectedApp);
+      } else if (current === 'dialer') {
+        initiateOutgoingCall();
+      } else if (current === 'snake') {
+        if (!snakeIsRunning) startSnakeGame();
+      } else {
+        handleLSK();
+      }
+    }
+
+    function handleDPad(dir) {
+      playShortClick();
+      const current = phoneState.activeScreen;
+
+      if (current === 'snake') {
+        changeSnakeDirection(dir);
+        return;
+      }
+
+      if (current === 'menu') {
+        let idx = phoneState.selectedMenuIndex;
+        if (dir === 'right') idx = (idx + 1) % 9;
+        if (dir === 'left') idx = (idx - 1 + 9) % 9;
+        if (dir === 'down') idx = (idx + 3) % 9;
+        if (dir === 'up') idx = (idx - 3 + 9) % 9;
+        phoneState.selectedMenuIndex = idx;
+        highlightMenuItem(idx);
+      } else if (current === 'calendar') {
+        if (dir === 'left') calendarChangeMonth(-1);
+        if (dir === 'right') calendarChangeMonth(1);
+      }
+    }
+
+    function handleCallButton() {
+      playKeypadTone('1');
+      if (phoneState.call.isIncoming) {
+        answerIncomingCall();
+      } else if (phoneState.activeScreen !== 'dialer') {
+        navigateTo('dialer');
+      } else {
+        initiateOutgoingCall();
+      }
+    }
+
+    function handleEndButton() {
+      playKeypadTone('#');
+      if (phoneState.call.active) {
+        endCall();
+      } else {
+        // Go straight to Home
+        phoneState.screenStack = ['home'];
+        renderCurrentScreen();
+      }
+    }
+
+    function handleKeypad(key) {
+      playKeypadTone(key);
+      const current = phoneState.activeScreen;
+
+      if (phoneState.isLocked) {
+        // PIN entry
+        phoneState.enteredPin += key;
+        const pinDisp = document.getElementById('lock-pin-digits');
+        const pinBox = document.getElementById('lock-pin-box');
+        pinBox.classList.remove('hidden');
+        pinDisp.textContent = '*'.repeat(phoneState.enteredPin.length).padEnd(4, '-');
+
+        if (phoneState.enteredPin.length >= 4) {
+          if (phoneState.enteredPin === phoneState.passcode) {
+            phoneState.isLocked = false;
+            phoneState.enteredPin = '';
+            pinBox.classList.add('hidden');
+            renderCurrentScreen();
+            showPhoneToast('Ponsel Terbuka');
+          } else {
+            showPhoneToast('PIN Salah!');
+            phoneState.enteredPin = '';
+            pinDisp.textContent = '----';
+          }
+        }
+        return;
+      }
+
+      if (current === 'home') {
+        navigateTo('dialer');
+        dialNumber(key);
+      } else if (current === 'dialer') {
+        dialNumber(key);
+      } else if (current === 'messages' && currentSmsSub === 'compose') {
+        handleT9Key(key);
+      } else if (current === 'calc') {
+        calcPress(key);
+      } else if (current === 'snake') {
+        if (key === '2') changeSnakeDirection('up');
+        if (key === '8') changeSnakeDirection('down');
+        if (key === '4') changeSnakeDirection('left');
+        if (key === '6') changeSnakeDirection('right');
+      }
+    }
+
+    function togglePhoneLock() {
+      playShortClick();
+      phoneState.isLocked = !phoneState.isLocked;
+      phoneState.enteredPin = '';
+      const pinBox = document.getElementById('lock-pin-box');
+      if (pinBox) pinBox.classList.add('hidden');
+      renderCurrentScreen();
+      showPhoneToast(phoneState.isLocked ? 'Ponsel Terkunci' : 'Ponsel Terbuka');
+    }
+
+    // Modal & Toast Helper (Strictly No Alert)
+    let modalOkCallback = null;
+    function showPhoneModal(title, desc, onOk, onCancel) {
+      const modal = document.getElementById('phone-modal');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-desc').textContent = desc;
+      modal.classList.remove('hidden');
+
+      modalOkCallback = () => {
+        modal.classList.add('hidden');
+        if (onOk) onOk();
+      };
+      document.getElementById('modal-btn-ok').onclick = modalOkCallback;
+      document.getElementById('modal-btn-cancel').onclick = () => {
+        modal.classList.add('hidden');
+        if (onCancel) onCancel();
+      };
+    }
+
+    let toastTimeout = null;
+    function showPhoneToast(msg) {
+      const toast = document.getElementById('phone-toast');
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.classList.remove('hidden');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 2200);
+    }
+
+    // --- CONTACTS & SETTINGS HELPERS ---
+    function renderContactsList() {
+      const list = document.getElementById('contacts-list');
+      const countLbl = document.getElementById('contacts-count-label');
+      if (!list) return;
+      countLbl.textContent = `${phoneState.contacts.length} Kontak`;
+
+      list.innerHTML = phoneState.contacts.map((c, i) => `
+        <div onclick="initiateOutgoingCall('${c.phone}')" class="p-1.5 rounded bg-black/10 hover:bg-black/20 cursor-pointer flex justify-between items-center">
+          <div>
+            <div class="font-bold text-xs">${c.name}</div>
+            <div class="text-[9px] opacity-75">${c.phone}</div>
+          </div>
+          <span class="text-xs">📞</span>
+        </div>
+      `).join('');
+    }
+
+    function promptAddContact() {
+      const name = promptModalInput('Nama Kontak Baru:');
+      if (name) {
+        const phone = promptModalInput('Nomor Telepon:');
+        if (phone) {
+          phoneState.contacts.push({ id: Date.now(), name, phone });
+          renderContactsList();
+          showPhoneToast('Kontak tersimpan!');
+        }
+      }
+    }
+
+    function promptModalInput(placeholderText) {
+      // In-line fallback safe prompt helper
+      return window.prompt(placeholderText, '');
+    }
+
+    function promptChangePIN() {
+      const newPin = promptModalInput('Masukkan PIN Baru (4 Angka):');
+      if (newPin && newPin.length === 4 && /^\d+$/.test(newPin)) {
+        phoneState.passcode = newPin;
+        document.getElementById('settings-pin-label').textContent = newPin;
+        showPhoneToast('PIN berhasil diperbarui');
+      } else {
+        showPhoneToast('PIN harus 4 digit angka!');
+      }
+    }
+
+    function updateOperatorName(name) {
+      phoneState.operatorName = name || 'INDOSIM';
+      document.getElementById('stat-operator').textContent = phoneState.operatorName;
+    }
+
+    function loadCustomWallpaper(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const bg = document.getElementById('home-wallpaper-bg');
+        bg.style.backgroundImage = `url('${evt.target.result}')`;
+        bg.style.opacity = '0.5';
+        showPhoneToast('Wallpaper berhasil dipasang!');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function resetWallpaper() {
+      const bg = document.getElementById('home-wallpaper-bg');
+      bg.style.backgroundImage = 'none';
+      showPhoneToast('Wallpaper dikembalikan standar');
+    }
+
+    function changeChassisSkin(color) {
+      const chassis = document.getElementById('phone-chassis');
+      if (color === 'blue') {
+        chassis.className = 'relative w-[340px] sm:w-[360px] bg-gradient-to-b from-blue-700 via-blue-800 to-blue-900 p-5 rounded-[48px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_0_8px_#0f172a,0_0_0_12px_#1e3a8a] border-t-2 border-blue-400 transition-all duration-300 order-1 lg:order-2';
+      } else if (color === 'black') {
+        chassis.className = 'relative w-[340px] sm:w-[360px] bg-gradient-to-b from-neutral-800 via-neutral-900 to-black p-5 rounded-[48px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_0_8px_#0f172a,0_0_0_12px_#171717] border-t-2 border-neutral-600 transition-all duration-300 order-1 lg:order-2';
+      } else if (color === 'pink') {
+        chassis.className = 'relative w-[340px] sm:w-[360px] bg-gradient-to-b from-pink-500 via-pink-600 to-rose-700 p-5 rounded-[48px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_0_8px_#0f172a,0_0_0_12px_#be185d] border-t-2 border-pink-300 transition-all duration-300 order-1 lg:order-2';
+      } else {
+        // Silver Classic
+        chassis.className = 'relative w-[340px] sm:w-[360px] bg-gradient-to-b from-slate-200 via-slate-300 to-slate-400 p-5 rounded-[48px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_0_8px_#0f172a,0_0_0_12px_#334155] border-t-2 border-white/60 transition-all duration-300 order-1 lg:order-2';
+      }
+      playShortClick();
+    }
+
+    // Scheduled Simulation Triggers
+    function scheduleIncomingCall() {
+      const name = document.getElementById('sched-call-caller').value || 'Bos Kantor';
+      const delay = parseInt(document.getElementById('sched-call-delay').value) || 5;
+      showPhoneToast(`Panggilan dijadwalkan dalam ${delay} detik`);
+      setTimeout(() => {
+        triggerIncomingCallSimulation(name, '081122334455');
+      }, delay * 1000);
+    }
+
+    function scheduleIncomingSMS() {
+      const sender = document.getElementById('sched-sms-sender').value || 'BANK INFO';
+      const text = document.getElementById('sched-sms-text').value || 'Pemberitahuan transaksi.';
+      const delay = parseInt(document.getElementById('sched-sms-delay').value) || 5;
+      showPhoneToast(`SMS dijadwalkan dalam ${delay} detik`);
+      setTimeout(() => {
+        triggerIncomingSmsSimulation(sender, text);
+      }, delay * 1000);
+    }
+
+    function triggerQuickCall() {
+      triggerIncomingCallSimulation('Teman Kantor', '081234567890');
+    }
+
+    function triggerQuickSMS() {
+      triggerIncomingSmsSimulation('Promo Provider', 'Selamat! Anda mendapatkan kuota gratis 10GB untuk hari ini.');
+    }
+
+    // --- KEYBOARD LISTENER & BOOTSTRAP ---
+    window.addEventListener('keydown', (e) => {
+      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+      if (activeTag === 'input' || activeTag === 'textarea') return;
+
+      if (e.key >= '0' && e.key <= '9') {
+        handleKeypad(e.key);
+      } else if (e.key === '*' || e.key === '#') {
+        handleKeypad(e.key);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        handleDPad('up');
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        handleDPad('down');
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleDPad('left');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleDPad('right');
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleCenterKey();
+      } else if (e.key === 'Backspace' || e.key === 'Escape') {
+        e.preventDefault();
+        handleRSK();
+      } else if (e.key.toLowerCase() === 'c') {
+        handleCallButton();
+      } else if (e.key.toLowerCase() === 'e') {
+        handleEndButton();
+      }
+    });
+
+    // Real-time Clock Updater
+    function updateClockDisplay() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const statClock = document.getElementById('stat-clock');
+      const homeClock = document.getElementById('home-time-display');
+      const lockClock = document.getElementById('lock-time-display');
+
+      if (statClock) statClock.textContent = timeStr;
+      if (homeClock) homeClock.textContent = timeStr;
+      if (lockClock) lockClock.textContent = timeStr;
+    }
+
+    // Initialize Menu Grid Clicks
+    document.querySelectorAll('.menu-item').forEach((item, index) => {
+      item.addEventListener('click', () => {
+        phoneState.selectedMenuIndex = index;
+        highlightMenuItem(index);
+        const app = item.getAttribute('data-app');
+        if (app) navigateTo(app);
+      });
+    });
+
+    window.onload = function() {
+      renderCurrentScreen();
+      renderCallHistory();
+      renderContactsList();
+      updateClockDisplay();
+      setInterval(updateClockDisplay, 1000);
+      showPhoneToast('FoneSim Siap. Gunakan Numpad atau Tombol Layar.');
+    };
+  </script>
+</body>
+</html>

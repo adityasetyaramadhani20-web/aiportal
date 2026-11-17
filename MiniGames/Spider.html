@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spider Solitaire</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --card-width: 60px;
+            --card-height: 84px;
+            --card-overlap: 25px;
+        }
+
+        @media (min-width: 640px) {
+            :root {
+                --card-width: 80px;
+                --card-height: 112px;
+                --card-overlap: 30px;
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            :root {
+                --card-width: 90px;
+                --card-height: 126px;
+                --card-overlap: 35px;
+            }
+        }
+
+        body {
+            background-color: #004d00;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18c0-1.1-.9-2-2-2s-2 .9-2 2v2.5C6 20.5 2 16.5 2 6.5V4c0-1.1.9-2 2-2s2 .9 2 2v2.5c0 6.6 2.7 9.8 8 10.5V14c0-1.1.9-2 2-2s2 .9 2 2v3c5.3-.7 8-3.9 8-10.5V4c0-1.1.9-2 2-2s2 .9 2 2v2.5c0 10-4 14-14 14z' fill='%23006400' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E");
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* Prevent body scroll, game handles it */
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Card Styles */
+        .card {
+            width: var(--card-width);
+            height: var(--card-height);
+            background-color: white;
+            border-radius: 6px;
+            box-shadow: 1px 1px 4px rgba(0,0,0,0.3);
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 4px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: grab;
+            /* transition removed for drag performance, added conditionally in JS */
+            z-index: 10;
+        }
+
+        .card:active {
+            cursor: grabbing;
+        }
+
+        @media (min-width: 640px) {
+            .card {
+                border-radius: 8px;
+                font-size: 18px;
+                padding: 6px;
+            }
+        }
+
+        .card.back {
+            background: repeating-linear-gradient(
+                45deg,
+                #3b82f6,
+                #3b82f6 10px,
+                #2563eb 10px,
+                #2563eb 20px
+            );
+            border: 2px solid white;
+            cursor: default;
+        }
+
+        .card.selected {
+            /* Highlight effect for click-selection */
+            transform: translateY(-10px);
+            box-shadow: 0 0 10px 4px rgba(255, 255, 0, 0.7);
+            z-index: 100;
+            filter: brightness(1.1);
+        }
+        
+        /* Class applied during drag */
+        .card.dragging {
+            position: fixed;
+            z-index: 1000 !important;
+            pointer-events: none; /* Crucial for detecting drop target underneath */
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+            opacity: 0.95;
+            transform: scale(1.05); /* Slight zoom when dragging */
+        }
+
+        .card.red { color: #d93025; }
+        .card.black { color: #202124; }
+
+        .suit-large {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3.5em; 
+            opacity: 1; 
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1; 
+        }
+
+        .corner-rank {
+            line-height: 1;
+            position: relative;
+            z-index: 2; 
+        }
+        
+        .corner-rank.bottom {
+            transform: rotate(180deg);
+            align-self: flex-end;
+        }
+
+        /* Layout Columns */
+        .game-column {
+            position: relative;
+            width: var(--card-width);
+            min-height: 200px;
+            padding-bottom: 50px; /* Expand hit area */
+        }
+
+        /* Placeholders */
+        .empty-slot {
+            width: var(--card-width);
+            height: var(--card-height);
+            border: 2px dashed rgba(255,255,255,0.2);
+            border-radius: 8px;
+            position: absolute;
+            top: 0;
+            pointer-events: none;
+        }
+        
+        /* Modal */
+        .modal {
+            background-color: rgba(0,0,0,0.8);
+            transition: opacity 0.3s;
+        }
+        .modal.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Animations */
+        @keyframes deal {
+            from { transform: translate(-500px, -500px); opacity: 0; }
+            to { transform: translate(0, 0); opacity: 1; }
+        }
+        .animate-deal {
+            animation: deal 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col text-white">
+
+    <!-- Header / Controls -->
+    <div class="bg-black/30 p-2 sm:p-4 shadow-md flex justify-between items-center z-50">
+        <div class="flex items-center gap-4">
+            <h1 class="text-lg sm:text-2xl font-bold text-yellow-400 hidden sm:block">Spider Solitaire</h1>
+            <div class="flex flex-col text-xs sm:text-sm">
+                <span>Skor: <span id="score-display">500</span></span>
+                <span>Langkah: <span id="moves-display">0</span></span>
+            </div>
+        </div>
+
+        <div class="flex gap-2">
+            <button onclick="undoMove()" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm sm:text-base transition">
+                Undo
+            </button>
+            <button onclick="showMenu()" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-sm sm:text-base transition font-bold">
+                Game Baru
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Area -->
+    <div class="flex-grow flex flex-col p-2 overflow-hidden">
+        
+        <!-- Tableau (Columns) -->
+        <div id="tableau" class="flex justify-center gap-1 sm:gap-2 md:gap-4 flex-grow relative mt-2 sm:mt-4">
+            <!-- Columns generated by JS -->
+        </div>
+
+        <!-- Bottom Area: Stock & Foundations -->
+        <!-- Adjusted padding-bottom (pb-8) to lift the stock pile up -->
+        <div class="h-32 flex justify-between items-end pb-8 sm:pb-10 px-4 sm:px-10">
+            
+            <!-- Stock Pile -->
+            <div class="relative cursor-pointer group" onclick="dealStock()">
+                <div class="card back absolute top-0 left-0 shadow-lg" style="transform: translate(-4px, -4px);"></div>
+                <div class="card back absolute top-0 left-0 shadow-lg" style="transform: translate(-2px, -2px);"></div>
+                <div id="stock-pile" class="card back flex items-center justify-center shadow-lg group-hover:brightness-110 transition">
+                    <span id="stock-count" class="text-white font-bold text-xl drop-shadow-md">50</span>
+                </div>
+            </div>
+
+            <!-- Completed Foundations -->
+            <div id="foundations" class="flex gap-1 sm:gap-2">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- New Game Modal -->
+    <div id="menu-modal" class="modal fixed inset-0 flex items-center justify-center z-50">
+        <div class="bg-white text-gray-800 p-6 rounded-lg shadow-2xl max-w-sm w-full mx-4 text-center">
+            <h2 class="text-2xl font-bold mb-4 text-green-800">Mulai Game Baru</h2>
+            <p class="mb-6 text-gray-600">Pilih tingkat kesulitan:</p>
+            
+            <div class="space-y-3">
+                <button onclick="startGame(1)" class="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded font-bold transition shadow-md">
+                    Mudah (1 Warna ♠)
+                </button>
+                <button onclick="startGame(2)" class="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded font-bold transition shadow-md">
+                    Menengah (2 Warna ♠♥)
+                </button>
+                <button onclick="startGame(4)" class="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded font-bold transition shadow-md">
+                    Asli (4 Warna ♠♥♣♦)
+                </button>
+            </div>
+            
+            <button onclick="hideMenu()" id="cancel-btn" class="mt-4 text-sm text-gray-500 underline hover:text-gray-800 hidden">
+                Batal
+            </button>
+        </div>
+    </div>
+
+    <!-- Win Modal -->
+    <div id="win-modal" class="modal hidden fixed inset-0 flex items-center justify-center z-50">
+        <div class="bg-white text-gray-800 p-8 rounded-lg shadow-2xl text-center border-4 border-yellow-400">
+            <h2 class="text-4xl font-bold mb-2 text-yellow-500">🏆 MENANG! 🏆</h2>
+            <p class="text-lg mb-4">Luar biasa! Anda menyelesaikan Spider Solitaire.</p>
+            <p class="mb-6 font-bold text-xl">Skor Akhir: <span id="final-score">0</span></p>
+            <button onclick="showMenu()" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-bold shadow-lg transition transform hover:scale-105">
+                Main Lagi
+            </button>
+        </div>
+    </div>
+
+    <!-- Message Toast -->
+    <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full text-sm opacity-0 transition pointer-events-none z-50">
+        Pesan
+    </div>
+
+    <script>
+        // --- Game Config & State ---
+        const SUITS = ['spades', 'hearts', 'clubs', 'diamonds'];
+        const SYMBOLS = { 
+            'spades': '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" style="display:inline-block;"><path d="M12 2C9 2 3 8 3 14c0 3 2 5 5 5 1.5 0 2.5-1 2.5-1s-0.5 1.5-2 3h7c-1.5-1.5-2-3-2-3s1 1 2.5 1c3 0 5-2 5-5C21 8 15 2 12 2z"/></svg>', 
+            'hearts': '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" style="display:inline-block;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>', 
+            'clubs': '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" style="display:inline-block;"><path d="M12 2.5c-2.3 0-4.2 1.9-4.2 4.2c0 1.6 0.9 3 2.3 3.7C7.8 11 6 13.3 6 16c0 2.8 2.2 5 5 5 0.6 0 1.1-0.1 1.6-0.3 -0.6 1.4-2 2.3-3.6 2.3h6c-1.6 0-3-0.9-3.6-2.3 0.5 0.2 1 0.3 1.6 0.3 2.8 0 5-2.2 5-5 0-2.7-1.8-5-4.1-5.6 1.4-0.7 2.3-2.1 2.3-3.7C16.2 4.4 14.3 2.5 12 2.5z"/></svg>', 
+            'diamonds': '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" style="display:inline-block;"><path d="M12 2l-8 10l8 10l8-10L12 2z"/></svg>' 
+        };
+        const COLORS = { 'spades': 'black', 'hearts': 'red', 'clubs': 'black', 'diamonds': 'red' };
+        const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        
+        let gameState = {
+            columns: [], // Array of 10 arrays
+            stock: [],
+            foundations: 0,
+            score: 500,
+            moves: 0,
+            history: [], // For undo
+            difficulty: 1
+        };
+
+        let selectedCards = null; // { colIndex, cardIndex }
+        
+        // --- Drag & Drop State ---
+        let dragState = {
+            active: false,
+            colIndex: -1,
+            cardIndex: -1,
+            startX: 0,
+            startY: 0,
+            elements: [], // DOM elements being dragged
+            offsets: [], // {x, y} offsets from cursor for each card
+        };
+
+        // --- Init ---
+        window.onload = () => {
+            // First load shows menu
+            // Global mouse up listeners for drag end
+            document.addEventListener('mouseup', handleDragEnd);
+            document.addEventListener('touchend', handleDragEnd);
+            document.addEventListener('mousemove', handleDragMove);
+            document.addEventListener('touchmove', handleDragMove, { passive: false });
+        };
+
+        function showMenu() {
+            document.getElementById('menu-modal').classList.remove('hidden');
+            if (gameState.columns.length > 0) {
+                document.getElementById('cancel-btn').classList.remove('hidden');
+            }
+        }
+
+        function hideMenu() {
+            document.getElementById('menu-modal').classList.add('hidden');
+        }
+
+        function startGame(difficulty) {
+            gameState.difficulty = difficulty;
+            gameState.score = 500;
+            gameState.moves = 0;
+            gameState.foundations = 0;
+            gameState.history = [];
+            selectedCards = null;
+            
+            updateScore();
+            hideMenu();
+            document.getElementById('win-modal').classList.add('hidden');
+            document.getElementById('foundations').innerHTML = '';
+
+            let deck = [];
+            let suitsToUse = [];
+            if (difficulty === 1) suitsToUse = ['spades'];
+            else if (difficulty === 2) suitsToUse = ['spades', 'hearts'];
+            else suitsToUse = ['spades', 'hearts', 'clubs', 'diamonds'];
+
+            const numDecksPerSuit = 8 / suitsToUse.length;
+
+            suitsToUse.forEach(suit => {
+                for (let i = 0; i < numDecksPerSuit; i++) {
+                    for (let r = 0; r < 13; r++) {
+                        deck.push({
+                            suit: suit,
+                            rank: r + 1,
+                            rankDisplay: RANKS[r],
+                            faceUp: false,
+                            id: Math.random().toString(36).substr(2, 9)
+                        });
+                    }
+                }
+            });
+
+            deck.sort(() => Math.random() - 0.5);
+
+            gameState.columns = Array.from({ length: 10 }, () => []);
+            for (let i = 0; i < 54; i++) {
+                let colIndex = i % 10;
+                let card = deck.pop();
+                gameState.columns[colIndex].push(card);
+            }
+
+            gameState.columns.forEach(col => {
+                if(col.length > 0) col[col.length - 1].faceUp = true;
+            });
+
+            gameState.stock = deck;
+            renderTableau();
+            renderStock();
+        }
+
+        // --- Rendering ---
+        function renderTableau() {
+            const container = document.getElementById('tableau');
+            container.innerHTML = '';
+
+            gameState.columns.forEach((col, colIndex) => {
+                const colDiv = document.createElement('div');
+                colDiv.className = 'game-column';
+                colDiv.dataset.colIndex = colIndex; // For drop detection
+
+                // Click on empty column logic handled via drag end or click
+                colDiv.onclick = (e) => {
+                    if (!dragState.active) handleColumnClick(e, colIndex);
+                };
+
+                const placeholder = document.createElement('div');
+                placeholder.className = 'empty-slot';
+                colDiv.appendChild(placeholder);
+
+                col.forEach((card, cardIndex) => {
+                    const cardDiv = createCardElement(card, colIndex, cardIndex);
+                    cardDiv.style.top = `${cardIndex * getOverlap()}px`;
+                    // Transition only if NOT dragging this specific card (handled by JS during drag)
+                    cardDiv.style.transition = 'transform 0.2s, box-shadow 0.2s'; 
+                    colDiv.appendChild(cardDiv);
+                });
+
+                container.appendChild(colDiv);
+            });
+        }
+
+        function getOverlap() {
+            const root = document.documentElement;
+            const style = getComputedStyle(root);
+            return parseInt(style.getPropertyValue('--card-overlap'));
+        }
+
+        function createCardElement(card, colIndex, cardIndex) {
+            const div = document.createElement('div');
+            
+            let isSelected = false;
+            if (selectedCards && selectedCards.colIndex === colIndex && cardIndex >= selectedCards.cardIndex) {
+                isSelected = true;
+            }
+
+            div.className = `card ${card.faceUp ? '' : 'back'} ${COLORS[card.suit]} ${isSelected ? 'selected' : ''}`;
+            
+            if (card.faceUp) {
+                div.innerHTML = `
+                    <div class="flex justify-between w-full">
+                        <div class="corner-rank flex flex-col items-center">
+                            <span>${card.rankDisplay}</span>
+                            <span class="text-sm">${SYMBOLS[card.suit]}</span>
+                        </div>
+                    </div>
+                    <div class="suit-large">${SYMBOLS[card.suit]}</div>
+                    <div class="flex justify-between w-full">
+                        <div class="corner-rank bottom flex flex-col items-center">
+                            <span>${card.rankDisplay}</span>
+                            <span class="text-sm">${SYMBOLS[card.suit]}</span>
+                        </div>
+                    </div>
+                `;
+                
+                // Attach Drag Start Listeners
+                div.onmousedown = (e) => handleDragStart(e, colIndex, cardIndex);
+                div.ontouchstart = (e) => handleDragStart(e, colIndex, cardIndex);
+            }
+
+            // Click handling is somewhat redundant with drag start, but we separate "click" from "drag" logic
+            // We'll let mousedown/touchstart propagate to handle drag initiation.
+            // If drag never moves significantly, we treat it as a click.
+            
+            return div;
+        }
+
+        function renderStock() {
+            const stockCount = document.getElementById('stock-count');
+            const stockPile = document.getElementById('stock-pile');
+            stockCount.innerText = gameState.stock.length;
+            
+            if (gameState.stock.length === 0) {
+                stockPile.classList.add('opacity-50', 'cursor-not-allowed');
+                stockPile.classList.remove('back');
+                stockPile.style.backgroundColor = 'transparent';
+                stockPile.style.border = '2px solid rgba(255,255,255,0.2)';
+                stockCount.style.display = 'none';
+            } else {
+                stockPile.classList.remove('opacity-50', 'cursor-not-allowed');
+                stockPile.classList.add('back');
+                stockPile.style.backgroundColor = '';
+                stockPile.style.border = '2px solid white';
+                stockCount.style.display = 'block';
+            }
+        }
+
+        function updateScore() {
+            document.getElementById('score-display').innerText = gameState.score;
+            document.getElementById('moves-display').innerText = gameState.moves;
+        }
+
+        // --- Drag & Drop Logic ---
+
+        function handleDragStart(e, colIndex, cardIndex) {
+            if (e.button !== 0 && e.type === 'mousedown') return; // Only left click
+            
+            // Check if card(s) can be dragged (valid sequence)
+            if (!isValidSelection(colIndex, cardIndex)) return;
+
+            // Prepare Drag State
+            const touch = e.type === 'touchstart' ? e.touches[0] : e;
+            dragState.startX = touch.clientX;
+            dragState.startY = touch.clientY;
+            dragState.colIndex = colIndex;
+            dragState.cardIndex = cardIndex;
+            dragState.active = false; // Will become active after moving a threshold
+            dragState.elements = [];
+            
+            // Don't prevent default yet, allows scrolling if user doesn't drag horizontally
+            // e.preventDefault(); 
+        }
+
+        function handleDragMove(e) {
+            if (dragState.colIndex === -1) return;
+
+            const touch = e.type === 'touchmove' ? e.touches[0] : e;
+            const dx = touch.clientX - dragState.startX;
+            const dy = touch.clientY - dragState.startY;
+
+            // Threshold to start dragging (prevents accidental drags on clicks)
+            if (!dragState.active && Math.sqrt(dx*dx + dy*dy) > 5) {
+                initDragVisuals();
+            }
+
+            if (dragState.active) {
+                if (e.type === 'touchmove') e.preventDefault(); // Prevent scrolling while dragging
+
+                // Move elements
+                dragState.elements.forEach((el, i) => {
+                    el.style.left = (touch.clientX + dragState.offsets[i].x) + 'px';
+                    el.style.top = (touch.clientY + dragState.offsets[i].y) + 'px';
+                });
+            }
+        }
+
+        function initDragVisuals() {
+            dragState.active = true;
+            selectedCards = null; // Clear click selection if dragging starts
+            
+            // Get all card elements from this index downwards
+            const colDiv = document.querySelectorAll('.game-column')[dragState.colIndex];
+            // The children structure is [placeholder, card, card...]
+            // Card index 0 is child 1.
+            const allCards = Array.from(colDiv.children).slice(1);
+            const draggedCards = allCards.slice(dragState.cardIndex);
+
+            // Calculate offsets and switch to fixed position
+            dragState.elements = draggedCards;
+            dragState.offsets = [];
+
+            draggedCards.forEach(card => {
+                const rect = card.getBoundingClientRect();
+                dragState.offsets.push({
+                    x: rect.left - dragState.startX,
+                    y: rect.top - dragState.startY
+                });
+                
+                // Set styles for dragging
+                card.classList.add('dragging');
+                card.style.left = rect.left + 'px';
+                card.style.top = rect.top + 'px';
+                card.style.width = rect.width + 'px'; // Maintain width
+            });
+        }
+
+        function handleDragEnd(e) {
+            if (dragState.colIndex === -1) return;
+
+            if (dragState.active) {
+                // Drop Logic
+                const touch = e.type === 'touchend' ? e.changedTouches[0] : e;
+                
+                // Find drop target
+                // We need to hide dragged elements briefly to see what's under them
+                dragState.elements.forEach(el => el.style.display = 'none');
+                const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                dragState.elements.forEach(el => el.style.display = 'flex');
+
+                const targetColDiv = elemBelow ? elemBelow.closest('.game-column') : null;
+                
+                let success = false;
+                if (targetColDiv) {
+                    const targetColIndex = parseInt(targetColDiv.dataset.colIndex);
+                    // Attempt move logic
+                    // We need to temporarily set selectedCards for attemptMove to work 
+                    // or refactor attemptMove. Let's refactor attemptMove to be more flexible.
+                    success = executeMove(dragState.colIndex, targetColIndex, dragState.cardIndex);
+                }
+
+                if (!success) {
+                    // Revert visual (Snap back) - Simplified: just re-render
+                    renderTableau();
+                }
+            } else {
+                // Was just a click
+                 // Only trigger click if we released over the same column we started
+                const touch = e.type === 'touchend' ? e.changedTouches[0] : e;
+                const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                // Simple click handling
+                if(elemBelow) {
+                     handleColumnClick(e, dragState.colIndex);
+                }
+            }
+
+            // Reset State
+            dragState.active = false;
+            dragState.colIndex = -1;
+            dragState.elements = [];
+        }
+
+        // --- Interaction Logic (Click & Logic) ---
+
+        function isValidSelection(colIndex, cardIndex) {
+            const col = gameState.columns[colIndex];
+            if (col.length === 0) return false;
+            
+            // Check if cards from cardIndex to end are valid sequence
+            for (let i = cardIndex; i < col.length - 1; i++) {
+                const current = col[i];
+                const next = col[i+1];
+                if (current.suit !== next.suit || current.rank !== next.rank + 1) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function handleColumnClick(e, colIndex) {
+            if (e) e.stopPropagation();
+
+            const col = gameState.columns[colIndex];
+            
+            // Selection Logic
+            if (!selectedCards) {
+                if (col.length === 0) return;
+
+                // Auto-select max valid sequence from bottom
+                let validSequenceStartIndex = col.length - 1;
+                for (let i = col.length - 1; i > 0; i--) {
+                    const current = col[i];
+                    const above = col[i-1];
+                    if (!above.faceUp) break;
+                    if (current.suit !== above.suit || current.rank !== above.rank - 1) break;
+                    validSequenceStartIndex = i - 1;
+                }
+                
+                selectedCards = { colIndex: colIndex, cardIndex: validSequenceStartIndex };
+                renderTableau();
+            } 
+            else {
+                if (selectedCards.colIndex === colIndex) {
+                    selectedCards = null; // Deselect
+                    renderTableau();
+                } else {
+                    const success = executeMove(selectedCards.colIndex, colIndex, selectedCards.cardIndex);
+                    if (!success) {
+                        // If invalid move, change selection to new column (if valid)
+                        // Or just deselect. Let's try to select new column for better UX.
+                        selectedCards = null;
+                        handleColumnClick(null, colIndex); // Recursive call to select new
+                    }
+                }
+            }
+        }
+
+        function executeMove(fromColIdx, toColIdx, cardIndex) {
+            const fromCol = gameState.columns[fromColIdx];
+            const toCol = gameState.columns[toColIdx];
+            
+            if (fromColIdx === toColIdx) return false;
+
+            const movingCards = fromCol.slice(cardIndex);
+            const headCard = movingCards[0];
+            
+            let allowed = false;
+            if (toCol.length === 0) {
+                allowed = true;
+            } else {
+                const targetCard = toCol[toCol.length - 1];
+                if (targetCard.rank === headCard.rank + 1) {
+                    allowed = true;
+                }
+            }
+
+            if (allowed) {
+                saveState();
+
+                gameState.columns[fromColIdx].splice(cardIndex, movingCards.length);
+                gameState.columns[toColIdx].push(...movingCards);
+                
+                if (gameState.columns[fromColIdx].length > 0) {
+                    const newTop = gameState.columns[fromColIdx][gameState.columns[fromColIdx].length - 1];
+                    if (!newTop.faceUp) {
+                        newTop.faceUp = true;
+                        gameState.score += 10; // Bonus for flipping
+                    }
+                }
+
+                gameState.moves++;
+                gameState.score = Math.max(0, gameState.score - 1);
+                
+                checkCompletedSequence(toColIdx);
+                selectedCards = null;
+                updateScore();
+                renderTableau();
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        function checkCompletedSequence(colIndex) {
+            const col = gameState.columns[colIndex];
+            if (col.length < 13) return;
+
+            const last13 = col.slice(col.length - 13);
+            const suit = last13[0].suit;
+            const allSameSuit = last13.every(c => c.suit === suit && c.faceUp);
+            if (!allSameSuit) return;
+            if (last13[0].rank !== 13) return;
+
+            let isSequence = true;
+            for (let i = 0; i < 12; i++) {
+                if (last13[i].rank !== last13[i+1].rank + 1) {
+                    isSequence = false;
+                    break;
+                }
+            }
+
+            if (isSequence) {
+                gameState.columns[colIndex].splice(col.length - 13, 13);
+                if (gameState.columns[colIndex].length > 0) {
+                    gameState.columns[colIndex][gameState.columns[colIndex].length - 1].faceUp = true;
+                }
+                gameState.foundations++;
+                gameState.score += 100;
+                addFoundationGraphic(suit);
+
+                if (gameState.foundations === 8) {
+                    setTimeout(() => {
+                        document.getElementById('final-score').innerText = gameState.score;
+                        document.getElementById('win-modal').classList.remove('hidden');
+                    }, 500);
+                }
+            }
+        }
+
+        function dealStock() {
+            if (gameState.stock.length === 0) return;
+            const hasEmptyColumn = gameState.columns.some(col => col.length === 0);
+            if (hasEmptyColumn) {
+                showToast("Isi semua kolom kosong sebelum membagikan kartu!");
+                return;
+            }
+
+            saveState();
+            for (let i = 0; i < 10; i++) {
+                if (gameState.stock.length > 0) {
+                    const card = gameState.stock.pop();
+                    card.faceUp = true;
+                    gameState.columns[i].push(card);
+                    checkCompletedSequence(i);
+                }
+            }
+            renderTableau();
+            renderStock();
+        }
+
+        // --- Utils & UI ---
+        function addFoundationGraphic(suit) {
+            const container = document.getElementById('foundations');
+            const el = document.createElement('div');
+            el.className = `card ${COLORS[suit]} flex items-center justify-center`;
+            el.style.position = 'relative';
+            el.style.width = 'var(--card-width)';
+            el.style.height = 'var(--card-height)';
+            el.innerHTML = `<span class="text-4xl">${SYMBOLS[suit]}</span><span class="absolute bottom-1 right-1 font-bold">K</span>`;
+            container.appendChild(el);
+        }
+
+        function saveState() {
+            const stateCopy = {
+                columns: JSON.parse(JSON.stringify(gameState.columns)),
+                stock: JSON.parse(JSON.stringify(gameState.stock)),
+                score: gameState.score,
+                foundations: gameState.foundations
+            };
+            gameState.history.push(stateCopy);
+            if (gameState.history.length > 10) gameState.history.shift();
+        }
+
+        function undoMove() {
+            if (gameState.history.length === 0) {
+                showToast("Tidak ada langkah untuk di-undo");
+                return;
+            }
+            const prev = gameState.history.pop();
+            gameState.columns = prev.columns;
+            gameState.stock = prev.stock;
+            gameState.score = prev.score;
+            gameState.foundations = prev.foundations;
+            
+            const fContainer = document.getElementById('foundations');
+            fContainer.innerHTML = '';
+            for(let i=0; i<gameState.foundations; i++) {
+                const div = document.createElement('div');
+                div.className = 'card back';
+                div.style.position = 'relative'; 
+                fContainer.appendChild(div);
+            }
+
+            selectedCards = null;
+            renderTableau();
+            renderStock();
+            updateScore();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.opacity = '1';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

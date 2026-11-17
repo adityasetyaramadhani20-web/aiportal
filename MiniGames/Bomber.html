@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bomber</title>
+    <style>
+        :root {
+            --primary: #2ecc71;
+            --danger: #e74c3c;
+            --dark: #2c3e50;
+            --text: #ecf0f1;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1e272e, #2c3e50);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Container utama game */
+        #game-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        #game-container {
+            position: relative;
+            background: #27ae60;
+            border: 4px solid #ecf0f1;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+            /* Ukuran dinamis menyesuaikan viewport */
+            width: 95vw;
+            max-width: 840px;
+            height: 65vh; 
+            max-height: 520px;
+            display: none; /* Disembunyikan sampai game dimulai */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Agar tidak gepeng saat dire-scale */
+            image-rendering: pixelated;
+        }
+
+        /* Overlay UI dalam Game */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0));
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 10px 15px;
+            box-sizing: border-box;
+            font-weight: bold;
+            font-size: 16px;
+            pointer-events: none;
+            z-index: 5;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        .ui-stats { display: flex; gap: 15px; }
+        .ui-text span { color: #f1c40f; }
+
+        /* Layar Menu & Game Over (Glassmorphism) */
+        .overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(44, 62, 80, 0.85);
+            backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            border-radius: 4px;
+        }
+
+        h1 { margin: 0 0 10px 0; font-size: 2.5rem; text-align: center; color: #f1c40f; text-shadow: 2px 2px 4px #000; letter-spacing: 2px; }
+        h2 { margin: 0 0 20px 0; font-size: 1.2rem; font-weight: normal; text-align: center; }
+
+        .btn-group { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; width: 80%; max-width: 300px; }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            box-shadow: 0 5px #27ae60;
+            transition: all 0.1s;
+            text-transform: uppercase;
+        }
+
+        button.btn-danger { background: var(--danger); box-shadow: 0 5px #c0392b; }
+        button:active { transform: translateY(5px); box-shadow: 0 0 transparent; }
+
+        /* Kontrol Mobile */
+        #mobile-controls {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 15px;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 20;
+        }
+
+        .d-pad {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+        }
+
+        .d-btn {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .d-btn::after {
+            content: ''; border: solid white; border-width: 0 4px 4px 0;
+            display: inline-block; padding: 4px;
+        }
+
+        .d-up { top: 5px; left: 47.5px; } .d-up::after { transform: rotate(-135deg); }
+        .d-down { bottom: 5px; left: 47.5px; } .d-down::after { transform: rotate(45deg); }
+        .d-left { top: 47.5px; left: 5px; } .d-left::after { transform: rotate(135deg); }
+        .d-right { top: 47.5px; right: 5px; } .d-right::after { transform: rotate(-45deg); }
+
+        .action-btn {
+            width: 85px;
+            height: 85px;
+            background: rgba(231, 76, 60, 0.8);
+            border: 4px solid #c0392b;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .active-btn { background: rgba(255, 255, 255, 0.5) !important; }
+        .active-action { transform: scale(0.95); background: #c0392b; }
+
+        /* Munculkan kontrol di HP */
+        @media (max-width: 768px) {
+            #mobile-controls { display: flex; }
+            #game-container { border-width: 2px; border-radius: 0; width: 100vw; }
+            h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="overlay-screen">
+        <h1>BOMBER</h1>
+        <h2>Pilih Mode Permainan</h2>
+        <div class="btn-group">
+            <button onclick="startGame('classic')">Mode Klasik</button>
+            <button class="btn-danger" onclick="startGame('frenzy')">Mode Frenzy (100s)</button>
+        </div>
+    </div>
+
+    <div id="game-wrapper">
+        <div id="game-container">
+            <div id="ui-layer">
+                <div class="ui-stats">
+                    <div class="ui-text">❤️ <span id="status-display">3</span></div>
+                    <div class="ui-text">⭐ <span id="score-display">0</span></div>
+                </div>
+                <div class="ui-text" id="timer-container" style="display: none;">
+                    ⏱️ <span id="timer-display">100</span>s
+                </div>
+            </div>
+            
+            <canvas id="gameCanvas"></canvas>
+            
+            <div id="game-over-screen" class="overlay-screen" style="display: none;">
+                <h1 id="end-title">Game Over</h1>
+                <p id="end-message" style="font-size: 1.2rem; margin-bottom: 5px;"></p>
+                <p id="end-score" style="font-size: 1.5rem; margin-bottom: 25px; font-weight: bold; color: #f1c40f;"></p>
+                <div class="btn-group">
+                    <button onclick="showMenu()">Kembali ke Menu</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kontrol Mobile -->
+        <div id="mobile-controls">
+            <div class="d-pad" id="dpad">
+                <div class="d-btn d-up" data-dir="up"></div>
+                <div class="d-btn d-down" data-dir="down"></div>
+                <div class="d-btn d-left" data-dir="left"></div>
+                <div class="d-btn d-right" data-dir="right"></div>
+            </div>
+            <div class="action-btn" id="btn-bomb">💣</div>
+        </div>
+    </div>
+
+<script>
+    /**
+     * KONFIGURASI DAN STATE
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const TILE_SIZE = 40;
+    
+    // Tipe Tile
+    const WALL = 1;  // Besi
+    const BRICK = 2; // Bata
+    const EMPTY = 0;
+
+    let COLS = 15;
+    let ROWS = 11;
+
+    let map = [];
+    let bombs = [];
+    let explosions = [];
+    let enemies = [];
+    let particles = [];
+    let popups = []; // Teks melayang untuk skor
+
+    let score = 0;
+    let lives = 3;
+    let gameActive = false;
+    let currentMode = 'classic';
+    let keys = {};
+    
+    // Timer Frenzy
+    let timeLeft = 0;
+    let lastTimeCheck = 0;
+
+    // Camera (Untuk peta besar)
+    const camera = { x: 0, y: 0, width: 0, height: 0 };
+
+    const player = {
+        x: TILE_SIZE, y: TILE_SIZE,
+        radius: TILE_SIZE * 0.35,
+        speed: 3.5,
+        alive: true,
+        maxBombs: 1,
+        bombRange: 2,
+        wobble: 0 // Untuk animasi jalan
+    };
+
+    const touchInput = { up: false, down: false, left: false, right: false };
+
+    /**
+     * INISIALISASI GAME
+     */
+    function showMenu() {
+        gameActive = false;
+        document.getElementById('main-menu').style.display = 'flex';
+        document.getElementById('game-container').style.display = 'none';
+        document.getElementById('game-over-screen').style.display = 'none';
+        
+        // Reset Mobile UI
+        if(window.innerWidth <= 768) {
+            document.getElementById('mobile-controls').style.display = 'none';
+        }
+    }
+
+    function startGame(mode) {
+        currentMode = mode;
+        document.getElementById('main-menu').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        
+        if(window.innerWidth <= 768) {
+            document.getElementById('mobile-controls').style.display = 'flex';
+        }
+
+        // Konfigurasi berdasarkan mode
+        if (mode === 'classic') {
+            COLS = 15;
+            ROWS = 11;
+            player.maxBombs = 1;
+            player.bombRange = 2;
+            document.getElementById('timer-container').style.display = 'none';
+            setupGame(5); // 5 Musuh
+        } else if (mode === 'frenzy') {
+            COLS = 21; // Map lebih lebar
+            ROWS = 13;
+            player.maxBombs = 3;
+            player.bombRange = 3; // Bom lebih besar
+            timeLeft = 100;
+            lastTimeCheck = Date.now();
+            document.getElementById('timer-container').style.display = 'block';
+            document.getElementById('timer-display').innerText = timeLeft;
+            setupGame(15); // 15 Musuh
+        }
+    }
+
+    function setupGame(enemyCount) {
+        // Set resolusi internal canvas (Viewport)
+        // Jika layar kecil, kita biarkan resolusi besar, tapi CSS yang mengecilkan.
+        // Jika peta lebih besar dari viewport yang diinginkan, kita pakai kamera.
+        const maxDisplayCols = 15;
+        const maxDisplayRows = 11;
+        
+        camera.width = Math.min(COLS, maxDisplayCols) * TILE_SIZE;
+        camera.height = Math.min(ROWS, maxDisplayRows) * TILE_SIZE;
+        
+        canvas.width = camera.width;
+        canvas.height = camera.height;
+
+        score = 0;
+        lives = 3;
+        player.alive = true;
+        player.x = TILE_SIZE;
+        player.y = TILE_SIZE;
+        gameActive = true;
+        
+        bombs = [];
+        explosions = [];
+        particles = [];
+        popups = [];
+        
+        updateHUD();
+        document.getElementById('game-over-screen').style.display = 'none';
+        
+        generateMap();
+        spawnEnemies(enemyCount);
+        
+        requestAnimationFrame(gameLoop);
+    }
+
+    function resetRound() {
+        player.x = TILE_SIZE;
+        player.y = TILE_SIZE;
+        player.alive = true;
+        bombs = [];
+        explosions = [];
+        // Respawn musuh yang tersisa agar tidak diam di tempat
+        const remaining = enemies.length;
+        spawnEnemies(remaining);
+    }
+
+    function generateMap() {
+        map = [];
+        for (let r = 0; r < ROWS; r++) {
+            let row = [];
+            for (let c = 0; c < COLS; c++) {
+                if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) {
+                    row.push(WALL);
+                } else if (r % 2 === 0 && c % 2 === 0) {
+                    row.push(WALL);
+                } else if ((r === 1 && c === 1) || (r === 1 && c === 2) || (r === 2 && c === 1)) {
+                    row.push(EMPTY); // Area spawn aman
+                } else {
+                    // Frenzy mode bata lebih padat
+                    let chance = currentMode === 'frenzy' ? 0.6 : 0.4;
+                    row.push(Math.random() < chance ? BRICK : EMPTY);
+                }
+            }
+            map.push(row);
+        }
+    }
+
+    function spawnEnemies(count) {
+        enemies = [];
+        let attempts = 0;
+        while (enemies.length < count && attempts < 200) {
+            let c = Math.floor(Math.random() * COLS);
+            let r = Math.floor(Math.random() * ROWS);
+            
+            if (map[r][c] === EMPTY && (c > 3 || r > 3)) { // Jauh dari player
+                enemies.push({
+                    x: c * TILE_SIZE,
+                    y: r * TILE_SIZE,
+                    dirX: Math.random() < 0.5 ? 1 : -1,
+                    dirY: 0,
+                    speed: currentMode === 'frenzy' ? 1.8 : 1.2, // Frenzy lebih cepat
+                    radius: TILE_SIZE * 0.35,
+                    timer: 0,
+                    wobbleOffset: Math.random() * Math.PI * 2
+                });
+            }
+            attempts++;
+        }
+    }
+
+    /**
+     * CORE LOOP & UPDATE
+     */
+    function gameLoop() {
+        if (!gameActive) return;
+
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function update() {
+        updateTimer();
+        updatePlayer();
+        updateCamera();
+        updateBombs();
+        updateExplosions();
+        updateEnemies();
+        updateParticles();
+        
+        // Kondisi Menang
+        if (enemies.length === 0) {
+            gameOver(true, "Area Tersapu Bersih!");
+        }
+    }
+
+    function updateTimer() {
+        if (currentMode === 'frenzy' && player.alive) {
+            let now = Date.now();
+            if (now - lastTimeCheck >= 1000) {
+                timeLeft--;
+                lastTimeCheck = now;
+                document.getElementById('timer-display').innerText = timeLeft;
+                
+                if(timeLeft <= 10) {
+                    document.getElementById('timer-display').style.color = '#e74c3c';
+                }
+
+                if (timeLeft <= 0) {
+                    gameOver(false, "Kehabisan Waktu!");
+                }
+            }
+        }
+    }
+
+    function updateHUD() {
+        document.getElementById('score-display').innerText = score;
+        document.getElementById('status-display').innerText = lives;
+    }
+
+    function updateCamera() {
+        // Posisikan kamera di tengah pemain
+        let targetCamX = player.x + TILE_SIZE/2 - camera.width/2;
+        let targetCamY = player.y + TILE_SIZE/2 - camera.height/2;
+
+        // Batasi kamera agar tidak keluar map
+        camera.x = Math.max(0, Math.min(targetCamX, (COLS * TILE_SIZE) - camera.width));
+        camera.y = Math.max(0, Math.min(targetCamY, (ROWS * TILE_SIZE) - camera.height));
+    }
+
+    function handlePlayerDeath() {
+        if (!player.alive) return;
+        
+        lives--;
+        updateHUD();
+        createParticles(player.x + TILE_SIZE/2, player.y + TILE_SIZE/2, '#ecf0f1', 20);
+        player.alive = false; 
+        
+        if (lives > 0) {
+            setTimeout(() => { if (gameActive) resetRound(); }, 1500);
+        } else {
+            setTimeout(() => { gameOver(false, "Kamu Terbunuh!"); }, 1000);
+        }
+    }
+
+    function updatePlayer() {
+        if (!player.alive) return;
+
+        let dx = 0; let dy = 0;
+        let isMoving = false;
+
+        if (keys['ArrowUp'] || keys['w'] || touchInput.up) { dy = -player.speed; isMoving = true; }
+        if (keys['ArrowDown'] || keys['s'] || touchInput.down) { dy = player.speed; isMoving = true; }
+        if (keys['ArrowLeft'] || keys['a'] || touchInput.left) { dx = -player.speed; isMoving = true; }
+        if (keys['ArrowRight'] || keys['d'] || touchInput.right) { dx = player.speed; isMoving = true; }
+
+        // Mencegah jalan diagonal jadi lebih cepat
+        if (dx !== 0 && dy !== 0) {
+            dx *= 0.707; dy *= 0.707; 
+        }
+
+        if (isMoving) {
+            player.wobble += 0.2;
+            moveEntity(player, dx, dy, true); // 'true' menandakan ini adalah player
+        } else {
+            player.wobble = 0;
+        }
+    }
+
+    function moveEntity(entity, dx, dy, isPlayer = false) {
+        // Toleransi hitbox lebih kecil dari radius agar mudah masuk lorong
+        const colRadius = entity.radius * 0.7; 
+
+        // X Axis
+        if (dx !== 0) {
+            if (!checkCollision(entity.x + dx, entity.y, colRadius, isPlayer)) {
+                entity.x += dx;
+            } else {
+                // Auto-Slide (membantu pemain meluncur masuk lorong jika menabrak sudut)
+                let gridY = Math.floor(entity.y / TILE_SIZE) * TILE_SIZE + TILE_SIZE/2;
+                let diff = entity.y - (gridY - TILE_SIZE/2);
+                if (diff < 15) entity.y -= entity.speed * 0.8; // Slide atas
+                else if (diff > TILE_SIZE - 15) entity.y += entity.speed * 0.8; // Slide bawah
+            }
+        }
+
+        // Y Axis
+        if (dy !== 0) {
+            if (!checkCollision(entity.x, entity.y + dy, colRadius, isPlayer)) {
+                entity.y += dy;
+            } else {
+                // Auto-Slide
+                let gridX = Math.floor(entity.x / TILE_SIZE) * TILE_SIZE + TILE_SIZE/2;
+                let diff = entity.x - (gridX - TILE_SIZE/2);
+                if (diff < 15) entity.x -= entity.speed * 0.8; // Slide kiri
+                else if (diff > TILE_SIZE - 15) entity.x += entity.speed * 0.8; // Slide kanan
+            }
+        }
+    }
+
+    function checkCollision(x, y, r, isPlayer = false) {
+        // Cek 4 titik sudut hitbox (kotak)
+        const margin = TILE_SIZE/2 - r;
+        const pts = [
+            {x: x + margin, y: y + margin},
+            {x: x + TILE_SIZE - margin - 1, y: y + margin},
+            {x: x + margin, y: y + TILE_SIZE - margin - 1},
+            {x: x + TILE_SIZE - margin - 1, y: y + TILE_SIZE - margin - 1}
+        ];
+
+        for (let p of pts) {
+            let c = Math.floor(p.x / TILE_SIZE);
+            let row = Math.floor(p.y / TILE_SIZE);
+            
+            if (row < 0 || row >= ROWS || c < 0 || c >= COLS) return true;
+            if (map[row][c] === WALL || map[row][c] === BRICK) return true;
+
+            // Cek Bom: Jika pergerakan ini untuk player, hiraukan bom (bebas jalan).
+            // Tapi jika untuk musuh, bom tetap berfungsi sebagai tembok yang solid.
+            if (!isPlayer) {
+                for(let b of bombs) {
+                    if (b.c === c && b.r === row) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function placeBomb() {
+        if (!player.alive || !gameActive) return;
+        
+        let c = Math.floor((player.x + TILE_SIZE/2) / TILE_SIZE);
+        let r = Math.floor((player.y + TILE_SIZE/2) / TILE_SIZE);
+
+        let hasBomb = bombs.some(b => b.c === c && b.r === r);
+        
+        if (!hasBomb && bombs.length < player.maxBombs) {
+            bombs.push({
+                c: c, r: r,
+                timer: 150, // 2.5 detik
+                range: player.bombRange,
+                scale: 0
+            });
+        }
+    }
+
+    function updateBombs() {
+        for (let i = bombs.length - 1; i >= 0; i--) {
+            let b = bombs[i];
+            b.timer--;
+            
+            // Animasi membesar saat dipasang
+            if(b.scale < 1) b.scale += 0.1;
+
+            // Memicu ledakan berantai jika terkena api dari bom lain
+            let touchedByFire = explosions.some(e => e.c === b.c && e.r === b.r);
+
+            if (b.timer <= 0 || touchedByFire) {
+                createExplosion(b.c, b.r, b.range);
+                bombs.splice(i, 1);
+            }
+        }
+    }
+
+    function createExplosion(c, r, range) {
+        addExplosionCell(c, r, 'center');
+        const dirs = [
+            {x:0, y:-1, t:'vertical'}, {x:0, y:1, t:'vertical'}, 
+            {x:-1, y:0, t:'horizontal'}, {x:1, y:0, t:'horizontal'}
+        ];
+
+        for (let d of dirs) {
+            for (let i = 1; i <= range; i++) {
+                let nc = c + (d.x * i);
+                let nr = r + (d.y * i);
+
+                if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) break;
+                if (map[nr][nc] === WALL) break;
+
+                let isEnd = (i === range);
+                let type = d.t;
+                if(isEnd) {
+                    if(d.x === 1) type = 'right'; else if(d.x === -1) type = 'left';
+                    else if(d.y === 1) type = 'down'; else if(d.y === -1) type = 'up';
+                }
+
+                if (map[nr][nc] === BRICK) {
+                    map[nr][nc] = EMPTY;
+                    score += 10;
+                    updateHUD();
+                    addPopup('+10', nc*TILE_SIZE, nr*TILE_SIZE, '#e67e22');
+                    addExplosionCell(nc, nr, type);
+                    createParticles(nc * TILE_SIZE + TILE_SIZE/2, nr * TILE_SIZE + TILE_SIZE/2, '#d35400', 10);
+                    break; 
+                }
+
+                addExplosionCell(nc, nr, type);
+            }
+        }
+    }
+
+    function addExplosionCell(c, r, type) {
+        // Hindari duplikat visual jika bersilangan
+        if(!explosions.some(e => e.c === c && e.r === r)) {
+            explosions.push({ c: c, r: r, timer: 20, type: type });
+        }
+    }
+
+    function updateExplosions() {
+        for (let i = explosions.length - 1; i >= 0; i--) {
+            let e = explosions[i];
+            e.timer--;
+            
+            // Hitbox Ledakan (lebih kecil 20% dari ukuran tile agar adil)
+            let hitboxMargin = TILE_SIZE * 0.15;
+            let exBox = {
+                x: e.c * TILE_SIZE + hitboxMargin,
+                y: e.r * TILE_SIZE + hitboxMargin,
+                w: TILE_SIZE - hitboxMargin*2,
+                h: TILE_SIZE - hitboxMargin*2
+            };
+
+            // Vs Player
+            if (player.alive) {
+                let pBox = {
+                    x: player.x + TILE_SIZE/2 - player.radius*0.5,
+                    y: player.y + TILE_SIZE/2 - player.radius*0.5,
+                    w: player.radius, h: player.radius
+                };
+                if (intersect(exBox, pBox)) handlePlayerDeath();
+            }
+
+            // Vs Musuh
+            for (let j = enemies.length - 1; j >= 0; j--) {
+                let en = enemies[j];
+                let enBox = {
+                    x: en.x + TILE_SIZE/2 - en.radius*0.5,
+                    y: en.y + TILE_SIZE/2 - en.radius*0.5,
+                    w: en.radius, h: en.radius
+                };
+                if (intersect(exBox, enBox)) {
+                    enemies.splice(j, 1);
+                    score += 100;
+                    updateHUD();
+                    addPopup('+100', en.x, en.y, '#9b59b6');
+                    createParticles(en.x + TILE_SIZE/2, en.y + TILE_SIZE/2, '#8e44ad', 15);
+                }
+            }
+
+            if (e.timer <= 0) explosions.splice(i, 1);
+        }
+    }
+
+    function intersect(r1, r2) {
+        return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
+    }
+
+    function updateEnemies() {
+        for (let e of enemies) {
+            e.timer--;
+            e.wobbleOffset += 0.1;
+
+            if (e.timer <= 0) {
+                // AI sederhana: ganti arah ke arah yang tidak terhalang tembok
+                let possibleDirs = [
+                    {x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}
+                ];
+                let validDirs = [];
+                for(let d of possibleDirs) {
+                    if(!checkCollision(e.x + d.x*5, e.y + d.y*5, e.radius)) {
+                        validDirs.push(d);
+                    }
+                }
+                
+                if(validDirs.length > 0) {
+                    // Coba jangan putar balik jika bisa
+                    let forward = validDirs.find(d => d.x === e.dirX && d.y === e.dirY);
+                    if(forward && Math.random() < 0.7) {
+                        // Terus jalan
+                    } else {
+                        let pick = validDirs[Math.floor(Math.random() * validDirs.length)];
+                        e.dirX = pick.x; e.dirY = pick.y;
+                    }
+                } else {
+                    e.dirX *= -1; e.dirY *= -1;
+                }
+                e.timer = 30 + Math.random() * 60;
+            }
+
+            let nx = e.x + (e.dirX * e.speed);
+            let ny = e.y + (e.dirY * e.speed);
+
+            if (checkCollision(nx, ny, e.radius)) {
+                e.timer = 0; // Segera ganti arah jika nabrak
+            } else {
+                e.x = nx; e.y = ny;
+                
+                // Cek nabrak player
+                if (player.alive) {
+                    let dist = Math.hypot((player.x+TILE_SIZE/2) - (e.x+TILE_SIZE/2), (player.y+TILE_SIZE/2) - (e.y+TILE_SIZE/2));
+                    if (dist < TILE_SIZE * 0.7) {
+                        handlePlayerDeath();
+                    }
+                }
+            }
+        }
+    }
+
+    function createParticles(x, y, color, count) {
+        for(let i=0; i<count; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6,
+                life: 20 + Math.random()*20,
+                maxLife: 40,
+                color: color
+            });
+        }
+    }
+
+    function updateParticles() {
+        for(let i=particles.length-1; i>=0; i--) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy;
+            p.life--;
+            if(p.life <= 0) particles.splice(i, 1);
+        }
+        for(let i=popups.length-1; i>=0; i--) {
+            popups[i].y -= 0.5;
+            popups[i].life--;
+            if(popups[i].life <= 0) popups.splice(i, 1);
+        }
+    }
+
+    function addPopup(text, x, y, color) {
+        popups.push({ text: text, x: x + TILE_SIZE/2, y: y, color: color, life: 40 });
+    }
+
+    function gameOver(win, msg) {
+        if (!gameActive) return;
+        gameActive = false;
+        
+        const screen = document.getElementById('game-over-screen');
+        const title = document.getElementById('end-title');
+        const msgEl = document.getElementById('end-message');
+        const scoreTxt = document.getElementById('end-score');
+        
+        screen.style.display = 'flex';
+        title.innerText = win ? "MISI SELESAI!" : "GAME OVER";
+        title.style.color = win ? "#2ecc71" : "#e74c3c";
+        msgEl.innerText = msg;
+        scoreTxt.innerText = "Skor Anda: " + score;
+        
+        if(window.innerWidth <= 768) {
+            document.getElementById('mobile-controls').style.display = 'none';
+        }
+    }
+
+    /**
+     * DRAWING (RENDERING VISUAL)
+     */
+    function draw() {
+        // Clear viewport
+        ctx.fillStyle = "#1e272e";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Terapkan Kamera
+        ctx.save();
+        ctx.translate(-camera.x, -camera.y);
+
+        // Draw Ground (Rumput catur)
+        for(let r=0; r<ROWS; r++){
+            for(let c=0; c<COLS; c++){
+                // Culling: Jangan gambar tile di luar layar (optimasi performa)
+                if ((c+1)*TILE_SIZE < camera.x || c*TILE_SIZE > camera.x + camera.width ||
+                    (r+1)*TILE_SIZE < camera.y || r*TILE_SIZE > camera.y + camera.height) continue;
+
+                ctx.fillStyle = (r%2 === c%2) ? "#27ae60" : "#2ecc71";
+                ctx.fillRect(c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+        }
+
+        // Draw Map Objects
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if ((c+1)*TILE_SIZE < camera.x || c*TILE_SIZE > camera.x + camera.width ||
+                    (r+1)*TILE_SIZE < camera.y || r*TILE_SIZE > camera.y + camera.height) continue;
+
+                let x = c * TILE_SIZE;
+                let y = r * TILE_SIZE;
+                
+                if (map[r][c] === WALL) {
+                    // Metal/Batu Hard
+                    let grad = ctx.createLinearGradient(x, y, x, y+TILE_SIZE);
+                    grad.addColorStop(0, "#95a5a6");
+                    grad.addColorStop(1, "#7f8c8d");
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    
+                    // Highlight 3D atas
+                    ctx.fillStyle = "rgba(255,255,255,0.3)";
+                    ctx.fillRect(x, y, TILE_SIZE, 4);
+                    // Shadow bawah
+                    ctx.fillStyle = "rgba(0,0,0,0.4)";
+                    ctx.fillRect(x, y+TILE_SIZE-4, TILE_SIZE, 4);
+                    ctx.fillRect(x+TILE_SIZE-4, y, 4, TILE_SIZE);
+                } else if (map[r][c] === BRICK) {
+                    // Bata Lembut
+                    ctx.fillStyle = "#d35400";
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    
+                    ctx.fillStyle = "#e67e22";
+                    ctx.fillRect(x, y, TILE_SIZE, 2); // Top highlight
+                    
+                    // Garis Semen
+                    ctx.fillStyle = "rgba(0,0,0,0.4)";
+                    ctx.fillRect(x, y+13, TILE_SIZE, 2);
+                    ctx.fillRect(x, y+26, TILE_SIZE, 2);
+                    ctx.fillRect(x+10, y, 2, 13);
+                    ctx.fillRect(x+30, y+13, 2, 13);
+                    ctx.fillRect(x+15, y+26, 2, 14);
+                    
+                    // Shadow dasar
+                    ctx.fillStyle = "rgba(0,0,0,0.2)";
+                    ctx.fillRect(x, y+TILE_SIZE-4, TILE_SIZE, 4);
+                }
+            }
+        }
+
+        // Draw Bombs
+        for (let b of bombs) {
+            let cx = b.c * TILE_SIZE + TILE_SIZE/2;
+            let cy = b.r * TILE_SIZE + TILE_SIZE/2;
+            let pulse = Math.sin(Date.now() / 150) * 0.05;
+            let currentScale = b.scale + pulse;
+            let r = TILE_SIZE * 0.4 * currentScale;
+
+            // Bayangan
+            ctx.fillStyle = "rgba(0,0,0,0.4)";
+            ctx.beginPath(); ctx.ellipse(cx, cy+10, r, r*0.5, 0, 0, Math.PI*2); ctx.fill();
+
+            // Badan Bom
+            let grad = ctx.createRadialGradient(cx-r*0.3, cy-r*0.3, r*0.1, cx, cy, r);
+            grad.addColorStop(0, "#7f8c8d");
+            grad.addColorStop(1, "#2c3e50");
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+
+            // Sumbu yang menyala
+            ctx.strokeStyle = (b.timer % 10 < 5) ? "#f1c40f" : "#e74c3c";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - r*0.8);
+            ctx.lineTo(cx + 6, cy - r*1.2);
+            ctx.stroke();
+            
+            // Highlight putih
+            ctx.fillStyle = "white";
+            ctx.beginPath(); ctx.arc(cx - r*0.3, cy - r*0.3, r*0.2, 0, Math.PI*2); ctx.fill();
+        }
+
+        // Draw Explosions
+        for (let e of explosions) {
+            let cx = e.c * TILE_SIZE + TILE_SIZE/2;
+            let cy = e.r * TILE_SIZE + TILE_SIZE/2;
+            let innerR = TILE_SIZE * 0.25;
+            let outerR = TILE_SIZE * 0.45;
+
+            // Animasi berkedip
+            let coreColor = (e.timer % 4 < 2) ? "#ffffff" : "#f1c40f";
+            let fireColor = (e.timer % 6 < 3) ? "#e67e22" : "#e74c3c";
+
+            ctx.fillStyle = fireColor;
+            if(e.type === 'center') {
+                ctx.beginPath(); ctx.arc(cx, cy, outerR, 0, Math.PI*2); ctx.fill();
+            } else {
+                ctx.fillRect(e.c*TILE_SIZE, e.r*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+
+            ctx.fillStyle = coreColor;
+            ctx.beginPath(); ctx.arc(cx, cy, innerR, 0, Math.PI*2); ctx.fill();
+        }
+
+        // Draw Enemies
+        for (let e of enemies) {
+            let cx = e.x + TILE_SIZE/2;
+            let cy = e.y + TILE_SIZE/2 + Math.sin(e.wobbleOffset) * 3; // Float animation
+
+            // Bayangan
+            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.beginPath(); ctx.ellipse(cx, e.y+TILE_SIZE-5, e.radius*0.8, e.radius*0.3, 0, 0, Math.PI*2); ctx.fill();
+
+            // Tubuh (Slime)
+            ctx.fillStyle = "#9b59b6"; // Ungu musuh
+            ctx.beginPath();
+            ctx.arc(cx, cy, e.radius, Math.PI, 0);
+            ctx.lineTo(cx + e.radius, cy + e.radius*0.8);
+            // Kaki zig-zag
+            ctx.lineTo(cx + e.radius*0.5, cy + e.radius*0.4);
+            ctx.lineTo(cx, cy + e.radius*0.8);
+            ctx.lineTo(cx - e.radius*0.5, cy + e.radius*0.4);
+            ctx.lineTo(cx - e.radius, cy + e.radius*0.8);
+            ctx.closePath();
+            ctx.fill();
+
+            // Mata galak
+            ctx.fillStyle = "white";
+            ctx.beginPath(); ctx.arc(cx - 5, cy - 2, 4, 0, Math.PI*2); ctx.arc(cx + 5, cy - 2, 4, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "black";
+            ctx.beginPath(); ctx.arc(cx - 5, cy - 2, 2, 0, Math.PI*2); ctx.arc(cx + 5, cy - 2, 2, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = "black"; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(cx-9, cy-6); ctx.lineTo(cx-3, cy-4); ctx.stroke(); // Alis
+            ctx.beginPath(); ctx.moveTo(cx+9, cy-6); ctx.lineTo(cx+3, cy-4); ctx.stroke();
+        }
+
+        // Draw Player
+        if (player.alive) {
+            let cx = player.x + TILE_SIZE/2;
+            let cy = player.y + TILE_SIZE/2 + Math.abs(Math.sin(player.wobble)) * 3; // Bounce walk
+
+            // Bayangan
+            ctx.fillStyle = "rgba(0,0,0,0.4)";
+            ctx.beginPath(); ctx.ellipse(cx, player.y+TILE_SIZE-5, player.radius, player.radius*0.4, 0, 0, Math.PI*2); ctx.fill();
+
+            // Tubuh (Baju putih/biru)
+            ctx.fillStyle = "#ecf0f1";
+            ctx.beginPath(); ctx.arc(cx, cy, player.radius, 0, Math.PI*2); ctx.fill();
+            
+            ctx.fillStyle = "#3498db";
+            ctx.beginPath(); ctx.arc(cx, cy, player.radius, 0, Math.PI); ctx.fill();
+
+            // Helm/Topi
+            ctx.fillStyle = "#f39c12"; // Helm oranye
+            ctx.beginPath();
+            ctx.arc(cx, cy - player.radius*0.2, player.radius*0.9, Math.PI, 0);
+            ctx.lineTo(cx + player.radius*0.9, cy);
+            ctx.lineTo(cx - player.radius*0.9, cy);
+            ctx.fill();
+            // Garis helm
+            ctx.fillStyle = "#e67e22"; ctx.fillRect(cx-player.radius*0.9, cy-3, player.radius*1.8, 3);
+
+            // Visor (Kaca mata)
+            ctx.fillStyle = "#2c3e50";
+            ctx.fillRect(cx - 8, cy - 6, 16, 6);
+            ctx.fillStyle = "#34495e";
+            ctx.fillRect(cx - 6, cy - 5, 4, 2); // pantulan
+        }
+
+        // Draw Particles & Popups
+        for(let p of particles) {
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.life / p.maxLife;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        for(let p of popups) {
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.life / 40;
+            ctx.font = "bold 14px 'Segoe UI'";
+            ctx.textAlign = "center";
+            ctx.fillText(p.text, p.x, p.y);
+            // Outline
+            ctx.strokeStyle = "black"; ctx.lineWidth = 1; ctx.strokeText(p.text, p.x, p.y);
+            ctx.globalAlpha = 1;
+        }
+
+        ctx.restore(); // Restore Camera
+    }
+
+    /**
+     * INPUT HANDLING (KEYBOARD & TOUCH)
+     */
+    window.addEventListener('keydown', (e) => {
+        keys[e.key] = true;
+        if (e.code === 'Space' && gameActive) placeBomb();
+    });
+    window.addEventListener('keyup', (e) => keys[e.key] = false );
+
+    // Mobile D-PAD Setup
+    const dpadBtns = document.querySelectorAll('.d-btn');
+    dpadBtns.forEach(btn => {
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchInput[btn.dataset.dir] = true;
+            btn.classList.add('active-btn');
+        });
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchInput[btn.dataset.dir] = false;
+            btn.classList.remove('active-btn');
+        });
+        btn.addEventListener('touchcancel', (e) => {
+            touchInput[btn.dataset.dir] = false;
+            btn.classList.remove('active-btn');
+        });
+    });
+
+    const btnBomb = document.getElementById('btn-bomb');
+    btnBomb.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        btnBomb.classList.add('active-action');
+        placeBomb();
+    });
+    btnBomb.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        btnBomb.classList.remove('active-action');
+    });
+
+</script>
+</body>
+</html>

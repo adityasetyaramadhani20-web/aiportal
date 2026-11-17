@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="id">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		<title>SkillJump</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+		<style>
+			body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #111;
+            color: white;
+            overflow: hidden; 
+            touch-action: none; 
+			}
+			
+			#game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16/9;
+            margin: 0 auto;
+            background-color: #87CEEB; 
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+			}
+			
+			canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated; 
+			}
+			
+			/* Efek garis TV CRT kuno */
+			#scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 10;
+			}
+			
+			#ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 20;
+            pointer-events: none;
+			}
+			
+			.hud-text {
+            text-shadow: 2px 2px 0px #000;
+			}
+			
+			/* Kontrol Sentuh Mobile */
+			#touch-controls {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            width: 100%;
+            padding: 0 20px;
+            box-sizing: border-box;
+            display: none; 
+            justify-content: space-between;
+            z-index: 30;
+            user-select: none;
+			}
+			
+			.btn-touch {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: white;
+            backdrop-filter: blur(4px);
+            touch-action: manipulation;
+			}
+			
+			.btn-touch:active {
+            background: rgba(255, 255, 255, 0.4);
+			}
+			
+			.menu-btn {
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.5);
+			}
+			.menu-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.5);
+			}
+			
+			@media (max-width: 768px) {
+            #touch-controls { display: flex; }
+            .hud-text { font-size: 10px; }
+            #game-container { height: 100vh; aspect-ratio: auto; }
+            .menu-btn { width: 80%; max-width: 300px; font-size: 12px; }
+			}
+		</style>
+	</head>
+	<body class="flex flex-col items-center justify-center min-h-screen">
+		
+		<div id="game-container">
+			<!-- Canvas Game Internal Resolusi 800x450 -->
+			<canvas id="gameCanvas" width="800" height="450"></canvas>
+			<div id="scanlines"></div>
+			
+			<!-- HUD Informasi di atas layar -->
+			<div id="ui-layer" class="p-4 flex justify-between w-full" style="display: none;">
+				<div class="flex flex-col w-1/3">
+					<p class="hud-text text-yellow-400 text-sm md:text-base">SKOR: <span id="scoreVal">0</span></p>
+					<p class="hud-text text-white text-xs mt-2" id="powerUpText"></p>
+				</div>
+				
+				<!-- Timer khusus Mode Frenzy -->
+				<div id="time-container" class="flex flex-col w-1/3 items-center hidden">
+					<p class="hud-text text-orange-400 text-xs md:text-sm">WAKTU</p>
+					<p class="hud-text text-white text-lg md:text-2xl mt-1" id="timeVal">30</p>
+				</div>
+				
+				<div class="flex flex-col w-1/3 items-end">
+					<p class="hud-text text-blue-400 text-sm md:text-base mb-2">LEVEL: <span id="levelVal">1</span></p>
+					<p class="hud-text text-red-500 text-sm md:text-base">NYAWA: <span id="livesVal">3</span></p>
+				</div>
+			</div>
+			
+			<!-- Tombol Kontrol Sentuh -->
+			<div id="touch-controls">
+				<div class="flex gap-4 pointer-events-auto">
+					<button id="btn-left" class="btn-touch">◀</button>
+					<button id="btn-right" class="btn-touch">▶</button>
+				</div>
+				<div class="pointer-events-auto">
+					<button id="btn-jump" class="btn-touch">▲</button>
+				</div>
+			</div>
+			
+			<!-- Main Menu Screen -->
+			<div id="main-menu-screen" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50">
+				<h1 class="text-3xl md:text-5xl text-yellow-400 mb-2 hud-text text-center">SKILLJUMP</h1>
+				<p class="text-white text-xs md:text-sm mb-6 hud-text">Pilih Mode Permainan</p>
+				
+				<!-- Pilihan Level Awal -->
+				<div class="mb-6 w-64 md:w-80 pointer-events-auto">
+					<label for="level-select" class="block text-white text-xs md:text-sm mb-2 hud-text text-center">MAP AWAL:</label>
+					<div class="relative w-full">
+						<select id="level-select" class="w-full bg-[#111] text-yellow-400 border-4 border-white p-3 font-['Press_Start_2P'] text-xs cursor-pointer appearance-none">
+							<option value="random">ACAK (RANDOM)</option>
+							<!-- Pilihan 1-24 akan diisi menggunakan JavaScript -->
+						</select>
+						<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-white">
+							▼
+						</div>
+					</div>
+				</div>
+				
+				<button id="btn-classic" class="menu-btn px-6 py-4 bg-green-500 text-white font-bold border-4 border-white hover:bg-green-400 transition-colors hud-text cursor-pointer pointer-events-auto mb-4 w-64 md:w-80">MODE KLASIK</button>
+				
+				<button id="btn-frenzy" class="menu-btn px-6 py-4 bg-red-500 text-white font-bold border-4 border-white hover:bg-red-400 transition-colors hud-text cursor-pointer pointer-events-auto mb-4 w-64 md:w-80">MODE FRENZY</button>
+			</div>
+			
+			<!-- Layar Game Over -->
+			<div id="game-over-screen" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50 hidden">
+				<h1 id="end-title" class="text-3xl md:text-5xl text-red-500 mb-6 hud-text text-center">PERMAINAN BERAKHIR</h1>
+				<p class="text-white mb-6 hud-text">SKOR AKHIR: <span id="final-score">0</span></p>
+				<button id="btn-restart" class="menu-btn px-6 py-3 bg-yellow-400 text-black font-bold border-4 border-white hover:bg-yellow-300 transition-colors hud-text cursor-pointer pointer-events-auto mb-4 w-64">MAIN LAGI</button>
+				<button id="btn-menu" class="menu-btn px-6 py-3 bg-blue-500 text-white font-bold border-4 border-white hover:bg-blue-400 transition-colors hud-text cursor-pointer pointer-events-auto w-64">MENU UTAMA</button>
+			</div>
+		</div>
+		
+		<script>
+			const canvas = document.getElementById('gameCanvas');
+			const ctx = canvas.getContext('2d');
+			
+			// Referensi UI Elements
+			const uiLayer = document.getElementById('ui-layer');
+			const scoreUI = document.getElementById('scoreVal');
+			const livesUI = document.getElementById('livesVal');
+			const levelUI = document.getElementById('levelVal');
+			const timeContainer = document.getElementById('time-container');
+			const timeUI = document.getElementById('timeVal');
+			
+			const mainMenuScreen = document.getElementById('main-menu-screen');
+			const gameOverScreen = document.getElementById('game-over-screen');
+			const endTitle = document.getElementById('end-title');
+			const finalScoreUI = document.getElementById('final-score');
+			const powerUpUI = document.getElementById('powerUpText');
+			const levelSelect = document.getElementById('level-select');
+			
+			// Referensi Tombol
+			const btnClassic = document.getElementById('btn-classic');
+			const btnFrenzy = document.getElementById('btn-frenzy');
+			const btnRestart = document.getElementById('btn-restart');
+			const btnMenu = document.getElementById('btn-menu');
+			const btnLeft = document.getElementById('btn-left');
+			const btnRight = document.getElementById('btn-right');
+			const btnJump = document.getElementById('btn-jump');
+			
+			// Isi opsi dropdown Level
+			for (let i = 0; i < 25; i++) {
+				let opt = document.createElement('option');
+				opt.value = i;
+				opt.text = "MAP " + (i + 1);
+				levelSelect.appendChild(opt);
+			}
+			
+			// Game Variables
+			const TILE_SIZE = 30;
+			let cameraX = 0;
+			let score = 0;
+			let lives = 3;
+			let currentLevel = 0;
+			let activeMode = 'menu'; 
+			let gameState = 'menu'; 
+			let gameLoopId;
+			let currentMapData = [];
+			
+			let timeLeft = 30;
+			let timerInterval = null;
+			
+			// Penampung Entitas Game
+			let blocks = [];
+			let coins = [];
+			let enemies = [];
+			let particles = [];
+			let powerups = [];
+			let goal = null;
+			
+			const keys = { left: false, right: false, up: false };
+			
+			function startTimer() {
+				if (timerInterval) clearInterval(timerInterval);
+				timerInterval = setInterval(() => {
+					if (gameState === 'playing' && activeMode === 'frenzy') {
+						timeLeft--;
+						timeUI.innerText = timeLeft;
+						
+						if (timeLeft <= 5) timeUI.classList.add('text-red-500');
+						else timeUI.classList.remove('text-red-500');
+						
+						if (timeLeft <= 0) die(true); 
+					}
+				}, 1000);
+			}
+			
+			function stopTimer() {
+				if (timerInterval) clearInterval(timerInterval);
+			}
+			
+			// FUNGSI HELPER PETA YANG AMAN (Mencegah Blank Screen)
+			function createSafeMap(rows, cols) {
+				let map = Array(rows).fill().map(() => Array(cols).fill('.'));
+				return {
+					map: map,
+					put: (r, c, char) => { 
+						r = Math.floor(r); c = Math.floor(c);
+						if (r >= 0 && r < rows && c >= 0 && c < cols) map[r][c] = char; 
+					},
+					fillRow: (r, startC, endC, char) => { 
+						for(let c=startC; c<=endC; c++) {
+							let safeR = Math.floor(r); let safeC = Math.floor(c);
+							if (safeR >= 0 && safeR < rows && safeC >= 0 && safeC < cols) map[safeR][safeC] = char;
+						}
+					},
+					fillCol: (c, startR, endR, char) => { 
+						for(let r=startR; r<=endR; r++) {
+							let safeR = Math.floor(r); let safeC = Math.floor(c);
+							if (safeR >= 0 && safeR < rows && safeC >= 0 && safeC < cols) map[safeR][safeC] = char;
+						}
+					}
+				};
+			}
+			
+			// 1. GENERATOR PETA MODE FRENZY
+			function getFrenzyMap(index) {
+				const rows = 15; const cols = 120; 
+				const helper = createSafeMap(rows, cols);
+				const { map, put, fillRow, fillCol } = helper;
+				
+				// Dasar Aman Wajib!
+				fillRow(14, 0, 8, '#'); put(13, 2, '@'); // Area Mulai
+				fillRow(14, 110, 119, '#'); put(13, 115, 'D'); // Area Selesai
+				
+				// Tambahkan batas lantai dasar lava agar kalau jatuh langsung mati
+				fillRow(14, 9, 109, '^');
+				
+				switch(index) {
+					// --- BATCH 1 (1-12) : Level Lari Cepat ---
+					case 0: // Sprint Sederhana
+                    for(let c=10; c<108; c+=6) { put(14, c, '#'); put(14, c+1, '#'); put(14, c+2, '#'); put(13, c+1, 'C'); }
+                    break;
+					case 1: // Parkour Atas Awan
+                    let h1 = 14;
+                    for(let c=10; c<108; c+=5) {
+                        h1 = (h1 === 14) ? 11 : 14; 
+                        put(h1, c, '#'); put(h1, c+1, '#'); put(h1-1, c, 'C');
+					}
+                    break;
+					case 2: // Terowongan Maut 
+                    fillRow(14, 9, 109, '#');
+                    fillRow(9, 9, 109, '#'); 
+                    for(let c=15; c<105; c+=8) { put(13, c, 'E'); put(10, c+2, 'C'); }
+                    put(13, 10, 'P'); 
+                    break;
+					case 3: // Batu Loncatan Lebar 
+                    for(let c=12; c<108; c+=5) { put(13, c, '#'); put(13, c+1, '#'); put(11, c+1, 'C'); } 
+                    break;
+					case 4: // Invasi Musuh
+                    fillRow(14, 9, 109, '#');
+                    for(let c=20; c<100; c+=6) put(13, c, 'E'); 
+                    for(let c=23; c<100; c+=6) { put(11, c, '#'); put(10, c, 'C'); } 
+                    break;
+					case 5: // Pulau-pulau Sniper
+                    for(let c=12; c<105; c+=6) { 
+                        put(14, c, '#'); put(14, c+1, '#'); put(14, c+2, '#');
+                        if (c % 12 === 0) put(13, c+1, 'E');
+                        else put(12, c+1, 'C');
+					}
+                    put(10, 15, 'P'); put(10, 100, 'P');
+                    break;
+					case 6: // Dinding Rintangan
+                    fillRow(14, 9, 109, '#');
+                    for(let c=15; c<105; c+=8) {
+                        put(13, c, '#'); put(12, c, '#'); 
+                        put(13, c+4, 'E'); put(10, c, 'C');
+					}
+                    break;
+					case 7: // Tangga Ekstrem Lava
+                    for(let c=10; c<105; c+=5) {
+                        let step = Math.floor((c - 10) / 5);
+                        let y = 14 - (step % 4); 
+                        put(y, c, '#'); put(y, c+1, '#'); put(y-1, c, 'C');
+					}
+                    break;
+					case 8: // Lorong Celah Lava
+                    fillRow(14, 9, 109, '#'); 
+                    for(let c=15; c<105; c+=7) { put(14, c, '^'); put(14, c+1, '^'); put(12, c, 'C'); } 
+                    break;
+					case 9: // Langit Berbahaya (Sudah Diperbaiki)
+                    put(12, 10, '#'); put(12, 11, '#'); 
+                    put(10, 14, '#'); put(10, 15, '#');
+                    fillRow(8, 18, 105, '#'); 
+                    for(let c=24; c<100; c+=6) put(7, c, 'E');
+                    put(7, 20, 'P'); put(7, 60, 'P');
+                    break;
+					case 10: // Tangga Berongga
+                    fillRow(14, 9, 109, '#');
+                    for(let c=15; c<105; c+=8) {
+                        put(13, c, '#'); put(11, c+2, '#'); put(11, c+3, '#'); 
+                        put(13, c+4, 'E');
+					}
+                    break;
+					case 11: // Ujian Terakhir: Dash Super Cepat
+                    fillRow(14, 9, 109, '#');
+                    for(let c=15; c<105; c+=6) { put(14, c, '^'); put(14, c+1, '^'); } 
+                    for(let c=18; c<105; c+=6) { put(11, c, '#'); put(10, c, 'E'); } 
+                    put(13, 10, 'P'); put(13, 40, 'P'); put(13, 80, 'P'); 
+                    break;
+					case 12: // Lompatan Koin Ganda (Eks-Level 12)
+                    for(let c=12; c<108; c+=4) { 
+                        put(13, c, '#'); put(13, c+1, '#'); 
+                        put(11, c, 'C'); put(11, c+1, 'C');
+					}
+                    put(10, 50, 'P'); 
+                    break;
+					case 13: // Tangga Gelombang (Eks-Level 13)
+                    let yH = 14;
+                    for(let c=10; c<108; c+=4) {
+                        put(yH, c, '#'); put(yH, c+1, '#');
+                        yH = (yH === 14) ? 12 : (yH === 12) ? 10 : 14; // Tinggi bergelombang lambat
+                        put(yH-1, c, 'C');
+					}
+                    break;
+					case 14: // Terowongan Sniper (Eks-Level 14/15)
+                    fillRow(9, 9, 112, '#'); // Atap pelindung
+                    for(let c=12; c<112; c+=5) { 
+                        put(14, c, '#'); put(14, c+1, '#'); put(14, c+2, '#'); put(9, c-3,'C'); put(9, c-2,'C'); put(9, c-1,'C');
+                        if (c % 10 === 2) put(13, c+1, 'E'); 
+					}
+                    break;
+					case 15: // Tangga Turun Naik Curam
+                    for(let c=10; c<105; c+=3) {
+                        let y = 14 - (c % 9)/3; // 14, 13, 12 berulang
+                        put(Math.floor(y), c, '#'); put(Math.floor(y), c+1, '#');
+					}
+                    break;
+					case 16: // Super Mario Bata Atas (Eks-Level 18)
+                    fillRow(14, 9, 109, '#');
+                    for(let c=15; c<105; c+=8) { put(14, c, '^'); put(14, c+1, '^'); } 
+                    for(let c=14; c<105; c+=8) { put(10, c, '#'); put(10, c+1, '#'); put(10, c+2, '#'); put(9, c+1, 'C'); } 
+                    for(let c=20; c<105; c+=20) { put(13, c, 'E'); }
+                    break;
+					case 17: // Jembatan Runtuh Ilusi (Eks-Level 19)
+                    for(let c=12; c<105; c+=3) { put(14, c, '#'); put(14, c+1, '#'); } // 2 blok, 1 gap
+                    for(let c=15; c<105; c+=15) { put(10, c, 'P'); } 
+                    break;
+					case 18: // Lorong Sempit Lava (Eks-Level 20)
+                    fillRow(14, 9, 109, '#'); fillRow(10, 9, 109, '#'); // Atap di y=10, masih muat 4 blok
+                    for(let c=15; c<105; c+=6) { put(14, c, '^'); put(14, c+1, '^'); put(13, c+3, 'C'); }
+                    break;
+					case 19: // Tiang Presisi Maksimal (Eks-Level 24)
+                    for(let c=13; c<108; c+=4) {
+                        let h = 14 - (c % 3); // 14, 13, 12 berulang
+                        put(h, c, '#'); put(h, c+1, '#');
+					}
+                    break;
+					case 20: // Rute Ganda Bertingkat (Eks-Level 26)
+                    fillRow(14, 9, 109, '#');
+                    fillRow(10, 15, 105, '#'); // Jembatan dua
+                    put(12, 11, '#'); put(12, 12, '#'); put(10, 14, '#'); // Tangga naik
+                    for(let c=18; c<105; c+=8) { put(14, c, '^'); put(14, c+1, '^'); put(13, c+4, 'E'); } // Bawah bahaya
+                    for(let c=18; c<105; c+=4) { put(9, c, 'C'); } // Atas kaya
+                    break;
+					case 21: // Terowongan Zig-zag Dinding (Eks-Level 28)
+                    fillRow(14, 9, 109, '#');
+                    for(let c=15; c<105; c+=10) {
+                        put(13, c, '#'); put(12, c, '#'); // Dinding pendek bawah
+                        put(10, c+5, '#'); put(11, c+5, '#'); // Dinding gantung atas
+                        put(13, c+3, 'E'); put(12, c+7, 'C');
+					}
+                    break;
+					case 22: // Penjara Kubus Bawah (Eks-Level 30)
+                    fillRow(14, 9, 109, '#');
+                    for(let c=15; c<105; c+=10) {
+                        fillRow(13, c, c+3, '#'); // Atap kubus
+                        put(14, c, '#'); put(13, c, '#'); // Dinding
+                        put(15, c+2, 'E'); // Musuh terperangkap
+                        put(12, c+2, 'C'); // Panduan atas
+					}
+                    break;
+					case 23: // Jebakan Langit-langit Berduri (Eks-Level 33)
+                    for(let c=12; c<105; c+=4) {
+                        put(14, c, '#'); put(14, c+1, '#'); // Pijakan bawah
+                        put(10, c, '#'); put(10, c+1, '#'); // Ancaman atas
+                        put(13, c, 'C');
+					}
+                    for(let c=20; c<100; c+=12) put(13, c, 'E');
+                    break;
+					case 24: // Labirin Kematian Bertingkat (Frenzy Baru)
+                    fillRow(14, 9, 109, '#'); // Lantai dasar
+                    // Sesi 1: Lorong sempit dan tiang penghalang
+                    for(let c=10; c<30; c+=4) {
+                        fillCol(c, 11, 13, '#'); // Tiang
+                        put(14, c+2, '^'); // Jebakan lava bawah
+                        put(10, c, '#'); put(10, c+1, '#'); put(9, c+1, 'C'); // Jalur atas
+					}
+                    // Sesi 2: Lorong ganda dengan lubang mematikan
+                    fillRow(7, 30, 60, '#'); // Atap atas
+                    fillRow(11, 30, 60, '#'); // Lantai pemisah
+                    for(let c=32; c<60; c+=6) {
+                        put(14, c, '^'); put(14, c+1, '^'); // Lava di bawah
+                        put(10, c, 'E'); put(13, c+3, 'E'); // Musuh di kedua lantai
+                        put(7, c+2, '.'); put(7, c+3, '.'); // Lubang atap
+                        put(11, c+4, '.'); put(11, c+5, '.'); // Lubang lantai pemisah
+					}
+                    // Sesi 3: Tangga melayang tak beraturan
+                    for(let c=62; c<105; c+=5) {
+                        put(12, c, '#'); put(12, c+1, '#');
+                        put(9, c+2, '#'); put(9, c+3, '#');
+                        put(14, c+1, '^'); put(14, c+2, '^'); put(14, c+3, '^');
+                        put(8, c+2, 'C'); put(11, c+1, 'E');
+					}
+                    put(6, 45, 'P'); put(10, 80, 'P'); // Powerup untuk membantu
+                    break;					
+				}
+				return map.map(row => row.join(''));
+			}
+			
+			// 2. GENERATOR PETA MODE KLASIK
+			function getClassicMap(index) {
+				const rows = 15; const cols = 60; 
+				const helper = createSafeMap(rows, cols);
+				const { map, put, fillRow, fillCol } = helper;
+				
+				// Dasar Aman Wajib!
+				fillRow(14, 0, 5, '#'); put(13, 2, '@'); 
+				fillRow(14, 54, 59, '#'); put(13, 56, 'D'); 
+				
+				// Default lantai jika tidak dirombak di bawahnya
+				fillRow(14, 6, 53, '#');
+				
+				switch(index) {
+					// --- BATCH 1 (1-12) : Puzzle Klasik Bawaan ---
+					case 0: // Pengenalan Jurang
+                    put(14, 20, '^'); put(14, 21, '^'); put(14, 22, '^'); 
+                    put(13, 19, 'C'); put(11, 21, 'C'); put(13, 23, 'C'); 
+                    put(13, 35, 'E');
+                    break;
+					case 1: // Tangga Piramida
+                    put(13, 20, '#'); 
+                    put(13, 21, '#'); put(12, 21, '#'); 
+                    put(13, 22, '#'); put(12, 22, '#'); put(11, 22, '#'); // Puncak
+                    put(13, 23, '#'); put(12, 23, '#');
+                    put(13, 24, '#');
+                    put(13, 30, '#'); 
+                    put(13, 31, '#'); put(12, 31, '#'); 
+                    put(13, 32, '#'); put(12, 32, '#'); put(11, 32, '#'); // Puncak
+                    put(13, 33, '#'); put(12, 33, '#');
+                    put(13, 34, '#');
+                    put(13, 40, '#'); 					
+                    put(13, 41, '#'); put(12, 41, '#'); 
+                    put(13, 42, '#'); put(12, 42, '#'); put(11, 42, '#'); // Puncak
+                    put(13, 43, '#'); put(12, 43, '#');
+                    put(13, 44, '#');					
+                    put(9, 22, 'C'); put(13, 36, 'E'); put(13, 47, 'E');
+                    break;
+					case 2: // Rute Ganda (Atas / Bawah)
+                    fillRow(10, 15, 35, '#'); // Jembatan atas
+                    put(9, 20, 'C'); put(9, 25, 'C'); put(9, 30, 'C');
+                    put(13, 18, 'E'); put(13, 28, 'E'); 
+                    break;
+					case 3: // Danau Lava & Batu Loncatan (Disesuaikan)
+                    fillRow(14, 15, 42, '^');
+                    put(14, 18, '#'); put(14, 19, '#'); put(13, 18, 'C'); 
+                    put(14, 23, '#'); put(14, 24, '#'); put(13, 23, 'C'); 
+                    put(14, 28, '#'); put(14, 29, '#'); put(13, 28, 'C'); 
+                    put(14, 33, '#'); put(14, 34, '#'); put(13, 33, 'C');
+                    put(14, 38, '#'); put(14, 39, '#'); put(13, 38, 'C');
+                    break;
+					case 4: // Musuh Berjajar
+                    for(let c=20; c<45; c+=4) put(13, c, 'E');
+                    put(11, 15, '#'); put(11, 16, '#'); put(10, 15, 'C'); 
+                    break;
+					case 5: // Gua Stalaktit Aman 
+                    fillRow(9, 15, 45, '#'); // Atap
+                    for(let c=18; c<45; c+=5) {
+                        put(14, c, '^'); put(14, c+1, '^'); 
+                        put(10, c+3, '#'); 
+                        put(13, c+3, 'C');
+					}
+                    break;
+					case 6: // Platform Langit
+                    fillRow(14, 15, 45, '^');
+                    put(12, 15, '#'); put(12, 16, '#'); 
+                    put(10, 20, '#'); put(10, 21, '#'); put(9, 20, 'C');
+                    put(8, 25, '#'); put(8, 26, '#'); put(7, 25, 'C');
+                    put(10, 31, '#'); put(10, 32, '#');
+                    put(12, 37, '#'); put(12, 38, '#');
+                    put(12, 43, '#'); put(12, 44, '#');
+                    break;
+					case 7: // Tiang Berdiri
+                    fillRow(14, 15, 45, '^');
+                    for(let c=18; c<45; c+=5) {
+                        put(14, c, '#'); put(13, c, '#'); put(12, c, '#'); put(11, c, 'C');
+					}
+                    break;
+					case 8: // Terowongan Bawah
+                    fillRow(11, 15, 40, '#'); fillCol(15, 11, 14, '#'); fillCol(40, 11, 14, '#');
+                    put(14, 15, '.'); put(13, 15, '.'); 
+                    put(14, 40, '.'); put(13, 40, '.'); 
+                    put(13, 20, 'E'); put(13, 30, 'E'); put(9, 25, 'C');
+                    break;
+					case 9: // Turunan Curam
+                    for(let c=10; c<20; c++) put(13, c, '#'); 
+                    for(let c=20; c<30; c++) put(12, c, '#');
+                    for(let c=30; c<40; c++) put(11, c, '#');
+                    put(9, 38, 'C'); put(11, 25, 'E'); put(13, 45, 'E');
+                    break;
+					case 10: // Lompatan Akurat Koin Cincin
+                    put(14, 25, '^'); put(14, 26, '^'); put(14, 27, '^'); put(14, 28, '^');
+                    put(12, 25, 'C'); put(11, 26, 'C'); put(11, 27, 'C'); put(12, 28, 'C');
+                    put(14, 35, '^'); put(14, 36, '^'); put(14, 37, '^'); put(14, 38, '^');
+                    put(12, 35, 'C'); put(11, 36, 'C'); put(11, 37, 'C'); put(12, 38, 'C');
+                    break;
+					case 11: // Ujian Akhir Klasik
+                    fillRow(14, 12, 50, '^');
+                    put(13, 15, '#'); put(13, 16, '#'); put(12, 15, 'C');
+                    put(11, 20, '#'); put(11, 21, '#'); put(10, 20, 'E');
+                    put(9, 25, '#'); put(9, 26, '#'); put(8, 25, 'C');
+                    put(12, 31, '#'); put(12, 32, '#'); 
+                    put(12, 37, '#'); put(12, 38, '#'); 
+                    put(14, 42, '#'); put(14, 43, '#'); put(14, 44, '#'); put(14, 45, '#'); put(14, 46, '#'); put(13, 43, 'C'); put(13, 44, 'C');
+                    break;
+					case 12: // Bonus Latihan Atas (Eks-Level 12)
+                    put(14, 20, '^'); put(14, 21, '^'); 
+                    put(12, 15, '#'); put(12, 16, '#'); put(10, 15, 'C'); // Akses platform atas
+                    put(13, 35, 'E');
+                    put(14, 40, '^'); put(14, 41, '^'); 
+                    put(12, 45, '#'); put(12, 46, '#'); put(10, 45, 'C'); // Akses platform atas
+                    put(13, 48, 'E');					
+                    break;
+					case 13: // Reruntuhan Kuil (Eks-Level 14)
+                    for(let i=0; i<4; i++) {
+                        let baseCol = 10 + (i * 10);
+                        put(13, baseCol, '#'); put(12, baseCol, '#'); put(13, baseCol+1, '#');
+                        put(11, baseCol, 'C'); put(13, baseCol-3, 'E');
+					}
+                    break;
+					case 14: // Platform Mengambang Murni (Eks-Level 15)
+                    fillRow(14, 10, 46, '^');
+                    put(12, 12, '#'); put(12, 13, '#'); put(11, 12, 'C');
+                    put(11, 18, '#'); put(11, 19, '#'); 
+                    put(10, 24, '#'); put(10, 25, '#'); put(9, 24, 'C');
+                    put(11, 30, '#'); put(11, 31, '#'); put(10, 30, 'E');
+                    put(12, 36, '#'); put(12, 37, '#'); put(11, 36, 'C');
+                    put(12, 41, '#'); put(12, 42, '#'); put(11, 41, 'C');					
+                    break;
+					case 15: // Invasi Atas Bawah (Eks-Level 16)
+                    for(let c=15; c<45; c+=6) put(13, c, 'E'); 
+                    put(10, 15, '#'); put(10, 16, '#'); put(9, 15, 'C');
+                    put(10, 23, '#'); put(10, 24, '#'); put(9, 23, 'C');
+                    put(10, 31, '#'); put(10, 32, '#'); put(9, 31, 'C');
+                    break;
+					case 16: // Terowongan Vertikal (Eks-Level 17)
+                    fillCol(20, 11, 14, '#'); fillCol(21, 11, 14, '#'); // Pembatas
+                    put(14, 25, '^'); put(14, 26, '^'); 
+                    fillCol(30, 11, 14, '#'); fillCol(31, 11, 14, '#'); 
+                    put(10, 15, 'C'); put(10, 26, 'E'); put(10, 35, 'C');
+                    break;
+					case 17: // Pulau Menengah Lava (Eks-Level 18)
+                    fillRow(14, 15, 25, '^'); fillRow(14, 30, 40, '^');
+                    put(12, 19, '#'); put(12, 20, '#'); put(12, 21, '#'); put(11, 20, 'C'); // Penyelamat 1
+                    put(12, 33, '#'); put(12, 34, '#'); put(12, 35, '#'); put(12, 36, '#'); // Penyelamat 2
+                    put(13, 27, 'E');
+                    break;
+					case 18: // Kolom Koin Presisi (Eks-Level 19)
+                    [18, 26, 34, 42].forEach(c => { 
+                        put(14, c, '^'); put(14, c+1, '^');
+                        put(12, c+1, 'C'); put(11, c+1, 'C'); 
+					});
+                    break;
+					case 19: // Kastil Blok (Eks-Level 20)
+                    fillRow(13, 20, 21, '#'); fillRow(12, 20, 21, '#'); 
+                    fillRow(13, 35, 36, '#'); fillRow(12, 35, 36, '#');
+                    put(11, 20, 'C'); put(11, 35, 'C');
+                    put(13, 28, 'E'); 
+                    break;
+					case 20: // Arcade Drop (Eks-Level 33)
+                    for(let c=15; c<20; c++) put(12, c, '#');
+                    for(let c=20; c<25; c++) put(10, c, '#');
+                    fillRow(14, 25, 35, '^'); // Jurang di balik puncak
+                    put(12, 30, '#'); put(12, 31, '#'); // Pijakan jatuh aman
+                    put(11, 30, 'E');
+                    break;
+					
+					case 21: // Titik Buta Lava (Eks-Level 25)
+                    fillRow(14, 15, 44, '^'); 
+                    put(14, 18, '#'); put(14, 19, '#'); put(14, 20, '#'); put(14, 21, '#');
+                    put(12, 25, '#'); put(12, 26, '#'); put(12, 27, '#'); put(12, 28, '#'); put(11, 27, 'C');
+                    put(14, 32, '#'); put(14, 33, '#'); put(14, 34, '#'); put(14, 35, '#');
+                    put(10, 38, '#'); put(10, 39, '#'); put(10, 40, '#'); put(10, 41, '#');
+                    break;
+					
+					case 22: // Kandang Penjara (Eks-Level 34)
+                    fillRow(14, 15, 48, '^');
+                    for(let c=18; c<48; c+=8) {
+                        fillRow(12, c, c+3, '#'); // Lantai kandang
+                        fillRow(10, c, c+3, '#'); // Atap kandang
+                        put(11, c, '#'); put(11, c+3, '#'); // Dinding
+                        put(11, c+1, 'E'); // Musuh terkurung
+                        put(9, c+1, 'C'); // Jalan pemain di atas
+					}
+                    break;
+					case 23: // Neraka Platformer Mini (Eks-Level 35)
+                    fillRow(14, 12, 48, '^'); 
+                    put(12, 15, '#'); put(12, 16, '#'); put(12, 17, '#'); put(11, 16, 'C');
+                    put(10, 22, '#'); put(10, 23, '#'); put(10, 24, '#'); put(9, 23, 'E');
+                    put(12, 29, '#'); put(12, 30, '#'); put(12, 31, '#'); 
+                    put(10, 36, '#'); put(10, 37, '#'); put(10, 38, '#');
+                    fillCol(43, 11, 14, '#'); // Tembok penghalang terakhir
+                    break;
+					case 24: // Labirin Presisi (Klasik Baru)
+                    fillRow(14, 6, 53, '^'); // Sebagian besar lantai adalah lava
+                    
+                    // Jalur 1: Naik berliku
+                    put(12, 8, '#'); put(12, 9, '#'); 
+                    put(10, 12, '#'); put(10, 13, '#'); put(9, 12, 'C');
+                    put(8, 16, '#'); put(8, 17, '#'); put(8, 18, '#');
+                    
+                    // Jalur 2: Terowongan sempit di udara
+                    fillRow(6, 18, 35, '#'); // Atap
+                    fillRow(10, 21, 35, '#'); // Lantai terowongan
+                    put(9, 25, 'E'); put(9, 32, 'E'); put(7, 28, 'C');
+                    
+                    // Tembok raksasa penghalang
+                    fillCol(36, 7, 13, '#'); 
+                    
+                    // Jalur 3: Turun secara presisi
+                    put(11, 38, '#'); put(11, 39, '#');
+                    put(13, 42, '#'); put(13, 43, '#'); put(12, 42, 'C');
+                    
+                    // Rintangan akhir berlapis
+                    put(13, 46, '#'); put(12, 46, '#'); put(11, 46, '#');
+                    put(10, 48, '#'); put(10, 49, '#'); put(9, 48, 'C');
+                    put(12, 51, '#'); put(12, 52, '#');
+                    break;					
+				}					
+				return map.map(row => row.join(''));
+			}
+			
+			class Player {
+				constructor(x, y) {
+					this.x = x; this.y = y;
+					this.width = 20; this.height = 20;
+					this.vx = 0; this.vy = 0;
+					this.speed = 4;
+					this.jumpStrength = -15.5; 
+					this.gravity = 0.8;
+					this.grounded = false;
+					this.baseColor = '#3b82f6';
+					this.color = this.baseColor;
+					this.invincible = false;
+					this.invincibleTimer = 0;
+				}
+				
+				update() {
+					if (keys.left) this.vx = -this.speed;
+					else if (keys.right) this.vx = this.speed;
+					else this.vx = 0;
+					
+					if (keys.up && this.grounded) {
+						this.vy = this.jumpStrength;
+						this.grounded = false;
+						createParticles(this.x + this.width/2, this.y + this.height, '#fff', 5);
+					}
+					
+					this.vy += this.gravity;
+					if(this.vy > 12) this.vy = 12; 
+					
+					this.x += this.vx;
+					this.y += this.vy;
+					
+					if (this.x < 0) this.x = 0;
+					
+					// Kamera dinamis
+					if (this.x > cameraX + canvas.width / 2) {
+						cameraX = this.x - canvas.width / 2;
+						} else if (this.x < cameraX + canvas.width / 4 && cameraX > 0) {
+						cameraX = this.x - canvas.width / 4;
+					}
+					if (cameraX < 0) cameraX = 0;
+					
+					// Mode Powerup
+					if (this.invincible) {
+						this.invincibleTimer--;
+						this.speed = 6.5; 
+						const colors = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
+						this.color = (Math.floor(Date.now() / 100) % 2 === 0) ? colors[Math.floor(Math.random() * colors.length)] : '#fff';
+						powerUpUI.innerText = "⭐ SUPER: " + Math.ceil(this.invincibleTimer/60) + "s";
+						
+						if (this.invincibleTimer <= 0) {
+							this.invincible = false;
+							this.color = this.baseColor;
+							this.speed = 4;
+							powerUpUI.innerText = "";
+						}
+					}
+				}
+				
+				draw() {
+					ctx.fillStyle = this.color;
+					ctx.fillRect(this.x, this.y, this.width, this.height);
+					ctx.fillStyle = 'white';
+					let eyeOffset = this.vx > 0 ? 8 : (this.vx < 0 ? 2 : 5);
+					ctx.fillRect(this.x + eyeOffset, this.y + 4, 4, 4);
+					ctx.fillRect(this.x + eyeOffset + 6, this.y + 4, 4, 4);
+					ctx.fillStyle = 'black';
+					ctx.fillRect(this.x + eyeOffset + 2, this.y + 6, 2, 2);
+					ctx.fillRect(this.x + eyeOffset + 8, this.y + 6, 2, 2);
+				}
+			}
+			
+			class Block {
+				constructor(x, y, type) {
+					this.x = x; this.y = y;
+					this.width = TILE_SIZE; this.height = TILE_SIZE;
+					this.type = type; 
+				}
+				draw() {
+					if (this.type === '#') {
+						ctx.fillStyle = '#8B4513'; 
+						ctx.fillRect(this.x, this.y, this.width, this.height);
+						ctx.fillStyle = '#228B22'; 
+						ctx.fillRect(this.x, this.y, this.width, 6);
+						} else if (this.type === '^') {
+						ctx.fillStyle = '#ff4500'; 
+						let yOffset = Math.sin(Date.now() / 200 + this.x) * 3;
+						ctx.fillRect(this.x, this.y + 10 + yOffset, this.width, this.height - 10 - yOffset);
+						ctx.fillStyle = '#ffd700';
+						ctx.fillRect(this.x + 5, this.y + 12 + yOffset, 4, 4);
+						} else if (this.type === 'D') {
+						ctx.fillStyle = '#8B4513';
+						ctx.fillRect(this.x, this.y, this.width, this.height * 2); 
+						ctx.fillStyle = '#000';
+						ctx.fillRect(this.x + 5, this.y + 5, this.width - 10, this.height * 2 - 5);
+					}
+				}
+			}
+			
+			class Coin {
+				constructor(x, y) {
+					this.x = x + 5; this.y = y + 5;
+					this.width = 20; this.height = 20;
+					this.collected = false;
+					this.startY = this.y;
+				}
+				update() { this.y = this.startY + Math.sin(Date.now() / 150 + this.x) * 4; }
+				draw() {
+					if (this.collected) return;
+					ctx.fillStyle = '#ffd700';
+					ctx.beginPath();
+					ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI * 2);
+					ctx.fill();
+					ctx.strokeStyle = '#daa520';
+					ctx.lineWidth = 2;
+					ctx.stroke();
+				}
+			}
+			
+			class PowerUp {
+				constructor(x, y) {
+					this.x = x + 5; this.y = y + 5;
+					this.width = 20; this.height = 20;
+					this.collected = false;
+					this.startY = this.y;
+				}
+				update() { this.y = this.startY + Math.sin(Date.now() / 100 + this.x) * 6; }
+				draw() {
+					if (this.collected) return;
+					let cx = this.x + this.width / 2;
+					let cy = this.y + this.height / 2;
+					ctx.beginPath();
+					for (let i = 0; i < 10; i++) {
+						let r = i % 2 === 0 ? 10 : 5;
+						let angle = (i * Math.PI) / 5;
+						if (i === 0) ctx.moveTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+						else ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+					}
+					ctx.closePath();
+					ctx.fillStyle = Math.floor(Date.now() / 100) % 2 === 0 ? '#ff0' : '#f0f';
+					ctx.fill();
+				}
+			}
+			
+			class Enemy {
+				constructor(x, y) {
+					this.x = x; this.y = y + 10; 
+					this.width = 20; this.height = 20;
+					this.vx = 2; this.speed = 1.5;
+					this.patrolCenter = x; this.range = 50; 
+				}
+				update() {
+					this.x += this.vx;
+					if (this.x > this.patrolCenter + this.range) this.vx = -this.speed;
+					else if (this.x < this.patrolCenter - this.range) this.vx = this.speed;
+				}
+				draw() {
+					ctx.fillStyle = '#ef4444'; 
+					ctx.fillRect(this.x, this.y, this.width, this.height);
+					ctx.fillStyle = 'white';
+					ctx.fillRect(this.x + 2, this.y + 4, 6, 4);
+					ctx.fillRect(this.x + 12, this.y + 4, 6, 4);
+					ctx.fillStyle = 'black';
+					ctx.fillRect(this.x + 4, this.y + 6, 2, 2);
+					ctx.fillRect(this.x + 14, this.y + 6, 2, 2);
+				}
+			}
+			
+			class Particle {
+				constructor(x, y, color) {
+					this.x = x; this.y = y;
+					this.vx = (Math.random() - 0.5) * 6;
+					this.vy = (Math.random() - 0.5) * 6;
+					this.life = 1.0; this.color = color;
+					this.size = Math.random() * 4 + 2;
+				}
+				update() { this.x += this.vx; this.y += this.vy; this.life -= 0.05; }
+				draw() {
+					ctx.globalAlpha = Math.max(0, this.life);
+					ctx.fillStyle = this.color;
+					ctx.fillRect(this.x, this.y, this.size, this.size);
+					ctx.globalAlpha = 1.0;
+				}
+			}
+			
+			let player = new Player(50, 50);
+			
+			function createParticles(x, y, color, amount) {
+				for (let i = 0; i < amount; i++) particles.push(new Particle(x, y, color));
+			}
+			
+			function buildLevel() {
+				blocks = []; coins = []; enemies = []; particles = []; powerups = []; goal = null; cameraX = 0;
+				const map = currentMapData; 
+				
+				for (let row = 0; row < map.length; row++) {
+					if(!map[row]) continue;
+					for (let col = 0; col < map[row].length; col++) {
+						let char = map[row][col];
+						let x = col * TILE_SIZE; let y = row * TILE_SIZE;
+						if (char === '#') blocks.push(new Block(x, y, '#'));
+						else if (char === '^') blocks.push(new Block(x, y, '^'));
+						else if (char === 'D') goal = new Block(x, y - TILE_SIZE, 'D'); 
+						else if (char === 'C') coins.push(new Coin(x, y));
+						else if (char === 'P') powerups.push(new PowerUp(x, y));
+						else if (char === 'E') enemies.push(new Enemy(x, y));
+						else if (char === '@') {
+							player.x = x; player.y = y; player.vx = 0; player.vy = 0;
+							player.invincible = false; player.color = player.baseColor;
+							powerUpUI.innerText = "";
+						}
+					}
+				}
+			}
+			
+			function rectIntersect(r1, r2) {
+				return !(r2.x > r1.x + r1.width || r2.x + r2.width < r1.x || r2.y > r1.y + r1.height || r2.y + r2.height < r1.y);
+			}
+			
+			function resolveCollisions() {
+				player.grounded = false;
+				
+				for (let block of blocks) {
+					if (rectIntersect(player, block)) {
+						if (block.type === '^') {
+							if (player.invincible) player.vy = -10;
+							else { die(); return; }
+							} else if (block.type === '#') {
+							let dx = (player.x + player.width/2) - (block.x + block.width/2);
+							let dy = (player.y + player.height/2) - (block.y + block.height/2);
+							let width = (player.width + block.width) / 2;
+							let height = (player.height + block.height) / 2;
+							let crossWidth = width * dy; let crossHeight = height * dx;
+							
+							if (Math.abs(dx) <= width && Math.abs(dy) <= height) {
+								if (crossWidth > crossHeight) {
+									if (crossWidth > -crossHeight) { player.y = block.y + block.height; player.vy = 0; } 
+									else { player.x = block.x - player.width; player.vx = 0; }
+									} else {
+									if (crossWidth > -crossHeight) { player.x = block.x + block.width; player.vx = 0; } 
+									else { player.y = block.y - player.height; player.vy = 0; player.grounded = true; }
+								}
+							}
+						}
+					}
+				}
+				
+				for (let i = coins.length - 1; i >= 0; i--) {
+					if (!coins[i].collected && rectIntersect(player, coins[i])) {
+						coins[i].collected = true; score += 10; scoreUI.innerText = score;
+						createParticles(coins[i].x, coins[i].y, '#ffd700', 10);
+					}
+				}
+				
+				for (let i = powerups.length - 1; i >= 0; i--) {
+					if (!powerups[i].collected && rectIntersect(player, powerups[i])) {
+						powerups[i].collected = true; score += 50; scoreUI.innerText = score;
+						createParticles(powerups[i].x, powerups[i].y, '#f0f', 20);
+						player.invincible = true; player.invincibleTimer = 300; 
+					}
+				}
+				
+				for (let i = enemies.length - 1; i >= 0; i--) {
+					let enemy = enemies[i];
+					if (rectIntersect(player, enemy)) {
+						if (player.invincible || (player.vy > 0 && player.y < enemy.y)) {
+							if(!player.invincible) player.vy = -10; 
+							createParticles(enemy.x, enemy.y, '#ef4444', 15);
+							enemies.splice(i, 1); score += 20; scoreUI.innerText = score;
+							} else {
+							die(); return;
+						}
+					}
+				}
+				
+				if (goal && rectIntersect(player, goal)) levelComplete();
+				
+				// Perbaikan jatuh di luar batas (Cegah blank screen)
+				if (player.y > canvas.height + 100) die();
+			}
+			
+			function die(timeout = false) {
+				createParticles(player.x, player.y, player.baseColor, 30);
+				lives--; livesUI.innerText = lives;
+				
+				if (lives <= 0) {
+					gameState = 'gameover';
+					endTitle.innerText = "PERMAINAN BERAKHIR";
+					endTitle.className = "text-3xl md:text-5xl text-red-500 mb-6 hud-text text-center";
+					finalScoreUI.innerText = score;
+					gameOverScreen.style.display = 'flex';
+					uiLayer.style.display = 'none';
+					stopTimer();
+					} else {
+					if(activeMode === 'frenzy') {
+						timeLeft = 30; 
+						timeUI.innerText = timeLeft;
+						timeUI.classList.remove('text-red-500');
+					}
+					buildLevel(); 
+				}
+			}
+			
+			function levelComplete() {
+				currentLevel++; 
+				score += 100; scoreUI.innerText = score;
+				levelUI.innerText = currentLevel + 1;
+				
+				// Level selanjutnya dipastikan selalu acak (random)
+				let randomIndex = Math.floor(Math.random() * 25);
+				
+				if (activeMode === 'classic') {
+					currentMapData = getClassicMap(randomIndex);
+					} else if (activeMode === 'frenzy') {
+					currentMapData = getFrenzyMap(randomIndex);
+					timeLeft = 30;
+					timeUI.innerText = timeLeft;
+					timeUI.classList.remove('text-red-500');
+				}
+				
+				buildLevel();
+			}
+			
+			function draw() {
+				ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+				
+				// Tambahkan gambar awan pemanis
+				ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+				for (let i = 0; i < 5; i++) {
+					let cloudX = (i * 200 - cameraX * 0.2) % (canvas.width + 100);
+					if (cloudX < -100) cloudX += canvas.width + 100;
+					ctx.beginPath();
+					ctx.arc(cloudX, 80 + (i%2)*20, 30, 0, Math.PI*2);
+					ctx.arc(cloudX+20, 70 + (i%2)*20, 40, 0, Math.PI*2);
+					ctx.arc(cloudX+50, 80 + (i%2)*20, 30, 0, Math.PI*2);
+					ctx.fill();
+				}
+				
+				ctx.save();
+				ctx.translate(-cameraX, 0); 
+				blocks.forEach(b => b.draw());
+				if (goal) goal.draw(); 
+				coins.forEach(c => { c.update(); c.draw(); });
+				powerups.forEach(p => { p.update(); p.draw(); });
+				enemies.forEach(e => { e.update(); e.draw(); });
+				player.draw(); 
+				for (let i = particles.length - 1; i >= 0; i--) {
+					particles[i].update(); particles[i].draw();
+					if (particles[i].life <= 0) particles.splice(i, 1);
+				}
+				ctx.restore();
+			}
+			
+			function gameLoop() {
+				if (gameState === 'playing') {
+					player.update();
+					resolveCollisions();
+					draw();
+				}
+				gameLoopId = requestAnimationFrame(gameLoop);
+			}
+			
+			function startMenu() {
+				gameState = 'menu';
+				mainMenuScreen.style.display = 'flex';
+				gameOverScreen.style.display = 'none';
+				uiLayer.style.display = 'none';
+				stopTimer(); 
+				
+				if(gameLoopId) cancelAnimationFrame(gameLoopId);
+				
+				ctx.fillStyle = '#87CEEB';
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+			}
+			
+			// Fungsi initGame dimodifikasi untuk menerima parameter kedua (apakah menggunakan pilihan menu)
+			function initGame(mode, useMenuSelection = false) {
+				activeMode = mode;
+				score = 0;
+				currentLevel = 0;
+				lives = (mode === 'frenzy') ? 5 : 3;
+				
+				scoreUI.innerText = score;
+				livesUI.innerText = lives;
+				levelUI.innerText = currentLevel + 1; // Tulisan di HUD akan selalu mulai dari 1 untuk menandakan level run ini
+				powerUpUI.innerText = "";
+				
+				gameState = 'playing';
+				mainMenuScreen.style.display = 'none';
+				gameOverScreen.style.display = 'none';
+				uiLayer.style.display = 'flex';
+				
+				// Tentukan Level Awal
+				let startIndex;
+				if (useMenuSelection && levelSelect.value !== 'random') {
+					startIndex = parseInt(levelSelect.value); // Ambil dari dropdown
+					} else {
+					startIndex = Math.floor(Math.random() * 25); // Acak
+				}
+				
+				if (mode === 'classic') {
+					timeContainer.classList.add('hidden');
+					stopTimer();
+					currentMapData = getClassicMap(startIndex);
+					} else {
+					timeContainer.classList.remove('hidden');
+					timeLeft = 30;
+					timeUI.innerText = timeLeft;
+					timeUI.classList.remove('text-red-500');
+					startTimer();
+					currentMapData = getFrenzyMap(startIndex); 
+				}
+				
+				buildLevel();
+				
+				if(gameLoopId) cancelAnimationFrame(gameLoopId);
+				gameLoop();
+			}
+			
+			window.addEventListener('keydown', (e) => {
+				if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+				if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+				if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') keys.up = true;
+			});
+			
+			window.addEventListener('keyup', (e) => {
+				if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+				if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+				if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') keys.up = false;
+			});
+			
+			const addTouch = (element, keyTarget) => {
+				element.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyTarget] = true; }, {passive: false});
+				element.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyTarget] = false; }, {passive: false});
+			};
+			addTouch(btnLeft, 'left'); addTouch(btnRight, 'right'); addTouch(btnJump, 'up');
+			
+			// Parameter `true` memberitahu fungsi untuk mengecek dropdown level saat dimainkan dari Menu Utama
+			btnClassic.addEventListener('click', () => initGame('classic', true));
+			btnClassic.addEventListener('touchstart', (e) => { e.preventDefault(); initGame('classic', true); }, {passive: false});
+			
+			btnFrenzy.addEventListener('click', () => initGame('frenzy', true));
+			btnFrenzy.addEventListener('touchstart', (e) => { e.preventDefault(); initGame('frenzy', true); }, {passive: false});
+			
+			// Parameter `false` memastikan saat ditekan "MAIN LAGI", map kembali menjadi acak
+			btnRestart.addEventListener('click', () => initGame(activeMode, false));
+			btnRestart.addEventListener('touchstart', (e) => { e.preventDefault(); initGame(activeMode, false); }, {passive: false});
+			
+			btnMenu.addEventListener('click', startMenu);
+			btnMenu.addEventListener('touchstart', (e) => { e.preventDefault(); startMenu(); }, {passive: false});
+			
+			window.onload = startMenu;
+		</script>
+	</body>
+</html>

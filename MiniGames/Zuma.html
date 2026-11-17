@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Zuma</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: white;
+            overflow: hidden;
+            touch-action: none; /* Prevent scroll on touch */
+            margin: 0;
+            padding: 0;
+        }
+        h1, .cinzel {
+            font-family: 'Cinzel', serif;
+        }
+        #game-container {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+        }
+        canvas {
+            background: transparent;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        /* UI Overlays */
+        .ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- Game Canvas (Dinamis mengikuti ukuran layar) -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Score HUD -->
+    <div id="hud" class="absolute top-4 left-4 z-0 pointer-events-none text-xl font-bold cinzel text-amber-400 drop-shadow-md hidden">
+        Level: <span id="levelDisplay">1</span> | Score: <span id="scoreDisplay">0</span>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menuUI" class="ui-layer">
+        <h1 class="text-6xl text-amber-400 mb-2 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] text-center">ZUMA</h1>
+        <p class="text-slate-300 mb-8 text-lg text-center px-4">Cocokkan 3 warna. Jangan biarkan kelereng masuk ke lubang maut!</p>
+        <div class="flex flex-col sm:flex-row gap-4">
+            <button id="startClassicBtn" class="px-8 py-4 bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white rounded-full text-xl font-bold transition-transform transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.5)] cinzel">
+                Mode Klasik
+            </button>
+            <button id="startFrenzyBtn" class="px-8 py-4 bg-gradient-to-b from-purple-600 to-pink-700 hover:from-purple-500 hover:to-pink-600 text-white rounded-full text-xl font-bold transition-transform transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(217,70,239,0.5)] cinzel">
+                Mode Frenzy
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverUI" class="ui-layer hidden">
+        <h1 class="text-6xl text-red-500 mb-2 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] text-center">Game Over</h1>
+        <p class="text-slate-300 mb-8 text-2xl text-center">Level: <span id="finalLevel" class="text-amber-400 font-bold">1</span> | Skor Akhir: <span id="finalScore" class="text-amber-400 font-bold">0</span></p>
+        <button id="restartBtn" class="px-8 py-4 bg-gradient-to-b from-red-500 to-rose-700 hover:from-red-400 hover:to-rose-600 text-white rounded-full text-2xl font-bold transition-transform transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(225,29,72,0.5)] cinzel">
+            Main Lagi
+        </button>
+    </div>
+
+    <!-- Win Screen -->
+    <div id="winUI" class="ui-layer hidden">
+        <h1 class="text-5xl sm:text-6xl text-emerald-400 mb-2 drop-shadow-[0_0_15px_rgba(52,211,153,0.8)] text-center">Level <span id="winLevelDisplay">1</span> Selesai!</h1>
+        <p class="text-slate-300 mb-8 text-2xl text-center">Luar biasa! Skor: <span id="winScore" class="text-amber-400 font-bold">0</span></p>
+        <button id="nextLevelBtn" class="px-8 py-4 bg-gradient-to-b from-emerald-500 to-green-700 hover:from-emerald-400 hover:to-green-600 text-white rounded-full text-2xl font-bold transition-transform transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.5)] cinzel">
+            Lanjut Level Berikutnya
+        </button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// UI Elements
+const menuUI = document.getElementById('menuUI');
+const gameOverUI = document.getElementById('gameOverUI');
+const winUI = document.getElementById('winUI');
+const hud = document.getElementById('hud');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const levelDisplay = document.getElementById('levelDisplay');
+const finalScore = document.getElementById('finalScore');
+const finalLevel = document.getElementById('finalLevel');
+const winScore = document.getElementById('winScore');
+const winLevelDisplay = document.getElementById('winLevelDisplay');
+
+// Game Constants (Dinamis diset lewat resize event)
+let CANVAS_WIDTH = window.innerWidth;
+let CANVAS_HEIGHT = window.innerHeight;
+const MARBLE_RADIUS = 15;
+const MARBLE_DIAM = MARBLE_RADIUS * 2;
+const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#a855f7']; // Merah, Biru, Hijau, Kuning, Ungu
+
+// Game Variables
+let gameState = 'menu'; // menu, playing, gameover, win
+let gameMode = 'classic'; // classic, frenzy
+let score = 0;
+let currentLevel = 1;
+let pathPoints = [];
+let totalPathLength = 0;
+let tunnels = []; 
+let chain = []; 
+let projectiles = [];
+let particles = [];
+let spawnerActive = true;
+let marblesSpawned = 0;
+const MAX_MARBLES = 120; // Jumlah total kelereng sebelum menang
+
+// Speeds
+let marbleSpeed = 0.3; // Mulai dari 25% kecepatan lama (1.2)
+const pullSpeed = 7;
+const projSpeed = 18;
+
+// Shooter Entity
+const shooter = {
+    x: CANVAS_WIDTH / 2,
+    y: CANVAS_HEIGHT / 2,
+    angle: 0,
+    color: COLORS[0],
+    nextColor: COLORS[1]
+};
+
+// Mengatur ukuran kanvas dinamis (mengisi layar)
+function resizeCanvas() {
+    let oldWidth = CANVAS_WIDTH;
+    let oldHeight = CANVAS_HEIGHT;
+    let oldPathLen = totalPathLength;
+    
+    CANVAS_WIDTH = window.innerWidth;
+    CANVAS_HEIGHT = window.innerHeight;
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+    
+    shooter.x = CANVAS_WIDTH / 2;
+    shooter.y = CANVAS_HEIGHT / 2;
+
+    if (gameState !== 'menu' && oldPathLen > 0) {
+        generatePath();
+        // Menyesuaikan rasio jarak kelereng jika layar diubah ukurannya
+        let scale = totalPathLength / oldPathLen;
+        chain.forEach(m => m.distance *= scale);
+        tunnels.forEach(t => {
+            t.start *= scale;
+            t.end *= scale;
+        });
+    } else {
+        generatePath();
+    }
+}
+window.addEventListener('resize', resizeCanvas);
+
+function generatePath() {
+    pathPoints = [];
+    totalPathLength = 0;
+    let lastX, lastY;
+    
+    const maxAngle = Math.PI * 7.5;
+    
+    // Elips menyesuaikan ukuran layar agar area gameplay merata
+    const rxStart = (CANVAS_WIDTH / 2) - 40;
+    const ryStart = (CANVAS_HEIGHT / 2) - 40;
+    const rxEnd = 90;
+    const ryEnd = 90;
+    
+    for (let a = 0; a <= maxAngle; a += 0.05) {
+        // Interpolasi radius (elips) dari luar ke dalam
+        let progress = a / maxAngle;
+        let rx = rxStart - progress * (rxStart - rxEnd);
+        let ry = ryStart - progress * (ryStart - ryEnd);
+        
+        let x = shooter.x + rx * Math.cos(a);
+        let y = shooter.y + ry * Math.sin(a);
+        
+        if (a === 0) {
+            lastX = x; lastY = y;
+            pathPoints.push({ x, y, dist: 0, angle: a });
+        } else {
+            let dx = x - lastX;
+            let dy = y - lastY;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+            totalPathLength += dist;
+            pathPoints.push({ x, y, dist: totalPathLength, angle: Math.atan2(dy, dx) });
+            lastX = x; lastY = y;
+        }
+    }
+}
+
+function getPos(d) {
+    if (d <= 0) return { x: pathPoints[0].x, y: pathPoints[0].y, angle: pathPoints[0].angle };
+    if (d >= totalPathLength) return { x: pathPoints[pathPoints.length - 1].x, y: pathPoints[pathPoints.length - 1].y, angle: pathPoints[pathPoints.length - 1].angle };
+
+    for (let i = 1; i < pathPoints.length; i++) {
+        if (pathPoints[i].dist >= d) {
+            let p1 = pathPoints[i - 1];
+            let p2 = pathPoints[i];
+            let ratio = (d - p1.dist) / (p2.dist - p1.dist);
+            let x = p1.x + (p2.x - p1.x) * ratio;
+            let y = p1.y + (p2.y - p1.y) * ratio;
+            return { x, y, angle: p2.angle };
+        }
+    }
+    return pathPoints[pathPoints.length - 1];
+}
+
+function getClosestPathDistance(px, py) {
+    let minDist = Infinity;
+    let closestD = 0;
+    for (let i = 0; i < pathPoints.length; i++) {
+        let dx = pathPoints[i].x - px;
+        let dy = pathPoints[i].y - py;
+        let distSq = dx * dx + dy * dy;
+        if (distSq < minDist) {
+            minDist = distSq;
+            closestD = pathPoints[i].dist;
+        }
+    }
+    return closestD;
+}
+
+function getRandomColor() {
+    return COLORS[Math.floor(Math.random() * COLORS.length)];
+}
+
+function getShooterColor() {
+    if (gameMode === 'frenzy' && Math.random() < 0.15) {
+        return '#000000'; // Bom
+    }
+    return getRandomColor();
+}
+
+function startGame(mode = 'classic', resetProgress = true) {
+    if (resetProgress) {
+        currentLevel = 1;
+        score = 0;
+    }
+    
+    gameMode = mode;
+    resizeCanvas(); // Pastikan ukuran update sebelum mulai
+    
+    tunnels = [];
+    if (gameMode === 'frenzy') {
+        // Memperpendek terowongan menjadi 10% dari panjang lintasan
+        tunnels.push({ start: totalPathLength * 0.20, end: totalPathLength * 0.30 });
+        tunnels.push({ start: totalPathLength * 0.65, end: totalPathLength * 0.75 });
+    }
+
+    chain = [];
+    projectiles = [];
+    particles = [];
+    marblesSpawned = 0;
+    spawnerActive = true;
+    
+    // Perhitungan Kecepatan
+    if (gameMode === 'classic') {
+        // Base 0.3, bertambah 0.1 setiap level (Level 1: 0.3, Level 2: 0.4, dst)
+        marbleSpeed = 0.3 + ((currentLevel - 1) * 0.1);
+    } else {
+        // Mode Frenzy lebih cepat dari awal
+        marbleSpeed = 1.8 + ((currentLevel - 1) * 0.2);
+    }
+
+    gameState = 'playing';
+    
+    shooter.color = getShooterColor();
+    shooter.nextColor = getShooterColor();
+    
+    menuUI.classList.add('hidden');
+    gameOverUI.classList.add('hidden');
+    winUI.classList.add('hidden');
+    hud.classList.remove('hidden');
+    
+    levelDisplay.innerText = currentLevel;
+    updateScore(0);
+    
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+}
+
+function updateScore(points) {
+    score += points;
+    scoreDisplay.innerText = score;
+}
+
+function gameOver() {
+    gameState = 'gameover';
+    hud.classList.add('hidden');
+    finalScore.innerText = score;
+    finalLevel.innerText = currentLevel;
+    gameOverUI.classList.remove('hidden');
+}
+
+function winGame() {
+    gameState = 'win';
+    hud.classList.add('hidden');
+    winScore.innerText = score;
+    winLevelDisplay.innerText = currentLevel;
+    winUI.classList.remove('hidden');
+}
+
+function handleInput(e) {
+    if (gameState !== 'playing') return;
+    
+    let rect = canvas.getBoundingClientRect();
+    let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    let scaleX = canvas.width / rect.width;
+    let scaleY = canvas.height / rect.height;
+    
+    let mx = (clientX - rect.left) * scaleX;
+    let my = (clientY - rect.top) * scaleY;
+    
+    shooter.angle = Math.atan2(my - shooter.y, mx - shooter.x);
+}
+
+function fireProjectile() {
+    if (gameState !== 'playing') return;
+    if (projectiles.length > 1) return; // Prevent spamming
+    
+    let startX = shooter.x + Math.cos(shooter.angle) * 40;
+    let startY = shooter.y + Math.sin(shooter.angle) * 40;
+    
+    projectiles.push({
+        x: startX,
+        y: startY,
+        vx: Math.cos(shooter.angle) * projSpeed,
+        vy: Math.sin(shooter.angle) * projSpeed,
+        color: shooter.color
+    });
+    
+    shooter.color = shooter.nextColor;
+    shooter.nextColor = getShooterColor();
+}
+
+// Event Listeners
+canvas.addEventListener('mousemove', handleInput);
+canvas.addEventListener('mousedown', (e) => {
+    handleInput(e);
+    fireProjectile();
+});
+canvas.addEventListener('touchstart', (e) => {
+    handleInput(e);
+    fireProjectile();
+}, { passive: false });
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    handleInput(e);
+}, { passive: false });
+
+document.getElementById('startClassicBtn').addEventListener('click', () => startGame('classic', true));
+document.getElementById('startFrenzyBtn').addEventListener('click', () => startGame('frenzy', true));
+document.getElementById('restartBtn').addEventListener('click', () => startGame(gameMode, true));
+document.getElementById('nextLevelBtn').addEventListener('click', () => {
+    currentLevel++;
+    startGame(gameMode, false); // false = jangan reset skor dan level
+});
+
+function createParticles(x, y, color) {
+    for (let i = 0; i < 15; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 10,
+            vy: (Math.random() - 0.5) * 10,
+            life: 1.0,
+            color: color,
+            size: Math.random() * 5 + 3
+        });
+    }
+}
+
+function checkMatches(index) {
+    if (index < 0 || index >= chain.length) return false;
+    
+    let matchColor = chain[index].color;
+    let startIndex = index;
+    let endIndex = index;
+    
+    while (startIndex > 0 && chain[startIndex - 1].color === matchColor) {
+        let gap = chain[startIndex - 1].distance - chain[startIndex].distance - MARBLE_DIAM;
+        if (gap > 5) break;
+        startIndex--;
+    }
+    
+    while (endIndex < chain.length - 1 && chain[endIndex + 1].color === matchColor) {
+        let gap = chain[endIndex].distance - chain[endIndex + 1].distance - MARBLE_DIAM;
+        if (gap > 5) break;
+        endIndex++;
+    }
+    
+    let count = endIndex - startIndex + 1;
+    if (count >= 3) {
+        for (let i = startIndex; i <= endIndex; i++) {
+            let pos = getPos(chain[i].distance);
+            createParticles(pos.x, pos.y, chain[i].color);
+        }
+        
+        chain.splice(startIndex, count);
+        updateScore(count * 10);
+        return true;
+    }
+    return false;
+}
+
+let lastTime = 0;
+function update(dt) {
+    if (gameState !== 'playing') return;
+
+    if (spawnerActive) {
+        if (chain.length === 0 || chain[chain.length - 1].distance > MARBLE_DIAM) {
+            if (marblesSpawned < MAX_MARBLES) {
+                let newColor = getRandomColor();
+                chain.push({ color: newColor, distance: 0 });
+                marblesSpawned++;
+            } else {
+                spawnerActive = false;
+            }
+        }
+    }
+
+    // Perubahan logika: kelereng di belakang terus mendorong maju bahkan jika spawner kosong
+    if (chain.length > 0) {
+        chain[chain.length - 1].distance += marbleSpeed;
+    }
+
+    let pulled = new Array(chain.length).fill(false);
+    for (let i = chain.length - 1; i > 0; i--) {
+        let current = chain[i];
+        let front = chain[i - 1];
+        let gap = front.distance - current.distance - MARBLE_DIAM;
+
+        if (gap > 2 && current.color === front.color && !pulled[i - 1]) {
+            let pullIdx = i - 1;
+            while (pullIdx >= 0) {
+                chain[pullIdx].distance -= pullSpeed;
+                pulled[pullIdx] = true;
+                if (pullIdx > 0) {
+                    let nextGap = chain[pullIdx - 1].distance - chain[pullIdx].distance - MARBLE_DIAM;
+                    if (nextGap > 2) break; 
+                }
+                pullIdx--;
+            }
+
+            if (chain[i - 1].distance - current.distance - MARBLE_DIAM <= 0) {
+                chain[i - 1].distance = current.distance + MARBLE_DIAM; 
+                if (checkMatches(i - 1)) break; 
+            }
+        }
+    }
+
+    for (let i = chain.length - 1; i > 0; i--) {
+        let current = chain[i];
+        let front = chain[i - 1];
+        if (current.distance + MARBLE_DIAM > front.distance) {
+            front.distance = current.distance + MARBLE_DIAM;
+        }
+    }
+
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+        let p = projectiles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0 || p.x > CANVAS_WIDTH || p.y < 0 || p.y > CANVAS_HEIGHT) {
+            projectiles.splice(i, 1);
+            continue;
+        }
+
+        let hitTunnel = false;
+        let pDistCenter = getClosestPathDistance(p.x, p.y);
+        for (let t of tunnels) {
+            if (pDistCenter >= t.start && pDistCenter <= t.end) {
+                let pos = getPos(pDistCenter);
+                let dx = p.x - pos.x;
+                let dy = p.y - pos.y;
+                if (Math.sqrt(dx * dx + dy * dy) < MARBLE_DIAM + 5) {
+                    createParticles(p.x, p.y, '#94a3b8');
+                    projectiles.splice(i, 1);
+                    hitTunnel = true;
+                    break;
+                }
+            }
+        }
+        if (hitTunnel) continue;
+
+        let hit = false;
+        for (let j = 0; j < chain.length; j++) {
+            let mPos = getPos(chain[j].distance);
+            let dx = p.x - mPos.x;
+            let dy = p.y - mPos.y;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < MARBLE_DIAM) {
+                if (p.color === '#000000') {
+                    let blastRadius = 3; 
+                    let startIdx = Math.max(0, j - blastRadius);
+                    let endIdx = Math.min(chain.length - 1, j + blastRadius);
+                    let count = endIdx - startIdx + 1;
+                    
+                    for(let k = startIdx; k <= endIdx; k++) {
+                        let pos = getPos(chain[k].distance);
+                        createParticles(pos.x, pos.y, chain[k].color);
+                        createParticles(pos.x, pos.y, '#f59e0b');
+                        createParticles(pos.x, pos.y, '#ef4444');
+                    }
+                    chain.splice(startIdx, count);
+                    updateScore(count * 20);
+                    projectiles.splice(i, 1);
+                    hit = true;
+                    break;
+                }
+                
+                let projDist = getClosestPathDistance(p.x, p.y);
+                let insertIndex = chain.length;
+                for (let k = 0; k < chain.length; k++) {
+                    if (projDist > chain[k].distance) {
+                        insertIndex = k;
+                        break;
+                    }
+                }
+                
+                chain.splice(insertIndex, 0, { color: p.color, distance: projDist });
+                
+                if (insertIndex > 0 && chain[insertIndex-1].distance < projDist + MARBLE_DIAM) {
+                     chain[insertIndex-1].distance = projDist + MARBLE_DIAM;
+                }
+
+                checkMatches(insertIndex);
+                projectiles.splice(i, 1);
+                hit = true;
+                break;
+            }
+        }
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.03;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    if (chain.length > 0) {
+        if (chain[0].distance >= totalPathLength) gameOver();
+    } else if (!spawnerActive) {
+        winGame();
+    }
+}
+
+function getGradient(ctx, x, y, color) {
+    let grad = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, MARBLE_RADIUS);
+    let darkColor = '#000';
+    
+    if (color === '#000000') {
+        grad.addColorStop(0, '#666666');
+        grad.addColorStop(0.3, '#111111');
+        grad.addColorStop(1, '#000000');
+        return grad;
+    }
+
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.3, color);
+    
+    switch(color) {
+        case '#ef4444': darkColor = '#7f1d1d'; break;
+        case '#3b82f6': darkColor = '#1e3a8a'; break;
+        case '#10b981': darkColor = '#064e3b'; break;
+        case '#f59e0b': darkColor = '#78350f'; break;
+        case '#a855f7': darkColor = '#4c1d95'; break;
+    }
+    grad.addColorStop(1, darkColor);
+    return grad;
+}
+
+function draw() {
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    let endPos = getPos(totalPathLength);
+    
+    let holeGlow = ctx.createRadialGradient(endPos.x, endPos.y, 10, endPos.x, endPos.y, 50);
+    holeGlow.addColorStop(0, '#000000');
+    holeGlow.addColorStop(0.5, '#450a0a'); 
+    holeGlow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = holeGlow;
+    ctx.beginPath(); ctx.arc(endPos.x, endPos.y, 50, 0, Math.PI * 2); ctx.fill();
+    
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(endPos.x, endPos.y, 25, 0, Math.PI * 2); ctx.fill();
+
+    if (pathPoints.length > 0) {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+        for (let i = 1; i < pathPoints.length; i++) ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+        ctx.strokeStyle = '#020617'; 
+        ctx.lineWidth = MARBLE_DIAM + 8;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+        for (let i = 1; i < pathPoints.length; i++) ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+        ctx.strokeStyle = '#1e293b'; 
+        ctx.lineWidth = MARBLE_DIAM;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+        for (let i = 1; i < pathPoints.length; i++) ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+    }
+
+    for (let i = chain.length - 1; i >= 0; i--) {
+        let m = chain[i];
+        let pos = getPos(m.distance);
+        
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath(); ctx.arc(pos.x + 3, pos.y + 3, MARBLE_RADIUS, 0, Math.PI * 2); ctx.fill();
+        
+        ctx.fillStyle = getGradient(ctx, pos.x, pos.y, m.color);
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, MARBLE_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+        
+        if (m.color === '#000000') {
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath(); ctx.arc(pos.x + 5, pos.y - 5, 4, 0, Math.PI * 2); ctx.fill();
+        } else {
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath(); ctx.arc(pos.x - 6, pos.y - 6, 3, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+
+    for (let t of tunnels) {
+        ctx.beginPath();
+        let started = false;
+        for (let pt of pathPoints) {
+            if (pt.dist >= t.start && pt.dist <= t.end) {
+                if (!started) { ctx.moveTo(pt.x, pt.y); started = true; }
+                else { ctx.lineTo(pt.x, pt.y); }
+            }
+        }
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = MARBLE_DIAM + 18;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        
+        ctx.beginPath();
+        started = false;
+        for (let pt of pathPoints) {
+            if (pt.dist >= t.start && pt.dist <= t.end) {
+                if (!started) { ctx.moveTo(pt.x, pt.y); started = true; }
+                else { ctx.lineTo(pt.x, pt.y); }
+            }
+        }
+        ctx.strokeStyle = '#475569'; 
+        ctx.lineWidth = MARBLE_DIAM + 12;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        started = false;
+        for (let pt of pathPoints) {
+            if (pt.dist >= t.start && pt.dist <= t.end) {
+                if (!started) { ctx.moveTo(pt.x, pt.y); started = true; }
+                else { ctx.lineTo(pt.x, pt.y); }
+            }
+        }
+        ctx.strokeStyle = '#334155'; 
+        ctx.lineWidth = 6;
+        ctx.stroke();
+    }
+
+    ctx.save();
+    ctx.translate(shooter.x, shooter.y);
+    
+    ctx.fillStyle = '#334155';
+    ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 4; ctx.stroke();
+    
+    ctx.rotate(shooter.angle);
+    
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.moveTo(-10, -20);
+    ctx.lineTo(50, -10);
+    ctx.lineTo(50, 10);
+    ctx.lineTo(-10, 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = getGradient(ctx, -20, 0, shooter.nextColor);
+    ctx.beginPath(); ctx.arc(-20, 0, 10, 0, Math.PI * 2); ctx.fill();
+    if (shooter.nextColor === '#000000') {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.arc(-16, -3, 3, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.fillStyle = getGradient(ctx, 15, 0, shooter.color);
+    ctx.beginPath(); ctx.arc(15, 0, MARBLE_RADIUS, 0, Math.PI * 2); ctx.fill();
+    if (shooter.color === '#000000') {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.arc(20, -5, 4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    ctx.restore();
+
+    for (let p of projectiles) {
+        ctx.fillStyle = getGradient(ctx, p.x, p.y, p.color);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, MARBLE_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+        
+        if (p.color === '#000000') {
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath(); ctx.arc(p.x + 5, p.y - 5, 4, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+
+    for (let p of particles) {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+}
+
+function gameLoop(timestamp) {
+    let dt = timestamp - lastTime;
+    lastTime = timestamp;
+    
+    update(dt);
+    draw();
+    
+    if (gameState === 'playing') {
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+// Inisialisasi awal
+resizeCanvas();
+draw();
+
+</script>
+</body>
+</html>

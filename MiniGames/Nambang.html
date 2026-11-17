@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nambang</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700;800&family=Inter:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .font-mono-mining {
+            font-family: 'Chakra Petch', monospace, sans-serif;
+        }
+
+        /* Custom scrollbar for shop */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+
+        /* Canvas styling */
+        #mineCanvas {
+            image-rendering: pixelated;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .gold-glow {
+            text-shadow: 0 0 12px rgba(234, 179, 8, 0.45);
+        }
+
+        .button-press {
+            transition: transform 0.05s ease, background-color 0.15s ease;
+        }
+        .button-press:active {
+            transform: scale(0.97);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-amber-500 selection:text-black">
+
+    <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur sticky top-0 z-40 px-4 py-3 shadow-lg">
+        <div class="max-w-[1750px] mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/20 text-white font-mono-mining text-xl font-bold">
+                    ⛏️
+                </div>
+                <div>
+                    <h1 class="text-xl font-black tracking-wider uppercase font-mono-mining text-amber-400 leading-none">NAMBANG</h1>
+                    <span class="text-xs text-slate-400">Area Tambang 25 &times; 25 Batu (Layar Lebar)</span>
+                </div>
+            </div>
+
+            <!-- Currency and Main KPI -->
+            <div class="flex items-center gap-3 md:gap-6 flex-wrap">
+                <div class="bg-slate-950/80 border border-amber-500/30 px-3.5 py-1.5 rounded-xl flex items-center gap-2.5 shadow-inner">
+                    <span class="text-xs uppercase font-bold text-slate-400">Kas:</span>
+                    <span id="txtMoney" class="text-lg md:text-xl font-black font-mono-mining text-amber-400 gold-glow">Rp 0</span>
+                </div>
+                
+                <div class="bg-slate-950/80 border border-cyan-500/30 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                    <span class="text-xs uppercase font-semibold text-slate-400">Lap. Kedalaman:</span>
+                    <span id="txtDepth" class="text-sm md:text-base font-bold font-mono-mining text-cyan-300">Level 1</span>
+                </div>
+
+                <div class="bg-slate-950/80 border border-emerald-500/30 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                    <span class="text-xs uppercase font-semibold text-slate-400">Idle DPS:</span>
+                    <span id="txtDPS" class="text-sm md:text-base font-bold font-mono-mining text-emerald-400">0 dmg/dtk</span>
+                </div>
+
+                <!-- Audio & Settings button -->
+                <button id="btnAudioToggle" class="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 text-sm transition flex items-center gap-1.5" title="Suara Nyala/Mati">
+                    <span id="audioIcon">🔊</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1750px] mx-auto w-full p-2 sm:p-4 grid grid-cols-1 xl:grid-cols-12 gap-5 flex-grow">
+        
+        <!-- Left: Mining Area 25x25 Canvas Column (8 Cols on XL Widescreen) -->
+        <div class="xl:col-span-8 flex flex-col items-center">
+            <div class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-xl flex flex-col items-center relative">
+                
+                <!-- HUD Canvas Toolbar & Layer Progress -->
+                <div class="w-full flex flex-col gap-2 mb-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-slate-400">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span id="txtRemainingBlocks" class="font-bold text-slate-200">Sisa Batu Aktif: 625 / 625</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-slate-400">Target Bor:</span>
+                            <select id="selectTargetMode" class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-amber-300 focus:outline-none">
+                                <option value="weakest">Batu Terlemah (Fokus Cepat)</option>
+                                <option value="random">Acak Merata</option>
+                                <option value="sequential">Urut Baris</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar Kedalaman (Seamless Layer Progression) -->
+                    <div class="w-full bg-slate-950 rounded-full h-3 border border-slate-800 overflow-hidden relative shadow-inner">
+                        <div id="layerProgressBar" class="h-full bg-gradient-to-r from-amber-500 via-emerald-400 to-cyan-400 rounded-full transition-all duration-150 w-full"></div>
+                    </div>
+                </div>
+
+                <!-- Canvas Wrapper with Square Aspect Ratio - Widescreen expanded up to 860px -->
+                <div class="relative w-full aspect-square max-w-[860px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-2xl flex items-center justify-center">
+                    <canvas id="mineCanvas" class="w-full h-full block"></canvas>
+                    
+                    <!-- Floating Indicator Overlay on Canvas Bottom -->
+                    <div class="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur px-2.5 py-1 rounded-md text-[11px] text-slate-400 border border-slate-800 pointer-events-none">
+                        Klik batu untuk menggali dengan <span class="text-amber-400 font-bold">Sekop</span>
+                    </div>
+                    <div id="tileHoverInfo" class="absolute top-2 right-2 bg-slate-950/85 backdrop-blur px-2.5 py-1 rounded-md text-[11px] text-cyan-300 border border-cyan-800/40 pointer-events-none hidden font-mono-mining">
+                        HP: -- | Lv: --
+                    </div>
+                </div>
+
+                <!-- Legend of Hidden Drops -->
+                <div class="w-full mt-3 pt-3 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-[11px]">
+                    <div class="bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                        <span class="text-slate-400 block">Batu Biasa</span>
+                        <span class="font-bold text-amber-200">Rp 1</span>
+                    </div>
+                    <div class="bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                        <span class="text-slate-400 block">🔩 Besi (+Rp2)</span>
+                        <span class="font-bold text-slate-300">Rp 3</span>
+                    </div>
+                    <div class="bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                        <span class="text-slate-400 block">🪙 Emas (+Rp5)</span>
+                        <span class="font-bold text-yellow-400">Rp 6</span>
+                    </div>
+                    <div class="bg-slate-950/60 p-1.5 rounded-lg border border-slate-800">
+                        <span class="text-slate-400 block">💎 Permata (+Rp10)</span>
+                        <span class="font-bold text-emerald-400">Rp 11</span>
+                    </div>
+                    <div class="bg-slate-950/60 p-1.5 rounded-lg border border-slate-800 col-span-2 sm:col-span-1">
+                        <span class="text-slate-400 block">✨ Kristal (+Rp20)</span>
+                        <span class="font-bold text-purple-400">Rp 21</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Shop, Tool Automation, Upgrades (4 Cols on XL) -->
+        <div class="xl:col-span-4 flex flex-col gap-4">
+            
+            <!-- Manual Click Tool: SEKOP -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <div class="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-lg">
+                            🥄
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-base text-white">Sekop Manual</h2>
+                            <p class="text-xs text-slate-400">Gali manual per klik mouse/tap</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div id="txtShovelLevel" class="text-sm font-bold text-amber-400 font-mono-mining">Level 1</div>
+                        <div id="txtShovelPower" class="text-xs text-slate-300">Daya: 1 pt/klik</div>
+                    </div>
+                </div>
+
+                <button id="btnUpgradeShovel" class="button-press w-full mt-2 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold text-xs sm:text-sm flex items-center justify-between shadow-lg shadow-amber-500/10 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    <span class="flex items-center gap-1.5">
+                        <span>⬆️ Upgrade Sekop (+1 pt)</span>
+                    </span>
+                    <span id="txtShovelCost" class="font-mono-mining font-extrabold text-sm">Rp 10</span>
+                </button>
+            </div>
+
+            <!-- AUTOMATION SHOP & UPGRADES -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col flex-grow">
+                <div class="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
+                    <h2 class="font-bold text-base text-white flex items-center gap-2">
+                        <span>⚙️</span> Alat Otomatis & Upgrade
+                    </h2>
+                    <span class="text-xs text-slate-400">Idle Generator</span>
+                </div>
+
+                <div class="space-y-3 overflow-y-auto max-h-[480px] pr-1">
+                    
+                    <!-- 1. PACUL -->
+                    <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 flex flex-col gap-2 hover:border-slate-700 transition">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">⛏️</span>
+                                <div>
+                                    <div class="font-bold text-sm text-slate-200">Pacul</div>
+                                    <div class="text-[11px] text-slate-400">Otomatis gali <span class="text-emerald-400 font-semibold" id="txtPaculPower">2</span> pt/dtk</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span id="txtPaculCount" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono-mining">Milik: 0</span>
+                                <div id="txtPaculLevel" class="text-[11px] text-cyan-400 font-mono-mining mt-0.5">Lv. 1</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <button id="btnBuyPacul" class="button-press py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-lg text-xs font-semibold flex flex-col items-center justify-center border border-slate-700 transition disabled:opacity-40">
+                                <span>Beli Pacul (+1 Unit)</span>
+                                <span id="txtCostBuyPacul" class="text-amber-400 font-mono-mining font-bold text-[11px]">Rp 100</span>
+                            </button>
+                            <button id="btnUpgradePacul" class="button-press py-1.5 px-2 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-200 border border-cyan-800/50 rounded-lg text-xs font-semibold flex flex-col items-center justify-center transition disabled:opacity-40">
+                                <span>Upgrade (+2 pt)</span>
+                                <span id="txtCostUpgradePacul" class="text-cyan-300 font-mono-mining font-bold text-[11px]">Rp 200</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2. BOR -->
+                    <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 flex flex-col gap-2 hover:border-slate-700 transition">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">🔩</span>
+                                <div>
+                                    <div class="font-bold text-sm text-slate-200">Bor</div>
+                                    <div class="text-[11px] text-slate-400">Otomatis gali <span class="text-emerald-400 font-semibold" id="txtBorPower">5</span> pt/dtk</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span id="txtBorCount" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono-mining">Milik: 0</span>
+                                <div id="txtBorLevel" class="text-[11px] text-cyan-400 font-mono-mining mt-0.5">Lv. 1</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <button id="btnBuyBor" class="button-press py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-lg text-xs font-semibold flex flex-col items-center justify-center border border-slate-700 transition disabled:opacity-40">
+                                <span>Beli Bor (+1 Unit)</span>
+                                <span id="txtCostBuyBor" class="text-amber-400 font-mono-mining font-bold text-[11px]">Rp 1.000</span>
+                            </button>
+                            <button id="btnUpgradeBor" class="button-press py-1.5 px-2 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-200 border border-cyan-800/50 rounded-lg text-xs font-semibold flex flex-col items-center justify-center transition disabled:opacity-40">
+                                <span>Upgrade (+5 pt)</span>
+                                <span id="txtCostUpgradeBor" class="text-cyan-300 font-mono-mining font-bold text-[11px]">Rp 2.000</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3. BOR BOBOK -->
+                    <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 flex flex-col gap-2 hover:border-slate-700 transition">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">⚡</span>
+                                <div>
+                                    <div class="font-bold text-sm text-slate-200">Bor Bobok</div>
+                                    <div class="text-[11px] text-slate-400">Otomatis gali <span class="text-emerald-400 font-semibold" id="txtBobokPower">10</span> pt/dtk</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span id="txtBobokCount" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono-mining">Milik: 0</span>
+                                <div id="txtBobokLevel" class="text-[11px] text-cyan-400 font-mono-mining mt-0.5">Lv. 1</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <button id="btnBuyBobok" class="button-press py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-lg text-xs font-semibold flex flex-col items-center justify-center border border-slate-700 transition disabled:opacity-40">
+                                <span>Beli Bor Bobok</span>
+                                <span id="txtCostBuyBobok" class="text-amber-400 font-mono-mining font-bold text-[11px]">Rp 10.000</span>
+                            </button>
+                            <button id="btnUpgradeBobok" class="button-press py-1.5 px-2 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-200 border border-cyan-800/50 rounded-lg text-xs font-semibold flex flex-col items-center justify-center transition disabled:opacity-40">
+                                <span>Upgrade (+10 pt)</span>
+                                <span id="txtCostUpgradeBobok" class="text-cyan-300 font-mono-mining font-bold text-[11px]">Rp 20.000</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 4. BOR TAMBANG -->
+                    <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 flex flex-col gap-2 hover:border-slate-700 transition">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">🚜</span>
+                                <div>
+                                    <div class="font-bold text-sm text-slate-200">Bor Tambang</div>
+                                    <div class="text-[11px] text-slate-400">Otomatis gali <span class="text-emerald-400 font-semibold" id="txtTambangPower">100</span> pt/dtk</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span id="txtTambangCount" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono-mining">Milik: 0</span>
+                                <div id="txtTambangLevel" class="text-[11px] text-cyan-400 font-mono-mining mt-0.5">Lv. 1</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <button id="btnBuyTambang" class="button-press py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-lg text-xs font-semibold flex flex-col items-center justify-center border border-slate-700 transition disabled:opacity-40">
+                                <span>Beli Bor Tambang</span>
+                                <span id="txtCostBuyTambang" class="text-amber-400 font-mono-mining font-bold text-[11px]">Rp 100.000</span>
+                            </button>
+                            <button id="btnUpgradeTambang" class="button-press py-1.5 px-2 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-200 border border-cyan-800/50 rounded-lg text-xs font-semibold flex flex-col items-center justify-center transition disabled:opacity-40">
+                                <span>Upgrade (+100 pt)</span>
+                                <span id="txtCostUpgradeTambang" class="text-cyan-300 font-mono-mining font-bold text-[11px]">Rp 200.000</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer Quick Actions & Stats -->
+                <div class="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                    <div class="flex items-center gap-1.5">
+                        <span id="saveStatusIndicator" class="text-emerald-400">● Tersimpan otomatis</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="btnResetGame" class="hover:text-rose-400 transition underline">Reset Data</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Reset Confirmation Custom Modal (No alert/confirm) -->
+    <div id="resetModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl">
+            <div class="text-3xl mb-3">⚠️</div>
+            <h3 class="text-lg font-bold text-white mb-2">Reset Seluruh Kemajuan?</h3>
+            <p class="text-xs text-slate-400 mb-5">Semua uang tambang, alat, level sekop, dan kedalaman batu akan kembali ke awal.</p>
+            <div class="flex gap-3 justify-center">
+                <button id="btnCancelReset" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-300">Batal</button>
+                <button id="btnConfirmReset" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 rounded-xl text-xs font-bold text-white shadow-lg shadow-rose-600/30">Ya, Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toastBox" class="fixed bottom-4 right-4 z-50 pointer-events-none flex flex-col gap-2"></div>
+
+    <script>
+        // Synthesizer Web Audio API murni untuk sound effects tanpa URL eksternal
+        const AudioEngine = {
+            ctx: null,
+            enabled: true,
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.ctx = new AudioContext();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+
+            playClick(freq = 240) {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(70, this.ctx.currentTime + 0.08);
+
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.08);
+                } catch(e) {}
+            },
+
+            playBreak(pitch = 180) {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(pitch, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.15);
+
+                    gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                } catch(e) {}
+            },
+
+            playLayerComplete() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const notes = [440, 554.37, 659.25, 880];
+                    notes.forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'triangle';
+                        const start = this.ctx.currentTime + idx * 0.08;
+                        osc.frequency.setValueAtTime(freq, start);
+                        gain.gain.setValueAtTime(0.2, start);
+                        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.28);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(start);
+                        osc.stop(start + 0.28);
+                    });
+                } catch(e) {}
+            },
+
+            playOreChime(bonus = 0) {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    const baseFreq = 520 + bonus * 40;
+                    osc.frequency.setValueAtTime(baseFreq, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, this.ctx.currentTime + 0.2);
+
+                    gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.25);
+                } catch(e) {}
+            },
+
+            playUpgrade() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+                    osc.frequency.setValueAtTime(659.25, this.ctx.currentTime + 0.08);
+
+                    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.22);
+                } catch(e) {}
+            }
+        };
+
+        const GRID_SIZE = 25; // 25x25 = 625 tiles
+        const TOTAL_CELLS = GRID_SIZE * GRID_SIZE;
+
+        const gameState = {
+            money: 0,
+            depth: 1, // Global layer progress
+            remainingRocks: TOTAL_CELLS,
+            totalMined: 0,
+            targetMode: 'weakest', // 'weakest', 'random', 'sequential'
+            shovel: {
+                level: 1,
+                power: 1,
+                baseCost: 10
+            },
+            tools: {
+                pacul: {
+                    count: 0,
+                    level: 1,
+                    basePower: 2,
+                    stepPower: 2,
+                    buyPrice: 100,
+                    stepUpgrade: 100
+                },
+                bor: {
+                    count: 0,
+                    level: 1,
+                    basePower: 5,
+                    stepPower: 5,
+                    buyPrice: 1000,
+                    stepUpgrade: 1000
+                },
+                borBobok: {
+                    count: 0,
+                    level: 1,
+                    basePower: 10,
+                    stepPower: 10,
+                    buyPrice: 10000,
+                    stepUpgrade: 10000
+                },
+                borTambang: {
+                    count: 0,
+                    level: 1,
+                    basePower: 100,
+                    stepPower: 100,
+                    buyPrice: 100000,
+                    stepUpgrade: 100000
+                }
+            },
+            grid: [],
+            particles: [],
+            lastIdleTick: performance.now(),
+            seqIndex: 0
+        };
+
+        function createTile(index, depth = 1) {
+            // Kotak dengan rentang random (5-10 kali) yang semakin dalam maka bertambah +5 poin
+            const baseHp = Math.floor(Math.random() * 6) + 5; // 5 s/d 10
+            const depthBonus = (depth - 1) * 5;
+            const hp = baseHp + depthBonus;
+
+            return {
+                id: index,
+                row: Math.floor(index / GRID_SIZE),
+                col: index % GRID_SIZE,
+                hp: hp,
+                maxHp: hp,
+                depth: depth,
+                isCleared: false,
+                shake: 0
+            };
+        }
+
+        function initGrid() {
+            gameState.grid = [];
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                gameState.grid.push(createTile(i, gameState.depth));
+            }
+            gameState.remainingRocks = TOTAL_CELLS;
+        }
+
+        function advanceToNextDepth() {
+            gameState.depth++;
+            gameState.remainingRocks = TOTAL_CELLS;
+            
+            // Seamless refill seluruh 625 petak ke kedalaman berikutnya (+5 HP per kedalaman)
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                const tile = gameState.grid[i];
+                const baseHp = Math.floor(Math.random() * 6) + 5;
+                const depthBonus = (gameState.depth - 1) * 5;
+                tile.depth = gameState.depth;
+                tile.maxHp = baseHp + depthBonus;
+                tile.hp = tile.maxHp;
+                tile.isCleared = false;
+                tile.shake = 4;
+            }
+
+            AudioEngine.playLayerComplete();
+            showToast(`🎉 Lapisan Baru! Kedalaman ${gameState.depth} (+5 HP Batu)`, '#38bdf8');
+            
+            // Floating banner pengumuman kedalaman baru di tengah arena
+            gameState.particles.push({
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                text: `KEDALAMAN ${gameState.depth}`,
+                color: '#38bdf8',
+                alpha: 1.0,
+                vy: -0.6,
+                size: 28,
+                life: 75
+            });
+        }
+
+        // Hitung bonus drop tersembunyi
+        function rollMineralBonus() {
+            // Batu biasa = Rp1
+            // Bonus tersembunyi: Besi (Rp2), Emas (Rp5), Permata (Rp10), Kristal (Rp20)
+            const roll = Math.random() * 100;
+            if (roll < 2) {
+                return { name: 'Kristal', bonus: 20, color: '#c084fc', icon: '✨' };
+            } else if (roll < 6) {
+                return { name: 'Permata', bonus: 10, color: '#34d399', icon: '💎' };
+            } else if (roll < 15) {
+                return { name: 'Emas', bonus: 5, color: '#facc15', icon: '🪙' };
+            } else if (roll < 32) {
+                return { name: 'Besi', bonus: 2, color: '#cbd5e1', icon: '🔩' };
+            }
+            return { name: 'Batu', bonus: 0, color: '#e2e8f0', icon: '' };
+        }
+
+        const canvas = document.getElementById('mineCanvas');
+        const ctx = canvas.getContext('2d');
+        const hoverInfo = document.getElementById('tileHoverInfo');
+
+        let cellSize = canvas.width / GRID_SIZE;
+
+        function resizeCanvas() {
+            canvas.width = 900;
+            canvas.height = 900;
+            cellSize = canvas.width / GRID_SIZE;
+        }
+
+        let hoveredTile = null;
+
+        function getStoneColor(depth, hpRatio) {
+            let baseH = 220; 
+            let baseS = 18;
+            let baseL = 26;
+
+            if (depth <= 3) {
+                baseH = 30; baseS = 24; baseL = 30;
+            } else if (depth <= 7) {
+                baseH = 215; baseS = 15; baseL = 25;
+            } else if (depth <= 15) {
+                baseH = 240; baseS = 22; baseL = 18;
+            } else {
+                baseH = 280; baseS = 30; baseL = 15;
+            }
+
+            const crackLightness = (1 - hpRatio) * 12;
+            return `hsl(${baseH}, ${baseS}%, ${baseL + crackLightness}%)`;
+        }
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                const tile = gameState.grid[i];
+                const x = tile.col * cellSize;
+                const y = tile.row * cellSize;
+
+                // Tampilan jika batu sudah digali (rongga tambang yang sudah kosong)
+                if (tile.isCleared) {
+                    ctx.fillStyle = '#080c14';
+                    ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+
+                    // Pola kedalaman lubang tambang
+                    ctx.fillStyle = '#0f172a';
+                    ctx.beginPath();
+                    ctx.arc(x + cellSize / 2, y + cellSize / 2, cellSize * 0.22, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x + 0.5, y + 0.5, cellSize - 1, cellSize - 1);
+                    continue;
+                }
+
+                const hpRatio = Math.max(0, tile.hp / tile.maxHp);
+
+                // Efek getaran jika batu baru saja diklik
+                const shakeOffsetX = tile.shake > 0 ? (Math.random() - 0.5) * tile.shake : 0;
+                const shakeOffsetY = tile.shake > 0 ? (Math.random() - 0.5) * tile.shake : 0;
+                if (tile.shake > 0) tile.shake *= 0.6;
+
+                const drawX = x + shakeOffsetX;
+                const drawY = y + shakeOffsetY;
+
+                // Gambar latar belakang petak batu
+                ctx.fillStyle = getStoneColor(tile.depth, hpRatio);
+                ctx.fillRect(drawX + 1, drawY + 1, cellSize - 2, cellSize - 2);
+
+                // Pola retakan jika batu terluka
+                if (hpRatio < 0.95) {
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+                    ctx.lineWidth = 1.2;
+                    ctx.beginPath();
+                    if (hpRatio < 0.7) {
+                        ctx.moveTo(drawX + 4, drawY + 4);
+                        ctx.lineTo(drawX + cellSize * 0.45, drawY + cellSize * 0.45);
+                    }
+                    if (hpRatio < 0.4) {
+                        ctx.lineTo(drawX + cellSize * 0.8, drawY + cellSize * 0.3);
+                        ctx.moveTo(drawX + cellSize * 0.45, drawY + cellSize * 0.45);
+                        ctx.lineTo(drawX + cellSize * 0.55, drawY + cellSize * 0.85);
+                    }
+                    ctx.stroke();
+                }
+
+                // Angka HP sisa di tengah kotak
+                ctx.fillStyle = hpRatio > 0.3 ? '#f8fafc' : '#f87171';
+                ctx.font = 'bold 11px "Chakra Petch", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(tile.hp, drawX + cellSize / 2, drawY + cellSize / 2 + 1);
+
+                // Border subtle per petak
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(drawX + 0.5, drawY + 0.5, cellSize - 1, cellSize - 1);
+            }
+
+            // Highlight hover kotak
+            if (hoveredTile && !hoveredTile.isCleared) {
+                const hx = hoveredTile.col * cellSize;
+                const hy = hoveredTile.row * cellSize;
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(hx + 1.5, hy + 1.5, cellSize - 3, cellSize - 3);
+            }
+        }
+
+        function spawnFloatingReward(x, y, text, color) {
+            gameState.particles.push({
+                x: x,
+                y: y,
+                text: text,
+                color: color,
+                alpha: 1.0,
+                vy: -1.2,
+                size: 13,
+                life: 45
+            });
+        }
+
+        function spawnDustParticles(x, y, count = 3) {
+            for (let i = 0; i < count; i++) {
+                gameState.particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 2.5,
+                    vy: (Math.random() - 0.5) * 2.5 - 1,
+                    size: Math.random() * 2.5 + 1.5,
+                    color: '#94a3b8',
+                    alpha: 0.9,
+                    life: 25
+                });
+            }
+        }
+
+        function updateAndDrawParticles() {
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const p = gameState.particles[i];
+                p.life--;
+
+                if (p.text) {
+                    p.y += p.vy;
+                    p.alpha = Math.max(0, p.life / 45);
+
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.font = `bold ${p.size}px "Chakra Petch", sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.shadowColor = 'black';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText(p.text, p.x, p.y);
+                    ctx.restore();
+                } else {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.08;
+                    p.alpha = Math.max(0, p.life / 25);
+
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(p.x, p.y, p.size, p.size);
+                    ctx.restore();
+                }
+
+                if (p.life <= 0) {
+                    gameState.particles.splice(i, 1);
+                }
+            }
+        }
+
+        function damageTile(tile, power, isManualClick = false) {
+            if (!tile || tile.isCleared || tile.hp <= 0) return;
+
+            tile.hp -= power;
+            tile.shake = Math.min(8, power);
+
+            const px = tile.col * cellSize + cellSize / 2;
+            const py = tile.row * cellSize + cellSize / 2;
+
+            spawnDustParticles(px, py, isManualClick ? 4 : 2);
+
+            if (isManualClick) {
+                AudioEngine.playClick(260 + (tile.row * 6));
+            }
+
+            // Jika batu berhasil digali habis
+            if (tile.hp <= 0) {
+                tile.hp = 0;
+                tile.isCleared = true;
+                gameState.remainingRocks = Math.max(0, gameState.remainingRocks - 1);
+
+                const baseReward = 1;
+                const bonusDrop = rollMineralBonus();
+                const totalGain = baseReward + bonusDrop.bonus;
+
+                gameState.money += totalGain;
+                gameState.totalMined++;
+
+                // Suara pecah & ore chime
+                if (bonusDrop.bonus > 0) {
+                    AudioEngine.playOreChime(bonusDrop.bonus);
+                    spawnFloatingReward(px, py, `+Rp ${totalGain} ${bonusDrop.name}!`, bonusDrop.color);
+                    showToast(`Menemukan ${bonusDrop.icon} ${bonusDrop.name} (+Rp ${bonusDrop.bonus})!`, bonusDrop.color);
+                } else {
+                    AudioEngine.playBreak(160);
+                    spawnFloatingReward(px, py, `+Rp ${totalGain}`, '#fcd34d');
+                }
+
+                // Cek jika seluruh 625 batu aktif di kedalaman ini sudah habis
+                if (gameState.remainingRocks <= 0) {
+                    advanceToNextDepth();
+                }
+            }
+        }
+
+        function getCanvasTileFromEvent(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+            if (clientX === undefined || clientY === undefined) return null;
+
+            const x = (clientX - rect.left) * (canvas.width / rect.width);
+            const y = (clientY - rect.top) * (canvas.height / rect.height);
+
+            const col = Math.floor(x / cellSize);
+            const row = Math.floor(y / cellSize);
+
+            if (col >= 0 && col < GRID_SIZE && row >= 0 && row < GRID_SIZE) {
+                const index = row * GRID_SIZE + col;
+                return gameState.grid[index];
+            }
+            return null;
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            hoveredTile = getCanvasTileFromEvent(e);
+            if (hoveredTile && !hoveredTile.isCleared) {
+                hoverInfo.classList.remove('hidden');
+                hoverInfo.innerText = `Sisa HP: ${hoveredTile.hp}/${hoveredTile.maxHp} | Kedalaman: ${hoveredTile.depth}`;
+            } else {
+                hoverInfo.classList.add('hidden');
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoveredTile = null;
+            hoverInfo.classList.add('hidden');
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            AudioEngine.init();
+            const tile = getCanvasTileFromEvent(e);
+            if (tile && !tile.isCleared) {
+                const shovelPower = gameState.shovel.power;
+                damageTile(tile, shovelPower, true);
+                updateUI();
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            AudioEngine.init();
+            const tile = getCanvasTileFromEvent(e);
+            if (tile && !tile.isCleared) {
+                const shovelPower = gameState.shovel.power;
+                damageTile(tile, shovelPower, true);
+                updateUI();
+            }
+        }, { passive: true });
+
+        function calculateToolDamage(tool) {
+            return tool.basePower + (tool.level - 1) * tool.stepPower;
+        }
+
+        function calculateTotalDPS() {
+            let total = 0;
+            const t = gameState.tools;
+            total += t.pacul.count * calculateToolDamage(t.pacul);
+            total += t.bor.count * calculateToolDamage(t.bor);
+            total += t.borBobok.count * calculateToolDamage(t.borBobok);
+            total += t.borTambang.count * calculateToolDamage(t.borTambang);
+            return total;
+        }
+
+        function getIdleTargetTile() {
+            // Hanya targetkan batu yang masih aktif belum habis digali
+            const activeTiles = gameState.grid.filter(t => !t.isCleared && t.hp > 0);
+            if (activeTiles.length === 0) return null;
+
+            const mode = gameState.targetMode;
+
+            if (mode === 'weakest') {
+                let lowest = activeTiles[0];
+                for (let i = 1; i < activeTiles.length; i++) {
+                    if (activeTiles[i].hp < lowest.hp) {
+                        lowest = activeTiles[i];
+                    }
+                }
+                return lowest;
+            } else if (mode === 'random') {
+                const randomIndex = Math.floor(Math.random() * activeTiles.length);
+                return activeTiles[randomIndex];
+            } else {
+                // Urut baris bergiliran pada batu aktif
+                gameState.seqIndex = (gameState.seqIndex + 1) % activeTiles.length;
+                return activeTiles[gameState.seqIndex];
+            }
+        }
+
+        function processIdleMining(deltaSeconds) {
+            const totalDps = calculateTotalDPS();
+            if (totalDps <= 0) return;
+
+            let remainingDamage = Math.round(totalDps * deltaSeconds);
+            if (remainingDamage < 1 && Math.random() < (totalDps * deltaSeconds)) {
+                remainingDamage = 1;
+            }
+
+            while (remainingDamage > 0) {
+                const targetTile = getIdleTargetTile();
+                if (!targetTile) break;
+
+                const hitDmg = Math.min(remainingDamage, Math.max(1, targetTile.hp));
+                damageTile(targetTile, hitDmg, false);
+                remainingDamage -= hitDmg;
+            }
+        }
+
+        function getShovelUpgradeCost() {
+            return gameState.shovel.level * 10;
+        }
+
+        function getToolUpgradeCost(toolKey) {
+            const tool = gameState.tools[toolKey];
+            return tool.buyPrice + (tool.stepUpgrade * tool.level);
+        }
+
+        function buyShovelUpgrade() {
+            AudioEngine.init();
+            const cost = getShovelUpgradeCost();
+            if (gameState.money >= cost) {
+                gameState.money -= cost;
+                gameState.shovel.level++;
+                gameState.shovel.power += 1;
+                AudioEngine.playUpgrade();
+                showToast(`Sekop dinaikkan ke Lv. ${gameState.shovel.level}! (+1 Daya)`);
+                updateUI();
+            }
+        }
+
+        function buyToolUnit(toolKey, name) {
+            AudioEngine.init();
+            const tool = gameState.tools[toolKey];
+            if (gameState.money >= tool.buyPrice) {
+                gameState.money -= tool.buyPrice;
+                tool.count++;
+                AudioEngine.playUpgrade();
+                showToast(`Membeli 1x ${name}! Total: ${tool.count}`);
+                updateUI();
+            }
+        }
+
+        function upgradeTool(toolKey, name) {
+            AudioEngine.init();
+            const tool = gameState.tools[toolKey];
+            const cost = getToolUpgradeCost(toolKey);
+            if (gameState.money >= cost) {
+                gameState.money -= cost;
+                tool.level++;
+                AudioEngine.playUpgrade();
+                showToast(`${name} berhasil diupgrade ke Lv. ${tool.level}!`);
+                updateUI();
+            }
+        }
+
+        function formatRupiah(num) {
+            if (num >= 1_000_000_000) {
+                return 'Rp ' + (num / 1_000_000_000).toFixed(2).replace('.', ',') + ' M';
+            }
+            if (num >= 1_000_000) {
+                return 'Rp ' + (num / 1_000_000).toFixed(2).replace('.', ',') + ' Jt';
+            }
+            return 'Rp ' + Math.floor(num).toLocaleString('id-ID');
+        }
+
+        function updateUI() {
+            // Main Top Bar
+            document.getElementById('txtMoney').innerText = formatRupiah(gameState.money);
+            document.getElementById('txtDepth').innerText = `Level ${gameState.depth}`;
+            document.getElementById('txtDPS').innerText = `${calculateTotalDPS().toLocaleString('id-ID')} dmg/dtk`;
+
+            // Layer Progress Bar & Remaining Active Blocks
+            const remainingTxt = document.getElementById('txtRemainingBlocks');
+            if (remainingTxt) {
+                remainingTxt.innerText = `Sisa Batu Aktif: ${gameState.remainingRocks} / ${TOTAL_CELLS}`;
+            }
+            const progressBar = document.getElementById('layerProgressBar');
+            if (progressBar) {
+                const pct = Math.max(0, Math.min(100, (gameState.remainingRocks / TOTAL_CELLS) * 100));
+                progressBar.style.width = `${pct}%`;
+            }
+
+            // Shovel section
+            document.getElementById('txtShovelLevel').innerText = `Level ${gameState.shovel.level}`;
+            document.getElementById('txtShovelPower').innerText = `Daya: ${gameState.shovel.power} pt/klik`;
+            const shovelCost = getShovelUpgradeCost();
+            document.getElementById('txtShovelCost').innerText = formatRupiah(shovelCost);
+            document.getElementById('btnUpgradeShovel').disabled = gameState.money < shovelCost;
+
+            // Tools section
+            const t = gameState.tools;
+
+            // Pacul
+            document.getElementById('txtPaculPower').innerText = calculateToolDamage(t.pacul);
+            document.getElementById('txtPaculCount').innerText = `Milik: ${t.pacul.count}`;
+            document.getElementById('txtPaculLevel').innerText = `Lv. ${t.pacul.level}`;
+            document.getElementById('txtCostBuyPacul').innerText = formatRupiah(t.pacul.buyPrice);
+            const paculUpCost = getToolUpgradeCost('pacul');
+            document.getElementById('txtCostUpgradePacul').innerText = formatRupiah(paculUpCost);
+            document.getElementById('btnBuyPacul').disabled = gameState.money < t.pacul.buyPrice;
+            document.getElementById('btnUpgradePacul').disabled = gameState.money < paculUpCost;
+
+            // Bor
+            document.getElementById('txtBorPower').innerText = calculateToolDamage(t.bor);
+            document.getElementById('txtBorCount').innerText = `Milik: ${t.bor.count}`;
+            document.getElementById('txtBorLevel').innerText = `Lv. ${t.bor.level}`;
+            document.getElementById('txtCostBuyBor').innerText = formatRupiah(t.bor.buyPrice);
+            const borUpCost = getToolUpgradeCost('bor');
+            document.getElementById('txtCostUpgradeBor').innerText = formatRupiah(borUpCost);
+            document.getElementById('btnBuyBor').disabled = gameState.money < t.bor.buyPrice;
+            document.getElementById('btnUpgradeBor').disabled = gameState.money < borUpCost;
+
+            // Bor Bobok
+            document.getElementById('txtBobokPower').innerText = calculateToolDamage(t.borBobok);
+            document.getElementById('txtBobokCount').innerText = `Milik: ${t.borBobok.count}`;
+            document.getElementById('txtBobokLevel').innerText = `Lv. ${t.borBobok.level}`;
+            document.getElementById('txtCostBuyBobok').innerText = formatRupiah(t.borBobok.buyPrice);
+            const bobokUpCost = getToolUpgradeCost('borBobok');
+            document.getElementById('txtCostUpgradeBobok').innerText = formatRupiah(bobokUpCost);
+            document.getElementById('btnBuyBobok').disabled = gameState.money < t.borBobok.buyPrice;
+            document.getElementById('btnUpgradeBobok').disabled = gameState.money < bobokUpCost;
+
+            // Bor Tambang
+            document.getElementById('txtTambangPower').innerText = calculateToolDamage(t.borTambang);
+            document.getElementById('txtTambangCount').innerText = `Milik: ${t.borTambang.count}`;
+            document.getElementById('txtTambangLevel').innerText = `Lv. ${t.borTambang.level}`;
+            document.getElementById('txtCostBuyTambang').innerText = formatRupiah(t.borTambang.buyPrice);
+            const tambangUpCost = getToolUpgradeCost('borTambang');
+            document.getElementById('txtCostUpgradeTambang').innerText = formatRupiah(tambangUpCost);
+            document.getElementById('btnBuyTambang').disabled = gameState.money < t.borTambang.buyPrice;
+            document.getElementById('btnUpgradeTambang').disabled = gameState.money < tambangUpCost;
+        }
+
+        function showToast(message, color = '#38bdf8') {
+            const toastBox = document.getElementById('toastBox');
+            const el = document.createElement('div');
+            el.className = 'bg-slate-900 border border-slate-700 px-3.5 py-2 rounded-xl text-xs shadow-2xl text-slate-100 flex items-center gap-2 transition-all transform duration-300 opacity-0 translate-y-2';
+            el.innerHTML = `<span style="color: ${color}">●</span> <span>${message}</span>`;
+            toastBox.appendChild(el);
+
+            setTimeout(() => {
+                el.classList.remove('opacity-0', 'translate-y-2');
+            }, 20);
+
+            setTimeout(() => {
+                el.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => el.remove(), 300);
+            }, 2600);
+        }
+
+        document.getElementById('btnUpgradeShovel').addEventListener('click', buyShovelUpgrade);
+
+        document.getElementById('btnBuyPacul').addEventListener('click', () => buyToolUnit('pacul', 'Pacul'));
+        document.getElementById('btnUpgradePacul').addEventListener('click', () => upgradeTool('pacul', 'Pacul'));
+
+        document.getElementById('btnBuyBor').addEventListener('click', () => buyToolUnit('bor', 'Bor'));
+        document.getElementById('btnUpgradeBor').addEventListener('click', () => upgradeTool('bor', 'Bor'));
+
+        document.getElementById('btnBuyBobok').addEventListener('click', () => buyToolUnit('borBobok', 'Bor Bobok'));
+        document.getElementById('btnUpgradeBobok').addEventListener('click', () => upgradeTool('borBobok', 'Bor Bobok'));
+
+        document.getElementById('btnBuyTambang').addEventListener('click', () => buyToolUnit('borTambang', 'Bor Tambang'));
+        document.getElementById('btnUpgradeTambang').addEventListener('click', () => upgradeTool('borTambang', 'Bor Tambang'));
+
+        document.getElementById('selectTargetMode').addEventListener('change', (e) => {
+            gameState.targetMode = e.target.value;
+        });
+
+        document.getElementById('btnAudioToggle').addEventListener('click', () => {
+            AudioEngine.enabled = !AudioEngine.enabled;
+            if (AudioEngine.enabled) AudioEngine.init();
+            document.getElementById('audioIcon').innerText = AudioEngine.enabled ? '🔊' : '🔇';
+        });
+
+        const STORAGE_KEY = 'NAMBANG_GAME_SAVE_V1';
+
+        function saveGame() {
+            try {
+                const saveData = {
+                    money: gameState.money,
+                    depth: gameState.depth,
+                    remainingRocks: gameState.remainingRocks,
+                    totalMined: gameState.totalMined,
+                    targetMode: gameState.targetMode,
+                    shovel: gameState.shovel,
+                    tools: gameState.tools,
+                    grid: gameState.grid.map(t => ({ id: t.id, hp: t.hp, maxHp: t.maxHp, depth: t.depth, isCleared: t.isCleared })),
+                    savedAt: Date.now()
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+                const ind = document.getElementById('saveStatusIndicator');
+                if (ind) {
+                    ind.innerText = '● Tersimpan';
+                    setTimeout(() => { ind.innerText = '● Tersimpan otomatis'; }, 1500);
+                }
+            } catch(e) {}
+        }
+
+        function loadGame() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) {
+                    initGrid();
+                    return;
+                }
+                const data = JSON.parse(raw);
+                gameState.money = Number(data.money) || 0;
+                gameState.depth = Number(data.depth) || 1;
+                gameState.totalMined = Number(data.totalMined) || 0;
+                if (data.targetMode) gameState.targetMode = data.targetMode;
+                document.getElementById('selectTargetMode').value = gameState.targetMode;
+
+                if (data.shovel) gameState.shovel = data.shovel;
+                if (data.tools) gameState.tools = data.tools;
+
+                if (Array.isArray(data.grid) && data.grid.length === TOTAL_CELLS) {
+                    gameState.grid = data.grid.map(t => ({
+                        id: t.id,
+                        row: Math.floor(t.id / GRID_SIZE),
+                        col: t.id % GRID_SIZE,
+                        hp: t.hp,
+                        maxHp: t.maxHp,
+                        depth: t.depth || gameState.depth,
+                        isCleared: !!t.isCleared,
+                        shake: 0
+                    }));
+                    gameState.remainingRocks = gameState.grid.filter(t => !t.isCleared && t.hp > 0).length;
+                    if (gameState.remainingRocks === 0) {
+                        advanceToNextDepth();
+                    }
+                } else {
+                    initGrid();
+                }
+
+                if (data.savedAt) {
+                    const elapsedSec = Math.min(21600, Math.floor((Date.now() - data.savedAt) / 1000));
+                    const dps = calculateTotalDPS();
+                    if (elapsedSec > 5 && dps > 0) {
+                        const estimatedDamage = dps * elapsedSec;
+                        const estimatedEarnings = Math.floor((estimatedDamage / 18) * 1.5);
+                        if (estimatedEarnings > 0) {
+                            gameState.money += estimatedEarnings;
+                            setTimeout(() => {
+                                showToast(`Selamat datang kembali! Pendapatan idle offline: ${formatRupiah(estimatedEarnings)} (${elapsedSec} dtk)`, '#f59e0b');
+                            }, 500);
+                        }
+                    }
+                }
+            } catch(e) {
+                initGrid();
+            }
+        }
+
+        const resetModal = document.getElementById('resetModal');
+        document.getElementById('btnResetGame').addEventListener('click', () => {
+            resetModal.classList.remove('hidden');
+        });
+        document.getElementById('btnCancelReset').addEventListener('click', () => {
+            resetModal.classList.add('hidden');
+        });
+        document.getElementById('btnConfirmReset').addEventListener('click', () => {
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        });
+
+        let lastFrameTime = performance.now();
+
+        function gameLoop(now) {
+            const dt = (now - lastFrameTime) / 1000;
+            lastFrameTime = now;
+
+            processIdleMining(dt);
+            drawGrid();
+            updateAndDrawParticles();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function() {
+            resizeCanvas();
+            loadGame();
+            updateUI();
+
+            setInterval(saveGame, 5000);
+            setInterval(updateUI, 500);
+
+            requestAnimationFrame(gameLoop);
+        };
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
+    </script>
+</body>
+</html>

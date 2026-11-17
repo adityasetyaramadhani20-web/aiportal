@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tetris</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-green: #00ff00;
+            --neon-yellow: #ffff00;
+            --bg-dark: #050510;
+        }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: var(--bg-dark);
+            color: white;
+            overflow: hidden;
+            touch-action: none; /* Mencegah zoom/scroll default pada mobile */
+        }
+
+        .font-arcade {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Canvas Styling */
+        canvas {
+            image-rendering: pixelated; 
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.1s;
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        /* Animations */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake-screen {
+            animation: shake 0.5s;
+            animation-iteration-count: 1;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        /* Mobile Controls */
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(4px);
+            active:bg-opacity-40;
+            transition: all 0.1s;
+        }
+        .control-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.95);
+        }
+
+        /* Mode Selection Cards */
+        .mode-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .mode-card:hover, .mode-card.selected {
+            transform: translateY(-5px);
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+        }
+        .mode-card.frenzy:hover, .mode-card.frenzy.selected {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.4);
+        }
+
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-center items-center relative overflow-hidden bg-gray-900">
+    
+    <!-- Solid Dark Background (No Image) -->
+    <div class="absolute inset-0 bg-[#0a0a12] z-0"></div>
+
+    <!-- Main Game Container -->
+    <div id="gameContainer" class="relative z-10 w-full max-w-5xl h-full flex flex-col md:flex-row items-center justify-center p-2 md:p-8 hidden opacity-0 transition-opacity duration-500">
+        
+        <!-- Left Panel (Hold/Stats) - Hidden on super small screens -->
+        <div class="hidden md:flex flex-col space-y-4 w-48 mr-6">
+            <div class="glass-panel rounded-xl p-4 text-center">
+                <h3 class="text-gray-400 text-sm mb-1 uppercase tracking-widest">Score</h3>
+                <p id="scoreDisplay" class="font-arcade text-3xl text-yellow-400 glow-text">0</p>
+            </div>
+            <div class="glass-panel rounded-xl p-4 text-center">
+                <h3 class="text-gray-400 text-sm mb-1 uppercase tracking-widest">Level</h3>
+                <p id="levelDisplay" class="font-arcade text-3xl text-blue-400">1</p>
+            </div>
+            <div class="glass-panel rounded-xl p-4 text-center">
+                <h3 class="text-gray-400 text-sm mb-1 uppercase tracking-widest">Lines</h3>
+                <p id="linesDisplay" class="font-arcade text-3xl text-green-400">0</p>
+            </div>
+        </div>
+
+        <!-- Main Canvas Area -->
+        <div class="relative group">
+            <canvas id="gameCanvas" class="rounded-lg bg-gray-900/90"></canvas>
+            
+            <!-- Frenzy Timer Overlay -->
+            <div id="frenzyTimerPanel" class="absolute top-4 right-4 hidden">
+                <div class="relative w-16 h-16 flex items-center justify-center">
+                    <svg class="absolute w-full h-full rotate-[-90deg]">
+                        <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,0.1)" stroke-width="4" fill="none"></circle>
+                        <circle id="timerCircle" cx="32" cy="32" r="28" stroke="#ff0055" stroke-width="4" fill="none" stroke-dasharray="175" stroke-dashoffset="0"></circle>
+                    </svg>
+                    <span id="frenzyTime" class="font-arcade text-xl font-bold text-red-500">60</span>
+                </div>
+            </div>
+
+            <!-- Mobile Score (Visible only on mobile) -->
+            <div class="absolute -top-12 left-0 w-full flex justify-between px-2 md:hidden">
+                <div class="text-left">
+                    <div class="text-xs text-gray-400">SCORE</div>
+                    <div id="mobileScore" class="font-arcade text-xl text-yellow-400">0</div>
+                </div>
+                 <div class="text-right" id="mobileTimerArea" style="display:none;">
+                    <div class="text-xs text-red-400">TIME</div>
+                    <div id="mobileTime" class="font-arcade text-xl text-red-500">60</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel (Next/Controls Info) -->
+        <div class="flex flex-col space-y-4 w-32 md:w-48 ml-4 md:ml-6 absolute md:relative top-4 right-2 md:top-auto md:right-auto">
+            <div class="glass-panel rounded-xl p-4 flex flex-col items-center">
+                <h3 class="text-gray-400 text-sm mb-2 uppercase tracking-widest">Next</h3>
+                <canvas id="nextCanvas" width="100" height="100" class="bg-transparent"></canvas>
+            </div>
+            
+            <!-- Pause Button -->
+            <button id="pauseBtn" class="glass-panel p-3 rounded-lg hover:bg-white/10 active:scale-95 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mx-auto text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile Controls (Bottom) -->
+    <div id="mobileControls" class="absolute bottom-6 w-full px-6 flex justify-between items-end z-20 md:hidden hidden">
+        <div class="flex space-x-4">
+            <button id="btnLeft" class="control-btn w-16 h-16 rounded-full flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <button id="btnRight" class="control-btn w-16 h-16 rounded-full flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+            </button>
+        </div>
+        <div class="flex space-x-4">
+             <button id="btnDown" class="control-btn w-16 h-16 rounded-full flex items-center justify-center bg-white/5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 13l-7 7-7-7m14-8l-7 7-7-7" /></svg>
+            </button>
+            <button id="btnRotate" class="control-btn w-20 h-20 rounded-full flex items-center justify-center border-neon-blue bg-blue-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Menu Overlay -->
+    <div id="menuOverlay" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md">
+        <h1 class="font-arcade text-5xl md:text-7xl mb-8 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 font-bold drop-shadow-lg text-center leading-tight">
+            NEO<br><span class="text-white">TETRIS</span>
+        </h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl px-6">
+            <!-- Classic Mode -->
+            <div id="btnClassic" class="mode-card glass-panel p-6 rounded-2xl flex flex-col items-center group">
+                <div class="w-16 h-16 mb-4 rounded-full bg-blue-500/20 flex items-center justify-center group-hover:bg-blue-500/40 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-cyan-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" /></svg>
+                </div>
+                <h2 class="text-2xl font-bold mb-2 font-arcade">CLASSIC</h2>
+                <p class="text-gray-400 text-center text-sm">Main santai. Kecepatan bertambah tiap level.</p>
+            </div>
+
+            <!-- Frenzy Mode -->
+            <div id="btnFrenzy" class="mode-card frenzy glass-panel p-6 rounded-2xl flex flex-col items-center group">
+                <div class="w-16 h-16 mb-4 rounded-full bg-pink-500/20 flex items-center justify-center group-hover:bg-pink-500/40 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-pink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                </div>
+                <h2 class="text-2xl font-bold mb-2 text-pink-500 font-arcade">FRENZY</h2>
+                <p class="text-gray-400 text-center text-sm">Time Attack + <span class="text-red-400 font-bold">TNT Blocks</span>. Ledakkan area!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="absolute inset-0 z-50 hidden flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div class="glass-panel p-8 rounded-2xl text-center max-w-sm w-full mx-4 border border-red-500/30 shadow-[0_0_50px_rgba(220,38,38,0.3)]">
+            <h2 class="text-4xl font-arcade font-bold text-white mb-2">GAME OVER</h2>
+            <p id="finalMode" class="text-gray-400 mb-6 uppercase tracking-widest text-sm">Classic Mode</p>
+            
+            <div class="mb-8">
+                <div class="text-xs text-gray-400 uppercase">Final Score</div>
+                <div id="finalScore" class="text-5xl font-arcade text-yellow-400 glow-text">0</div>
+            </div>
+
+            <button id="btnRestart" class="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg font-bold text-lg hover:from-blue-500 hover:to-cyan-400 transform hover:scale-105 transition shadow-lg">
+                MAIN LAGI
+            </button>
+            <button id="btnHome" class="mt-4 text-gray-400 hover:text-white text-sm underline">Kembali ke Menu</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const COLS = 10;
+        const ROWS = 20;
+        const BLOCK_SIZE = 30; // Base size, will scale
+        
+        // Colors
+        const COLORS = [
+            null,
+            '#00f3ff', // I - Cyan
+            '#3b82f6', // J - Blue
+            '#f97316', // L - Orange
+            '#eab308', // O - Yellow
+            '#22c55e', // S - Green
+            '#a855f7', // T - Purple
+            '#ef4444', // Z - Red
+            '#ffffff'  // TNT - White/Flashing
+        ];
+
+        // Shapes definition - DIPERBAIKI: Semua bentuk menggunakan matriks persegi (3x3 atau 4x4)
+        // untuk memastikan rotasi bekerja dengan benar tanpa mengubah bentuk secara aneh.
+        const PIECES = [
+            [], // Empty
+            [ // I (4x4)
+                [0, 0, 0, 0],
+                [1, 1, 1, 1],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0]
+            ],
+            [ // J (3x3)
+                [2, 0, 0],
+                [2, 2, 2],
+                [0, 0, 0]
+            ], 
+            [ // L (3x3)
+                [0, 0, 3],
+                [3, 3, 3],
+                [0, 0, 0]
+            ], 
+            [ // O (2x2) - Tidak berubah saat diputar
+                [4, 4],
+                [4, 4]
+            ], 
+            [ // S (3x3)
+                [0, 5, 5],
+                [5, 5, 0],
+                [0, 0, 0]
+            ], 
+            [ // T (3x3)
+                [0, 6, 0],
+                [6, 6, 6],
+                [0, 0, 0]
+            ], 
+            [ // Z (3x3)
+                [7, 7, 0],
+                [0, 7, 7],
+                [0, 0, 0]
+            ]
+        ];
+
+        // --- GAME STATE ---
+        let canvas, ctx, nextCanvas, nextCtx;
+        let board = [];
+        let score = 0;
+        let level = 1;
+        let lines = 0;
+        let dropInterval = 1000;
+        let lastTime = 0;
+        let dropCounter = 0;
+        let isPaused = false;
+        let isGameOver = false;
+        let gameMode = 'CLASSIC'; // 'CLASSIC' or 'FRENZY'
+        let frenzyTime = 60;
+        let currentPiece = null;
+        let nextPiece = null;
+        let animationId = null;
+        let scale = 1;
+
+        // Sound Effects (Visual representation mostly)
+        let particles = [];
+
+        // --- SETUP ---
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            nextCanvas = document.getElementById('nextCanvas');
+            nextCtx = nextCanvas.getContext('2d');
+
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            // Button Listeners
+            document.getElementById('btnClassic').addEventListener('click', () => startGame('CLASSIC'));
+            document.getElementById('btnFrenzy').addEventListener('click', () => startGame('FRENZY'));
+            document.getElementById('btnRestart').addEventListener('click', restartGame);
+            document.getElementById('btnHome').addEventListener('click', showHome);
+            document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+            // Controls
+            document.addEventListener('keydown', handleKeyInput);
+            setupTouchControls();
+
+            // Initial Draw
+            createBoard();
+        }
+
+        function resizeCanvas() {
+            // Calculate scale to fit screen
+            const availableHeight = window.innerHeight * 0.75;
+            const targetBlockSize = Math.floor(availableHeight / ROWS);
+            scale = Math.max(0.8, Math.min(2, targetBlockSize / 20)); // Clamp scale logic
+            
+            const finalBlockSize = targetBlockSize;
+            
+            canvas.width = COLS * finalBlockSize;
+            canvas.height = ROWS * finalBlockSize;
+            
+            // Adjust Next Piece Canvas
+            nextCanvas.width = 4 * 20; // smaller blocks for preview
+            nextCanvas.height = 4 * 20;
+
+            if (currentPiece) draw();
+        }
+
+        // --- GAME LOGIC ---
+
+        function createBoard() {
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+        }
+
+        function startGame(mode) {
+            gameMode = mode;
+            document.getElementById('menuOverlay').classList.add('hidden');
+            document.getElementById('gameContainer').classList.remove('hidden');
+            document.getElementById('gameContainer').classList.remove('opacity-0');
+            document.getElementById('gameOverModal').classList.add('hidden');
+            
+            // UI Setup for Mode
+            if (mode === 'FRENZY') {
+                document.getElementById('frenzyTimerPanel').classList.remove('hidden');
+                document.getElementById('mobileTimerArea').style.display = 'block';
+                document.getElementById('mobileControls').classList.remove('hidden'); // Force show on mobile
+                frenzyTime = 60;
+            } else {
+                document.getElementById('frenzyTimerPanel').classList.add('hidden');
+                document.getElementById('mobileTimerArea').style.display = 'none';
+            }
+
+            // Check if mobile to show controls
+            if (window.innerWidth < 768) {
+                document.getElementById('mobileControls').classList.remove('hidden');
+            }
+
+            resetGameVars();
+            spawnPiece();
+            updateScore();
+            animationId = requestAnimationFrame(update);
+        }
+
+        function resetGameVars() {
+            createBoard();
+            score = 0;
+            level = 1;
+            lines = 0;
+            dropInterval = gameMode === 'FRENZY' ? 800 : 1000;
+            isPaused = false;
+            isGameOver = false;
+            particles = [];
+            currentPiece = null;
+            nextPiece = null;
+        }
+
+        function showHome() {
+            cancelAnimationFrame(animationId);
+            document.getElementById('gameOverModal').classList.add('hidden');
+            document.getElementById('gameContainer').classList.add('hidden');
+            document.getElementById('menuOverlay').classList.remove('hidden');
+            document.getElementById('mobileControls').classList.add('hidden');
+        }
+
+        function restartGame() {
+            startGame(gameMode);
+        }
+
+        function spawnPiece() {
+            if (!nextPiece) nextPiece = createRandomPiece();
+            
+            currentPiece = nextPiece;
+            nextPiece = createRandomPiece();
+            
+            // Center piece
+            currentPiece.x = Math.floor(COLS / 2) - Math.floor(currentPiece.matrix[0].length / 2);
+            currentPiece.y = 0;
+
+            // Check collision immediately (Game Over)
+            if (collide(board, currentPiece)) {
+                gameOver();
+            }
+
+            drawNextPiece();
+        }
+
+        function createRandomPiece() {
+            const typeId = Math.floor(Math.random() * (PIECES.length - 1)) + 1;
+            
+            // DIPERBAIKI: Menggunakan deep copy (JSON parse/stringify) untuk memastikan
+            // kita TIDAK memodifikasi array PIECES yang asli saat memutar.
+            let matrix = JSON.parse(JSON.stringify(PIECES[typeId]));
+            
+            let isBomb = false;
+
+            // Frenzy Logic: 15% chance for a TNT block
+            if (gameMode === 'FRENZY' && Math.random() < 0.15) {
+                isBomb = true;
+            }
+
+            return {
+                matrix: matrix,
+                type: typeId,
+                x: 0,
+                y: 0,
+                isBomb: isBomb
+            };
+        }
+
+        function collide(arena, player) {
+            const [m, o] = [player.matrix, player];
+            for (let y = 0; y < m.length; ++y) {
+                for (let x = 0; x < m[y].length; ++x) {
+                    if (m[y][x] !== 0 &&
+                        (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function merge(arena, player) {
+            player.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        // In Frenzy mode, if piece is bomb, store as 8
+                        let valToStore = player.isBomb ? 8 : value;
+                        if (y + player.y >= 0 && y + player.y < ROWS) {
+                             arena[y + player.y][x + player.x] = valToStore;
+                        }
+                    }
+                });
+            });
+        }
+
+        function rotate(matrix, dir) {
+            for (let y = 0; y < matrix.length; ++y) {
+                for (let x = 0; x < y; ++x) {
+                    [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+                }
+            }
+            if (dir > 0) matrix.forEach(row => row.reverse());
+            else matrix.reverse();
+        }
+
+        function playerDrop() {
+            currentPiece.y++;
+            if (collide(board, currentPiece)) {
+                currentPiece.y--;
+                merge(board, currentPiece);
+                arenaSweep(); // Check lines & bombs
+                spawnPiece();
+            }
+            dropCounter = 0;
+        }
+
+        function playerMove(dir) {
+            currentPiece.x += dir;
+            if (collide(board, currentPiece)) {
+                currentPiece.x -= dir;
+            }
+        }
+
+        function playerRotate(dir) {
+            const pos = currentPiece.x;
+            let offset = 1;
+            rotate(currentPiece.matrix, dir);
+            
+            // Wall kick dasar (mencoba geser kiri/kanan jika bentrok setelah putar)
+            while (collide(board, currentPiece)) {
+                currentPiece.x += offset;
+                offset = -(offset + (offset > 0 ? 1 : -1));
+                if (offset > currentPiece.matrix[0].length) {
+                    rotate(currentPiece.matrix, -dir);
+                    currentPiece.x = pos;
+                    return;
+                }
+            }
+        }
+
+        function getGhostY() {
+            const ghost = { ...currentPiece, matrix: [...currentPiece.matrix] };
+            // Simple logic mostly for visual, doesn't need deep copy of matrix content for Y check
+            while (!collide(board, ghost)) {
+                ghost.y++;
+            }
+            return ghost.y - 1;
+        }
+
+        // --- FRENZY & LINE CLEARING LOGIC ---
+
+        function arenaSweep() {
+            let rowCount = 0;
+            let tntTriggered = false;
+            let explosionPoints = [];
+
+            outer: for (let y = ROWS - 1; y > 0; --y) {
+                let isFull = true;
+                let hasTNT = false;
+                let tntX = -1;
+
+                for (let x = 0; x < COLS; ++x) {
+                    if (board[y][x] === 0) {
+                        isFull = false;
+                    }
+                    if (board[y][x] === 8) {
+                        hasTNT = true;
+                        tntX = x;
+                    }
+                }
+
+                if (isFull) {
+                    const row = board.splice(y, 1)[0].fill(0);
+                    board.unshift(row);
+                    ++y;
+                    rowCount++;
+
+                    if (hasTNT && gameMode === 'FRENZY') {
+                        tntTriggered = true;
+                        explosionPoints.push({x: tntX, y: y});
+                    }
+                }
+            }
+
+            if (tntTriggered) {
+                explosionPoints.forEach(pt => {
+                    explodeArea(pt.x, pt.y);
+                });
+                shakeScreen();
+            }
+
+            if (rowCount > 0) {
+                // Scoring
+                const lineScores = [0, 100, 300, 500, 800];
+                let multiplier = gameMode === 'FRENZY' ? 1.5 : 1;
+                score += lineScores[rowCount] * level * multiplier;
+                if (tntTriggered) score += 500; // TNT Bonus
+
+                lines += rowCount;
+                
+                // Level Up
+                if (lines >= level * 10) {
+                    level++;
+                    dropInterval = Math.max(100, dropInterval - 50);
+                }
+
+                // Frenzy Time Bonus
+                if (gameMode === 'FRENZY') {
+                    frenzyTime = Math.min(60, frenzyTime + (rowCount * 3));
+                    createFloatingText(`+${rowCount*3}s`, canvas.width/2, canvas.height/2, 'green');
+                }
+
+                createFloatingText(`+${lineScores[rowCount]}`, canvas.width/2, canvas.height/3, 'yellow');
+                updateScore();
+            }
+        }
+
+        function explodeArea(cX, cY) {
+            // Explode 5x5 radius
+            const radius = 2;
+            for (let y = cY - radius; y <= cY + radius; y++) {
+                for (let x = cX - radius; x <= cX + radius; x++) {
+                    if (y >= 0 && y < ROWS && x >= 0 && x < COLS) {
+                        if (board[y][x] !== 0) {
+                            board[y][x] = 0;
+                            for(let i=0; i<3; i++) createParticle(x, y, '#ff0000');
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- UPDATE & DRAW ---
+
+        function update(time = 0) {
+            if (isGameOver || isPaused) return;
+
+            const deltaTime = time - lastTime;
+            lastTime = time;
+
+            dropCounter += deltaTime;
+            if (dropCounter > dropInterval) {
+                playerDrop();
+            }
+
+            if (gameMode === 'FRENZY') {
+                frenzyTime -= deltaTime / 1000;
+                updateTimerUI();
+                if (frenzyTime <= 0) {
+                    gameOver();
+                    return;
+                }
+            }
+
+            draw();
+            updateParticles();
+            animationId = requestAnimationFrame(update);
+        }
+
+        function draw() {
+            const bSize = canvas.width / COLS;
+
+            ctx.fillStyle = '#050510';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Board
+            board.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        drawBlock(ctx, x, y, bSize, COLORS[value], value === 8);
+                    }
+                });
+            });
+
+            // Draw Ghost Piece
+            if (currentPiece) {
+                const ghostY = getGhostY();
+                currentPiece.matrix.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value !== 0) {
+                            drawBlock(ctx, x + currentPiece.x, y + ghostY, bSize, 'rgba(255, 255, 255, 0.1)', false, true);
+                        }
+                    });
+                });
+
+                // Draw Active Piece
+                currentPiece.matrix.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value !== 0) {
+                            const color = currentPiece.isBomb ? '#ffffff' : COLORS[value];
+                            drawBlock(ctx, x + currentPiece.x, y + currentPiece.y, bSize, color, currentPiece.isBomb);
+                        }
+                    });
+                });
+            }
+
+            drawParticles(ctx, bSize);
+        }
+
+        function drawBlock(context, x, y, size, color, isBomb = false, isGhost = false) {
+            const px = x * size;
+            const py = y * size;
+
+            if (isGhost) {
+                context.fillStyle = color;
+                context.fillRect(px, py, size, size);
+                context.strokeStyle = 'rgba(255,255,255,0.3)';
+                context.lineWidth = 1;
+                context.strokeRect(px, py, size, size);
+                return;
+            }
+
+            context.fillStyle = color;
+            context.fillRect(px + 1, py + 1, size - 2, size - 2);
+
+            context.fillStyle = 'rgba(255,255,255,0.2)';
+            context.fillRect(px + 1, py + 1, size - 2, size/3);
+
+            if (isBomb) {
+                context.strokeStyle = '#ff0000';
+                context.lineWidth = 2;
+                context.strokeRect(px + 2, py + 2, size - 4, size - 4);
+                
+                context.fillStyle = 'red';
+                context.font = 'bold 12px sans-serif';
+                context.textAlign = 'center';
+                if (Math.floor(Date.now() / 200) % 2 === 0) {
+                     context.fillText("!", px + size/2, py + size - 5);
+                }
+            }
+        }
+
+        function drawNextPiece() {
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+            if (!nextPiece) return;
+
+            const bSize = 20;
+            const offsetX = (nextCanvas.width - nextPiece.matrix[0].length * bSize) / 2;
+            const offsetY = (nextCanvas.height - nextPiece.matrix.length * bSize) / 2;
+
+            nextPiece.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        nextCtx.fillStyle = nextPiece.isBomb ? '#fff' : COLORS[value];
+                        nextCtx.fillRect(offsetX + x * bSize, offsetY + y * bSize, bSize - 1, bSize - 1);
+                        nextCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+                        nextCtx.strokeRect(offsetX + x * bSize, offsetY + y * bSize, bSize - 1, bSize - 1);
+                    }
+                });
+            });
+        }
+
+        // --- PARTICLES & VISUALS ---
+        function createParticle(x, y, color) {
+            particles.push({
+                x: x * (canvas.width / COLS) + 15,
+                y: y * (canvas.width / COLS) + 15,
+                vx: (Math.random() - 0.5) * 5,
+                vy: (Math.random() - 0.5) * 5,
+                life: 1.0,
+                color: color
+            });
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function drawParticles(ctx, bSize) {
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            });
+        }
+
+        function createFloatingText(text, x, y, color) {
+             // Placeholder for text effects
+        }
+
+        function shakeScreen() {
+            const container = document.getElementById('gameContainer');
+            container.classList.remove('shake-screen');
+            void container.offsetWidth; 
+            container.classList.add('shake-screen');
+        }
+
+        function updateScore() {
+            document.getElementById('scoreDisplay').innerText = score;
+            document.getElementById('mobileScore').innerText = score;
+            document.getElementById('levelDisplay').innerText = level;
+            document.getElementById('linesDisplay').innerText = lines;
+        }
+
+        function updateTimerUI() {
+            const intTime = Math.ceil(frenzyTime);
+            const display = document.getElementById('frenzyTime');
+            const mobileDisplay = document.getElementById('mobileTime');
+            const circle = document.getElementById('timerCircle');
+            
+            display.innerText = intTime;
+            mobileDisplay.innerText = intTime;
+
+            if (intTime < 10) {
+                display.classList.add('animate-pulse');
+                mobileDisplay.classList.add('animate-pulse');
+            } else {
+                display.classList.remove('animate-pulse');
+                mobileDisplay.classList.remove('animate-pulse');
+            }
+
+            const percent = frenzyTime / 60;
+            const offset = 175 - (175 * percent);
+            circle.style.strokeDashoffset = offset;
+        }
+
+        // --- INPUT HANDLING ---
+        function handleKeyInput(event) {
+            if (isGameOver || isPaused) return;
+
+            if (event.keyCode === 37) { // Left
+                playerMove(-1);
+            } else if (event.keyCode === 39) { // Right
+                playerMove(1);
+            } else if (event.keyCode === 40) { // Down
+                playerDrop();
+            } else if (event.keyCode === 38) { // Up (Rotate)
+                playerRotate(1);
+            }
+        }
+
+        function setupTouchControls() {
+            document.getElementById('btnLeft').addEventListener('touchstart', (e) => { e.preventDefault(); playerMove(-1); draw(); });
+            document.getElementById('btnRight').addEventListener('touchstart', (e) => { e.preventDefault(); playerMove(1); draw(); });
+            document.getElementById('btnDown').addEventListener('touchstart', (e) => { e.preventDefault(); playerDrop(); draw(); });
+            document.getElementById('btnRotate').addEventListener('touchstart', (e) => { e.preventDefault(); playerRotate(1); draw(); });
+
+            document.addEventListener('touchmove', function(event) {
+                event = event.originalEvent || event;
+                if (event.scale !== 1) {
+                   event.preventDefault();
+                }
+            }, { passive: false });
+        }
+
+        function togglePause() {
+            if (isGameOver) return;
+            isPaused = !isPaused;
+            const btn = document.getElementById('pauseBtn');
+            btn.innerHTML = isPaused ? 
+                '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' :
+                '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+            
+            if (!isPaused) {
+                lastTime = performance.now();
+                animationId = requestAnimationFrame(update);
+            }
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            cancelAnimationFrame(animationId);
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('finalMode').innerText = gameMode + " MODE";
+            document.getElementById('gameOverModal').classList.remove('hidden');
+        }
+
+        window.onload = init;
+
+    </script>
+</body>
+</html>

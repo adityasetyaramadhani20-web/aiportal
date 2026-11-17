@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Destroyer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        .font-pixel {
+            font-family: 'Press Start 2P', monospace;
+        }
+
+        /* Custom scrollbar for toolbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+
+        /* Glassmorphic & Retro styling */
+        .retro-border {
+            border: 3px solid #374151;
+            box-shadow: 4px 4px 0px #111827;
+        }
+
+        .tool-btn {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tool-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .tool-btn:active, .tool-btn.active {
+            transform: translateY(1px);
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            cursor: crosshair;
+        }
+
+        /* Custom tool cursor feedback */
+        .cursor-hammer { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m15 5 4 4'/><path d='M13 7 4 16l3 3 9-9'/><path d='m8 11 3 3'/></svg>") 12 12, pointer; }
+        .cursor-laser { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ef4444' stroke-width='2'><circle cx='12' cy='12' r='8'/><line x1='12' y1='2' x2='12' y2='22'/><line x1='2' y1='12' x2='22' y2='12'/></svg>") 12 12, pointer; }
+        .cursor-punch { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ec4899' stroke-width='2'><circle cx='12' cy='12' r='10'/><path d='M12 8v8'/><path d='M8 12h8'/></svg>") 12 12, pointer; }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+        .pulse { animation: pulse-glow 2s infinite; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden select-none">
+
+    <!-- Top Bar Navigation & Game Info -->
+    <header class="bg-slate-900 border-b border-slate-800 p-3 shadow-lg flex flex-wrap items-center justify-between gap-3 z-20">
+        <div class="flex items-center gap-3">
+            <div class="bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 p-2.5 rounded-xl shadow-md text-slate-950 font-black text-xl flex items-center justify-center">
+                <i class="fa-solid fa-burst text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="font-pixel text-xs sm:text-sm text-yellow-400 tracking-wider">DESTROYER</h1>
+                <p class="text-xs text-slate-400 hidden sm:block">Image Destruction</p>
+            </div>
+        </div>
+
+        <!-- Mode Switcher -->
+        <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button id="modeClassicBtn" onclick="setGameMode('classic')" class="px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 bg-red-600 text-white shadow">
+                <i class="fa-solid fa-bomb"></i> Klasik
+            </button>
+            <button id="modePhysicsBtn" onclick="setGameMode('physics')" class="px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-hand-fist"></i> Fisik (Samsak)
+            </button>
+        </div>
+
+        <!-- Destruction Stats & Actions -->
+        <div class="flex items-center gap-3">
+            <div class="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-fire text-red-500 text-sm"></i>
+                <span class="text-xs text-slate-400">Hancur:</span>
+                <span id="damageMeter" class="font-pixel text-xs text-red-400">0%</span>
+            </div>
+
+            <button onclick="takeScreenshot()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
+                <i class="fa-solid fa-camera"></i> <span class="hidden sm:inline">Foto</span>
+            </button>
+
+            <button onclick="resetCanvas()" class="bg-red-950/60 hover:bg-red-900 border border-red-800 text-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Workspace -->
+    <main class="flex-1 flex flex-col md:flex-row p-3 md:p-4 gap-4 items-center justify-center max-w-7xl mx-auto w-full relative">
+
+        <!-- Left Toolbar / Preset Selector (Collapsible/Scrollable) -->
+        <aside class="w-full md:w-64 bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 border border-slate-800 flex flex-col gap-4 shadow-xl">
+            <!-- Preset Selector -->
+            <div>
+                <label class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block flex items-center gap-1.5">
+                    <i class="fa-solid fa-image text-blue-400"></i> Pilih Gambar Target
+                </label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="loadPreset('desktop')" class="preset-btn p-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-left transition flex items-center gap-2 text-xs">
+                        <i class="fa-solid fa-desktop text-sky-400 text-base"></i> Desktop XP
+                    </button>
+                    <button onclick="loadPreset('browser')" class="preset-btn p-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-left transition flex items-center gap-2 text-xs">
+                        <i class="fa-solid fa-globe text-emerald-400 text-base"></i> Web Browser
+                    </button>
+                    <button onclick="loadPreset('robot')" class="preset-btn p-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-left transition flex items-center gap-2 text-xs">
+                        <i class="fa-solid fa-robot text-purple-400 text-base"></i> Boss Robot
+                    </button>
+                    <button onclick="loadPreset('bsod')" class="preset-btn p-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-left transition flex items-center gap-2 text-xs">
+                        <i class="fa-solid fa-triangle-exclamation text-blue-500 text-base"></i> BSOD Error
+                    </button>
+                </div>
+
+                <!-- Custom Upload -->
+                <label class="mt-2 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2 px-3 rounded-lg cursor-pointer border border-dashed border-slate-600 transition">
+                    <i class="fa-solid fa-cloud-arrow-up text-amber-400"></i>
+                    <span>Upload Gambar Seni/Foto</span>
+                    <input type="file" id="imageUploader" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                </label>
+            </div>
+
+            <!-- Global Tool Controls -->
+            <div class="border-t border-slate-800 pt-3">
+                <div class="flex justify-between text-xs text-slate-400 mb-1">
+                    <span>Ukuran Radius Alat</span>
+                    <span id="radiusValueDisplay" class="font-bold text-slate-200">25px</span>
+                </div>
+                <input type="range" id="toolRadius" min="10" max="80" value="25" oninput="updateToolRadius(this.value)" class="w-full accent-red-500 cursor-pointer">
+            </div>
+
+            <!-- Sound Toggle -->
+            <div class="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800 text-xs">
+                <span class="text-slate-300 flex items-center gap-1.5">
+                    <i id="audioIcon" class="fa-solid fa-volume-high text-green-400"></i> Efek Suara Prosedural
+                </span>
+                <input type="checkbox" id="soundToggle" checked class="accent-red-500 w-4 h-4 cursor-pointer">
+            </div>
+        </aside>
+
+        <!-- Center Canvas Viewport -->
+        <div id="viewportContainer" class="flex-1 w-full flex items-center justify-center relative min-h-[380px] md:min-h-[500px]">
+            <!-- Canvas Frame -->
+            <div id="shakeWrapper" class="relative rounded-2xl overflow-hidden shadow-2xl bg-slate-900 border-4 border-slate-800 flex items-center justify-center max-w-full">
+                <!-- Canvas Element -->
+                <canvas id="gameCanvas" width="800" height="500" class="max-w-full h-auto block rounded-lg shadow-inner"></canvas>
+            </div>
+
+            <!-- Toast / Floating Message Overlay -->
+            <div id="toastMessage" class="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-700 text-amber-400 px-4 py-2 rounded-xl text-xs font-bold shadow-2xl pointer-events-none transition-all opacity-0 transform -translate-y-2 flex items-center gap-2">
+                <i class="fa-solid fa-circle-info"></i> <span id="toastText">Selamat Datang! Pilih alat untuk menghancurkan.</span>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Interactive Toolbar -->
+    <footer class="bg-slate-900 border-t border-slate-800 p-3 z-20">
+        <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-center gap-2" id="classicToolbar">
+            <!-- Classic Tools List -->
+            <button onclick="selectTool('hammer')" class="tool-btn active bg-amber-600 hover:bg-amber-500 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-hammer text-lg"></i>
+                <span class="text-[10px] font-bold">Palu</span>
+            </button>
+
+            <button onclick="selectTool('saw')" class="tool-btn bg-red-600 hover:bg-red-500 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-compact-disc text-lg animate-spin" style="animation-duration:3s"></i>
+                <span class="text-[10px] font-bold">Gergaji</span>
+            </button>
+
+            <button onclick="selectTool('gun')" class="tool-btn bg-slate-700 hover:bg-slate-600 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-gun text-lg"></i>
+                <span class="text-[10px] font-bold">Senapan</span>
+            </button>
+
+            <button onclick="selectTool('flame')" class="tool-btn bg-orange-600 hover:bg-orange-500 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-fire-flame-curved text-lg text-yellow-300"></i>
+                <span class="text-[10px] font-bold">Pelontar Api</span>
+            </button>
+
+            <button onclick="selectTool('laser')" class="tool-btn bg-rose-600 hover:bg-rose-500 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-bolt text-lg text-cyan-200"></i>
+                <span class="text-[10px] font-bold">Laser</span>
+            </button>
+
+            <button onclick="selectTool('paint')" class="tool-btn bg-purple-600 hover:bg-purple-500 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-paint-brush text-lg"></i>
+                <span class="text-[10px] font-bold">Cat Warni</span>
+            </button>
+
+            <button onclick="selectTool('stamp')" class="tool-btn bg-pink-600 hover:bg-pink-500 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-stamp text-lg"></i>
+                <span class="text-[10px] font-bold">Stempel</span>
+            </button>
+
+            <button onclick="selectTool('ants')" class="tool-btn bg-emerald-700 hover:bg-emerald-600 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-bugs text-lg text-emerald-200"></i>
+                <span class="text-[10px] font-bold">Semut</span>
+            </button>
+
+            <button onclick="selectTool('magnet')" class="tool-btn bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-magnet text-lg text-indigo-200"></i>
+                <span class="text-[10px] font-bold">BlackHole</span>
+            </button>
+
+            <button onclick="selectTool('cleaner')" class="tool-btn bg-teal-600 hover:bg-teal-500 text-white p-2.5 rounded-xl flex flex-col items-center gap-1 w-16 sm:w-20 shadow-md">
+                <i class="fa-solid fa-soap text-lg"></i>
+                <span class="text-[10px] font-bold">Pembersih</span>
+            </button>
+        </div>
+
+        <!-- Sub-options for Paint & Stamp (Hidden by default) -->
+        <div id="subToolOptions" class="mt-2 flex items-center justify-center gap-3 text-xs hidden">
+            <!-- Paint color options -->
+            <div id="colorPickerGroup" class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                <span class="text-slate-400 font-bold px-1">Warna:</span>
+                <button onclick="setPaintColor('#ef4444')" class="w-5 h-5 rounded-full bg-red-500 border border-white/20"></button>
+                <button onclick="setPaintColor('#3b82f6')" class="w-5 h-5 rounded-full bg-blue-500 border border-white/20"></button>
+                <button onclick="setPaintColor('#10b981')" class="w-5 h-5 rounded-full bg-emerald-500 border border-white/20"></button>
+                <button onclick="setPaintColor('#eab308')" class="w-5 h-5 rounded-full bg-yellow-500 border border-white/20"></button>
+                <button onclick="setPaintColor('#a855f7')" class="w-5 h-5 rounded-full bg-purple-500 border border-white/20"></button>
+                <button onclick="setPaintColor('#000000')" class="w-5 h-5 rounded-full bg-black border border-white/20"></button>
+            </div>
+
+            <!-- Stamp Selection -->
+            <div id="stampPickerGroup" class="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                <span class="text-slate-400 font-bold px-1">Motif:</span>
+                <button onclick="setStampSymbol('💀')" class="px-2 py-0.5 bg-slate-800 rounded hover:bg-slate-700 text-base">💀</button>
+                <button onclick="setStampSymbol('💥')" class="px-2 py-0.5 bg-slate-800 rounded hover:bg-slate-700 text-base">💥</button>
+                <button onclick="setStampSymbol('💩')" class="px-2 py-0.5 bg-slate-800 rounded hover:bg-slate-700 text-base">💩</button>
+                <button onclick="setStampSymbol('❌')" class="px-2 py-0.5 bg-slate-800 rounded hover:bg-slate-700 text-base">❌</button>
+                <button onclick="setStampSymbol('🔥')" class="px-2 py-0.5 bg-slate-800 rounded hover:bg-slate-700 text-base">🔥</button>
+            </div>
+        </div>
+
+        <!-- Physics Mode Toolbar -->
+        <div class="max-w-2xl mx-auto flex items-center justify-center gap-4 hidden" id="physicsToolbar">
+            <div class="bg-slate-950 px-4 py-2 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-center gap-2">
+                <i class="fa-solid fa-hand-fist text-pink-500 text-base"></i>
+                <span><strong>Mode Samsak:</strong> Klik atau seret gambar untuk memukul, menendang, & menarik gambar secara elastis!</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        /* =========================================================================
+           WEB AUDIO API - PROCEDURAL SOUND SYNTHESIZER
+           (Fully self-contained, offline audio synthesis without external files)
+           ========================================================================= */
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContextClass();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function isAudioEnabled() {
+            return document.getElementById('soundToggle').checked;
+        }
+
+        // Procedural Audio Generators
+        function playSound(type) {
+            if (!isAudioEnabled()) return;
+            try {
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
+
+                if (type === 'hammer') {
+                    // Thud impact + low noise
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(140, now);
+                    osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+                    gain.gain.setValueAtTime(1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+
+                    // Noise burst
+                    const bufferSize = ctx.sampleRate * 0.1;
+                    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                    const noise = ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const noiseGain = ctx.createGain();
+                    noiseGain.gain.setValueAtTime(0.6, now);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    noise.connect(noiseGain);
+                    noiseGain.connect(ctx.destination);
+                    noise.start(now);
+                }
+                else if (type === 'gun') {
+                    // Gunshot pop
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(40, now + 0.08);
+                    gain.gain.setValueAtTime(0.8, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                }
+                else if (type === 'saw') {
+                    // Buzzing chainsaw frequency
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(110 + Math.random() * 40, now);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.06);
+                }
+                else if (type === 'laser') {
+                    // Sci-fi sweep
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(120, now + 0.12);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                }
+                else if (type === 'flame') {
+                    // Low rumble noise
+                    const bufferSize = ctx.sampleRate * 0.08;
+                    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+                    const noise = ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const gain = ctx.createGain();
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    noise.connect(gain);
+                    gain.connect(ctx.destination);
+                    noise.start(now);
+                }
+                else if (type === 'punch') {
+                    // Soft body spring punch bounce
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.exponentialRampToValueAtTime(50, now + 0.2);
+                    gain.gain.setValueAtTime(0.7, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                }
+                else if (type === 'stamp') {
+                    // Slap sound
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(80, now + 0.1);
+                    gain.gain.setValueAtTime(0.5, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                }
+                else if (type === 'clean') {
+                    // Gentle water splash
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600 + Math.random() * 200, now);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                }
+            } catch (e) {
+                console.warn('Audio Context error:', e);
+            }
+        }
+
+        // Global Canvas State
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        // Offscreen buffer canvas to store the pristine original image
+        const bufferCanvas = document.createElement('canvas');
+        const bufferCtx = bufferCanvas.getContext('2d');
+        bufferCanvas.width = canvas.width;
+        bufferCanvas.height = canvas.height;
+
+        let gameMode = 'classic'; // 'classic' or 'physics'
+        let currentTool = 'hammer'; // hammer, saw, gun, flame, laser, paint, stamp, ants, magnet, cleaner
+        let toolRadius = 25;
+        let paintColor = '#ef4444';
+        let stampSymbol = '💀';
+
+        let isMouseDown = false;
+        let mouseX = 0;
+        let mouseY = 0;
+        let originalImageData = null;
+
+        // Particle System for Juiciness
+        let particles = [];
+        let antsList = [];
+
+        // Physics Mode Soft Body Mesh Variables
+        const meshCols = 12;
+        const meshRows = 8;
+        let meshNodes = [];
+
+        // Preset Image Generators (Self-contained SVG/Canvas generated images)
+        function generatePresetImage(type) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tCtx = tempCanvas.getContext('2d');
+
+            if (type === 'desktop') {
+                // Classic Windows XP style Bliss Desktop wallpaper
+                const skyGrad = tCtx.createLinearGradient(0, 0, 0, 320);
+                skyGrad.addColorStop(0, '#0055ff');
+                skyGrad.addColorStop(1, '#87ceeb');
+                tCtx.fillStyle = skyGrad;
+                tCtx.fillRect(0, 0, 800, 320);
+
+                // Sun
+                tCtx.fillStyle = '#fff7d1';
+                tCtx.beginPath();
+                tCtx.arc(680, 80, 45, 0, Math.PI * 2);
+                tCtx.fill();
+
+                // Rolling Hills
+                tCtx.fillStyle = '#22c55e';
+                tCtx.beginPath();
+                tCtx.moveTo(0, 300);
+                tCtx.bezierCurveTo(200, 250, 400, 380, 800, 280);
+                tCtx.lineTo(800, 500);
+                tCtx.lineTo(0, 500);
+                tCtx.fill();
+
+                // Taskbar
+                tCtx.fillStyle = '#1e40af';
+                tCtx.fillRect(0, 460, 800, 40);
+                // Start button
+                tCtx.fillStyle = '#16a34a';
+                tCtx.beginPath();
+                tCtx.roundRect(5, 464, 90, 32, 6);
+                tCtx.fill();
+                tCtx.fillStyle = '#ffffff';
+                tCtx.font = 'bold 14px Outfit';
+                tCtx.fillText('Start', 35, 485);
+            }
+            else if (type === 'browser') {
+                // Modern Web Browser Window
+                tCtx.fillStyle = '#0f172a';
+                tCtx.fillRect(0, 0, 800, 500);
+
+                // Header Bar
+                tCtx.fillStyle = '#1e293b';
+                tCtx.fillRect(0, 0, 800, 70);
+
+                // Window buttons
+                tCtx.fillStyle = '#ef4444'; tCtx.beginPath(); tCtx.arc(20, 25, 6, 0, Math.PI*2); tCtx.fill();
+                tCtx.fillStyle = '#eab308'; tCtx.beginPath(); tCtx.arc(38, 25, 6, 0, Math.PI*2); tCtx.fill();
+                tCtx.fillStyle = '#22c55e'; tCtx.beginPath(); tCtx.arc(56, 25, 6, 0, Math.PI*2); tCtx.fill();
+
+                // Search Bar
+                tCtx.fillStyle = '#0f172a';
+                tCtx.beginPath(); tCtx.roundRect(80, 12, 600, 26, 12); tCtx.fill();
+                tCtx.fillStyle = '#94a3b8'; tCtx.font = '12px Outfit';
+                tCtx.fillText('https://destroyer2000.game/destroy-my-screen', 100, 30);
+
+                // Webpage Content
+                tCtx.fillStyle = '#ffffff';
+                tCtx.fillRect(20, 85, 760, 395);
+
+                tCtx.fillStyle = '#dc2626'; tCtx.font = 'bold 32px Outfit';
+                tCtx.fillText('JANGAN KLIK TOMBOL INI!', 60, 150);
+
+                tCtx.fillStyle = '#475569'; tCtx.font = '16px Outfit';
+                tCtx.fillText('Halaman ini sangat rahasia. Dilarang keras menghancurkannya!', 60, 185);
+
+                // Big Button
+                tCtx.fillStyle = '#ef4444';
+                tCtx.beginPath(); tCtx.roundRect(60, 220, 220, 50, 12); tCtx.fill();
+                tCtx.fillStyle = '#ffffff'; tCtx.font = 'bold 18px Outfit';
+                tCtx.fillText('HANCURKAN SEKARANG', 75, 252);
+
+                // Cute graphic box
+                tCtx.fillStyle = '#e2e8f0';
+                tCtx.fillRect(320, 220, 420, 220);
+                tCtx.fillStyle = '#94a3b8'; tCtx.font = '48px Outfit';
+                tCtx.fillText('🖥️💥🔨', 460, 340);
+            }
+            else if (type === 'robot') {
+                // Cute Angry Boss Robot Target
+                tCtx.fillStyle = '#1e1b4b';
+                tCtx.fillRect(0, 0, 800, 500);
+
+                // Robot Head
+                tCtx.fillStyle = '#6366f1';
+                tCtx.beginPath(); tCtx.roundRect(250, 100, 300, 240, 24); tCtx.fill();
+
+                // Eyes
+                tCtx.fillStyle = '#ef4444';
+                tCtx.beginPath(); tCtx.arc(330, 180, 35, 0, Math.PI * 2); tCtx.fill();
+                tCtx.beginPath(); tCtx.arc(470, 180, 35, 0, Math.PI * 2); tCtx.fill();
+                tCtx.fillStyle = '#ffffff';
+                tCtx.beginPath(); tCtx.arc(340, 170, 12, 0, Math.PI * 2); tCtx.fill();
+                tCtx.beginPath(); tCtx.arc(480, 170, 12, 0, Math.PI * 2); tCtx.fill();
+
+                // Mouth
+                tCtx.fillStyle = '#0f172a';
+                tCtx.fillRect(310, 260, 180, 40);
+                tCtx.fillStyle = '#ffffff';
+                for(let i=0; i<6; i++) {
+                    tCtx.fillRect(320 + i*26, 260, 18, 18);
+                    tCtx.fillRect(320 + i*26, 282, 18, 18);
+                }
+
+                // Antenna
+                tCtx.fillStyle = '#818cf8';
+                tCtx.fillRect(385, 40, 30, 60);
+                tCtx.fillStyle = '#f43f5e';
+                tCtx.beginPath(); tCtx.arc(400, 35, 20, 0, Math.PI*2); tCtx.fill();
+
+                // Text
+                tCtx.fillStyle = '#f87171'; tCtx.font = 'bold 24px Press Start 2P';
+                tCtx.fillText('PUKUL AKU!', 280, 420);
+            }
+            else if (type === 'bsod') {
+                // Classic Blue Screen of Death
+                tCtx.fillStyle = '#0000aa';
+                tCtx.fillRect(0, 0, 800, 500);
+
+                tCtx.fillStyle = '#ffffff';
+                tCtx.font = '20px monospace';
+                tCtx.fillText('A problem has been detected and Windows has been shut down', 40, 60);
+                tCtx.fillText('to prevent damage to your computer.', 40, 90);
+
+                tCtx.fillText('SYSTEM_THREAD_EXCEPTION_NOT_HANDLED', 40, 140);
+
+                tCtx.fillText('If this is the first time you have seen this error screen,', 40, 190);
+                tCtx.fillText('restart your computer. Use your HAMMER or CHAINSAW to fix.', 40, 220);
+
+                tCtx.fillText('Technical information:', 40, 280);
+                tCtx.fillText('*** STOP: 0x0000007E (0xC0000005, 0x804E518E, 0xF898563C)', 40, 310);
+
+                tCtx.fillText('*** DESTROYER2000.SYS - Address F898563C base at F8985000', 40, 350);
+                tCtx.font = '30px monospace';
+                tCtx.fillText(':(', 40, 420);
+            }
+
+            return tempCanvas;
+        }
+
+        // Load Preset into canvases
+        function loadPreset(presetName) {
+            const presetCanvas = generatePresetImage(presetName);
+            applyImageToCanvas(presetCanvas);
+            showToast(`Target diganti: ${presetName.toUpperCase()}`);
+        }
+
+        // Apply any image canvas/element onto game canvas & buffer
+        function applyImageToCanvas(imgSource) {
+            bufferCtx.clearRect(0, 0, bufferCanvas.width, bufferCanvas.height);
+            bufferCtx.drawImage(imgSource, 0, 0, canvas.width, canvas.height);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bufferCanvas, 0, 0);
+
+            originalImageData = bufferCtx.getImageData(0, 0, canvas.width, canvas.height);
+
+            // Re-init ants & soft body mesh
+            antsList = [];
+            initPhysicsMesh();
+            calculateDamagePercentage();
+        }
+
+        // Handle File Upload
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    applyImageToCanvas(img);
+                    showToast('Gambar kustom berhasil diunggah!');
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setGameMode(mode) {
+            gameMode = mode;
+            const classicBtn = document.getElementById('modeClassicBtn');
+            const physicsBtn = document.getElementById('modePhysicsBtn');
+            const classicTB = document.getElementById('classicToolbar');
+            const physicsTB = document.getElementById('physicsToolbar');
+
+            if (mode === 'classic') {
+                classicBtn.className = 'px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 bg-red-600 text-white shadow';
+                physicsBtn.className = 'px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white';
+                classicTB.classList.remove('hidden');
+                physicsTB.classList.add('hidden');
+                canvas.className = 'max-w-full h-auto block rounded-lg shadow-inner cursor-hammer';
+                showToast('Mode Klasik Aktif: Pilih alat dan hancurkan!');
+            } else {
+                physicsBtn.className = 'px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 bg-pink-600 text-white shadow';
+                classicBtn.className = 'px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-white';
+                physicsTB.classList.remove('hidden');
+                classicTB.classList.add('hidden');
+                document.getElementById('subToolOptions').classList.add('hidden');
+                canvas.className = 'max-w-full h-auto block rounded-lg shadow-inner cursor-punch';
+                showToast('Mode Fisik (Samsak): Klik/seret gambar untuk efek lentur!');
+            }
+        }
+
+        function selectTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active', 'ring-2', 'ring-white'));
+            event.currentTarget.classList.add('active', 'ring-2', 'ring-white');
+
+            const subGroup = document.getElementById('subToolOptions');
+            const colorPicker = document.getElementById('colorPickerGroup');
+            const stampPicker = document.getElementById('stampPickerGroup');
+
+            if (tool === 'paint') {
+                subGroup.classList.remove('hidden');
+                colorPicker.classList.remove('hidden');
+                stampPicker.classList.add('hidden');
+            } else if (tool === 'stamp') {
+                subGroup.classList.remove('hidden');
+                stampPicker.classList.remove('hidden');
+                colorPicker.classList.add('hidden');
+            } else {
+                subGroup.classList.add('hidden');
+            }
+
+            showToast(`Alat dipilih: ${tool.toUpperCase()}`);
+        }
+
+        function updateToolRadius(val) {
+            toolRadius = parseInt(val);
+            document.getElementById('radiusValueDisplay').innerText = val + 'px';
+        }
+
+        function setPaintColor(color) {
+            paintColor = color;
+            showToast('Warna cat diubah!');
+        }
+
+        function setStampSymbol(sym) {
+            stampSymbol = sym;
+            showToast(`Stempel diubah ke ${sym}`);
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('toastMessage');
+            document.getElementById('toastText').innerText = text;
+            toast.classList.remove('opacity-0', '-translate-y-2');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-2');
+            }, 2500);
+        }
+
+        function triggerScreenShake(magnitude = 10) {
+            const wrapper = document.getElementById('shakeWrapper');
+            const rx = (Math.random() - 0.5) * magnitude;
+            const ry = (Math.random() - 0.5) * magnitude;
+            wrapper.style.transform = `translate(${rx}px, ${ry}px)`;
+            setTimeout(() => {
+                wrapper.style.transform = 'translate(0px, 0px)';
+            }, 50);
+        }
+
+        // Spawns visual debris particles on canvas
+        function createDebris(x, y, color, count = 8) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 12,
+                    vy: (Math.random() - 0.5) * 12,
+                    size: Math.random() * 6 + 2,
+                    color: color,
+                    alpha: 1,
+                    life: 1
+                });
+            }
+        }
+
+        // Classic Destruction Action Engine
+        function executeClassicTool(x, y) {
+            ctx.save();
+
+            if (currentTool === 'hammer') {
+                playSound('hammer');
+                triggerScreenShake(12);
+
+                // Draw Cracks
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                for (let i = 0; i < 7; i++) {
+                    const angle = (Math.PI * 2 / 7) * i + Math.random() * 0.4;
+                    const len = toolRadius * (0.6 + Math.random() * 0.8);
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+                }
+                ctx.stroke();
+
+                // Punch transparent hole in center
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.arc(x, y, toolRadius * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                createDebris(x, y, '#4b5563', 10);
+            }
+            else if (currentTool === 'saw') {
+                playSound('saw');
+                triggerScreenShake(3);
+
+                // Clear jagged cut
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.arc(x + (Math.random()-0.5)*6, y + (Math.random()-0.5)*6, toolRadius * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Sparks
+                createDebris(x, y, '#f59e0b', 4);
+            }
+            else if (currentTool === 'gun') {
+                playSound('gun');
+                triggerScreenShake(4);
+
+                // Bullet Hole
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.arc(x, y, toolRadius * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Bullet burn mark around hole
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = '#111827';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(x, y, toolRadius * 0.35, 0, Math.PI * 2);
+                ctx.stroke();
+
+                createDebris(x, y, '#eab308', 5);
+            }
+            else if (currentTool === 'flame') {
+                playSound('flame');
+
+                // Scorched burn overlay
+                const grad = ctx.createRadialGradient(x, y, 2, x, y, toolRadius);
+                grad.addColorStop(0, 'rgba(239, 68, 68, 0.8)');
+                grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.5)');
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(x, y, toolRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Burn out center slightly
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.arc(x, y, toolRadius * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                createDebris(x, y, '#ef4444', 3);
+            }
+            else if (currentTool === 'laser') {
+                playSound('laser');
+                triggerScreenShake(2);
+
+                // Burning cyan laser stroke
+                ctx.strokeStyle = '#06b6d4';
+                ctx.shadowColor = '#22d3ee';
+                ctx.shadowBlur = 10;
+                ctx.lineWidth = toolRadius * 0.4;
+                ctx.lineCap = 'round';
+
+                ctx.beginPath();
+                ctx.moveTo(mouseX, mouseY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+
+                // Core punch out
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.arc(x, y, toolRadius * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            else if (currentTool === 'paint') {
+                playSound('stamp');
+
+                ctx.fillStyle = paintColor;
+                ctx.beginPath();
+                ctx.arc(x, y, toolRadius * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            else if (currentTool === 'stamp') {
+                playSound('stamp');
+
+                ctx.font = `${toolRadius * 1.8}px serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(stampSymbol, x, y);
+            }
+            else if (currentTool === 'ants') {
+                // Spawn crawling ant particle
+                for (let i = 0; i < 5; i++) {
+                    antsList.push({
+                        x: x + (Math.random() - 0.5) * 20,
+                        y: y + (Math.random() - 0.5) * 20,
+                        angle: Math.random() * Math.PI * 2
+                    });
+                }
+                showToast(`Semut dilepaskan! Total: ${antsList.length}`);
+            }
+            else if (currentTool === 'magnet') {
+                // Black hole pixel distortion
+                playSound('flame');
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.arc(x, y, toolRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                createDebris(x, y, '#6366f1', 6);
+            }
+            else if (currentTool === 'cleaner') {
+                playSound('clean');
+
+                // Restore pixels from pristine buffer canvas
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(x, y, toolRadius, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(bufferCanvas, 0, 0);
+                ctx.restore();
+            }
+
+            ctx.restore();
+            calculateDamagePercentage();
+        }
+
+        // Physics Mode Soft Body Mesh Initialization
+        function initPhysicsMesh() {
+            meshNodes = [];
+            const cellW = canvas.width / (meshCols - 1);
+            const cellH = canvas.height / (meshRows - 1);
+
+            for (let r = 0; r < meshRows; r++) {
+                for (let c = 0; c < meshCols; c++) {
+                    const px = c * cellW;
+                    const py = r * cellH;
+                    meshNodes.push({
+                        x: px,
+                        y: py,
+                        origX: px,
+                        origY: py,
+                        vx: 0,
+                        vy: 0,
+                        // Pin outer border nodes
+                        pinned: (r === 0 || r === meshRows - 1 || c === 0 || c === meshCols - 1)
+                    });
+                }
+            }
+        }
+
+        // Apply Punch Impulse in Physics Mode
+        function applyPhysicsPunch(hitX, hitY, force = 45) {
+            playSound('punch');
+            triggerScreenShake(10);
+
+            meshNodes.forEach(node => {
+                if (node.pinned) return;
+                const dx = node.x - hitX;
+                const dy = node.y - hitY;
+                const dist = Math.hypot(dx, dy);
+                if (dist < 180) {
+                    const factor = (1 - dist / 180) * force;
+                    const angle = Math.atan2(dy, dx);
+                    node.vx += Math.cos(angle) * factor;
+                    node.vy += Math.sin(angle) * factor;
+                }
+            });
+
+            // Add hit mark splash
+            ctx.save();
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+            ctx.beginPath();
+            ctx.arc(hitX, hitY, 30, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Update soft body spring physics loop
+        function updatePhysicsMesh() {
+            const k = 0.08; // Spring stiffness
+            const damping = 0.85; // Velocity damping
+
+            meshNodes.forEach(node => {
+                if (node.pinned) return;
+
+                // Return spring force to original home
+                const fx = (node.origX - node.x) * k;
+                const fy = (node.origY - node.y) * k;
+
+                node.vx = (node.vx + fx) * damping;
+                node.vy = (node.vy + fy) * damping;
+
+                node.x += node.vx;
+                node.y += node.vy;
+            });
+        }
+
+        // Render deformed mesh on Canvas using textured triangles
+        function renderPhysicsMesh() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const cellW = canvas.width / (meshCols - 1);
+            const cellH = canvas.height / (meshRows - 1);
+
+            for (let r = 0; r < meshRows - 1; r++) {
+                for (let c = 0; c < meshCols - 1; c++) {
+                    const n0 = meshNodes[r * meshCols + c];
+                    const n1 = meshNodes[r * meshCols + (c + 1)];
+                    const n2 = meshNodes[(r + 1) * meshCols + (c + 1)];
+                    const n3 = meshNodes[(r + 1) * meshCols + c];
+
+                    const u0 = c * cellW, v0 = r * cellH;
+                    const u1 = (c + 1) * cellW, v1 = (r + 1) * cellH;
+
+                    // Quad split into 2 triangles
+                    drawTexturedTriangle(bufferCanvas, n0, n1, n2, u0, v0, u1, v0, u1, v1);
+                    drawTexturedTriangle(bufferCanvas, n0, n2, n3, u0, v0, u1, v1, u0, v1);
+                }
+            }
+        }
+
+        // Canvas Triangle UV Transformation Mapper
+        function drawTexturedTriangle(img, p0, p1, p2, u0, v0, u1, v1, u2, v2) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.closePath();
+            ctx.clip();
+
+            // Affine matrix math mapping UVs
+            const delta = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1);
+            if (delta !== 0) {
+                const a = (p0.x * (v1 - v2) + p1.x * (v2 - v0) + p2.x * (v0 - v1)) / delta;
+                const b = (p0.y * (v1 - v2) + p1.y * (v2 - v0) + p2.y * (v0 - v1)) / delta;
+                const c = (p0.x * (u2 - u1) + p1.x * (u0 - u2) + p2.x * (u1 - u0)) / delta;
+                const d = (p0.y * (u2 - u1) + p1.y * (u0 - u2) + p2.y * (u1 - u0)) / delta;
+                const e = (p0.x * (u1 * v2 - u2 * v1) + p1.x * (u2 * v0 - u0 * v2) + p2.x * (u0 * v1 - u1 * v0)) / delta;
+                const f = (p0.y * (u1 * v2 - u2 * v1) + p1.y * (u2 * v0 - u0 * v2) + p2.y * (u0 * v1 - u1 * v0)) / delta;
+
+                ctx.transform(a, b, c, d, e, f);
+                ctx.drawImage(img, 0, 0);
+            }
+            ctx.restore();
+        }
+
+        // Calculate Damage Percentage by comparing canvas pixel transparency/changes
+        function calculateDamagePercentage() {
+            if (gameMode === 'physics' || !originalImageData) return;
+
+            const currentData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            const origData = originalImageData.data;
+            let changedPixels = 0;
+            const totalPixels = currentData.length / 4;
+
+            // Sample every 16th pixel for performance
+            for (let i = 0; i < currentData.length; i += 64) {
+                const diffA = Math.abs(currentData[i + 3] - origData[i + 3]);
+                const diffR = Math.abs(currentData[i] - origData[i]);
+                if (diffA > 50 || diffR > 50) {
+                    changedPixels++;
+                }
+            }
+
+            const percent = Math.min(100, Math.round((changedPixels / (totalPixels / 16)) * 100));
+            document.getElementById('damageMeter').innerText = percent + '%';
+        }
+
+        // Reset game canvas
+        function resetCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bufferCanvas, 0, 0);
+            antsList = [];
+            particles = [];
+            initPhysicsMesh();
+            calculateDamagePercentage();
+            showToast('Layar berhasil dibersihkan kembali!');
+        }
+
+        // Download / Screenshot export result
+        function takeScreenshot() {
+            const link = document.createElement('a');
+            link.download = 'destroyer-2000-result.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            showToast('Tangkapan layar berhasil disimpan!');
+        }
+
+        // Coordinate helper for both Mouse & Touch
+        function getCanvasCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            const coords = getCanvasCoordinates(e);
+            mouseX = coords.x;
+            mouseY = coords.y;
+
+            if (gameMode === 'classic') {
+                executeClassicTool(coords.x, coords.y);
+            } else {
+                applyPhysicsPunch(coords.x, coords.y);
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const coords = getCanvasCoordinates(e);
+
+            if (isMouseDown) {
+                if (gameMode === 'classic') {
+                    // Continuous stream tools
+                    if (['saw', 'gun', 'flame', 'laser', 'paint', 'cleaner', 'magnet'].includes(currentTool)) {
+                        executeClassicTool(coords.x, coords.y);
+                    }
+                } else {
+                    // Drag elastic physics
+                    applyPhysicsPunch(coords.x, coords.y, 15);
+                }
+            }
+
+            mouseX = coords.x;
+            mouseY = coords.y;
+        });
+
+        window.addEventListener('mouseup', () => { isMouseDown = false; });
+
+        // Touch event support for Mobile/Tablets
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isMouseDown = true;
+            const coords = getCanvasCoordinates(e);
+            mouseX = coords.x;
+            mouseY = coords.y;
+
+            if (gameMode === 'classic') {
+                executeClassicTool(coords.x, coords.y);
+            } else {
+                applyPhysicsPunch(coords.x, coords.y);
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isMouseDown) {
+                const coords = getCanvasCoordinates(e);
+                if (gameMode === 'classic') {
+                    if (['saw', 'gun', 'flame', 'laser', 'paint', 'cleaner', 'magnet'].includes(currentTool)) {
+                        executeClassicTool(coords.x, coords.y);
+                    }
+                } else {
+                    applyPhysicsPunch(coords.x, coords.y, 15);
+                }
+                mouseX = coords.x;
+                mouseY = coords.y;
+            }
+        });
+
+        canvas.addEventListener('touchend', () => { isMouseDown = false; });
+
+        // Main Animation & Physics Loop
+        function gameLoop() {
+            // Update & Render Physics Mode
+            if (gameMode === 'physics') {
+                updatePhysicsMesh();
+                renderPhysicsMesh();
+            }
+
+            // Update Ants in Classic Mode
+            if (gameMode === 'classic' && antsList.length > 0) {
+                ctx.fillStyle = '#000000';
+                antsList.forEach(ant => {
+                    ant.x += Math.cos(ant.angle) * 1.5;
+                    ant.y += Math.sin(ant.angle) * 1.5;
+                    ant.angle += (Math.random() - 0.5) * 0.5;
+
+                    // Keep inside bounds
+                    if (ant.x < 0 || ant.x > canvas.width) ant.angle += Math.PI;
+                    if (ant.y < 0 || ant.y > canvas.height) ant.angle += Math.PI;
+
+                    // Ant eats pixels
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.beginPath();
+                    ctx.arc(ant.x, ant.y, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    // Render tiny ant
+                    ctx.fillRect(ant.x, ant.y, 2, 2);
+                });
+            }
+
+            // Update particles
+            if (particles.length > 0) {
+                ctx.save();
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.alpha -= 0.03;
+
+                    if (p.alpha <= 0) {
+                        particles.splice(i, 1);
+                    } else {
+                        ctx.globalAlpha = p.alpha;
+                        ctx.fillStyle = p.color;
+                        ctx.fillRect(p.x, p.y, p.size, p.size);
+                    }
+                }
+                ctx.restore();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize Game on Window Load
+        window.onload = function() {
+            loadPreset('desktop');
+            gameLoop();
+        };
+    </script>
+</body>
+</html>

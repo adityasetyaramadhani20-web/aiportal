@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>DelSim</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            },
+            accent: '#f59e0b',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS for Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Font Awesome 6 Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Dexie.js for IndexedDB offline persistence -->
+  <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .leaflet-container {
+      font-family: 'Inter', sans-serif;
+      z-index: 10;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .pulse-ring {
+      animation: ringPulse 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+    }
+    @keyframes ringPulse {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      50% { transform: scale(1.4); opacity: 0; }
+      100% { transform: scale(0.9); opacity: 0; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex justify-center min-h-screen antialiased selection:bg-brand-500 selection:text-white">
+
+  <div id="appContainer" class="w-full max-w-lg md:max-w-4xl lg:max-w-6xl bg-white min-h-screen shadow-2xl flex flex-col relative overflow-hidden md:flex-row">
+    
+    <!-- Left / Top Primary Screen Area -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
+      
+      <!-- Top App Bar -->
+      <header class="bg-brand-600 text-white px-4 py-3 shadow-md flex items-center justify-between shrink-0 z-20">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center font-bold text-lg shadow-inner">
+            <i class="fa-solid fa-motorcycle text-brand-100"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold tracking-tight leading-tight">DelSim</h1>
+            <p class="text-xs text-brand-100 flex items-center gap-1">
+              <span id="headerLocName" class="truncate max-w-[180px] sm:max-w-xs font-medium">Memuat titik antar...</span>
+              <button onclick="switchTab('mapTab')" class="underline hover:text-white"><i class="fa-solid fa-pen text-[10px]"></i></button>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <!-- Simulation Mode Quick Pill -->
+          <button onclick="toggleSimControlModal()" class="bg-white/20 hover:bg-white/30 text-xs px-2.5 py-1.5 rounded-full font-medium flex items-center gap-1.5 transition">
+            <span id="simSpeedBadge" class="w-2 h-2 rounded-full bg-emerald-300 animate-ping"></span>
+            <span id="simSpeedText">1x Speed</span>
+            <i class="fa-solid fa-sliders text-[11px]"></i>
+          </button>
+          
+          <!-- Admin / Setting trigger -->
+          <button onclick="switchTab('adminTab')" title="Kelola Katalog" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+            <i class="fa-solid fa-store text-sm"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Body Tabs Viewport -->
+      <main class="flex-1 overflow-y-auto custom-scrollbar relative bg-slate-50 pb-20 md:pb-6" id="mainContent">
+
+        <!-- TAB 1: Beranda & Katalog Makanan -->
+        <section id="catalogTab" class="p-4 space-y-4">
+          <!-- Banner Pengumuman Simulasi -->
+          <div class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
+            <div class="space-y-1">
+              <h2 class="text-lg font-bold">Selamat Datang di DelSim</h2>
+              <p class="text-xs text-brand-100">Jelajahi cita rasa yang terjangkau di sekitarmu.</p>
+            </div>
+            <i class="fa-solid fa-burger text-4xl text-white/30 mr-2"></i>
+          </div>
+
+          <!-- Search & Filter Bar -->
+          <div class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+              <input type="text" id="menuSearchInput" oninput="renderCatalog()" placeholder="Cari makanan, kopi, camilan..." 
+                class="w-full bg-white pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm" />
+            </div>
+            <button onclick="toggleFilterDrawer()" class="bg-white p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm shadow-sm flex items-center gap-1.5 font-medium">
+              <i class="fa-solid fa-arrow-down-wide-short"></i>
+              <span class="hidden sm:inline">Filter</span>
+            </button>
+          </div>
+
+          <!-- Category Pills Bar -->
+          <div class="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar text-xs font-medium" id="categoryChips">
+            <!-- Rendered by JS -->
+          </div>
+
+          <!-- Grid Daftar Menu -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5" id="menuGrid">
+            <!-- Catalog Cards loaded via JS -->
+          </div>
+        </section>
+
+        <!-- TAB 2: Live Tracking & Rute Peta -->
+        <section id="mapTab" class="hidden flex flex-col h-full">
+          <!-- Mini Top Status Header -->
+          <div class="p-3 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-sm">
+            <div>
+              <div class="flex items-center gap-2">
+                <span id="orderBadgeStatus" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Menunggu Order</span>
+                <span id="routeDistanceEta" class="text-xs text-slate-500 font-medium">ETA: -- Menit</span>
+              </div>
+              <p id="trackingStageDesc" class="text-xs font-semibold text-slate-700 mt-0.5">Silakan lakukan pemesanan makanan untuk memulai simulasi pengantaran.</p>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="recenterMap()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs" title="Fokuskan Peta">
+                <i class="fa-solid fa-crosshairs"></i>
+              </button>
+              <button onclick="toggleLocPickerModal()" class="w-8 h-8 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-semibold" title="Atur Titik Antar / Jemput">
+                <i class="fa-solid fa-map-pin"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- The Leaflet Map Container -->
+          <div class="relative flex-1 min-h-[300px] w-full bg-slate-200">
+            <div id="liveMap" class="w-full h-full"></div>
+
+            <!-- Floating Overlay Courier Status Card -->
+            <div id="activeDriverOverlay" class="hidden absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur-md rounded-2xl p-3.5 shadow-xl border border-slate-100 z-[1000] space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <div class="relative">
+                    <img id="driverAvatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop" class="w-11 h-11 rounded-full object-cover border-2 border-brand-500" alt="Driver" />
+                    <span class="absolute -bottom-1 -right-1 bg-emerald-500 text-white text-[9px] px-1 rounded-full border border-white">4.9 ★</span>
+                  </div>
+                  <div>
+                    <h4 id="driverName" class="text-sm font-bold text-slate-800">Pak Bambang Santoso</h4>
+                    <p class="text-xs text-slate-500 flex items-center gap-1">
+                      <i class="fa-solid fa-motorcycle text-brand-600"></i> Honda Vario • B 4821 KDF
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <button onclick="triggerDriverChatModal()" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-comment-dots text-brand-600"></i>
+                    <span class="hidden sm:inline font-medium">Chat</span>
+                    <span id="chatBadge" class="hidden w-2 h-2 rounded-full bg-rose-500"></span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Progress bar pergerakan kurir -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[11px] font-medium text-slate-600">
+                  <span id="simPhaseText">Driver menuju restoran...</span>
+                  <span id="simPercentageText">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                  <div id="simProgressBar" class="bg-brand-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: Riwayat Transaksi -->
+        <section id="historyTab" class="hidden p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="font-bold text-slate-800 text-base">Riwayat Transaksi</h2>
+            <button onclick="clearAllHistory()" class="text-xs text-rose-500 hover:underline">Hapus Riwayat</button>
+          </div>
+          <div id="historyListContainer" class="space-y-3">
+            <!-- Populated via JS -->
+          </div>
+        </section>
+
+        <!-- TAB 4: Admin / Pengaturan Katalog & Skenario -->
+        <section id="adminTab" class="hidden p-4 space-y-4">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+            <div>
+              <h2 class="font-bold text-slate-800 text-base">Kelola Menu</h2>
+              <p class="text-xs text-slate-500">Atur menu yang akan dijajakan.</p>
+            </div>
+            <button onclick="openMenuFormModal()" class="bg-brand-600 hover:bg-brand-700 text-white text-xs px-3 py-2 rounded-xl font-medium flex items-center gap-1.5 shadow-sm">
+              <i class="fa-solid fa-plus"></i> Tambah Menu
+            </button>
+          </div>
+
+          <!-- Scenario Export / Import Actions -->
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Backup & Eksport Skenario</h3>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <button onclick="exportScenarioJSON()" class="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-medium flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-file-export text-brand-600"></i> Unduh JSON
+              </button>
+              <label class="p-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-medium flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                <i class="fa-solid fa-file-import text-amber-600"></i> Impor JSON
+                <input type="file" id="importScenarioInput" onchange="importScenarioJSON(event)" accept=".json" class="hidden" />
+              </label>
+            </div>
+            <button onclick="restoreDefaultCatalog()" class="w-full text-xs text-slate-500 hover:text-rose-600 py-1 font-medium transition flex items-center justify-center gap-1">
+              <i class="fa-solid fa-rotate-left"></i> Pulihkan Menu Bawaan DelSim
+            </button>
+          </div>
+
+          <!-- Admin Menu Items Table/List -->
+          <div class="space-y-2">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Daftar Menu Aktif</h3>
+            <div id="adminMenuList" class="space-y-2">
+              <!-- Admin list loaded by JS -->
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Bottom Navigation Bar (Mobile / Responsive) -->
+      <nav class="bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-around shrink-0 z-20 shadow-lg">
+        <button onclick="switchTab('catalogTab')" id="navCatalog" class="flex flex-col items-center gap-1 text-brand-600 transition">
+          <i class="fa-solid fa-bowl-food text-lg"></i>
+          <span class="text-[10px] font-semibold">Beranda</span>
+        </button>
+
+        <button onclick="switchTab('mapTab')" id="navMap" class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition relative">
+          <i class="fa-solid fa-map-location-dot text-lg"></i>
+          <span class="text-[10px] font-semibold">Tracking</span>
+          <span id="navTrackingDot" class="hidden absolute top-0 right-1 w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+        </button>
+
+        <button onclick="switchTab('historyTab')" id="navHistory" class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition">
+          <i class="fa-solid fa-receipt text-lg"></i>
+          <span class="text-[10px] font-semibold">Riwayat</span>
+        </button>
+
+        <button onclick="switchTab('adminTab')" id="navAdmin" class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition">
+          <i class="fa-solid fa-gear text-lg"></i>
+          <span class="text-[10px] font-semibold">Katalog</span>
+        </button>
+      </nav>
+
+      <!-- Floating Checkout Trigger Button -->
+      <div id="floatingCartBtn" class="hidden absolute bottom-16 left-4 right-4 z-30 transition-transform duration-300">
+        <button onclick="openCheckoutModal()" class="w-full bg-brand-600 hover:bg-brand-700 active:scale-[0.99] text-white p-3.5 rounded-2xl shadow-xl flex items-center justify-between font-semibold transition">
+          <div class="flex items-center gap-2.5">
+            <span id="cartCountBadge" class="w-6 h-6 rounded-full bg-white text-brand-600 font-bold text-xs flex items-center justify-center">0</span>
+            <span class="text-sm">Lihat Keranjang</span>
+          </div>
+          <span id="cartTotalPrice" class="text-sm tracking-tight">Rp 0</span>
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- MODALS CONTAINER -->
+
+  <!-- 1. Modal Checkout & Review Pesanan -->
+  <div id="checkoutModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+          <i class="fa-solid fa-bag-shopping text-brand-600"></i> Checkout Pesanan
+        </h3>
+        <button onclick="closeCheckoutModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div class="p-4 overflow-y-auto custom-scrollbar space-y-4 flex-1">
+        <!-- Lokasi Alamat Pengantaran -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Rute Pengantaran</span>
+            <button onclick="toggleLocPickerModal()" class="text-xs text-brand-600 font-semibold hover:underline flex items-center gap-1">
+              <i class="fa-solid fa-location-dot"></i> Ubah Pin
+            </button>
+          </div>
+          <div class="space-y-1.5 text-xs text-slate-700">
+            <div class="flex items-start gap-2">
+              <span class="w-2 h-2 rounded-full bg-amber-500 mt-1 shrink-0"></span>
+              <div>
+                <p class="font-semibold" id="checkoutRestoName">Restoran DelSim Senopati</p>
+                <p class="text-[11px] text-slate-400" id="checkoutRestoCoord">-6.2383, 106.8118</p>
+              </div>
+            </div>
+            <div class="border-l-2 border-dashed border-slate-300 ml-1 h-3"></div>
+            <div class="flex items-start gap-2">
+              <span class="w-2 h-2 rounded-full bg-brand-600 mt-1 shrink-0"></span>
+              <div>
+                <p class="font-semibold" id="checkoutUserAddress">Titik Drop-Off Pelanggan</p>
+                <p class="text-[11px] text-slate-400" id="checkoutUserCoord">-6.2443, 106.7998</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daftar Item Belanja -->
+        <div class="space-y-2">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Rincian Item</span>
+          <div id="checkoutItemsList" class="space-y-2">
+            <!-- JS populated -->
+          </div>
+        </div>
+
+        <!-- Metode Pembayaran -->
+        <div class="space-y-2">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Metode Pembayaran</span>
+          <div class="grid grid-cols-2 gap-2 text-xs font-medium">
+            <label class="p-2.5 rounded-xl border-2 border-brand-500 bg-brand-50/50 flex items-center gap-2 cursor-pointer has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+              <input type="radio" name="payMethod" value="qris" checked class="accent-brand-600" />
+              <span><i class="fa-solid fa-qrcode text-brand-600 mr-1"></i> QRIS Sim</span>
+            </label>
+            <label class="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center gap-2 cursor-pointer has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+              <input type="radio" name="payMethod" value="ewallet" class="accent-brand-600" />
+              <span><i class="fa-solid fa-wallet text-blue-500 mr-1"></i> E-Wallet</span>
+            </label>
+            <label class="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center gap-2 cursor-pointer has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+              <input type="radio" name="payMethod" value="va" class="accent-brand-600" />
+              <span><i class="fa-solid fa-building-columns text-purple-500 mr-1"></i> Virtual Acc</span>
+            </label>
+            <label class="p-2.5 rounded-xl border border-slate-200 bg-white flex items-center gap-2 cursor-pointer has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+              <input type="radio" name="payMethod" value="cod" class="accent-brand-600" />
+              <span><i class="fa-solid fa-money-bill-wave text-emerald-600 mr-1"></i> Bayar Tunai</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Rincian Biaya -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 space-y-1.5 text-xs">
+          <div class="flex justify-between text-slate-600">
+            <span>Subtotal Makanan</span>
+            <span id="billSubtotal">Rp 0</span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span id="billDistanceLabel">Ongkos Kirim (1.5 km)</span>
+            <span id="billDeliveryFee">Rp 10.000</span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Biaya Layanan & Aplikasi</span>
+            <span>Rp 2.000</span>
+          </div>
+          <div class="border-t border-slate-200 pt-1.5 flex justify-between font-bold text-sm text-slate-800">
+            <span>Total Pembayaran</span>
+            <span id="billGrandTotal" class="text-brand-600">Rp 0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-100 shrink-0 bg-white">
+        <button onclick="processOrderCheckout()" class="w-full bg-brand-600 hover:bg-brand-700 active:scale-[0.99] text-white py-3 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-lock text-xs"></i> Bayar & Mulai Pengantaran
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Modal QRIS & Payment Simulation Screen -->
+  <div id="paymentGateModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200">
+      <div class="space-y-1">
+        <div class="inline-flex p-2 bg-brand-50 rounded-2xl text-brand-600 mb-1">
+          <i class="fa-solid fa-qrcode text-2xl"></i>
+        </div>
+        <h3 class="font-bold text-slate-800 text-lg">Simulasi Pembayaran</h3>
+        <p class="text-xs text-slate-500" id="payModalSubtitle">Scan QRIS untuk menyelesaikan pesanan</p>
+      </div>
+
+      <!-- QRIS Canvas Box -->
+      <div id="qrisCanvasContainer" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 inline-block shadow-inner">
+        <canvas id="qrisCanvas" width="180" height="180" class="mx-auto rounded-lg"></canvas>
+        <p class="text-[10px] text-slate-400 font-mono mt-2 tracking-widest">NMID: ID1020304958291</p>
+      </div>
+
+      <div class="space-y-1 text-xs">
+        <p class="text-slate-500 font-medium">Total Tagihan:</p>
+        <p id="payGateTotalText" class="text-xl font-black text-brand-600 font-mono">Rp 0</p>
+      </div>
+
+      <div class="pt-2 flex gap-2">
+        <button onclick="simulatePaymentSuccess()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition">
+          <i class="fa-solid fa-circle-check mr-1"></i> Konfirmasi Bayar (Auto)
+        </button>
+        <button onclick="closePaymentGateModal()" class="px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold">
+          Batal
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Modal Kontrol Simulasi & Setting Timer -->
+  <div id="simControlModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-sm">
+            <i class="fa-solid fa-sliders"></i>
+          </div>
+          <h3 class="font-bold text-slate-800 text-base">Parameter Simulasi DelSim</h3>
+        </div>
+        <button onclick="toggleSimControlModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Speed Control -->
+      <div class="space-y-2">
+        <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Kecepatan Timer Simulasi</label>
+        <div class="grid grid-cols-4 gap-2">
+          <button onclick="setSimSpeed(1)" class="speed-btn py-2 text-xs font-bold rounded-xl border border-slate-200 bg-brand-50 border-brand-500 text-brand-700" data-speed="1">1x (Real)</button>
+          <button onclick="setSimSpeed(2)" class="speed-btn py-2 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600" data-speed="2">2x</button>
+          <button onclick="setSimSpeed(5)" class="speed-btn py-2 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600" data-speed="5">5x Cepat</button>
+          <button onclick="setSimSpeed(10)" class="speed-btn py-2 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600" data-speed="10">10x Turbo</button>
+        </div>
+      </div>
+
+      <!-- Traffic & Weather Conditions -->
+      <div class="space-y-2">
+        <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Kondisi Cuaca & Jalan Raya</label>
+        <select id="simEnvCondition" onchange="updateSimCondition()" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+          <option value="normal">Cerah & Lalu Lintas Lancar (Normal ETA)</option>
+          <option value="rain">Hujan Ringan / Basah (+25% Durasi ETA)</option>
+          <option value="traffic">Macet Jam Sibuk / Rush Hour (+60% Durasi ETA)</option>
+          <option value="storm">Badai Petir & Hujan Lebat (+100% Durasi ETA)</option>
+        </select>
+      </div>
+
+      <!-- Simulation Pause / Reset Actions -->
+      <div class="pt-2 flex gap-2">
+        <button onclick="togglePauseSimulation()" id="simPauseBtn" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-pause"></i> <span>Jeda Simulasi</span>
+        </button>
+        <button onclick="resetCurrentSimulation()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1">
+          <i class="fa-solid fa-rotate-right"></i> Reset Order
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Modal Custom Geotagging & Coordinate Picker -->
+  <div id="locPickerModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-3xl p-5 shadow-2xl space-y-4 flex flex-col max-h-[90vh]">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-location-crosshairs"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">Atur Titik Antar & Jemput</h3>
+            <p class="text-xs text-slate-500">Tentukan koordinat restoran dan alamat pengantaran.</p>
+          </div>
+        </div>
+        <button onclick="toggleLocPickerModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 flex-1 overflow-y-auto custom-scrollbar text-xs">
+        <!-- Koordinat Restoran -->
+        <div class="p-3 bg-amber-50/60 rounded-2xl border border-amber-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-800 flex items-center gap-1">
+              <i class="fa-solid fa-store"></i> Titik Jemput (Restoran)
+            </span>
+            <button onclick="usePresetCoord('resto', -6.2383, 106.8118, 'Senopati Culinary')" class="text-[10px] text-amber-700 underline">Set Senopati</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-[10px] text-slate-500">Latitude</label>
+              <input type="number" step="0.0001" id="inputRestoLat" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500">Longitude</label>
+              <input type="number" step="0.0001" id="inputRestoLng" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Koordinat Pelanggan -->
+        <div class="p-3 bg-brand-50/60 rounded-2xl border border-brand-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-brand-800 flex items-center gap-1">
+              <i class="fa-solid fa-house-user"></i> Titik Antar (Pelanggan)
+            </span>
+            <button onclick="useBrowserGeolocation()" class="text-[10px] text-brand-700 underline font-semibold flex items-center gap-1">
+              <i class="fa-solid fa-crosshairs"></i> Gunakan GPS Saya
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-[10px] text-slate-500">Latitude</label>
+              <input type="number" step="0.0001" id="inputUserLat" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500">Longitude</label>
+              <input type="number" step="0.0001" id="inputUserLng" class="w-full bg-white p-2 border border-slate-200 rounded-lg text-xs" />
+            </div>
+          </div>
+        </div>
+
+        <p class="text-[11px] text-slate-500 italic">
+          * Anda juga dapat langsung menggeser (drag) penanda ikon di tab <b>Tracking Peta</b> kapan saja.
+        </p>
+      </div>
+
+      <div class="pt-2 flex gap-2 shrink-0">
+        <button onclick="saveCustomCoordinates()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition">
+          Simpan & Perbarui Rute
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Modal Driver Chat Simulation -->
+  <div id="driverChatModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+      <div class="p-3 bg-brand-600 text-white flex items-center justify-between shrink-0">
+        <div class="flex items-center space-x-2.5">
+          <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop" class="w-8 h-8 rounded-full border border-white" alt="Driver" />
+          <div>
+            <h4 class="text-xs font-bold leading-tight">Pak Bambang Santoso</h4>
+            <p class="text-[10px] text-brand-100 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-300"></span> Online • Driver DelSim
+            </p>
+          </div>
+        </div>
+        <button onclick="closeDriverChatModal()" class="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center text-xs">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div id="chatMessagesContainer" class="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3 bg-slate-50 text-xs">
+        <!-- Populated via chat engine -->
+      </div>
+
+      <div class="p-3 bg-white border-t border-slate-100 flex items-center gap-2 shrink-0">
+        <input type="text" id="chatUserInput" onkeypress="if(event.key==='Enter') sendUserChatMessage()" placeholder="Ketik pesan untuk driver..." 
+          class="flex-1 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-brand-500" />
+        <button onclick="sendUserChatMessage()" class="w-9 h-9 rounded-xl bg-brand-600 hover:bg-brand-700 text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Modal Rating & Ulasan Driver -->
+  <div id="ratingModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200">
+      <div class="w-14 h-14 bg-brand-50 rounded-full flex items-center justify-center text-brand-600 text-2xl mx-auto shadow-inner">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-slate-800 text-lg">Pesanan Sampai Tujuan!</h3>
+        <p class="text-xs text-slate-500">Bagaimana pengalaman pengantaran makanan Anda?</p>
+      </div>
+
+      <!-- Star Rating Input -->
+      <div class="flex justify-center items-center gap-2 text-2xl text-amber-400" id="starContainer">
+        <button onclick="setRatingStars(1)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+        <button onclick="setRatingStars(2)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+        <button onclick="setRatingStars(3)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+        <button onclick="setRatingStars(4)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+        <button onclick="setRatingStars(5)" class="hover:scale-125 transition"><i class="fa-solid fa-star"></i></button>
+      </div>
+
+      <!-- Tag Pills -->
+      <div class="flex flex-wrap justify-center gap-1.5 text-[11px]">
+        <button onclick="toggleReviewTag(this)" class="tag-pill px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600">Rasa Lezat</button>
+        <button onclick="toggleReviewTag(this)" class="tag-pill px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600">Driver Cepat</button>
+        <button onclick="toggleReviewTag(this)" class="tag-pill px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600">Kemasan Rapi</button>
+        <button onclick="toggleReviewTag(this)" class="tag-pill px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600">Ramah Sopan</button>
+      </div>
+
+      <textarea id="ratingNotesInput" rows="2" placeholder="Tulis komentar tambahan (opsional)..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-brand-500 outline-none"></textarea>
+
+      <button onclick="submitRatingAndFinish()" class="w-full bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition">
+        Kirim Penilaian
+      </button>
+    </div>
+  </div>
+
+  <!-- 7. Modal Form Tambah/Edit Menu (Admin) -->
+  <div id="menuFormModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-3 max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2 shrink-0">
+        <h3 id="menuFormTitle" class="font-bold text-slate-800 text-base">Tambah Menu Baru</h3>
+        <button onclick="closeMenuFormModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="menuCrudForm" onsubmit="handleMenuFormSubmit(event)" class="space-y-3 overflow-y-auto custom-scrollbar flex-1 text-xs">
+        <input type="hidden" id="formMenuId" />
+        
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nama Makanan / Minuman</label>
+          <input type="text" id="formMenuName" required placeholder="Contoh: Ayam Geprek Sambal Matah" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Kategori</label>
+            <select id="formMenuCategory" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="Makanan">Makanan</option>
+              <option value="Minuman">Minuman</option>
+              <option value="Snack">Snack</option>
+              <option value="Kopi">Kopi</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Harga (Rp)</label>
+            <input type="number" id="formMenuPrice" required min="1000" step="500" placeholder="25000" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Deskripsi Singkat</label>
+          <textarea id="formMenuDesc" rows="2" placeholder="Komposisi dan cita rasa menu..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Foto Menu (URL atau Unggah File)</label>
+          <div class="flex gap-2">
+            <input type="url" id="formMenuImageUrl" placeholder="https://..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-brand-500" />
+            <label class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl cursor-pointer flex items-center justify-center font-medium">
+              <i class="fa-solid fa-upload mr-1"></i> File
+              <input type="file" id="formMenuFileInput" onchange="handleImageFilePick(event)" accept="image/*" class="hidden" />
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-2 flex gap-2 shrink-0">
+          <button type="submit" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-2.5 rounded-xl font-bold text-xs shadow-md transition">
+            Simpan Menu
+          </button>
+          <button type="button" onclick="closeMenuFormModal()" class="px-4 bg-slate-100 text-slate-600 rounded-xl font-medium">
+            Batal
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Message Overlay -->
+  <div id="toastNotification" class="fixed top-5 right-5 z-[9999] transition-all transform duration-300 opacity-0 pointer-events-none translate-y-[-10px] bg-slate-900 text-white text-xs px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-brand-400"></i>
+    <span id="toastMessage">Notifikasi sistem</span>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC & STATE ENGINE -->
+  <script>
+    // 1. IndexedDB Initialization via Dexie
+    const db = new Dexie("DelSimDatabase");
+    db.version(1).stores({
+      menu: "++id, name, category, price",
+      orders: "++id, timestamp, status, total",
+      settings: "key"
+    });
+
+    // Default Fallback Catalog Data
+    const defaultMenuData = [
+      {
+        name: "Nasi Goreng Spesial DelSim",
+        category: "Makanan",
+        price: 28000,
+        desc: "Nasi goreng aromatik dengan telur mata sapi, sate ayam, dan kerupuk udang renyah.",
+        image: "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=400&auto=format&fit=crop",
+        rating: 4.9
+      },
+      {
+        name: "Ayam Geprek Sambal Matah",
+        category: "Makanan",
+        price: 24000,
+        desc: "Ayam krispi gurih dengan ulekan sambal matah segar serai & bawang merah.",
+        image: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400&auto=format&fit=crop",
+        rating: 4.8
+      },
+      {
+        name: "Kopi Susu Gula Aren",
+        category: "Kopi",
+        price: 18000,
+        desc: "Double espresso arabika dengan susu segar creamy dan gula aren murni.",
+        image: "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400&auto=format&fit=crop",
+        rating: 4.9
+      },
+      {
+        name: "Matcha Latte Signature",
+        category: "Minuman",
+        price: 22000,
+        desc: "Matcha Uji asli Jepang dipadukan dengan oatmilk lembut segar.",
+        image: "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=400&auto=format&fit=crop",
+        rating: 4.7
+      },
+      {
+        name: "Dimsum Mentai Mozzarella",
+        category: "Snack",
+        price: 26000,
+        desc: "Dimsum ayam udang isi 4 pcs berlumur saus mentai gurih ditorch wangi.",
+        image: "https://images.unsplash.com/photo-1496116218417-1a781b1c416c?w=400&auto=format&fit=crop",
+        rating: 4.9
+      },
+      {
+        name: "Truffle Beef Burger",
+        category: "Makanan",
+        price: 42000,
+        desc: "Patty daging sapi Australia 120gr, keju leleh, dan saus truffle mayo gurih.",
+        image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format&fit=crop",
+        rating: 4.8
+      }
+    ];
+
+    // Application Reactive State
+    const AppState = {
+      cart: {}, // { itemId: { item, qty } }
+      activeTab: 'catalogTab',
+      selectedCategory: 'Semua',
+      restoLocation: { lat: -6.2383, lng: 106.8118, name: "Restoran DelSim Senopati" },
+      userLocation: { lat: -6.2443, lng: 106.7998, name: "Alamat Saya (Kebayoran Baru)" },
+      simSpeed: 1,
+      simCondition: 'normal', // normal, rain, traffic, storm
+      isPaused: false,
+      activeOrder: null, // Current active simulation order
+      routeWaypoints: [], // Array of [lat, lng] points for the courier
+      trackingTimerId: null,
+      lastTimestamp: 0,
+      activeRatingStars: 5,
+      selectedReviewTags: []
+    };
+
+    // Web Audio Synthesizer for in-app chimes (No external sound files required)
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+      },
+      playChime(type = 'bell') {
+        try {
+          this.init();
+          const ctx = this.ctx;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          const now = ctx.currentTime;
+          if (type === 'bell') {
+            osc.frequency.setValueAtTime(587.33, now); // D5
+            osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+            osc.start(now);
+            osc.stop(now + 0.5);
+          } else if (type === 'success') {
+            osc.frequency.setValueAtTime(440, now);
+            osc.frequency.setValueAtTime(554.37, now + 0.1);
+            osc.frequency.setValueAtTime(659.25, now + 0.2);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+            osc.start(now);
+            osc.stop(now + 0.6);
+          }
+        } catch (e) {
+          console.debug("Audio note skipped:", e);
+        }
+      }
+    };
+
+    let mapInstance = null;
+    let restoMarker = null;
+    let userMarker = null;
+    let courierMarker = null;
+    let routePolyline = null;
+
+    function initMap() {
+      if (mapInstance) return;
+
+      mapInstance = L.map('liveMap', {
+        zoomControl: false
+      }).setView([AppState.restoLocation.lat, AppState.restoLocation.lng], 14);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(mapInstance);
+
+      // Custom DivIcons
+      const restoIcon = L.divIcon({
+        className: 'custom-pin',
+        html: `<div class="w-8 h-8 rounded-full bg-amber-500 text-white shadow-lg flex items-center justify-center border-2 border-white text-xs">
+                 <i class="fa-solid fa-utensils"></i>
+               </div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      const userIcon = L.divIcon({
+        className: 'custom-pin',
+        html: `<div class="w-8 h-8 rounded-full bg-brand-600 text-white shadow-lg flex items-center justify-center border-2 border-white text-xs">
+                 <i class="fa-solid fa-house"></i>
+               </div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      const courierIcon = L.divIcon({
+        className: 'custom-courier-pin',
+        html: `<div class="relative flex items-center justify-center">
+                 <div class="absolute w-9 h-9 rounded-full bg-emerald-400 opacity-75 pulse-ring"></div>
+                 <div class="w-9 h-9 rounded-full bg-emerald-600 text-white shadow-xl flex items-center justify-center border-2 border-white text-sm z-10">
+                   <i class="fa-solid fa-motorcycle"></i>
+                 </div>
+               </div>`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
+      });
+
+      // Markers
+      restoMarker = L.marker([AppState.restoLocation.lat, AppState.restoLocation.lng], {
+        icon: restoIcon,
+        draggable: true
+      }).addTo(mapInstance).bindPopup("<b>Restoran</b><br>Tarik untuk pindah lokasi");
+
+      userMarker = L.marker([AppState.userLocation.lat, AppState.userLocation.lng], {
+        icon: userIcon,
+        draggable: true
+      }).addTo(mapInstance).bindPopup("<b>Alamat Anda</b><br>Tarik untuk ubah tujuan");
+
+      courierMarker = L.marker([AppState.restoLocation.lat, AppState.restoLocation.lng], {
+        icon: courierIcon
+      });
+
+      // Dragging handlers
+      restoMarker.on('dragend', function (e) {
+        const coord = e.target.getLatLng();
+        AppState.restoLocation.lat = coord.lat;
+        AppState.restoLocation.lng = coord.lng;
+        refreshRoute();
+      });
+
+      userMarker.on('dragend', function (e) {
+        const coord = e.target.getLatLng();
+        AppState.userLocation.lat = coord.lat;
+        AppState.userLocation.lng = coord.lng;
+        refreshRoute();
+      });
+
+      // Generate initial route
+      refreshRoute();
+    }
+
+    // Calculates Distance (KM) via Haversine Formula
+    function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371; // Radius of Earth in KM
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // Refresh route using real road routing (OSRM) with automatic smooth fallback
+    async function refreshRoute() {
+      const start = AppState.restoLocation;
+      const end = AppState.userLocation;
+
+      // Update addresses display in UI
+      document.getElementById('checkoutRestoCoord').textContent = `${start.lat.toFixed(4)}, ${start.lng.toFixed(4)}`;
+      document.getElementById('checkoutUserCoord').textContent = `${end.lat.toFixed(4)}, ${end.lng.toFixed(4)}`;
+
+      try {
+        // Query OSRM Public Routing API
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+        const resp = await fetch(osrmUrl);
+        const data = await resp.json();
+
+        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          // OSRM returns coordinates in [lng, lat] format
+          AppState.routeWaypoints = route.geometry.coordinates.map(c => [c[1], c[0]]);
+          const distanceKm = (route.distance / 1000).toFixed(1);
+          const durationMin = Math.ceil(route.duration / 60);
+          updateRouteVisuals(distanceKm, durationMin);
+          return;
+        }
+      } catch (err) {
+        console.debug("OSRM routing offline or throttled, using interpolation fallback:", err);
+      }
+
+      // FALLBACK: Haversine straight line interpolated into 20 curved segments
+      const fallbackPoints = [];
+      const steps = 25;
+      const straightDist = calculateHaversineDistance(start.lat, start.lng, end.lat, end.lng);
+      
+      for (let i = 0; i <= steps; i++) {
+        const ratio = i / steps;
+        // Add subtle sine-wave curve to simulate city road turns
+        const curveOffset = Math.sin(ratio * Math.PI) * 0.002;
+        const lat = start.lat + (end.lat - start.lat) * ratio + curveOffset;
+        const lng = start.lng + (end.lng - start.lng) * ratio + curveOffset;
+        fallbackPoints.push([lat, lng]);
+      }
+
+      AppState.routeWaypoints = fallbackPoints;
+      const distanceKm = straightDist.toFixed(1);
+      const durationMin = Math.max(5, Math.ceil(straightDist * 3)); // ~20 km/h baseline
+      updateRouteVisuals(distanceKm, durationMin);
+    }
+
+    function updateRouteVisuals(distanceKm, baseDurationMin) {
+      // Draw or update Leaflet Polyline
+      if (routePolyline) {
+        mapInstance.removeLayer(routePolyline);
+      }
+      routePolyline = L.polyline(AppState.routeWaypoints, {
+        color: '#059669',
+        weight: 5,
+        opacity: 0.8,
+        dashArray: '8, 8'
+      }).addTo(mapInstance);
+
+      // Fit map bounds
+      if (AppState.routeWaypoints.length > 0) {
+        mapInstance.fitBounds(routePolyline.getBounds(), { padding: [50, 50] });
+      }
+
+      // Calculate ETA with simulation weather modifier
+      let multiplier = 1.0;
+      if (AppState.simCondition === 'rain') multiplier = 1.25;
+      if (AppState.simCondition === 'traffic') multiplier = 1.6;
+      if (AppState.simCondition === 'storm') multiplier = 2.0;
+
+      const finalEta = Math.ceil(baseDurationMin * multiplier);
+      document.getElementById('routeDistanceEta').textContent = `${distanceKm} km • ${finalEta} Menit`;
+      document.getElementById('billDistanceLabel').textContent = `Ongkos Kirim (${distanceKm} km)`;
+      
+      // Calculate Delivery Fee: Base 8000 + 2000 per KM
+      const deliveryFee = Math.max(8000, Math.round((distanceKm * 2500) / 1000) * 1000);
+      AppState.calculatedDeliveryFee = deliveryFee;
+      AppState.calculatedDistance = distanceKm;
+      AppState.calculatedEta = finalEta;
+      updateCartTotals();
+    }
+
+    async function seedInitialDatabase() {
+      const count = await db.menu.count();
+      if (count === 0) {
+        await db.menu.bulkAdd(defaultMenuData);
+      }
+      renderCategories();
+      renderCatalog();
+      renderAdminCatalog();
+      loadOrderHistory();
+    }
+
+    async function renderCategories() {
+      const items = await db.menu.toArray();
+      const categories = ['Semua', ...new Set(items.map(i => i.category))];
+      const container = document.getElementById('categoryChips');
+      container.innerHTML = categories.map(cat => `
+        <button onclick="filterCategory('${cat}')" 
+          class="px-3.5 py-1.5 rounded-full whitespace-nowrap transition ${
+            AppState.selectedCategory === cat 
+              ? 'bg-brand-600 text-white shadow-sm font-semibold' 
+              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+          }">
+          ${cat}
+        </button>
+      `).join('');
+    }
+
+    function filterCategory(cat) {
+      AppState.selectedCategory = cat;
+      renderCategories();
+      renderCatalog();
+    }
+
+    async function renderCatalog() {
+      const searchTerm = document.getElementById('menuSearchInput').value.toLowerCase();
+      let items = await db.menu.toArray();
+
+      if (AppState.selectedCategory !== 'Semua') {
+        items = items.filter(i => i.category === AppState.selectedCategory);
+      }
+      if (searchTerm) {
+        items = items.filter(i => i.name.toLowerCase().includes(searchTerm) || (i.desc && i.desc.toLowerCase().includes(searchTerm)));
+      }
+
+      const grid = document.getElementById('menuGrid');
+      if (items.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full py-12 text-center text-slate-400 space-y-2">
+            <i class="fa-solid fa-utensils text-3xl"></i>
+            <p class="text-xs">Tidak ada menu yang sesuai.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = items.map(item => {
+        const inCart = AppState.cart[item.id] ? AppState.cart[item.id].qty : 0;
+        return `
+          <div class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between group">
+            <div>
+              <div class="relative h-36 w-full bg-slate-100 overflow-hidden">
+                <img src="${item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400'}" 
+                     alt="${item.name}" 
+                     class="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
+                     onerror="this.src='https://placehold.co/400x300/f1f5f9/94a3b8?text=Menu+DelSim'" />
+                <span class="absolute top-2 right-2 bg-white/90 backdrop-blur text-slate-800 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                  ★ ${item.rating || '4.8'}
+                </span>
+                <span class="absolute bottom-2 left-2 bg-slate-900/60 backdrop-blur text-white text-[9px] px-2 py-0.5 rounded-md">
+                  ${item.category}
+                </span>
+              </div>
+              <div class="p-3">
+                <h3 class="font-bold text-slate-800 text-sm line-clamp-1">${item.name}</h3>
+                <p class="text-xs text-slate-500 line-clamp-2 mt-1">${item.desc || 'Menu lezat pilihan dari resto terbaik DelSim.'}</p>
+              </div>
+            </div>
+
+            <div class="p-3 pt-0 flex items-center justify-between mt-2">
+              <span class="text-sm font-extrabold text-brand-700">Rp ${Number(item.price).toLocaleString('id-ID')}</span>
+              ${
+                inCart > 0 
+                  ? `<div class="flex items-center gap-2 bg-brand-50 rounded-xl p-1 border border-brand-200">
+                       <button onclick="updateCartQty(${item.id}, -1)" class="w-6 h-6 rounded-lg bg-white text-brand-700 hover:bg-brand-100 text-xs font-bold flex items-center justify-center">-</button>
+                       <span class="text-xs font-bold text-brand-700 px-1">${inCart}</span>
+                       <button onclick="updateCartQty(${item.id}, 1)" class="w-6 h-6 rounded-lg bg-brand-600 text-white hover:bg-brand-700 text-xs font-bold flex items-center justify-center">+</button>
+                     </div>`
+                  : `<button onclick="addToCart(${item.id})" class="bg-brand-50 hover:bg-brand-600 text-brand-700 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1">
+                       <i class="fa-solid fa-plus text-[10px]"></i> Tambah
+                     </button>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function addToCart(itemId) {
+      const item = await db.menu.get(itemId);
+      if (!item) return;
+
+      if (!AppState.cart[itemId]) {
+        AppState.cart[itemId] = { item, qty: 1 };
+      } else {
+        AppState.cart[itemId].qty += 1;
+      }
+      AudioEngine.playChime('bell');
+      updateCartTotals();
+      renderCatalog();
+    }
+
+    function updateCartQty(itemId, delta) {
+      if (!AppState.cart[itemId]) return;
+      AppState.cart[itemId].qty += delta;
+      if (AppState.cart[itemId].qty <= 0) {
+        delete AppState.cart[itemId];
+      }
+      updateCartTotals();
+      renderCatalog();
+      if (document.getElementById('checkoutModal').classList.contains('hidden') === false) {
+        renderCheckoutItemList();
+      }
+    }
+
+    function updateCartTotals() {
+      const cartKeys = Object.keys(AppState.cart);
+      let count = 0;
+      let subtotal = 0;
+
+      cartKeys.forEach(k => {
+        count += AppState.cart[k].qty;
+        subtotal += AppState.cart[k].qty * AppState.cart[k].item.price;
+      });
+
+      const deliveryFee = AppState.calculatedDeliveryFee || 10000;
+      const serviceFee = 2000;
+      const grandTotal = subtotal > 0 ? (subtotal + deliveryFee + serviceFee) : 0;
+
+      // Floating Cart pill UI
+      const cartBtn = document.getElementById('floatingCartBtn');
+      if (count > 0) {
+        cartBtn.classList.remove('hidden');
+        document.getElementById('cartCountBadge').textContent = count;
+        document.getElementById('cartTotalPrice').textContent = `Rp ${grandTotal.toLocaleString('id-ID')}`;
+      } else {
+        cartBtn.classList.add('hidden');
+      }
+
+      // Checkout modal numbers
+      document.getElementById('billSubtotal').textContent = `Rp ${subtotal.toLocaleString('id-ID')}`;
+      document.getElementById('billDeliveryFee').textContent = `Rp ${deliveryFee.toLocaleString('id-ID')}`;
+      document.getElementById('billGrandTotal').textContent = `Rp ${grandTotal.toLocaleString('id-ID')}`;
+      AppState.currentGrandTotal = grandTotal;
+    }
+
+    function openCheckoutModal() {
+      if (Object.keys(AppState.cart).length === 0) {
+        showToast("Keranjang Anda masih kosong!", "warning");
+        return;
+      }
+      renderCheckoutItemList();
+      document.getElementById('checkoutModal').classList.remove('hidden');
+    }
+
+    function closeCheckoutModal() {
+      document.getElementById('checkoutModal').classList.add('hidden');
+    }
+
+    function renderCheckoutItemList() {
+      const listContainer = document.getElementById('checkoutItemsList');
+      const items = Object.values(AppState.cart);
+      listContainer.innerHTML = items.map(entry => `
+        <div class="flex items-center justify-between py-1.5 border-b border-slate-100 text-xs">
+          <div>
+            <p class="font-bold text-slate-800">${entry.item.name}</p>
+            <p class="text-slate-500">Rp ${entry.item.price.toLocaleString('id-ID')} x ${entry.qty}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-slate-700">Rp ${(entry.item.price * entry.qty).toLocaleString('id-ID')}</span>
+            <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+              <button onclick="updateCartQty(${entry.item.id}, -1)" class="w-5 h-5 bg-white rounded text-slate-700 font-bold">-</button>
+              <button onclick="updateCartQty(${entry.item.id}, 1)" class="w-5 h-5 bg-white rounded text-slate-700 font-bold">+</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function processOrderCheckout() {
+      const selectedPayment = document.querySelector('input[name="payMethod"]:checked').value;
+      closeCheckoutModal();
+
+      if (selectedPayment === 'qris') {
+        drawQrisCanvas();
+        document.getElementById('payGateTotalText').textContent = `Rp ${AppState.currentGrandTotal.toLocaleString('id-ID')}`;
+        document.getElementById('paymentGateModal').classList.remove('hidden');
+      } else {
+        // Direct simulation for COD / E-Wallet
+        showToast("Memproses pembayaran...", "info");
+        setTimeout(() => {
+          simulatePaymentSuccess();
+        }, 1200);
+      }
+    }
+
+    function closePaymentGateModal() {
+      document.getElementById('paymentGateModal').classList.add('hidden');
+    }
+
+    // Draws custom procedural QR code matrix on HTML5 Canvas
+    function drawQrisCanvas() {
+      const canvas = document.getElementById('qrisCanvas');
+      const ctx = canvas.getContext('2d');
+      const size = 180;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, size, size);
+
+      // Draw QR corner finders
+      function drawFinder(x, y) {
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(x, y, 40, 40);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x + 6, y + 6, 28, 28);
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(x + 12, y + 12, 16, 16);
+      }
+
+      drawFinder(15, 15);
+      drawFinder(size - 55, 15);
+      drawFinder(15, size - 55);
+
+      // Procedural data dots inside
+      ctx.fillStyle = "#059669";
+      for (let r = 0; r < 14; r++) {
+        for (let c = 0; c < 14; c++) {
+          if ((r < 5 && c < 5) || (r < 5 && c > 8) || (r > 8 && c < 5)) continue;
+          if ((r + c * 3) % 2 === 0 || (r * c) % 3 === 0) {
+            ctx.fillRect(20 + c * 10, 20 + r * 10, 7, 7);
+          }
+        }
+      }
+
+      // Middle badge
+      ctx.fillStyle = "#059669";
+      ctx.fillRect(size / 2 - 14, size / 2 - 14, 28, 28);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 9px Inter";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("QRIS", size / 2, size / 2);
+    }
+
+    async function simulatePaymentSuccess() {
+      closePaymentGateModal();
+      AudioEngine.playChime('success');
+      showToast("Pembayaran Berhasil Dikonfirmasi!", "success");
+
+      // Build Order Object
+      const newOrder = {
+        timestamp: Date.now(),
+        dateStr: new Date().toLocaleString('id-ID'),
+        items: Object.values(AppState.cart),
+        total: AppState.currentGrandTotal,
+        status: 'Mencari Driver',
+        driver: {
+          name: "Bambang Santoso",
+          vehicle: "Honda Vario • B 4821 KDF",
+          avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop"
+        },
+        chatHistory: [
+          { sender: 'driver', text: 'Halo kak, pesanan sudah saya terima dan siap meluncur ke resto ya!', time: 'Baru saja' }
+        ]
+      };
+
+      const orderId = await db.orders.add(newOrder);
+      newOrder.id = orderId;
+      AppState.activeOrder = newOrder;
+
+      // Clear Shopping Cart
+      AppState.cart = {};
+      updateCartTotals();
+      renderCatalog();
+
+      // Switch to Map tab
+      switchTab('mapTab');
+      startLiveTrackingSimulation();
+    }
+
+    function startLiveTrackingSimulation() {
+      if (!courierMarker) return;
+      if (!AppState.routeWaypoints || AppState.routeWaypoints.length < 2) return;
+
+      document.getElementById('activeDriverOverlay').classList.remove('hidden');
+      document.getElementById('navTrackingDot').classList.remove('hidden');
+
+      // Place courier at start (Resto)
+      courierMarker.setLatLng(AppState.restoLocation).addTo(mapInstance);
+
+      // Simulation Timeline Configuration
+      AppState.simProgress = 0; // 0.0 to 1.0
+      AppState.simStage = 'to_resto'; // 'to_resto', 'cooking', 'on_the_way', 'delivered'
+      AppState.lastTimestamp = performance.now();
+      
+      if (AppState.trackingTimerId) cancelAnimationFrame(AppState.trackingTimerId);
+      
+      runSimulationStep();
+    }
+
+    function runSimulationStep(now) {
+      if (!AppState.activeOrder) return;
+
+      if (!AppState.isPaused && now) {
+        const deltaSec = (now - AppState.lastTimestamp) / 1000;
+        AppState.lastTimestamp = now;
+
+        // Base trip takes 40 seconds on 1x speed
+        const speedMultiplier = AppState.simSpeed;
+        const progressIncrement = (deltaSec / 45) * speedMultiplier;
+
+        AppState.simProgress = Math.min(1.0, AppState.simProgress + progressIncrement);
+        updateSimulationUI(AppState.simProgress);
+      } else {
+        AppState.lastTimestamp = now || performance.now();
+      }
+
+      if (AppState.simProgress < 1.0) {
+        AppState.trackingTimerId = requestAnimationFrame(runSimulationStep);
+      } else {
+        finishDeliverySimulation();
+      }
+    }
+
+    function updateSimulationUI(progress) {
+      const percentage = Math.round(progress * 100);
+      document.getElementById('simProgressBar').style.width = `${percentage}%`;
+      document.getElementById('simPercentageText').textContent = `${percentage}%`;
+
+      const badge = document.getElementById('orderBadgeStatus');
+      const stageDesc = document.getElementById('trackingStageDesc');
+      const phaseText = document.getElementById('simPhaseText');
+
+      // Waypoint index interpolation
+      const totalPoints = AppState.routeWaypoints.length;
+
+      if (progress < 0.25) {
+        AppState.simStage = 'to_resto';
+        badge.className = "px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800";
+        badge.textContent = "Driver Menuju Resto";
+        stageDesc.textContent = "Driver sedang bergerak menuju resto untuk mengambil pesanan Anda.";
+        phaseText.textContent = "Menjemput pesanan di resto...";
+        courierMarker.setLatLng(AppState.restoLocation);
+      } else if (progress >= 0.25 && progress < 0.45) {
+        AppState.simStage = 'cooking';
+        badge.className = "px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800";
+        badge.textContent = "Restoran Menyiapkan";
+        stageDesc.textContent = "Resto sedang mengemas pesanan dengan rapi dan higienis.";
+        phaseText.textContent = "Makanan sedang dimasak & dibungkus...";
+        courierMarker.setLatLng(AppState.restoLocation);
+      } else {
+        AppState.simStage = 'on_the_way';
+        badge.className = "px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800";
+        badge.textContent = "Pesanan Diantar";
+        stageDesc.textContent = "Kurir sedang dalam perjalanan menuju lokasi pengantaran Anda.";
+        phaseText.textContent = "Kurir sedang dalam perjalanan ke alamat Anda...";
+
+        // Map movement along waypoints
+        const travelProgress = (progress - 0.45) / 0.55; // Normalize 0 to 1
+        const targetIndex = Math.min(totalPoints - 1, Math.floor(travelProgress * totalPoints));
+        const currentCoord = AppState.routeWaypoints[targetIndex];
+        if (currentCoord) {
+          courierMarker.setLatLng(currentCoord);
+        }
+      }
+    }
+
+    function finishDeliverySimulation() {
+      AudioEngine.playChime('success');
+      document.getElementById('orderBadgeStatus').textContent = "Pesanan Tiba";
+      document.getElementById('trackingStageDesc').textContent = "Makanan telah sampai di depan pintu Anda. Selamat menikmati!";
+      document.getElementById('activeDriverOverlay').classList.add('hidden');
+      document.getElementById('navTrackingDot').classList.add('hidden');
+
+      if (AppState.activeOrder) {
+        AppState.activeOrder.status = "Selesai";
+        db.orders.update(AppState.activeOrder.id, { status: "Selesai" });
+      }
+
+      // Show Rating Dialog
+      setTimeout(() => {
+        openRatingModal();
+      }, 700);
+    }
+
+    function setSimSpeed(multiplier) {
+      AppState.simSpeed = multiplier;
+      document.getElementById('simSpeedText').textContent = `${multiplier}x Speed`;
+      
+      document.querySelectorAll('.speed-btn').forEach(b => {
+        if (parseInt(b.getAttribute('data-speed')) === multiplier) {
+          b.className = "speed-btn py-2 text-xs font-bold rounded-xl border border-brand-500 bg-brand-50 text-brand-700";
+        } else {
+          b.className = "speed-btn py-2 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600";
+        }
+      });
+      showToast(`Kecepatan simulasi: ${multiplier}x`, "info");
+    }
+
+    function updateSimCondition() {
+      AppState.simCondition = document.getElementById('simEnvCondition').value;
+      refreshRoute();
+      showToast("Kondisi lingkungan simulasi diperbarui.", "info");
+    }
+
+    function togglePauseSimulation() {
+      AppState.isPaused = !AppState.isPaused;
+      const btn = document.getElementById('simPauseBtn');
+      if (AppState.isPaused) {
+        btn.innerHTML = `<i class="fa-solid fa-play"></i> <span>Lanjutkan Simulasi</span>`;
+        showToast("Simulasi dijeda.", "warning");
+      } else {
+        btn.innerHTML = `<i class="fa-solid fa-pause"></i> <span>Jeda Simulasi</span>`;
+        AppState.lastTimestamp = performance.now();
+        showToast("Simulasi dilanjutkan.", "info");
+      }
+    }
+
+    function resetCurrentSimulation() {
+      if (AppState.trackingTimerId) cancelAnimationFrame(AppState.trackingTimerId);
+      AppState.activeOrder = null;
+      AppState.simProgress = 0;
+      if (courierMarker && mapInstance) mapInstance.removeLayer(courierMarker);
+      document.getElementById('activeDriverOverlay').classList.add('hidden');
+      document.getElementById('navTrackingDot').classList.add('hidden');
+      document.getElementById('orderBadgeStatus').textContent = "Menunggu Order";
+      document.getElementById('trackingStageDesc').textContent = "Silakan lakukan pemesanan makanan untuk memulai simulasi.";
+      toggleSimControlModal();
+      showToast("Status simulasi berhasil direset.", "info");
+    }
+
+    // Sync timestamp delta when browser tab visibility changes to prevent time drift
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && !AppState.isPaused) {
+        AppState.lastTimestamp = performance.now();
+      }
+    });
+
+    function triggerDriverChatModal() {
+      renderChatMessages();
+      document.getElementById('driverChatModal').classList.remove('hidden');
+      document.getElementById('chatBadge').classList.add('hidden');
+    }
+
+    function closeDriverChatModal() {
+      document.getElementById('driverChatModal').classList.add('hidden');
+    }
+
+    function renderChatMessages() {
+      const container = document.getElementById('chatMessagesContainer');
+      const chats = AppState.activeOrder ? AppState.activeOrder.chatHistory : [];
+
+      container.innerHTML = chats.map(c => `
+        <div class="flex ${c.sender === 'user' ? 'justify-end' : 'justify-start'}">
+          <div class="max-w-[80%] p-2.5 rounded-2xl ${c.sender === 'user' ? 'bg-brand-600 text-white rounded-br-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none shadow-sm'}">
+            <p>${c.text}</p>
+            <span class="text-[9px] block mt-1 opacity-70 text-right">${c.time}</span>
+          </div>
+        </div>
+      `).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function sendUserChatMessage() {
+      const input = document.getElementById('chatUserInput');
+      const text = input.value.trim();
+      if (!text || !AppState.activeOrder) return;
+
+      const nowStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      AppState.activeOrder.chatHistory.push({ sender: 'user', text, time: nowStr });
+      input.value = '';
+      renderChatMessages();
+
+      // Automated Mock Driver Response
+      setTimeout(() => {
+        const replies = [
+          "Siap kak! Makanan dipastikan aman dalam tas pemanas.",
+          "Oke baik kak, sebentar lagi sampai ya.",
+          "Terima kasih infonya kak, saya sudah dekat alamat.",
+          "Sudah di depan gerbang ya kak, terima kasih!"
+        ];
+        const randomReply = replies[Math.floor(Math.random() * replies.length)];
+        AppState.activeOrder.chatHistory.push({ sender: 'driver', text: randomReply, time: 'Baru saja' });
+        AudioEngine.playChime('bell');
+        renderChatMessages();
+      }, 1500);
+    }
+
+    // Rating & Review Screen Logic
+    function openRatingModal() {
+      document.getElementById('ratingModal').classList.remove('hidden');
+      setRatingStars(5);
+    }
+
+    function setRatingStars(count) {
+      AppState.activeRatingStars = count;
+      const stars = document.querySelectorAll('#starContainer button i');
+      stars.forEach((star, idx) => {
+        if (idx < count) {
+          star.className = "fa-solid fa-star text-amber-400";
+        } else {
+          star.className = "fa-regular fa-star text-slate-300";
+        }
+      });
+    }
+
+    function toggleReviewTag(btn) {
+      btn.classList.toggle('bg-brand-50');
+      btn.classList.toggle('border-brand-500');
+      btn.classList.toggle('text-brand-700');
+    }
+
+    async function submitRatingAndFinish() {
+      const notes = document.getElementById('ratingNotesInput').value.trim();
+      if (AppState.activeOrder) {
+        await db.orders.update(AppState.activeOrder.id, {
+          rating: AppState.activeRatingStars,
+          reviewNotes: notes
+        });
+      }
+      document.getElementById('ratingModal').classList.add('hidden');
+      showToast("Terima kasih atas ulasan bintang Anda!", "success");
+      loadOrderHistory();
+      switchTab('historyTab');
+    }
+
+    async function loadOrderHistory() {
+      const orders = await db.orders.reverse().toArray();
+      const container = document.getElementById('historyListContainer');
+
+      if (orders.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-400 space-y-2">
+            <i class="fa-solid fa-receipt text-3xl"></i>
+            <p class="text-xs">Belum ada riwayat pesanan.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = orders.map(ord => `
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm space-y-2 text-xs">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div>
+              <p class="font-bold text-slate-800">Pesanan #${ord.id}</p>
+              <p class="text-[10px] text-slate-400">${ord.dateStr || 'Baru saja'}</p>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ord.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
+              ${ord.status}
+            </span>
+          </div>
+
+          <div class="space-y-1">
+            ${(ord.items || []).map(i => `
+              <div class="flex justify-between text-slate-600 text-[11px]">
+                <span>${i.qty}x ${i.item.name}</span>
+                <span>Rp ${(i.qty * i.item.price).toLocaleString('id-ID')}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="flex items-center justify-between pt-1 font-bold text-slate-800">
+            <span>Total Transaksi</span>
+            <span class="text-brand-600">Rp ${Number(ord.total).toLocaleString('id-ID')}</span>
+          </div>
+
+          ${ord.rating ? `
+            <div class="bg-amber-50/50 p-2 rounded-xl text-[11px] text-amber-800 flex items-center justify-between">
+              <span>Penilaian Anda:</span>
+              <span>${'★'.repeat(ord.rating)} (${ord.rating}/5)</span>
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function clearAllHistory() {
+      await db.orders.clear();
+      loadOrderHistory();
+      showToast("Seluruh riwayat pesanan dibersihkan.", "info");
+    }
+
+    async function renderAdminCatalog() {
+      const items = await db.menu.toArray();
+      const container = document.getElementById('adminMenuList');
+
+      container.innerHTML = items.map(item => `
+        <div class="bg-white p-2.5 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 text-xs shadow-sm">
+          <img src="${item.image || 'https://placehold.co/100'}" class="w-12 h-12 rounded-xl object-cover bg-slate-100" />
+          <div class="flex-1">
+            <h4 class="font-bold text-slate-800">${item.name}</h4>
+            <p class="text-slate-500">${item.category} • Rp ${Number(item.price).toLocaleString('id-ID')}</p>
+          </div>
+          <div class="flex gap-1">
+            <button onclick="editMenuItem(${item.id})" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600">
+              <i class="fa-solid fa-pen text-xs"></i>
+            </button>
+            <button onclick="deleteMenuItem(${item.id})" class="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600">
+              <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openMenuFormModal(isEdit = false) {
+      document.getElementById('menuFormTitle').textContent = isEdit ? "Ubah Menu" : "Tambah Menu Baru";
+      if (!isEdit) {
+        document.getElementById('menuCrudForm').reset();
+        document.getElementById('formMenuId').value = '';
+      }
+      document.getElementById('menuFormModal').classList.remove('hidden');
+    }
+
+    function closeMenuFormModal() {
+      document.getElementById('menuFormModal').classList.add('hidden');
+    }
+
+    async function editMenuItem(id) {
+      const item = await db.menu.get(id);
+      if (!item) return;
+
+      document.getElementById('formMenuId').value = item.id;
+      document.getElementById('formMenuName').value = item.name;
+      document.getElementById('formMenuCategory').value = item.category;
+      document.getElementById('formMenuPrice').value = item.price;
+      document.getElementById('formMenuDesc').value = item.desc || '';
+      document.getElementById('formMenuImageUrl').value = item.image || '';
+
+      openMenuFormModal(true);
+    }
+
+    async function handleMenuFormSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('formMenuId').value;
+      const itemData = {
+        name: document.getElementById('formMenuName').value.trim(),
+        category: document.getElementById('formMenuCategory').value,
+        price: parseInt(document.getElementById('formMenuPrice').value),
+        desc: document.getElementById('formMenuDesc').value.trim(),
+        image: document.getElementById('formMenuImageUrl').value.trim() || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400",
+        rating: 4.8
+      };
+
+      if (id) {
+        await db.menu.update(parseInt(id), itemData);
+        showToast("Menu berhasil diperbarui!", "success");
+      } else {
+        await db.menu.add(itemData);
+        showToast("Menu baru berhasil ditambahkan!", "success");
+      }
+
+      closeMenuFormModal();
+      renderCatalog();
+      renderAdminCatalog();
+      renderCategories();
+    }
+
+    async function deleteMenuItem(id) {
+      await db.menu.delete(id);
+      showToast("Menu dihapus.", "info");
+      renderCatalog();
+      renderAdminCatalog();
+      renderCategories();
+    }
+
+    function handleImageFilePick(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        document.getElementById('formMenuImageUrl').value = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function restoreDefaultCatalog() {
+      await db.menu.clear();
+      await db.menu.bulkAdd(defaultMenuData);
+      renderCatalog();
+      renderAdminCatalog();
+      renderCategories();
+      showToast("Katalog menu bawaan berhasil dipulihkan!", "success");
+    }
+
+    // Export Scenario to JSON file
+    async function exportScenarioJSON() {
+      const menuItems = await db.menu.toArray();
+      const scenario = {
+        appName: "DelSim",
+        version: "1.0",
+        exportedAt: new Date().toISOString(),
+        restoLocation: AppState.restoLocation,
+        userLocation: AppState.userLocation,
+        catalog: menuItems
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(scenario, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `DelSim_Scenario_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast("Skenario berhasil diekspor!", "success");
+    }
+
+    // Import Scenario from JSON file
+    function importScenarioJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const scenario = JSON.parse(e.target.result);
+          if (scenario.catalog && Array.isArray(scenario.catalog)) {
+            await db.menu.clear();
+            await db.menu.bulkAdd(scenario.catalog);
+          }
+          if (scenario.restoLocation) AppState.restoLocation = scenario.restoLocation;
+          if (scenario.userLocation) AppState.userLocation = scenario.userLocation;
+
+          renderCatalog();
+          renderAdminCatalog();
+          renderCategories();
+          refreshRoute();
+          showToast("Skenario berhasil diimpor!", "success");
+        } catch (err) {
+          showToast("Format file JSON tidak valid!", "warning");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function toggleLocPickerModal() {
+      const modal = document.getElementById('locPickerModal');
+      modal.classList.toggle('hidden');
+      if (!modal.classList.contains('hidden')) {
+        document.getElementById('inputRestoLat').value = AppState.restoLocation.lat;
+        document.getElementById('inputRestoLng').value = AppState.restoLocation.lng;
+        document.getElementById('inputUserLat').value = AppState.userLocation.lat;
+        document.getElementById('inputUserLng').value = AppState.userLocation.lng;
+      }
+    }
+
+    function usePresetCoord(type, lat, lng, name) {
+      if (type === 'resto') {
+        document.getElementById('inputRestoLat').value = lat;
+        document.getElementById('inputRestoLng').value = lng;
+      }
+    }
+
+    function useBrowserGeolocation() {
+      if (!navigator.geolocation) {
+        showToast("Geolocation tidak didukung di browser ini.", "warning");
+        return;
+      }
+      showToast("Mendapatkan posisi GPS...", "info");
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          document.getElementById('inputUserLat').value = pos.coords.latitude;
+          document.getElementById('inputUserLng').value = pos.coords.longitude;
+          showToast("Lokasi GPS berhasil diambil!", "success");
+        },
+        err => {
+          showToast("Gagal mengambil GPS: Akses ditolak/non-HTTPS", "warning");
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+
+    function saveCustomCoordinates() {
+      const rLat = parseFloat(document.getElementById('inputRestoLat').value);
+      const rLng = parseFloat(document.getElementById('inputRestoLng').value);
+      const uLat = parseFloat(document.getElementById('inputUserLat').value);
+      const uLng = parseFloat(document.getElementById('inputUserLng').value);
+
+      if (isNaN(rLat) || isNaN(rLng) || isNaN(uLat) || isNaN(uLng)) {
+        showToast("Harap masukkan koordinat numerik yang valid!", "warning");
+        return;
+      }
+
+      AppState.restoLocation.lat = rLat;
+      AppState.restoLocation.lng = rLng;
+      AppState.userLocation.lat = uLat;
+      AppState.userLocation.lng = uLng;
+
+      if (restoMarker) restoMarker.setLatLng([rLat, rLng]);
+      if (userMarker) userMarker.setLatLng([uLat, uLng]);
+
+      refreshRoute();
+      toggleLocPickerModal();
+      showToast("Koordinat berhasil diperbarui!", "success");
+    }
+
+    function toggleSimControlModal() {
+      document.getElementById('simControlModal').classList.toggle('hidden');
+    }
+
+    function recenterMap() {
+      if (mapInstance && routePolyline) {
+        mapInstance.fitBounds(routePolyline.getBounds(), { padding: [50, 50] });
+      }
+    }
+
+    // App Navigation Tabs
+    function switchTab(targetTabId) {
+      AppState.activeTab = targetTabId;
+      const tabs = ['catalogTab', 'mapTab', 'historyTab', 'adminTab'];
+      tabs.forEach(t => {
+        const el = document.getElementById(t);
+        if (t === targetTabId) {
+          el.classList.remove('hidden');
+        } else {
+          el.classList.add('hidden');
+        }
+      });
+
+      // Bottom Nav active highlights
+      const navMapping = {
+        catalogTab: 'navCatalog',
+        mapTab: 'navMap',
+        historyTab: 'navHistory',
+        adminTab: 'navAdmin'
+      };
+
+      Object.entries(navMapping).forEach(([tabKey, navId]) => {
+        const btn = document.getElementById(navId);
+        if (tabKey === targetTabId) {
+          btn.className = "flex flex-col items-center gap-1 text-brand-600 transition";
+        } else {
+          btn.className = "flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition";
+        }
+      });
+
+      // If switched to map, invalidate map size for flawless Leaflet rendering
+      if (targetTabId === 'mapTab' && mapInstance) {
+        setTimeout(() => {
+          mapInstance.invalidateSize();
+          recenterMap();
+        }, 150);
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toastNotification');
+      const text = document.getElementById('toastMessage');
+      const icon = document.getElementById('toastIcon');
+
+      text.textContent = message;
+      if (type === 'success') {
+        icon.className = "fa-solid fa-circle-check text-brand-400";
+      } else if (type === 'warning') {
+        icon.className = "fa-solid fa-triangle-exclamation text-amber-400";
+      } else {
+        icon.className = "fa-solid fa-circle-info text-blue-400";
+      }
+
+      toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-[-10px]');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-[-10px]');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 3000);
+    }
+
+    window.onload = function() {
+      seedInitialDatabase();
+      initMap();
+      document.getElementById('headerLocName').textContent = AppState.userLocation.name;
+    };
+  </script>
+</body>
+</html>

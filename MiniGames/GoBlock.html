@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>GoBlock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --neon-red: #ff2244;
+      --neon-glow: rgba(255, 34, 68, 0.45);
+      --neon-dim: rgba(255, 34, 68, 0.15);
+      --bg-dark: #08080c;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #f1f1f4;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+    }
+
+    .neon-border {
+      border: 1px solid var(--neon-red);
+      box-shadow: 0 0 12px var(--neon-glow), inset 0 0 6px var(--neon-dim);
+    }
+
+    .neon-border-subtle {
+      border: 1px solid rgba(255, 34, 68, 0.35);
+    }
+
+    .neon-text {
+      color: #fff;
+      text-shadow: 0 0 8px var(--neon-red), 0 0 16px var(--neon-glow);
+    }
+
+    .neon-button {
+      background: linear-gradient(135deg, rgba(35, 10, 15, 0.9), rgba(15, 5, 8, 0.95));
+      border: 1px solid var(--neon-red);
+      box-shadow: 0 0 10px var(--neon-glow);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .neon-button:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(70, 15, 25, 0.95), rgba(30, 8, 14, 0.95));
+      box-shadow: 0 0 18px rgba(255, 34, 68, 0.7);
+      transform: translateY(-1px);
+    }
+
+    .neon-button:active:not(:disabled) {
+      transform: translateY(1px);
+      box-shadow: 0 0 6px var(--neon-glow);
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d0d14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3a1017;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--neon-red);
+    }
+
+    .modal-backdrop {
+      backdrop-filter: blur(8px);
+      background-color: rgba(5, 5, 8, 0.85);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between items-center p-2 sm:p-4">
+
+  <header class="w-full max-w-4xl flex items-center justify-between py-2 px-3 sm:px-4 rounded-xl bg-[#0e0e16]/80 neon-border-subtle mb-2">
+    <div class="flex items-center space-x-3">
+      <div class="w-3 h-3 rounded-full bg-red-600 animate-pulse shadow-[0_0_10px_#ff2244]"></div>
+      <h1 class="text-xl sm:text-2xl font-black tracking-widest uppercase neon-text">GOBLOCK</h1>
+      <span id="modeBadge" class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-red-950/80 text-red-400 border border-red-700/50">
+        NORMAL
+      </span>
+    </div>
+
+    <div class="flex items-center space-x-2">
+      <button id="soundToggleBtn" title="Toggle Suara" class="p-2 rounded-lg bg-[#161622] hover:bg-[#202030] border border-red-900/40 text-red-300 transition">
+        <svg id="soundIconOn" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+        </svg>
+        <svg id="soundIconOff" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path>
+        </svg>
+      </button>
+
+      <button id="openConfigBtn" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg neon-button text-xs sm:text-sm font-semibold tracking-wide">
+        <span id="headerEnemyPreview" class="text-base leading-none">😈</span>
+        <span class="hidden sm:inline">Karakter</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="w-full max-w-4xl flex flex-wrap items-center justify-between gap-2 px-2 py-1 mb-2">
+    <div class="flex items-center space-x-2">
+      <!-- Mode Switcher -->
+      <div class="flex rounded-lg bg-[#12121c] p-1 border border-red-950">
+        <button id="btnModeNormal" class="px-3 py-1 text-xs font-bold rounded-md bg-red-600 text-white shadow-[0_0_8px_#ff2244] transition">NORMAL</button>
+        <button id="btnModeFrenzy" class="px-3 py-1 text-xs font-bold rounded-md text-red-400 hover:text-white transition">FRENZY</button>
+      </div>
+
+      <!-- Pattern Selector -->
+      <div class="flex items-center space-x-1 bg-[#12121c] border border-red-950 rounded-lg px-2 py-1">
+        <label for="patternSelect" class="text-xs text-red-400/80 uppercase font-semibold">Pola:</label>
+        <select id="patternSelect" class="bg-transparent text-xs text-red-200 font-bold focus:outline-none cursor-pointer">
+          <!-- 20 Pattern options injected via JS -->
+        </select>
+      </div>
+    </div>
+
+    <!-- Turn and Status Counters -->
+    <div class="flex items-center space-x-4 text-xs tracking-wider">
+      <div class="flex items-center space-x-1">
+        <span class="text-neutral-500 uppercase">Langkah:</span>
+        <span id="turnCounter" class="font-bold text-red-400 text-sm">0</span>
+      </div>
+      <div class="flex items-center space-x-1">
+        <span class="text-neutral-500 uppercase">Lubang:</span>
+        <span id="holesCounter" class="font-bold text-red-400 text-sm">0</span>
+      </div>
+      <button id="resetBtn" class="px-3 py-1 rounded bg-red-950/60 hover:bg-red-900/60 border border-red-700/60 text-red-300 text-xs font-bold transition">
+        Ulangi
+      </button>
+    </div>
+  </div>
+
+  <main class="w-full max-w-4xl flex-1 flex flex-col items-center justify-center relative min-h-[360px] sm:min-h-[460px]">
+    <div class="relative w-full h-full flex items-center justify-center p-1">
+      <canvas id="gameCanvas" class="w-full h-full rounded-2xl cursor-pointer select-none border border-red-900/30 bg-[#07070b] shadow-[0_0_30px_rgba(255,34,68,0.06)]"></canvas>
+      
+      <!-- In-Game Notice / Result Banner -->
+      <div id="statusBanner" class="absolute pointer-events-none opacity-0 transition-opacity duration-300 top-6 px-6 py-2 rounded-full bg-[#120508]/90 border border-red-500 text-red-200 text-sm font-bold tracking-widest uppercase shadow-[0_0_20px_#ff2244]">
+        Jebak Musuh!
+      </div>
+    </div>
+  </main>
+
+  <footer class="w-full max-w-4xl flex items-center justify-between py-2 px-3 text-[11px] text-neutral-500 font-mono">
+    <div id="footerStatusText" class="truncate max-w-[280px] sm:max-w-md">Klik kotak untuk melubangi jalur.</div>
+    <div class="flex items-center space-x-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+      <span>READY</span>
+    </div>
+  </footer>
+
+  <div id="customModal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-3 z-50 hidden">
+    <div class="w-full max-w-md bg-[#0f0f18] rounded-2xl border border-red-600/80 p-5 shadow-[0_0_35px_rgba(255,34,68,0.3)] relative">
+      <div class="flex justify-between items-center pb-3 border-b border-red-950 mb-4">
+        <h2 class="text-base font-bold tracking-wider text-red-400 uppercase">Kustomisasi Musuh</h2>
+        <button id="closeConfigBtn" class="text-neutral-400 hover:text-white p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Presets & Upload -->
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="block text-neutral-400 uppercase font-semibold mb-2">Pilih Preset Karakter</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button class="preset-btn p-3 rounded-xl bg-[#161622] hover:bg-[#202030] border border-red-900/40 text-2xl flex flex-col items-center gap-1 transition" data-emoji="😈">
+              <span>😈</span>
+              <span class="text-[10px] text-neutral-400">Iblis</span>
+            </button>
+            <button class="preset-btn p-3 rounded-xl bg-[#161622] hover:bg-[#202030] border border-red-900/40 text-2xl flex flex-col items-center gap-1 transition" data-emoji="🪰">
+              <span>🪰</span>
+              <span class="text-[10px] text-neutral-400">Lalat</span>
+            </button>
+            <button class="preset-btn p-3 rounded-xl bg-[#161622] hover:bg-[#202030] border border-red-900/40 text-2xl flex flex-col items-center gap-1 transition" data-emoji="🤪">
+              <span>🤪</span>
+              <span class="text-[10px] text-neutral-400">Konyol</span>
+            </button>
+            <button class="preset-btn p-3 rounded-xl bg-[#161622] hover:bg-[#202030] border border-red-900/40 text-2xl flex flex-col items-center gap-1 transition" data-emoji="😡">
+              <span>😡</span>
+              <span class="text-[10px] text-neutral-400">Marah</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Image File Upload -->
+        <div>
+          <label class="block text-neutral-400 uppercase font-semibold mb-1">Atau Unggah Gambar Pribadi</label>
+          <div class="flex items-center space-x-2">
+            <input type="file" id="customImgUpload" accept="image/*" class="hidden">
+            <button id="triggerUploadBtn" class="flex-1 py-2 px-3 rounded-lg bg-[#14141f] border border-red-900/50 hover:border-red-600 text-neutral-300 text-left truncate transition">
+              Pilih file gambar...
+            </button>
+            <button id="clearImgBtn" class="py-2 px-3 rounded-lg bg-red-950/40 hover:bg-red-900/40 text-red-400 border border-red-900/40 hidden">
+              Hapus
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Speech Words -->
+        <div>
+          <label class="block text-neutral-400 uppercase font-semibold mb-1">
+            Kata-kata Karakter <span class="text-neutral-500 lowercase">(pisahkan dengan titik koma ';')</span>
+          </label>
+          <textarea id="customWordsInput" rows="3" class="w-full bg-[#141420] border border-red-950 rounded-xl p-2.5 text-red-200 text-xs focus:outline-none focus:border-red-600 font-sans resize-none" placeholder="Nggak kena!; Mau ke mana?; Kejar aku!; Terlalu lambat!; Wkwkwk; Bye-bye!"></textarea>
+        </div>
+
+        <!-- Action Button -->
+        <button id="saveConfigBtn" class="w-full py-2.5 rounded-xl neon-button text-xs font-bold uppercase tracking-wider text-white mt-2">
+          Terapkan Pengaturan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SoundManager = (() => {
+      let audioCtx = null;
+      let isMuted = false;
+
+      function init() {
+        if (!audioCtx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            audioCtx = new AudioContext();
+          }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }
+
+      function playHoleClick() {
+        if (isMuted) return;
+        init();
+        if (!audioCtx) return;
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(75, audioCtx.currentTime + 0.12);
+
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+      }
+
+      function playJump() {
+        if (isMuted) return;
+        init();
+        if (!audioCtx) return;
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(580, audioCtx.currentTime + 0.18);
+
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.18);
+      }
+
+      function playTrapped() {
+        if (isMuted) return;
+        init();
+        if (!audioCtx) return;
+
+        [440, 554, 659, 880].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.08);
+          gain.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.08 + 0.25);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + i * 0.08);
+          osc.stop(audioCtx.currentTime + i * 0.08 + 0.25);
+        });
+      }
+
+      function playEscape() {
+        if (isMuted) return;
+        init();
+        if (!audioCtx) return;
+
+        [350, 310, 260, 190].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.1);
+          gain.gain.setValueAtTime(0.14, audioCtx.currentTime + i * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.1 + 0.2);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + i * 0.1);
+          osc.stop(audioCtx.currentTime + i * 0.1 + 0.2);
+        });
+      }
+
+      function toggleMute() {
+        isMuted = !isMuted;
+        return isMuted;
+      }
+
+      return { init, playHoleClick, playJump, playTrapped, playEscape, toggleMute, isMuted: () => isMuted };
+    })();
+
+    const PATTERN_NAMES = [
+      "1. Medan Kosong",
+      "2. Salib Garis",
+      "3. Cincin Orbit",
+      "4. Gerbang Ganda",
+      "5. Bintang Segienam",
+      "6. Spiral Sempit",
+      "7. Celah Tengah",
+      "8. Klaster Spora",
+      "9. Trisula Rintangan",
+      "10. Labirin Kisi",
+      "11. Asteroid Acak A",
+      "12. Asteroid Acak B",
+      "13. Jam Pasir",
+      "14. Perisai Luar",
+      "15. Benteng Empat Sudut",
+      "16. Busur Terbelah",
+      "17. Koridor Zigzag",
+      "18. Lingkaran Bertingkat",
+      "19. Pusaran Neon",
+      "20. Benteng Inti"
+    ];
+
+    // Hexagonal coordinate math: Pointy-topped
+    const SQRT3 = Math.sqrt(3);
+
+    // 6 hexagonal axial neighbor directions
+    const HEX_DIRECTIONS = [
+      { q: 1, r: 0 },
+      { q: 1, r: -1 },
+      { q: 0, r: -1 },
+      { q: -1, r: 0 },
+      { q: -1, r: 1 },
+      { q: 0, r: 1 }
+    ];
+
+    function hexKey(q, r) {
+      return `${q},${r}`;
+    }
+
+    function hexDistance(q1, r1, q2 = 0, r2 = 0) {
+      return (Math.abs(q1 - q2) + Math.abs(q1 + r1 - q2 - r2) + Math.abs(r1 - r2)) / 2;
+    }
+
+    function generatePatternHoles(index, radius) {
+      const holes = new Set();
+
+      const addHole = (q, r) => {
+        // Can never place hole at origin (enemy start) or out of radius
+        if (q === 0 && r === 0) return;
+        if (hexDistance(q, r) <= radius) {
+          holes.add(hexKey(q, r));
+        }
+      };
+
+      for (let q = -radius; q <= radius; q++) {
+        for (let r = -radius; r <= radius; r++) {
+          if (hexDistance(q, r) > radius || (q === 0 && r === 0)) continue;
+          const d = hexDistance(q, r);
+
+          switch (index) {
+            case 0: // Empty
+              break;
+            case 1: // Cross
+              if (q === 0 || r === 0 || q + r === 0) {
+                if (d % 2 === 0) addHole(q, r);
+              }
+              break;
+            case 2: // Ring
+              if (d === 2 || (radius >= 6 && d === 4)) {
+                if ((q * 3 + r) % 2 === 0) addHole(q, r);
+              }
+              break;
+            case 3: // Twin Gates
+              if (Math.abs(r) === 2 && Math.abs(q) !== 1) addHole(q, r);
+              break;
+            case 4: // Hexagram Star
+              if ((Math.abs(q) === 2 || Math.abs(r) === 2 || Math.abs(q + r) === 2) && d > 1) {
+                if (Math.abs(q - r) % 2 === 0) addHole(q, r);
+              }
+              break;
+            case 5: // Spiral
+              if ((q + 2 * r) % 3 === 0 && d >= 2) addHole(q, r);
+              break;
+            case 6: // Center Chasm
+              if (Math.abs(q) === 1 && Math.abs(r) <= 2) addHole(q, r);
+              break;
+            case 7: // Clusters
+              if ((Math.abs(q) % 2 === 1 && Math.abs(r) % 2 === 1) && d > 1) addHole(q, r);
+              break;
+            case 8: // Trident
+              if ((q === r || q === -2 * r || r === -2 * q) && d >= 2) addHole(q, r);
+              break;
+            case 9: // Lattice
+              if ((q * q + r * r) % 4 === 1 && d > 1) addHole(q, r);
+              break;
+            case 10: // Random A
+              if (((Math.imul(q + 13, r + 7) ^ 0x5bd1e995) % 7) === 0 && d > 1) addHole(q, r);
+              break;
+            case 11: // Random B
+              if (((Math.abs(q * 7 + r * 13 + 3)) % 5) === 0 && d > 1) addHole(q, r);
+              break;
+            case 12: // Hourglass
+              if (Math.abs(q) > Math.abs(r) && d >= 2) addHole(q, r);
+              break;
+            case 13: // Outer Shield
+              if (d === radius - 1 && (q + r) % 2 === 0) addHole(q, r);
+              break;
+            case 14: // 4 Corners
+              if (d >= radius - 1 && Math.abs(q * r) > 2) addHole(q, r);
+              break;
+            case 15: // Broken Arc
+              if (d === 2 && q > -1) addHole(q, r);
+              if (d === radius - 1 && q < 1) addHole(q, r);
+              break;
+            case 16: // Zigzag
+              if (r % 2 === 0 && Math.abs(q) % 2 === 1 && d > 1) addHole(q, r);
+              break;
+            case 17: // Double rings
+              if ((d === 2 || d === radius - 1) && (q - r) % 2 === 0) addHole(q, r);
+              break;
+            case 18: // Vortex
+              if ((Math.atan2(r, q) * 4) % 2 > 0.8 && d >= 2) addHole(q, r);
+              break;
+            case 19: // Core Citadel
+              if (d === 1 && (q !== 0 || r !== 1)) addHole(q, r);
+              if (d === 3 && (q + r) % 2 === 0) addHole(q, r);
+              break;
+          }
+        }
+      }
+      return holes;
+    }
+
+    const GameState = {
+      mode: 'NORMAL', // 'NORMAL' | 'FRENZY'
+      normalRadius: 4,
+      frenzyRadius: 6, // 1.5x width (radius 6 vs 4)
+      patternIndex: 0,
+      turnCount: 0,
+      gameOver: false,
+      gameWon: false,
+
+      // Board grid
+      tiles: new Map(), // key -> { q, r, isHole: bool, expiresAt: timestamp }
+      frenzyDuration: 5000, // 5 seconds recovery
+
+      // Enemy specs
+      enemy: {
+        q: 0,
+        r: 0,
+        renderX: 0,
+        renderY: 0,
+        targetX: 0,
+        targetY: 0,
+        isJumping: false,
+        jumpProgress: 1,
+        jumpDuration: 280, // ms
+        jumpStartTime: 0,
+        scaleX: 1,
+        scaleY: 1,
+        lastJumpSourceX: 0,
+        lastJumpSourceY: 0,
+      },
+
+      // Customization
+      customEmoji: '😈',
+      customImage: null, // HTMLImageElement
+      customWords: [
+        "Nggak kena!",
+        "Mau ke mana?",
+        "Kejar aku!",
+        "Terlalu lambat!",
+        "Wkwkwk!",
+        "Cuma segitu?",
+        "Hampir saja!"
+      ],
+
+      // Speech bubble state
+      speech: {
+        text: '',
+        alpha: 0,
+        timer: 0,
+        duration: 2200 // ms
+      },
+
+      // Frenzy AI auto timer
+      lastFrenzyMoveTime: 0,
+      frenzyMoveInterval: 950 // ms per auto-move if player delays
+    };
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const modeBadge = document.getElementById('modeBadge');
+    const btnModeNormal = document.getElementById('btnModeNormal');
+    const btnModeFrenzy = document.getElementById('btnModeFrenzy');
+    const patternSelect = document.getElementById('patternSelect');
+    const turnCounter = document.getElementById('turnCounter');
+    const holesCounter = document.getElementById('holesCounter');
+    const resetBtn = document.getElementById('resetBtn');
+    const statusBanner = document.getElementById('statusBanner');
+    const footerStatusText = document.getElementById('footerStatusText');
+
+    const soundToggleBtn = document.getElementById('soundToggleBtn');
+    const soundIconOn = document.getElementById('soundIconOn');
+    const soundIconOff = document.getElementById('soundIconOff');
+
+    const openConfigBtn = document.getElementById('openConfigBtn');
+    const closeConfigBtn = document.getElementById('closeConfigBtn');
+    const customModal = document.getElementById('customModal');
+    const saveConfigBtn = document.getElementById('saveConfigBtn');
+    const customImgUpload = document.getElementById('customImgUpload');
+    const triggerUploadBtn = document.getElementById('triggerUploadBtn');
+    const clearImgBtn = document.getElementById('clearImgBtn');
+    const customWordsInput = document.getElementById('customWordsInput');
+    const headerEnemyPreview = document.getElementById('headerEnemyPreview');
+    const presetButtons = document.querySelectorAll('.preset-btn');
+
+    // Populate pattern select dropdown
+    PATTERN_NAMES.forEach((name, idx) => {
+      const opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = name;
+      patternSelect.appendChild(opt);
+    });
+
+    let canvasWidth = 0;
+    let canvasHeight = 0;
+    let hexSize = 24;
+    let centerX = 0;
+    let centerY = 0;
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvasWidth = rect.width;
+      canvasHeight = rect.height;
+
+      canvas.width = Math.floor(canvasWidth * dpr);
+      canvas.height = Math.floor(canvasHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      centerX = canvasWidth / 2;
+      centerY = canvasHeight / 2;
+
+      const currentRadius = GameState.mode === 'FRENZY' ? GameState.frenzyRadius : GameState.normalRadius;
+      // Calculate optimal hex size to fit canvas comfortably
+      const maxSpan = currentRadius * 2 + 1;
+      const fitWidth = (canvasWidth * 0.90) / (maxSpan * SQRT3);
+      const fitHeight = (canvasHeight * 0.88) / (maxSpan * 1.5 + 0.5);
+      hexSize = Math.max(14, Math.min(fitWidth, fitHeight));
+
+      // Synchronize enemy coordinates
+      const currentPos = hexToPixel(GameState.enemy.q, GameState.enemy.r);
+      if (!GameState.enemy.isJumping) {
+        GameState.enemy.renderX = currentPos.x;
+        GameState.enemy.renderY = currentPos.y;
+      }
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    function hexToPixel(q, r) {
+      const x = centerX + hexSize * (SQRT3 * q + (SQRT3 / 2) * r);
+      const y = centerY + hexSize * ((3 / 2) * r);
+      return { x, y };
+    }
+
+    function pixelToHex(px, py) {
+      // Find closest hexagon center
+      let closestKey = null;
+      let minDistance = Infinity;
+
+      GameState.tiles.forEach((tile) => {
+        const pos = hexToPixel(tile.q, tile.r);
+        const distSq = (px - pos.x) ** 2 + (py - pos.y) ** 2;
+        if (distSq < minDistance) {
+          minDistance = distSq;
+          closestKey = hexKey(tile.q, tile.r);
+        }
+      });
+
+      // Ensure inside the radius limit of the hexagon
+      if (Math.sqrt(minDistance) <= hexSize * 0.95) {
+        return closestKey;
+      }
+      return null;
+    }
+
+    function initBoard() {
+      GameState.tiles.clear();
+      GameState.turnCount = 0;
+      GameState.gameOver = false;
+      GameState.gameWon = false;
+      GameState.enemy.q = 0;
+      GameState.enemy.r = 0;
+      GameState.enemy.isJumping = false;
+      GameState.enemy.jumpProgress = 1;
+      GameState.speech.text = '';
+      GameState.speech.alpha = 0;
+      hideBanner();
+
+      const currentRadius = GameState.mode === 'FRENZY' ? GameState.frenzyRadius : GameState.normalRadius;
+      const patternHoles = generatePatternHoles(GameState.patternIndex, currentRadius);
+
+      for (let q = -currentRadius; q <= currentRadius; q++) {
+        for (let r = -currentRadius; r <= currentRadius; r++) {
+          if (hexDistance(q, r) <= currentRadius) {
+            const key = hexKey(q, r);
+            const isHole = patternHoles.has(key);
+            GameState.tiles.set(key, {
+              q,
+              r,
+              isHole,
+              expiresAt: 0
+            });
+          }
+        }
+      }
+
+      resizeCanvas();
+      const startPixel = hexToPixel(0, 0);
+      GameState.enemy.renderX = startPixel.x;
+      GameState.enemy.renderY = startPixel.y;
+      GameState.lastFrenzyMoveTime = performance.now();
+
+      updateCounters();
+      footerStatusText.textContent = GameState.mode === 'FRENZY' 
+        ? "Mode Frenzy: Kotak pulih tiap 5 detik! Jebak secepatnya." 
+        : "Mode Normal: Kunci musuh hingga tak bersisa ruang langkah.";
+    }
+
+    function updateCounters() {
+      turnCounter.textContent = GameState.turnCount;
+      let holesCount = 0;
+      GameState.tiles.forEach(t => { if (t.isHole) holesCount++; });
+      holesCounter.textContent = holesCount;
+    }
+
+    function getRadius() {
+      return GameState.mode === 'FRENZY' ? GameState.frenzyRadius : GameState.normalRadius;
+    }
+
+    function isEdgeHex(q, r) {
+      return hexDistance(q, r) === getRadius();
+    }
+
+    // Pathfinding algorithm for the enemy: BFS to shortest edge
+    function findBestEnemyMove() {
+      const startQ = GameState.enemy.q;
+      const startR = GameState.enemy.r;
+      const startKey = hexKey(startQ, startR);
+
+      // BFS Queue: each item holds { q, r, path: [startKey, ...] }
+      const queue = [{ q: startQ, r: startR, path: [startKey] }];
+      const visited = new Set([startKey]);
+      let shortestPathToEdge = null;
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+
+        // Check if edge is reached
+        if (isEdgeHex(current.q, current.r)) {
+          shortestPathToEdge = current.path;
+          break;
+        }
+
+        for (const dir of HEX_DIRECTIONS) {
+          const nq = current.q + dir.q;
+          const nr = current.r + dir.r;
+          const nKey = hexKey(nq, nr);
+
+          if (GameState.tiles.has(nKey) && !visited.has(nKey)) {
+            const tile = GameState.tiles.get(nKey);
+            if (!tile.isHole) {
+              visited.add(nKey);
+              queue.push({
+                q: nq,
+                r: nr,
+                path: [...current.path, nKey]
+              });
+            }
+          }
+        }
+      }
+
+      if (shortestPathToEdge && shortestPathToEdge.length > 1) {
+        // Return next node along the path to victory
+        const nextKey = shortestPathToEdge[1];
+        const [nq, nr] = nextKey.split(',').map(Number);
+        return { q: nq, r: nr };
+      }
+
+      // If no open route to perimeter exists (enemy trapped in a pocket),
+      // choose the neighbor with highest flood-fill territory to survive as long as possible
+      let bestNeighbor = null;
+      let maxTerritory = -1;
+
+      for (const dir of HEX_DIRECTIONS) {
+        const nq = startQ + dir.q;
+        const nr = startR + dir.r;
+        const nKey = hexKey(nq, nr);
+
+        if (GameState.tiles.has(nKey)) {
+          const tile = GameState.tiles.get(nKey);
+          if (!tile.isHole) {
+            const territorySize = calculateTerritory(nq, nr);
+            if (territorySize > maxTerritory) {
+              maxTerritory = territorySize;
+              bestNeighbor = { q: nq, r: nr };
+            }
+          }
+        }
+      }
+
+      return bestNeighbor; // null if completely trapped
+    }
+
+    function calculateTerritory(startQ, startR) {
+      const startKey = hexKey(startQ, startR);
+      const queue = [startKey];
+      const visited = new Set([startKey, hexKey(GameState.enemy.q, GameState.enemy.r)]);
+      let count = 0;
+
+      while (queue.length > 0) {
+        const [cq, cr] = queue.shift().split(',').map(Number);
+        count++;
+
+        for (const dir of HEX_DIRECTIONS) {
+          const nq = cq + dir.q;
+          const nr = cr + dir.r;
+          const nKey = hexKey(nq, nr);
+          if (GameState.tiles.has(nKey) && !visited.has(nKey)) {
+            const tile = GameState.tiles.get(nKey);
+            if (!tile.isHole) {
+              visited.add(nKey);
+              queue.push(nKey);
+            }
+          }
+        }
+      }
+      return count;
+    }
+
+    function triggerSpeech(customText = null) {
+      let phrase = customText;
+      if (!phrase && GameState.customWords.length > 0) {
+        const randIdx = Math.floor(Math.random() * GameState.customWords.length);
+        phrase = GameState.customWords[randIdx];
+      }
+      if (phrase) {
+        GameState.speech.text = phrase;
+        GameState.speech.alpha = 1;
+        GameState.speech.timer = performance.now();
+      }
+    }
+
+    function moveEnemyTo(destQ, destR) {
+      const srcPixel = hexToPixel(GameState.enemy.q, GameState.enemy.r);
+      const destPixel = hexToPixel(destQ, destR);
+
+      GameState.enemy.lastJumpSourceX = srcPixel.x;
+      GameState.enemy.lastJumpSourceY = srcPixel.y;
+      GameState.enemy.targetX = destPixel.x;
+      GameState.enemy.targetY = destPixel.y;
+
+      GameState.enemy.q = destQ;
+      GameState.enemy.r = destR;
+
+      GameState.enemy.isJumping = true;
+      GameState.enemy.jumpProgress = 0;
+      GameState.enemy.jumpStartTime = performance.now();
+
+      SoundManager.playJump();
+
+      // Trigger movement speech with 60% probability
+      if (Math.random() < 0.6) {
+        triggerSpeech();
+      }
+
+      // Check win/loss right after choosing edge
+      if (isEdgeHex(destQ, destR)) {
+        endGame(false); // Enemy Escaped!
+      }
+    }
+
+    function endGame(playerWon) {
+      GameState.gameOver = true;
+      GameState.gameWon = playerWon;
+
+      if (playerWon) {
+        SoundManager.playTrapped();
+        triggerSpeech("Aduh! Aku terkepung!");
+        showBanner("MUSUH TERJEBAK! KAMU MENANG", true);
+        footerStatusText.textContent = "Kemenangan mutlak! Musuh tidak memiliki jalan keluar.";
+      } else {
+        SoundManager.playEscape();
+        triggerSpeech("Wkwk! Aku berhasil kabur!");
+        showBanner("MUSUH LOLOS! KAMU KALAH", false);
+        footerStatusText.textContent = "Musuh mencapai ujung arena dan melarikan diri.";
+      }
+    }
+
+    function showBanner(text, isWin) {
+      statusBanner.textContent = text;
+      statusBanner.className = `absolute pointer-events-none transition-all duration-300 top-6 px-6 py-2 rounded-full border text-xs sm:text-sm font-black tracking-widest uppercase shadow-2xl ${
+        isWin 
+          ? 'bg-emerald-950/90 border-emerald-400 text-emerald-200 shadow-[0_0_25px_#10b981]' 
+          : 'bg-red-950/90 border-red-500 text-red-200 shadow-[0_0_25px_#ff2244]'
+      }`;
+      statusBanner.style.opacity = '1';
+    }
+
+    function hideBanner() {
+      statusBanner.style.opacity = '0';
+    }
+
+    function onTileClicked(tileKey) {
+      if (GameState.gameOver) return;
+
+      const tile = GameState.tiles.get(tileKey);
+      if (!tile) return;
+
+      // Cannot hole tile if already a hole
+      if (tile.isHole) return;
+
+      // Cannot hole tile where enemy currently is
+      if (tile.q === GameState.enemy.q && tile.r === GameState.enemy.r) {
+        triggerSpeech("Hei, jangan sentuh aku!");
+        GameState.enemy.scaleX = 1.35;
+        GameState.enemy.scaleY = 0.7;
+        return;
+      }
+
+      // Make a hole
+      tile.isHole = true;
+      SoundManager.playHoleClick();
+
+      if (GameState.mode === 'FRENZY') {
+        tile.expiresAt = performance.now() + GameState.frenzyDuration;
+      }
+
+      GameState.turnCount++;
+      updateCounters();
+
+      // Enemy turn
+      const nextMove = findBestEnemyMove();
+      if (!nextMove) {
+        endGame(true); // Player Trapped the Enemy!
+      } else {
+        moveEnemyTo(nextMove.q, nextMove.r);
+        GameState.lastFrenzyMoveTime = performance.now();
+      }
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+
+      const clickedKey = pixelToHex(px, py);
+      if (clickedKey) {
+        onTileClicked(clickedKey);
+      }
+    });
+
+    function updateFrenzyTiles(now) {
+      if (GameState.mode !== 'FRENZY' || GameState.gameOver) return;
+
+      let changed = false;
+      GameState.tiles.forEach((tile) => {
+        if (tile.isHole && tile.expiresAt > 0 && now >= tile.expiresAt) {
+          tile.isHole = false;
+          tile.expiresAt = 0;
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        updateCounters();
+      }
+
+      // Paced auto-move for enemy in Frenzy mode if player takes too long
+      if (now - GameState.lastFrenzyMoveTime >= GameState.frenzyMoveInterval && !GameState.enemy.isJumping) {
+        GameState.lastFrenzyMoveTime = now;
+        const nextMove = findBestEnemyMove();
+        if (!nextMove) {
+          endGame(true);
+        } else {
+          moveEnemyTo(nextMove.q, nextMove.r);
+        }
+      }
+    }
+
+    function drawHexagonPath(ctx, x, y, radius) {
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i - Math.PI / 6; // Pointy topped orientation
+        const hx = x + radius * Math.cos(angle);
+        const hy = y + radius * Math.sin(angle);
+        if (i === 0) ctx.moveTo(hx, hy);
+        else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath();
+    }
+
+    function renderBoard(now) {
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+      // Radial background glow in canvas
+      const bgGrad = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, canvasWidth * 0.65);
+      bgGrad.addColorStop(0, '#15060b');
+      bgGrad.addColorStop(0.5, '#0a0306');
+      bgGrad.addColorStop(1, '#050204');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      const radius = getRadius();
+
+      // Render Hex Tiles
+      GameState.tiles.forEach((tile) => {
+        const pos = hexToPixel(tile.q, tile.r);
+        const isEdge = isEdgeHex(tile.q, tile.r);
+        const innerRadius = hexSize * 0.92;
+
+        drawHexagonPath(ctx, pos.x, pos.y, innerRadius);
+
+        if (tile.isHole) {
+          // Void hole aesthetic
+          ctx.fillStyle = '#060102';
+          ctx.fill();
+
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = '#63101c';
+          ctx.stroke();
+
+          // If in frenzy mode, draw countdown ring
+          if (GameState.mode === 'FRENZY' && tile.expiresAt > 0) {
+            const timeLeft = Math.max(0, tile.expiresAt - now);
+            const ratio = timeLeft / GameState.frenzyDuration;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, innerRadius * 0.45, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio, false);
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = `rgba(255, 34, 68, ${0.4 + ratio * 0.6})`;
+            ctx.shadowColor = '#ff2244';
+            ctx.shadowBlur = 8;
+            ctx.stroke();
+            ctx.restore();
+          }
+        } else {
+          // Standard active tile
+          if (isEdge) {
+            // Edge indicator: warning faint red outline
+            ctx.fillStyle = '#1c0a10';
+            ctx.fill();
+            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = 'rgba(255, 68, 68, 0.4)';
+            ctx.stroke();
+          } else {
+            // Normal inner tile
+            ctx.fillStyle = '#140c12';
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(255, 34, 68, 0.22)';
+            ctx.stroke();
+          }
+
+          // Inner hexagon subtle core
+          ctx.beginPath();
+          drawHexagonPath(ctx, pos.x, pos.y, innerRadius * 0.4);
+          ctx.fillStyle = 'rgba(255, 34, 68, 0.04)';
+          ctx.fill();
+        }
+      });
+
+      // Update Jump Physics
+      if (GameState.enemy.isJumping) {
+        const elapsed = now - GameState.enemy.jumpStartTime;
+        let progress = Math.min(1, elapsed / GameState.enemy.jumpDuration);
+        GameState.enemy.jumpProgress = progress;
+
+        // Linear interpolation for X, Y
+        const currentX = GameState.enemy.lastJumpSourceX + (GameState.enemy.targetX - GameState.enemy.lastJumpSourceX) * progress;
+        const currentY = GameState.enemy.lastJumpSourceY + (GameState.enemy.targetY - GameState.enemy.lastJumpSourceY) * progress;
+
+        // Parabolic arc for bounce
+        const jumpHeight = hexSize * 1.35;
+        const arcY = -Math.sin(progress * Math.PI) * jumpHeight;
+
+        GameState.enemy.renderX = currentX;
+        GameState.enemy.renderY = currentY + arcY;
+
+        // Squash & stretch deformation during jump and landing
+        if (progress < 0.5) {
+          GameState.enemy.scaleX = 0.85;
+          GameState.enemy.scaleY = 1.25;
+        } else if (progress < 1) {
+          GameState.enemy.scaleX = 1.15;
+          GameState.enemy.scaleY = 0.9;
+        } else {
+          GameState.enemy.isJumping = false;
+          GameState.enemy.renderX = GameState.enemy.targetX;
+          GameState.enemy.renderY = GameState.enemy.targetY;
+          GameState.enemy.scaleX = 1.3;
+          GameState.enemy.scaleY = 0.75;
+        }
+      } else {
+        // Spring relaxation to neutral 1.0 scale
+        GameState.enemy.scaleX += (1 - GameState.enemy.scaleX) * 0.15;
+        GameState.enemy.scaleY += (1 - GameState.enemy.scaleY) * 0.15;
+      }
+
+      // Draw Shadow
+      const shadowY = GameState.enemy.isJumping ? GameState.enemy.targetY : GameState.enemy.renderY;
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(GameState.enemy.renderX, shadowY + hexSize * 0.45, hexSize * 0.48 * GameState.enemy.scaleX, hexSize * 0.2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.fill();
+      ctx.restore();
+
+      // Render Enemy Avatar
+      ctx.save();
+      ctx.translate(GameState.enemy.renderX, GameState.enemy.renderY);
+      ctx.scale(GameState.enemy.scaleX, GameState.enemy.scaleY);
+
+      // Red Neon Glow Aura
+      ctx.beginPath();
+      ctx.arc(0, 0, hexSize * 0.6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 34, 68, 0.25)';
+      ctx.shadowColor = '#ff2244';
+      ctx.shadowBlur = 14;
+      ctx.fill();
+
+      if (GameState.customImage) {
+        // Draw Custom Uploaded Image cropped in circular neon frame
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0, 0, hexSize * 0.52, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(
+          GameState.customImage,
+          -hexSize * 0.52,
+          -hexSize * 0.52,
+          hexSize * 1.04,
+          hexSize * 1.04
+        );
+        ctx.restore();
+
+        // Neon border ring
+        ctx.beginPath();
+        ctx.arc(0, 0, hexSize * 0.54, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ff2244';
+        ctx.stroke();
+      } else {
+        // Draw Preset Emoji
+        ctx.font = `${Math.floor(hexSize * 0.95)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(GameState.customEmoji, 0, 1);
+      }
+      ctx.restore();
+
+      if (GameState.speech.text && GameState.speech.alpha > 0) {
+        const elapsedSpeech = now - GameState.speech.timer;
+        if (elapsedSpeech > GameState.speech.duration) {
+          GameState.speech.alpha -= 0.05;
+          if (GameState.speech.alpha < 0) GameState.speech.alpha = 0;
+        }
+
+        if (GameState.speech.alpha > 0) {
+          ctx.save();
+          ctx.globalAlpha = GameState.speech.alpha;
+
+          const bubbleText = GameState.speech.text;
+          ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
+          const textMetrics = ctx.measureText(bubbleText);
+          const bubbleWidth = textMetrics.width + 18;
+          const bubbleHeight = 24;
+
+          const bubbleX = Math.min(Math.max(GameState.enemy.renderX, bubbleWidth / 2 + 10), canvasWidth - bubbleWidth / 2 - 10);
+          const bubbleY = GameState.enemy.renderY - hexSize * 1.15;
+
+          // Bubble background with red neon outline
+          ctx.fillStyle = 'rgba(12, 12, 20, 0.92)';
+          ctx.strokeStyle = '#ff2244';
+          ctx.lineWidth = 1.2;
+          ctx.shadowColor = '#ff2244';
+          ctx.shadowBlur = 8;
+
+          ctx.beginPath();
+          ctx.roundRect(bubbleX - bubbleWidth / 2, bubbleY - bubbleHeight / 2, bubbleWidth, bubbleHeight, 8);
+          ctx.fill();
+          ctx.stroke();
+
+          // Speech triangle pointer
+          ctx.beginPath();
+          ctx.moveTo(bubbleX - 4, bubbleY + bubbleHeight / 2);
+          ctx.lineTo(bubbleX, bubbleY + bubbleHeight / 2 + 5);
+          ctx.lineTo(bubbleX + 4, bubbleY + bubbleHeight / 2);
+          ctx.fillStyle = '#0c0c14';
+          ctx.fill();
+
+          // Bubble text
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(bubbleText, bubbleX, bubbleY);
+          ctx.restore();
+        }
+      }
+    }
+
+    function gameLoop(time) {
+      updateFrenzyTiles(time);
+      renderBoard(time);
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Mode toggles
+    btnModeNormal.addEventListener('click', () => {
+      if (GameState.mode === 'NORMAL') return;
+      GameState.mode = 'NORMAL';
+      modeBadge.textContent = 'NORMAL';
+      btnModeNormal.className = 'px-3 py-1 text-xs font-bold rounded-md bg-red-600 text-white shadow-[0_0_8px_#ff2244] transition';
+      btnModeFrenzy.className = 'px-3 py-1 text-xs font-bold rounded-md text-red-400 hover:text-white transition';
+      initBoard();
+    });
+
+    btnModeFrenzy.addEventListener('click', () => {
+      if (GameState.mode === 'FRENZY') return;
+      GameState.mode = 'FRENZY';
+      modeBadge.textContent = 'FRENZY';
+      btnModeFrenzy.className = 'px-3 py-1 text-xs font-bold rounded-md bg-red-600 text-white shadow-[0_0_8px_#ff2244] transition';
+      btnModeNormal.className = 'px-3 py-1 text-xs font-bold rounded-md text-red-400 hover:text-white transition';
+      initBoard();
+    });
+
+    patternSelect.addEventListener('change', (e) => {
+      GameState.patternIndex = parseInt(e.target.value, 10);
+      initBoard();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      initBoard();
+    });
+
+    // Sound toggle
+    soundToggleBtn.addEventListener('click', () => {
+      const isMuted = SoundManager.toggleMute();
+      soundIconOn.classList.toggle('hidden', isMuted);
+      soundIconOff.classList.toggle('hidden', !isMuted);
+    });
+
+    // Modal controllers
+    openConfigBtn.addEventListener('click', () => {
+      customWordsInput.value = GameState.customWords.join('; ');
+      customModal.classList.remove('hidden');
+    });
+
+    closeConfigBtn.addEventListener('click', () => {
+      customModal.classList.add('hidden');
+    });
+
+    // Emoji preset selection
+    presetButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const emoji = btn.dataset.emoji;
+        GameState.customEmoji = emoji;
+        GameState.customImage = null;
+        headerEnemyPreview.textContent = emoji;
+        clearImgBtn.classList.add('hidden');
+        triggerUploadBtn.textContent = 'Pilih file gambar...';
+        presetButtons.forEach(b => b.classList.remove('neon-border'));
+        btn.classList.add('neon-border');
+      });
+    });
+
+    // Custom image upload
+    triggerUploadBtn.addEventListener('click', () => {
+      customImgUpload.click();
+    });
+
+    customImgUpload.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            GameState.customImage = img;
+            triggerUploadBtn.textContent = file.name;
+            clearImgBtn.classList.remove('hidden');
+            headerEnemyPreview.textContent = '🖼️';
+            presetButtons.forEach(b => b.classList.remove('neon-border'));
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    clearImgBtn.addEventListener('click', () => {
+      GameState.customImage = null;
+      customImgUpload.value = '';
+      triggerUploadBtn.textContent = 'Pilih file gambar...';
+      clearImgBtn.classList.add('hidden');
+      headerEnemyPreview.textContent = GameState.customEmoji;
+    });
+
+    // Save custom settings
+    saveConfigBtn.addEventListener('click', () => {
+      const rawWords = customWordsInput.value.trim();
+      if (rawWords.length > 0) {
+        GameState.customWords = rawWords
+          .split(';')
+          .map(w => w.trim())
+          .filter(w => w.length > 0);
+      }
+      customModal.classList.add('hidden');
+      triggerSpeech("Pengaturan siap!");
+    });
+
+    window.onload = () => {
+      initBoard();
+      requestAnimationFrame(gameLoop);
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,1980 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Effector</title>
+<!-- Library JSZip dari CDN untuk kompresi & ekstraksi ZIP yang cepat; dilengkapi fallback built-in jika offline -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root {
+  --bg: #090a0f;
+  --panel: #11131a;
+  --panel-sub: #161824;
+  --card: #1b1e2c;
+  --card-hover: #23273a;
+  --line: #262a3d;
+  --line-light: #373d56;
+  --ac: #6366f1;
+  --ac-hover: #4f46e5;
+  --ac-glow: rgba(99, 102, 241, 0.28);
+  --mu: #8b92a8;
+  --tx: #f0f2f8;
+  --tx-dim: #bac0d4;
+  --err: #f43f5e;
+  --succ: #10b981;
+  --warn: #f59e0b;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column; background: var(--bg); color: var(--tx);
+  font-size: 13px; overflow: hidden; user-select: none;
+}
+
+/* Scrollbar kustom */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-light); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ac); }
+
+button, select, input, textarea { font: inherit; color: inherit; }
+button {
+  background: var(--card); border: 1px solid var(--line); border-radius: 6px;
+  padding: 5px 11px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; transition: background 0.15s, border-color 0.15s, transform 0.05s, box-shadow 0.15s;
+  font-weight: 500;
+}
+button:hover:not(:disabled) { background: var(--card-hover); border-color: var(--line-light); }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--ac); border-color: var(--ac); color: #fff; box-shadow: 0 1px 4px var(--ac-glow); }
+button.primary:hover:not(:disabled) { background: var(--ac-hover); border-color: var(--ac-hover); }
+button.danger { border-color: rgba(244,63,94,0.3); color: var(--err); }
+button.danger:hover:not(:disabled) { background: rgba(244,63,94,0.15); border-color: var(--err); }
+button[aria-pressed=true] { background: var(--ac); border-color: var(--ac); color: #fff; }
+
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--ac); outline-offset: 1px; }
+
+header {
+  height: 50px; background: var(--panel); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 14px;
+  flex-shrink: 0; gap: 10px; z-index: 10;
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: 0.02em; }
+.brand-badge {
+  font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+  background: var(--card); border: 1px solid var(--line); color: var(--ac);
+}
+.h-group { display: flex; align-items: center; gap: 6px; }
+
+/* Status Penyimpanan Otomatis */
+#save-pill {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--mu);
+  padding: 4px 8px; border-radius: 20px; background: var(--panel-sub); border: 1px solid var(--line);
+}
+#save-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--succ);
+  box-shadow: 0 0 6px var(--succ); transition: background 0.2s, box-shadow 0.2s;
+}
+#save-dot.saving {
+  background: var(--warn); box-shadow: 0 0 6px var(--warn); animation: pulse 0.8s infinite alternate;
+}
+@keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
+
+main { flex: 1; display: flex; min-height: 0; position: relative; }
+aside { background: var(--panel); overflow-y: auto; padding: 12px; flex-shrink: 0; user-select: text; }
+#left { width: 220px; border-right: 1px solid var(--line); }
+#right { width: 310px; border-left: 1px solid var(--line); }
+
+h2 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  font-weight: 700; color: var(--mu); margin: 16px 0 8px; display: flex; justify-content: space-between; align-items: center;
+}
+h2:first-child { margin-top: 0; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.col { display: flex; flex-direction: column; gap: 6px; }
+.wide { width: 100%; text-align: left; }
+label { display: block; color: var(--mu); font-size: 11px; margin-bottom: 3px; font-weight: 500; }
+input[type=text], input[type=number], select {
+  width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 8px; color: var(--tx); transition: border-color 0.15s;
+}
+input[type=text]:focus, input[type=number]:focus, select:focus { border-color: var(--ac); }
+input[type=color] {
+  width: 100%; height: 32px; padding: 0; background: none; border: 1px solid var(--line);
+  border-radius: 6px; cursor: pointer;
+}
+
+#stage {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 18px; min-width: 0; background: #07080c; position: relative;
+}
+#stage:fullscreen { padding: 0; background: #000; }
+.cv-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+canvas {
+  max-width: 100%; max-height: calc(100vh - 280px); aspect-ratio: 860/520;
+  border: 1px solid var(--line); border-radius: 8px; background: #0c0e16;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.55); touch-action: none;
+}
+#stage:fullscreen canvas { border: 0; border-radius: 0; max-height: 100vh; box-shadow: none; }
+.stage-meta {
+  margin-top: 8px; font-size: 11px; color: var(--mu); display: flex; gap: 12px; align-items: center;
+}
+
+fieldset {
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 0 0 10px;
+  display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,0.01);
+}
+legend { padding: 0 6px; color: var(--tx); font-weight: 600; font-size: 11px; letter-spacing: 0.02em; }
+.sp { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sp2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+.clip {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 7px 10px;
+  border: 1px solid var(--line); border-radius: 6px; margin-bottom: 5px; cursor: pointer;
+  background: var(--card); transition: border-color 0.15s, background 0.15s;
+}
+.clip:hover { background: var(--card-hover); border-color: var(--line-light); }
+.clip.sel { border-color: var(--ac); background: #23273e; }
+.clip small { color: var(--mu); font-variant-numeric: tabular-nums; }
+#empty { color: var(--mu); padding: 24px 0; text-align: center; font-size: 12px; }
+.hide { display: none !important; }
+
+/* Timeline */
+#tl { height: 184px; flex-shrink: 0; background: var(--panel); border-top: 1px solid var(--line); display: flex; flex-direction: column; }
+#tl-head {
+  display: flex; justify-content: space-between; align-items: center; padding: 5px 14px;
+  color: var(--mu); border-bottom: 1px solid var(--line); background: var(--panel-sub); font-size: 11px;
+}
+.tl-controls { display: flex; gap: 16px; align-items: center; }
+.tl-controls label { display: flex; align-items: center; gap: 6px; margin: 0; }
+.tl-controls input[type=range] { width: 95px; }
+#tl-scroll { flex: 1; overflow: auto; position: relative; }
+#tl-in { position: relative; min-width: 100%; }
+#ruler { position: relative; height: 22px; margin-left: 124px; border-bottom: 1px solid var(--line); background: #0e1017; }
+.tk {
+  position: absolute; top: 4px; height: 14px; font-size: 10px; color: var(--mu);
+  padding-left: 4px; border-left: 1px solid var(--line-light); font-variant-numeric: tabular-nums;
+}
+.trk { display: flex; height: 35px; border-bottom: 1px solid var(--line); }
+.gut {
+  position: sticky; left: 0; z-index: 5; width: 124px; flex-shrink: 0;
+  background: var(--panel); border-right: 1px solid var(--line); display: flex;
+  align-items: center; gap: 4px; padding: 0 8px;
+}
+.gut span { font-size: 11px; color: var(--tx-dim); width: 44px; font-weight: 500; }
+.gut button { padding: 2px 6px; font-size: 10px; min-width: 20px; }
+.gut input[type=range] { width: 40px; }
+.lane { position: relative; flex: 1; background: #0c0d14; }
+.lane:nth-child(even) { background: #0a0b12; }
+.tc {
+  position: absolute; top: 4px; bottom: 4px; background: var(--card); border: 1px solid #3d4360;
+  border-radius: 5px; padding: 3px 10px 0 8px; overflow: hidden; white-space: nowrap; font-size: 11px;
+  cursor: grab; touch-action: none; display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+.tc:active { cursor: grabbing; }
+.tc.sel { border-color: var(--ac); background: #272c47; box-shadow: 0 0 0 1px var(--ac); }
+.rz {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize;
+  background: rgba(255,255,255,0.08); border-left: 1px solid rgba(255,255,255,0.12);
+}
+.rz:hover { background: var(--ac); }
+#ph {
+  position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ac);
+  pointer-events: none; z-index: 6; box-shadow: 0 0 8px var(--ac);
+}
+#ph::after {
+  content: ""; position: absolute; top: 0; left: -4px; width: 10px; height: 10px;
+  background: var(--ac); border-radius: 2px; transform: rotate(45deg);
+}
+
+/* Footer Player */
+footer {
+  height: 56px; border-top: 1px solid var(--line); background: var(--panel);
+  display: flex; align-items: center; gap: 10px; padding: 0 14px; flex-shrink: 0;
+}
+#seek { flex: 1; accent-color: var(--ac); cursor: pointer; }
+#tlabel { min-width: 105px; text-align: right; font-variant-numeric: tabular-nums; color: var(--tx-dim); font-weight: 500; }
+#play { min-width: 74px; }
+.chk { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--tx-dim); cursor: pointer; font-size: 12px; }
+
+/* Menu dropdown & modal */
+.dropdown { position: relative; display: inline-block; }
+.dropdown-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; background: var(--card); border: 1px solid var(--line-light);
+  border-radius: 8px; min-width: 190px; box-shadow: 0 10px 28px rgba(0,0,0,0.45); z-index: 50;
+  display: none; flex-direction: column; padding: 4px;
+}
+.dropdown-menu.show { display: flex; }
+.dropdown-menu button, .dropdown-menu label {
+  width: 100%; border: 0; background: transparent; padding: 7px 10px; text-align: left;
+  border-radius: 5px; font-size: 12px; color: var(--tx); justify-content: flex-start;
+}
+.dropdown-menu button:hover, .dropdown-menu label:hover { background: var(--panel-sub); color: var(--ac); }
+
+/* Toasts */
+#toasts { position: fixed; right: 18px; bottom: 74px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; z-index: 100; }
+.toast {
+  background: var(--card); border: 1px solid var(--line-light); padding: 9px 14px; border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5); font-size: 12px; animation: slideIn 0.2s ease-out;
+}
+.toast.err { border-color: var(--err); color: var(--err); }
+.toast.succ { border-color: var(--succ); color: var(--succ); }
+@keyframes slideIn { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+kbd {
+  background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+  padding: 1px 5px; font-size: 10px; color: var(--tx-dim); font-family: inherit;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ac)"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+    Effector
+  </div>
+
+  <div class="h-group">
+    <!-- Undo / Redo -->
+    <button id="b-undo" title="Undo (Ctrl+Z)" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+      Undo
+    </button>
+    <button id="b-redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path></svg>
+      Redo
+    </button>
+
+    <div style="width:1px;height:22px;background:var(--line);margin:0 4px"></div>
+
+    <button id="b-grid" aria-pressed="true" title="Tampilkan kisi koordinat">Grid</button>
+    <button id="b-demo" title="Muat proyek animasi bawaan">Muat Contoh</button>
+    <button id="b-clear" class="danger" title="Bersihkan seluruh kanvas">Kosongkan</button>
+  </div>
+
+  <div class="h-group">
+    <!-- Indikator Auto-Save -->
+    <div id="save-pill" title="Status penyimpanan lokal">
+      <div id="save-dot"></div>
+      <span id="save-tx">Tersimpan</span>
+    </div>
+
+    <!-- Dropdown Impor -->
+    <div class="dropdown">
+      <button id="m-import-btn" title="Impor Proyek">Impor ▾</button>
+      <div id="m-import-menu" class="dropdown-menu">
+        <label style="cursor:pointer;margin:0">
+          <span>📦 Impor ZIP (Bundel Aset)</span>
+          <input id="f-import-zip" type="file" accept=".zip,application/zip" class="hide">
+        </label>
+        <label style="cursor:pointer;margin:0">
+          <span>📄 Impor JSON</span>
+          <input id="f-import" type="file" accept=".json,application/json" class="hide">
+        </label>
+      </div>
+    </div>
+
+    <!-- Dropdown Ekspor -->
+    <div class="dropdown">
+      <button id="m-export-btn" class="primary" title="Opsi Ekspor Proyek">Ekspor ▾</button>
+      <div id="m-export-menu" class="dropdown-menu">
+        <button id="b-export-zip">
+          <strong>📦 Ekspor ZIP (Aset Terpisah)</strong>
+        </button>
+        <button id="b-export">
+          <span>📄 Ekspor JSON</span>
+        </button>
+        <button id="b-rec">
+          <span>🎥 Rekam Video (MP4/WebM)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- Panel Kiri: Library Elemen & Media -->
+  <aside id="left">
+    <h2>Teks</h2>
+    <button class="wide" id="a-text">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+      Tambah Teks
+    </button>
+
+    <h2>Bentuk Vektor</h2>
+    <div class="row">
+      <button data-shape="rect">Kotak</button>
+      <button data-shape="circle">Lingkaran</button>
+      <button data-shape="triangle">Segitiga</button>
+      <button data-shape="star">Bintang</button>
+    </div>
+
+    <h2>Media Berkas</h2>
+    <div class="col">
+      <button class="wide" onclick="this.nextElementSibling.click()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+        Unggah Gambar
+      </button>
+      <input id="f-img" type="file" accept="image/*" class="hide">
+
+      <button class="wide" onclick="this.nextElementSibling.click()" title="Lampirkan berkas audio ke elemen terpilih">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+        Lampirkan Audio
+      </button>
+      <input id="f-aud" type="file" accept="audio/*" class="hide">
+    </div>
+
+    <h2>Pintasan Keyboard</h2>
+    <p style="color:var(--mu);line-height:1.7;margin:0;font-size:11px">
+      <kbd>Spasi</kbd> Putar / Jeda<br>
+      <kbd>Ctrl</kbd>+<kbd>Z</kbd> Undo<br>
+      <kbd>Ctrl</kbd>+<kbd>Y</kbd> Redo<br>
+      <kbd>Ctrl</kbd>+<kbd>D</kbd> Duplikat elemen<br>
+      <kbd>Del</kbd> Hapus elemen terpilih<br>
+      <kbd>Esc</kbd> Batalkan seleksi<br>
+      <em>Seret elemen di kanvas saat 0.0 s. Tarik berkas gambar langsung ke kanvas.</em>
+    </p>
+  </aside>
+
+  <!-- Panggung Kanvas -->
+  <section id="stage">
+    <div class="cv-wrap">
+      <canvas id="cv" width="860" height="520"></canvas>
+    </div>
+    <div class="stage-meta">
+      <span>Resolusi: 860 × 520 px</span>
+      <span>•</span>
+      <span id="cv-status">Mode Desain (0.0s)</span>
+    </div>
+  </section>
+
+  <!-- Panel Kanan: Inspector & Pengaturan Elemen -->
+  <aside id="right">
+    <h2>Daftar Klip (<span id="n-clip">0</span>)</h2>
+    <div id="clips"></div>
+    <div id="empty">Belum ada elemen.<br>Pilih tipe di panel kiri untuk memulai.</div>
+
+    <div id="insp" class="hide">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px">
+        <h2 id="i-title" style="margin:0">Elemen</h2>
+        <div style="display:flex;gap:4px">
+          <button id="b-dup" title="Duplikat Elemen (Ctrl+D)" style="padding:2px 7px;font-size:11px">Duplikat</button>
+          <button id="b-center" title="Posisikan ke tengah kanvas" style="padding:2px 7px;font-size:11px">Tengah</button>
+        </div>
+      </div>
+
+      <div class="col" style="margin-bottom:10px">
+        <div id="g-text">
+          <label for="k-text">Isi Teks</label>
+          <input type="text" id="k-text" data-k="text" maxlength="120">
+        </div>
+        <div class="sp2">
+          <div><label for="k-color">Warna</label><input type="color" id="k-color" data-k="color"></div>
+          <div><label for="k-h">Tinggi (px)</label><input type="number" id="k-h" data-k="h" min="16" max="450"></div>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend>Waktu & Animasi</legend>
+        <div class="sp2">
+          <div><label for="k-start">Mulai (detik)</label><input type="number" id="k-start" data-k="start" min="0" max="600" step="0.1"></div>
+          <div><label for="k-track">Jalur / Track</label><select id="k-track" data-k="track"></select></div>
+        </div>
+        <div><label for="k-fxIn">Efek Masuk</label><select id="k-fxIn" data-k="fxIn" data-fx="in"></select></div>
+        <div><label for="k-fxLoop">Efek Selama Tampil (Loop)</label><select id="k-fxLoop" data-k="fxLoop" data-fx="loop"></select></div>
+        <div><label for="k-fxOut">Efek Keluar</label><select id="k-fxOut" data-k="fxOut" data-fx="out"></select></div>
+        <div class="sp">
+          <div><label for="k-dIn">Masuk (s)</label><input type="number" id="k-dIn" data-k="dIn" min="0.1" max="10" step="0.1"></div>
+          <div><label for="k-dHold">Tampil (s)</label><input type="number" id="k-dHold" data-k="dHold" min="0.1" max="30" step="0.1"></div>
+          <div><label for="k-dOut">Keluar (s)</label><input type="number" id="k-dOut" data-k="dOut" min="0.1" max="10" step="0.1"></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Sintesis Suara & Audio</legend>
+        <label class="chk"><input type="checkbox" id="k-aOn" data-k="aOn">Bunyikan Sintesis Nada</label>
+        <div class="sp2">
+          <div>
+            <label for="k-aPh">Fase Pemicu</label>
+            <select id="k-aPh" data-k="aPh">
+              <option value="in">Saat Masuk</option>
+              <option value="loop">Saat Tampil</option>
+              <option value="out">Saat Keluar</option>
+            </select>
+          </div>
+          <div>
+            <label for="k-wave">Gelombang</label>
+            <select id="k-wave" data-k="wave">
+              <option value="sine">Sine</option>
+              <option value="triangle">Triangle</option>
+              <option value="sawtooth">Sawtooth</option>
+              <option value="square">Square</option>
+            </select>
+          </div>
+          <div><label for="k-note">Nada (MIDI)</label><select id="k-note" data-k="note"></select></div>
+          <div><label for="k-nDur">Durasi Nada (s)</label><input type="number" id="k-nDur" data-k="nDur" min="0.05" max="3" step="0.05"></div>
+        </div>
+        <div>
+          <label for="k-rev">Gema Reverb (<span id="rev-val">0</span>)</label>
+          <input type="range" id="k-rev" data-k="rev" min="0" max="1" step="0.05">
+        </div>
+        <div class="sp2">
+          <button id="b-test">Tes Suara</button>
+          <button id="b-clip-del" class="danger hide">Lepas Audio</button>
+        </div>
+      </fieldset>
+
+      <button id="b-del" class="danger wide" style="margin-top:4px">Hapus Elemen</button>
+    </div>
+  </aside>
+</main>
+
+<!-- Timeline Multi-Jalur -->
+<section id="tl" aria-label="Timeline Multi Jalur">
+  <div id="tl-head">
+    <div style="font-weight:600;color:var(--tx)">Timeline Multi-Jalur</div>
+    <div class="tl-controls">
+      <label>Skala Zoom <input id="zoom" type="range" min="30" max="220" value="70"></label>
+      <label>Volume Utama <input id="mvol" type="range" min="0" max="1" step="0.01" value="0.9"></label>
+    </div>
+  </div>
+  <div id="tl-scroll">
+    <div id="tl-in">
+      <div id="ruler"></div>
+      <div id="tl-rows"></div>
+      <div id="ph"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer Player -->
+<footer>
+  <button id="b-prev" title="Ke elemen sebelumnya (⏮)">⏮</button>
+  <button id="play" class="primary" title="Putar atau Jeda (Spasi)">Putar</button>
+  <button id="b-next" title="Ke elemen berikutnya (⏭)">⏭</button>
+  <button id="b-stop" title="Hentikan dan kembalikan ke 0">⏹ Berhenti</button>
+  <input id="seek" type="range" min="0" max="0" value="0" step="1" aria-label="Posisi Garis Waktu">
+  <span id="tlabel">0.0 / 0.0 s</span>
+  <label class="chk"><input type="checkbox" id="loop">Loop</label>
+  <button id="b-full" title="Beralih ke Layar Penuh">Layar Penuh</button>
+</footer>
+
+<div id="toasts" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   1. KONSTANTA, UTILITAS & NOTIFIKASI
+   ========================================================================== */
+const W = 860, H = 520, SCHEMA = 3;
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const midiName = m => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
+const midiFreq = m => 440 * Math.pow(2, (m - 69) / 12);
+
+function toast(msg, type = "info") {
+  const c = $("toasts"), d = document.createElement("div");
+  d.className = "toast " + (type === "error" || type === true ? "err" : type === "succ" ? "succ" : "");
+  d.textContent = msg;
+  c.appendChild(d);
+  setTimeout(() => {
+    d.style.opacity = "0";
+    d.style.transform = "translateY(10px)";
+    d.style.transition = "all 0.25s ease-out";
+    setTimeout(() => d.remove(), 260);
+  }, 2600);
+}
+
+/* ==========================================================================
+   2. SISTEM ZIP MURNI (Built-in Fallback RFC 1950/PKZIP Store Mode)
+   Menjamin ekspor ZIP tetap bekerja 100% offline tanpa ketergantungan CDN.
+   ========================================================================== */
+class MiniZip {
+  constructor() {
+    this.files = [];
+    if (!MiniZip.crcTable) {
+      let t = new Uint32Array(256);
+      for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let k = 0; k < 8; k++) c = ((c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1));
+        t[i] = c;
+      }
+      MiniZip.crcTable = t;
+    }
+  }
+  static crc32(buf) {
+    let t = MiniZip.crcTable, c = 0xffffffff;
+    for (let i = 0; i < buf.length; i++) c = t[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+  file(path, content) {
+    let bytes;
+    if (typeof content === "string") bytes = new TextEncoder().encode(content);
+    else if (content instanceof Uint8Array) bytes = content;
+    else if (content instanceof ArrayBuffer) bytes = new Uint8Array(content);
+    else bytes = new Uint8Array(0);
+    this.files.push({ name: path.replace(/\\/g, "/"), bytes });
+  }
+  generateBlob() {
+    let localHeaders = [], centralHeaders = [], offset = 0;
+    const enc = new TextEncoder();
+    for (const f of this.files) {
+      const nameBytes = enc.encode(f.name);
+      const crc = MiniZip.crc32(f.bytes);
+      const sz = f.bytes.length;
+      
+      // Local File Header
+      const lh = new Uint8Array(30 + nameBytes.length);
+      const dvL = new DataView(lh.buffer);
+      dvL.setUint32(0, 0x04034b50, true);
+      dvL.setUint16(4, 20, true);
+      dvL.setUint16(6, 0, true);
+      dvL.setUint16(8, 0, true); // Stored (no compression)
+      dvL.setUint16(10, 0, true);
+      dvL.setUint16(12, 0, true);
+      dvL.setUint32(14, crc, true);
+      dvL.setUint32(18, sz, true);
+      dvL.setUint32(22, sz, true);
+      dvL.setUint16(26, nameBytes.length, true);
+      dvL.setUint16(28, 0, true);
+      lh.set(nameBytes, 30);
+      localHeaders.push(lh, f.bytes);
+
+      // Central Directory Header
+      const ch = new Uint8Array(46 + nameBytes.length);
+      const dvC = new DataView(ch.buffer);
+      dvC.setUint32(0, 0x02014b50, true);
+      dvC.setUint16(4, 20, true);
+      dvC.setUint16(6, 20, true);
+      dvC.setUint16(8, 0, true);
+      dvC.setUint16(10, 0, true);
+      dvC.setUint16(12, 0, true);
+      dvC.setUint16(14, 0, true);
+      dvC.setUint32(16, crc, true);
+      dvC.setUint32(20, sz, true);
+      dvC.setUint32(24, sz, true);
+      dvC.setUint16(28, nameBytes.length, true);
+      dvC.setUint16(30, 0, true);
+      dvC.setUint16(32, 0, true);
+      dvC.setUint16(34, 0, true);
+      dvC.setUint16(36, 0, true);
+      dvC.setUint32(38, 0, true);
+      dvC.setUint32(42, offset, true);
+      ch.set(nameBytes, 46);
+      centralHeaders.push(ch);
+
+      offset += lh.length + f.bytes.length;
+    }
+    const cdOffset = offset;
+    let cdSize = 0;
+    centralHeaders.forEach(c => { cdSize += c.length; });
+
+    // End of Central Directory
+    const eocd = new Uint8Array(22);
+    const dvE = new DataView(eocd.buffer);
+    dvE.setUint32(0, 0x06054b50, true);
+    dvE.setUint16(4, 0, true);
+    dvE.setUint16(6, 0, true);
+    dvE.setUint16(8, this.files.length, true);
+    dvE.setUint16(10, this.files.length, true);
+    dvE.setUint32(12, cdSize, true);
+    dvE.setUint32(16, cdOffset, true);
+    dvE.setUint16(20, 0, true);
+
+    return new Blob([...localHeaders, ...centralHeaders, eocd], { type: "application/zip" });
+  }
+}
+
+/* ==========================================================================
+   3. REGISTRI EFEK ANIMASI LENGKAP
+   ========================================================================== */
+const ease = {
+  out: p => 1 - Math.pow(1 - p, 3),
+  back: p => { const c = 2.70158; return 1 + c * Math.pow(p - 1, 3) + 1.70158 * Math.pow(p - 1, 2); }
+};
+
+const FX = {
+  in: {
+    none:   { l: "Tanpa efek", f() {} },
+    fade:   { l: "Fade (Pudar)", f(p, s) { s.a *= p; } },
+    type:   { l: "Ketik Teks", f(p, s) { s.rv = p; } },
+    drop:   { l: "Jatuh Memantul", f(p, s) { s.a *= Math.min(1, p * 4); s.ty -= 180 * (1 - p) * (1 - p) * Math.abs(Math.cos(p * Math.PI * 3)); } },
+    spiral: { l: "Spiral Masuk", f(p, s) { const e = ease.out(p); s.a *= p; s.rot += (1 - e) * Math.PI * 2; s.sx *= e; s.sy *= e; } },
+    zoom:   { l: "Zoom Masuk", f(p, s) { const e = .15 + .85 * ease.out(p); s.a *= p; s.sx *= e; s.sy *= e; } },
+    slide:  { l: "Geser dari Bawah", f(p, s) { s.a *= p; s.ty += 70 * (1 - ease.out(p)); } },
+    flip:   { l: "Balik Horizontal", f(p, s) { s.a *= p; s.sx *= Math.cos((1 - ease.out(p)) * Math.PI / 2); } },
+    pop:    { l: "Pop Melompat", f(p, s) { const e = .6 + .4 * ease.back(p); s.a *= Math.min(1, p * 2); s.sx *= e; s.sy *= e; } },
+    glitch: { l: "Glitch Siber", f(p, s) { const j = 1 - p; s.a *= p < .5 ? .5 + Math.sin(p * 60) * .3 : 1; s.tx += Math.sin(p * 90) * 10 * j; s.ty += Math.cos(p * 70) * 4 * j; } }
+  },
+  loop: {
+    none:   { l: "Tanpa efek", f() {} },
+    pulse:  { l: "Denyut Halus", f(p, s) { const k = 1 + .18 * Math.sin(p * Math.PI); s.sx *= k; s.sy *= k; } },
+    spin:   { l: "Putar Penuh (360°)", f(p, s) { s.rot += p * Math.PI * 2; } },
+    float:  { l: "Mengambang", f(p, s) { s.ty -= 20 * Math.sin(p * Math.PI); } },
+    shake:  { l: "Getar Gempa", f(p, s) { s.tx += 10 * Math.sin(p * Math.PI * 4); } },
+    glow:   { l: "Pendar Cahaya", f(p, s) { s.glow = 26 * Math.sin(p * Math.PI); } },
+    wobble: { l: "Goyang Berirama", f(p, s) { s.rot += .14 * Math.sin(p * Math.PI * 2); } },
+    bounce: { l: "Memantul Atas-Bawah", f(p, s) { s.ty -= Math.abs(Math.sin(p * Math.PI * 2)) * 28; } },
+    blink:  { l: "Berkedip", f(p, s) { s.a *= (p * 4) % 1 < .5 ? 1 : .25; } },
+    hue:    { l: "Spektrum Warna", f(p, s) { s.hue = p * 360; } },
+    split:  { l: "Pisah Warna RGB", f(p, s) { s.split = 8 * Math.sin(p * Math.PI); } },
+    burst:  { l: "Hamburan Partikel", f(p, s) { s.burst = p; } }
+  },
+  out: {
+    none:     { l: "Tanpa efek", f() {} },
+    fade:     { l: "Fade (Pudar)", f(p, s) { s.a *= 1 - p; } },
+    dissolve: { l: "Hancur Jadi Partikel", f(p, s) { s.a *= 1 - p; s.burst = p / 3; } },
+    twirl:    { l: "Berputar Keluar", f(p, s) { const e = ease.out(p); s.a *= 1 - p; s.rot += e * Math.PI * 2; s.sx *= 1 - e * .9; s.sy *= 1 - e * .9; } },
+    zoom:     { l: "Zoom Menjauh", f(p, s) { const e = 1 - .9 * ease.out(p); s.a *= 1 - p; s.sx *= e; s.sy *= e; } },
+    slide:    { l: "Geser Menghilang", f(p, s) { s.a *= 1 - p; s.ty += 80 * ease.out(p); } },
+    shrink:   { l: "Menyusut Berputar", f(p, s) { const e = 1 - .99 * p; s.a *= 1 - p; s.sx *= e; s.sy *= e; s.rot += p * Math.PI / 2; } },
+    blur:     { l: "Kabur Membesar", f(p, s) { s.a *= 1 - p; s.blur = 18 * p; s.sx *= 1 + .25 * p; s.sy *= 1 + .25 * p; } }
+  }
+};
+
+/* ==========================================================================
+   4. MODEL STATE PROYEK
+   ========================================================================== */
+const S = {
+  els: [], sel: null, t: 0, playing: false, grid: true, loop: false, seq: 0, rec: false,
+  pps: 70, mvol: 0.9,
+  tracks: [0, 1, 2, 3].map(() => ({ vol: 1, mute: false }))
+};
+
+let recorder = null;
+const imgs = new Map();     // id -> HTMLImageElement
+const clips = new Map();    // id -> AudioBuffer
+const SHAPES = ["rect", "circle", "triangle", "star"];
+const SHAPE_COLOR = { rect: "#34d399", circle: "#f43f5e", triangle: "#fbbf24", star: "#a855f7" };
+
+const total = () => S.els.reduce((m, e) => Math.max(m, e.start + e.dIn + e.dHold + e.dOut), 0);
+
+function newEl(type, o = {}) {
+  const n = S.els.length;
+  return Object.assign({
+    id: "e" + (++S.seq),
+    type,
+    name: (type === "text" ? "Teks" : type === "image" ? "Gambar" : "Bentuk") + " " + (n + 1),
+    x: 100 + (n * 30) % 400,
+    y: 80 + (n * 25) % 250,
+    w: 140,
+    h: 80,
+    color: "#ffffff",
+    text: "Effector Studio",
+    shape: "rect",
+    image: null,
+    clip: null,
+    start: +total().toFixed(1),
+    fxIn: "zoom",
+    fxLoop: "pulse",
+    fxOut: "fade",
+    dIn: 0.5,
+    dHold: 1.2,
+    dOut: 0.5,
+    aOn: true,
+    aPh: "in",
+    note: 60 + (n * 4) % 24,
+    wave: "triangle",
+    nDur: 0.4,
+    track: 0,
+    rev: 0
+  }, o);
+}
+
+function addEl(el) {
+  S.els.push(el);
+  if (el.image) loadImg(el);
+  if (el.clip) decodeClip(el);
+  select(el.id);
+  refresh();
+  History.push();
+}
+
+function loadImg(el) {
+  const i = new Image();
+  i.onload = () => render();
+  i.src = el.image;
+  imgs.set(el.id, i);
+}
+
+async function decodeClip(el) {
+  try {
+    const res = await fetch(el.clip);
+    const buf = await res.arrayBuffer();
+    clips.set(el.id, await audio().decodeAudioData(buf));
+  } catch (e) {
+    clips.delete(el.id);
+    toast("Audio tidak dapat didekode: format berkas tidak didukung.", true);
+  }
+}
+
+function sanitize(o) {
+  if (!o || typeof o !== "object") return null;
+  const str = (v, d, n = 120) => typeof v === "string" ? v.slice(0, n) : d;
+  const num = (v, d, a, b) => Number.isFinite(+v) && v !== null && v !== "" ? clamp(+v, a, b) : d;
+  const pick = (v, set, d) => typeof v === "string" && v in set ? v : d;
+  const type = ["text", "shape", "image"].includes(o.type) ? o.type : null;
+  if (!type) return null;
+  const el = newEl(type, {
+    id: typeof o.id === "string" ? o.id : "e" + (++S.seq),
+    name: str(o.name, "Elemen"),
+    x: num(o.x, 100, 0, W),
+    y: num(o.y, 100, 0, H),
+    w: num(o.w, 140, 16, 700),
+    h: num(o.h, 80, 16, 450),
+    color: /^#[0-9a-f]{6}$/i.test(o.color) ? o.color : "#ffffff",
+    text: str(o.text, ""),
+    shape: SHAPES.includes(o.shape) ? o.shape : "rect",
+    image: typeof o.image === "string" && (o.image.startsWith("data:") || o.image.startsWith("blob:") || o.image.startsWith("assets/")) ? o.image : null,
+    clip: typeof o.clip === "string" && (o.clip.startsWith("data:") || o.clip.startsWith("blob:") || o.clip.startsWith("assets/")) ? o.clip : null,
+    start: num(o.start, 0, 0, 600),
+    dIn: num(o.dIn, 0.5, 0.1, 10),
+    dHold: num(o.dHold, 1, 0.1, 30),
+    dOut: num(o.dOut, 0.5, 0.1, 10),
+    fxIn: pick(o.fxIn, FX.in, "none"),
+    fxLoop: pick(o.fxLoop, FX.loop, "none"),
+    fxOut: pick(o.fxOut, FX.out, "none"),
+    aOn: !!o.aOn,
+    aPh: ["in", "loop", "out"].includes(o.aPh) ? o.aPh : "in",
+    note: Math.round(num(o.note, 60, 36, 84)),
+    wave: ["sine", "triangle", "sawtooth", "square"].includes(o.wave) ? o.wave : "triangle",
+    nDur: num(o.nDur, 0.4, 0.05, 3),
+    track: Math.round(num(o.track, 0, 0, 3)),
+    rev: num(o.rev, 0, 0, 1)
+  });
+  if (type === "image" && !el.image) return null;
+  return el;
+}
+
+/* ==========================================================================
+   5. SISTEM UNDO / REDO TERPADU
+   ========================================================================== */
+const History = {
+  undoStack: [],
+  redoStack: [],
+  max: 40,
+  isApplying: false,
+  debounceTimer: null,
+
+  snapshot() {
+    return JSON.stringify({
+      schema: SCHEMA,
+      els: S.els,
+      tracks: S.tracks,
+      mvol: S.mvol,
+      seq: S.seq
+    });
+  },
+
+  push(debounced = false) {
+    if (this.isApplying) return;
+    if (debounced) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = setTimeout(() => this.commit(), 350);
+    } else {
+      clearTimeout(this.debounceTimer);
+      this.commit();
+    }
+  },
+
+  commit() {
+    const snap = this.snapshot();
+    if (this.undoStack.length && this.undoStack[this.undoStack.length - 1] === snap) return;
+    this.undoStack.push(snap);
+    if (this.undoStack.length > this.max) this.undoStack.shift();
+    this.redoStack = [];
+    this.updateUI();
+    AutoSave.schedule();
+  },
+
+  undo() {
+    if (this.undoStack.length <= 1) return;
+    const current = this.undoStack.pop();
+    this.redoStack.push(current);
+    const prev = this.undoStack[this.undoStack.length - 1];
+    this.apply(prev);
+    toast("Undo");
+  },
+
+  redo() {
+    if (!this.redoStack.length) return;
+    const next = this.redoStack.pop();
+    this.undoStack.push(next);
+    this.apply(next);
+    toast("Redo");
+  },
+
+  apply(snapStr) {
+    this.isApplying = true;
+    try {
+      const data = JSON.parse(snapStr);
+      S.els = (data.els || []).map(o => sanitize(o)).filter(Boolean);
+      if (Array.isArray(data.tracks)) {
+        S.tracks = data.tracks.map(t => ({ vol: clamp(+t.vol, 0, 1), mute: !!t.mute }));
+      }
+      if (Number.isFinite(+data.mvol)) S.mvol = clamp(+data.mvol, 0, 1);
+      if (Number.isFinite(+data.seq)) S.seq = +data.seq;
+      $("mvol").value = S.mvol;
+      applyMix();
+
+      // Sinkronkan gambar & audio
+      S.els.forEach(el => {
+        if (el.image && !imgs.has(el.id)) loadImg(el);
+        if (el.clip && !clips.has(el.id)) decodeClip(el);
+      });
+
+      if (!S.els.find(e => e.id === S.sel)) S.sel = null;
+      select(S.sel);
+      refresh();
+    } finally {
+      this.isApplying = false;
+      this.updateUI();
+      AutoSave.schedule();
+    }
+  },
+
+  updateUI() {
+    $("b-undo").disabled = this.undoStack.length <= 1;
+    $("b-redo").disabled = this.redoStack.length === 0;
+  }
+};
+
+$("b-undo").onclick = () => History.undo();
+$("b-redo").onclick = () => History.redo();
+
+/* ==========================================================================
+   6. PENYIMPANAN OTOMATIS BERKAPASITAS TINGGI (INDEXEDDB & FALLBACK)
+   ========================================================================== */
+const AutoSave = {
+  dbName: "EffectorMotionDB",
+  storeName: "project_state",
+  db: null,
+  timer: null,
+
+  async init() {
+    return new Promise((resolve) => {
+      if (!window.indexedDB) { resolve(null); return; }
+      const req = indexedDB.open(this.dbName, 1);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          db.createObjectStore(this.storeName, { keyPath: "id" });
+        }
+      };
+      req.onsuccess = e => { this.db = e.target.result; resolve(this.db); };
+      req.onerror = () => resolve(null);
+    });
+  },
+
+  schedule() {
+    const dot = $("save-dot"), tx = $("save-tx");
+    dot.className = "saving";
+    tx.textContent = "Menyimpan...";
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.save(), 500);
+  },
+
+  async save() {
+    const payload = {
+      id: "autosave",
+      schema: SCHEMA,
+      elements: S.els,
+      tracks: S.tracks,
+      mvol: S.mvol,
+      seq: S.seq,
+      savedAt: Date.now()
+    };
+
+    let ok = false;
+    if (this.db) {
+      ok = await new Promise((res) => {
+        try {
+          const tx = this.db.transaction(this.storeName, "readwrite");
+          tx.objectStore(this.storeName).put(payload);
+          tx.oncomplete = () => res(true);
+          tx.onerror = () => res(false);
+        } catch (e) { res(false); }
+      });
+    }
+
+    if (!ok) {
+      try {
+        localStorage.setItem("effector_autosave", JSON.stringify(payload));
+        ok = true;
+      } catch (err) {
+        console.warn("Storage penuh:", err);
+      }
+    }
+
+    const dot = $("save-dot"), tx = $("save-tx");
+    dot.className = "";
+    if (ok) {
+      const now = new Date();
+      tx.textContent = "Tersimpan " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+    } else {
+      tx.textContent = "Gagal Simpan";
+    }
+  },
+
+  async load() {
+    if (this.db) {
+      const rec = await new Promise((res) => {
+        try {
+          const tx = this.db.transaction(this.storeName, "readonly");
+          const req = tx.objectStore(this.storeName).get("autosave");
+          req.onsuccess = () => res(req.result || null);
+          req.onerror = () => res(null);
+        } catch (e) { res(null); }
+      });
+      if (rec) return rec;
+    }
+    try {
+      const raw = localStorage.getItem("effector_autosave");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  },
+
+  async clear() {
+    if (this.db) {
+      try {
+        const tx = this.db.transaction(this.storeName, "readwrite");
+        tx.objectStore(this.storeName).delete("autosave");
+      } catch (e) {}
+    }
+    try { localStorage.removeItem("effector_autosave"); } catch (e) {}
+  }
+};
+
+/* ==========================================================================
+   7. MESIN AUDIO WEB AUDIO API
+   ========================================================================== */
+let AC = null, master, reverb, streamDest, trackG = [];
+const live = [];
+
+function impulse(c, sec) {
+  const n = Math.floor(c.sampleRate * sec), b = c.createBuffer(2, n, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+  }
+  return b;
+}
+
+function audio() {
+  if (!AC) {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain();
+    const lim = AC.createDynamicsCompressor();
+    lim.threshold.value = -6; lim.ratio.value = 20; lim.attack.value = .003; lim.release.value = .15;
+    streamDest = AC.createMediaStreamDestination();
+    master.connect(lim);
+    lim.connect(AC.destination);
+    lim.connect(streamDest);
+    reverb = AC.createConvolver();
+    reverb.buffer = impulse(AC, 1.6);
+    reverb.connect(master);
+    trackG = S.tracks.map(() => { const g = AC.createGain(); g.connect(master); return g; });
+    applyMix();
+  }
+  if (AC.state === "suspended") AC.resume();
+  return AC;
+}
+
+function applyMix() {
+  if (!AC) return;
+  master.gain.value = S.mvol;
+  S.tracks.forEach((t, i) => { if (trackG[i]) trackG[i].gain.value = t.mute ? 0 : t.vol; });
+}
+
+function out(node, el) {
+  if (trackG[el.track]) node.connect(trackG[el.track]);
+  else node.connect(master);
+  if (el.rev > 0) {
+    const g = AC.createGain();
+    g.gain.value = el.rev;
+    node.connect(g);
+    g.connect(reverb);
+  }
+}
+
+function tone(el, at) {
+  const c = audio(), o = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
+  o.type = el.wave;
+  o.frequency.value = midiFreq(el.note);
+  f.type = "lowpass";
+  f.frequency.setValueAtTime(3200, at);
+  f.frequency.exponentialRampToValueAtTime(600, at + el.nDur);
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(0.3, at + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + el.nDur);
+  o.connect(f);
+  f.connect(g);
+  out(g, el);
+  o.start(at);
+  o.stop(at + el.nDur + 0.05);
+  live.push(o);
+
+  const buf = clips.get(el.id);
+  if (buf) {
+    const b = c.createBufferSource(), gg = c.createGain();
+    gg.gain.value = 0.6;
+    b.buffer = buf;
+    b.connect(gg);
+    out(gg, el);
+    b.start(at);
+    live.push(b);
+  }
+}
+
+function stopSounds() {
+  live.splice(0).forEach(n => { try { n.stop(); } catch (e) {} });
+}
+
+const trigAt = el => el.start + (el.aPh === "in" ? 0 : el.aPh === "loop" ? el.dIn : el.dIn + el.dHold);
+
+function scheduleFrom(t0) {
+  stopSounds();
+  const c = audio();
+  S.els.forEach(el => {
+    if (el.aOn && trigAt(el) >= t0 - 1e-3) {
+      tone(el, c.currentTime + 0.05 + (trigAt(el) - t0));
+    }
+  });
+}
+
+/* ==========================================================================
+   8. RENDERER KANVAS 2D & INTERAKSI DESAIN
+   ========================================================================== */
+const cv = $("cv"), ctx = cv.getContext("2d");
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+cv.width = W * DPR; cv.height = H * DPR;
+
+const isEdit = () => S.t === 0 && !S.playing && !S.rec;
+
+function stateAt(el, t) {
+  const l = t - el.start, s = { a: 1, sx: 1, sy: 1, tx: 0, ty: 0, rot: 0, glow: 0, blur: 0 };
+  if (l < 0 || l >= el.dIn + el.dHold + el.dOut) return null;
+  if (l < el.dIn) FX.in[el.fxIn].f(l / el.dIn, s);
+  else if (l < el.dIn + el.dHold) FX.loop[el.fxLoop].f((l - el.dIn) / el.dHold, s);
+  else FX.out[el.fxOut].f((l - el.dIn - el.dHold) / el.dOut, s);
+  return s;
+}
+
+function poly(pts) {
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function body(el, s, col) {
+  const w = el.w, h = el.h;
+  ctx.fillStyle = col || el.color;
+  if (el.type === "text") {
+    ctx.font = `700 ${Math.max(12, h * 0.42)}px system-ui, -apple-system, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    if (s && s.rv !== undefined) {
+      const fw = Math.min(ctx.measureText(el.text).width, w);
+      ctx.textAlign = "left";
+      ctx.fillText(el.text.slice(0, Math.ceil(el.text.length * s.rv)), -fw / 2, 0, w);
+    } else {
+      ctx.fillText(el.text, 0, 0, w);
+    }
+  } else if (el.type === "image") {
+    const i = imgs.get(el.id);
+    if (!i || !i.naturalWidth) return;
+    const k = Math.min(w / i.naturalWidth, h / i.naturalHeight);
+    const iw = i.naturalWidth * k, ih = i.naturalHeight * k;
+    ctx.drawImage(i, -iw / 2, -ih / 2, iw, ih);
+  } else if (el.shape === "circle") {
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (el.shape === "triangle") {
+    poly([[0, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]]);
+  } else if (el.shape === "star") {
+    const p = [];
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 0.21 : 0.5;
+      const a = -Math.PI / 2 + i * Math.PI / 5;
+      p.push([Math.cos(a) * r * w, Math.sin(a) * r * h]);
+    }
+    poly(p);
+  } else {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, 6);
+    else ctx.rect(-w / 2, -h / 2, w, h);
+    ctx.fill();
+  }
+}
+
+function render() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const edit = isEdit();
+
+  // Grid latar belakang
+  if (S.grid && edit) {
+    ctx.fillStyle = "#1e2233";
+    for (let x = 12; x < W; x += 24) {
+      for (let y = 12; y < H; y += 24) {
+        ctx.fillRect(x, y, 1.5, 1.5);
+      }
+    }
+  }
+
+  S.els.forEach(el => {
+    const s = edit ? { a: 1, sx: 1, sy: 1, tx: 0, ty: 0, rot: 0, glow: 0, blur: 0 } : stateAt(el, S.t);
+    if (!s) return;
+    ctx.save();
+    ctx.translate(el.x + el.w / 2 + s.tx, el.y + el.h / 2 + s.ty);
+    ctx.rotate(s.rot);
+    ctx.scale(s.sx, s.sy);
+    ctx.globalAlpha = clamp(s.a, 0, 1);
+    if (s.glow) { ctx.shadowColor = el.color; ctx.shadowBlur = s.glow; }
+
+    const fl = [];
+    if (s.blur) fl.push(`blur(${s.blur}px)`);
+    if (s.hue) fl.push(`hue-rotate(${s.hue}deg)`);
+    if (fl.length && "filter" in ctx) ctx.filter = fl.join(" ");
+
+    if (s.split) {
+      [["#ff2d55", -1], ["#00e5ff", 1]].forEach(([c, d]) => {
+        ctx.save();
+        ctx.translate(d * s.split, 0);
+        ctx.globalAlpha *= 0.6;
+        body(el, s, c);
+        ctx.restore();
+      });
+    }
+
+    body(el, s);
+
+    if (s.burst !== undefined) {
+      const q = (s.burst * 3) % 1;
+      ctx.fillStyle = el.color;
+      ctx.shadowBlur = 0;
+      for (let i = 0; i < 16; i++) {
+        const a = i * 2.39996, r = Math.max(el.w, el.h) / 2 + q * (50 + (i * 7 % 5) * 14);
+        ctx.globalAlpha = clamp(s.a, 0, 1) * (1 - q);
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 3, 0, 6.283);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    // Kotak seleksi visual
+    if (edit && el.id === S.sel) {
+      ctx.save();
+      ctx.strokeStyle = "#6366f1";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(el.x - 3, el.y - 3, el.w + 6, el.h + 6);
+      ctx.setLineDash([]);
+      // Handle sudut
+      ctx.fillStyle = "#ffffff";
+      [[el.x - 4, el.y - 4], [el.x + el.w - 2, el.y - 4], [el.x - 4, el.y + el.h - 2], [el.x + el.w - 2, el.y + el.h - 2]].forEach(([hx, hy]) => {
+        ctx.fillRect(hx, hy, 6, 6);
+      });
+      ctx.restore();
+    }
+  });
+
+  const T = total();
+  $("tlabel").textContent = S.t.toFixed(1) + " / " + T.toFixed(1) + " s";
+  $("cv-status").textContent = edit ? "Mode Desain (0.0s)" : (S.playing ? "Sedang Memutar" : "Jeda") + " (" + S.t.toFixed(1) + "s)";
+
+  const GUT = 124;
+  const x = GUT + S.t * S.pps, sc = $("tl-scroll");
+  $("ph").style.left = x + "px";
+  if (S.playing && (x > sc.scrollLeft + sc.clientWidth - 30 || x < sc.scrollLeft + GUT)) {
+    sc.scrollLeft = Math.max(0, x - GUT - 50);
+  }
+  const sk = $("seek");
+  sk.max = Math.round(T * 1000);
+  sk.value = Math.round(S.t * 1000);
+}
+
+/* ==========================================================================
+   9. PEMUTAR & TRANSPORT GARIS WAKTU
+   ========================================================================== */
+let anchorAc = 0, anchorT = 0, raf = 0;
+
+function tick() {
+  if (!S.playing) return;
+  S.t = anchorT + (audio().currentTime - anchorAc);
+  if (S.t >= total()) {
+    if (S.loop && !S.rec) {
+      play(0);
+      return;
+    }
+    stop();
+    toast("Pemutaran selesai.");
+    return;
+  }
+  render();
+  raf = requestAnimationFrame(tick);
+}
+
+function play(from) {
+  if (!S.els.length) { toast("Tambahkan elemen terlebih dahulu.", true); return; }
+  cancelAnimationFrame(raf);
+  S.t = from >= total() ? 0 : from;
+  S.playing = true;
+  anchorT = S.t;
+  anchorAc = audio().currentTime + 0.05;
+  scheduleFrom(S.t);
+  $("play").textContent = "Jeda";
+  tick();
+}
+
+function pause() {
+  if (S.rec) { stop(); return; }
+  S.playing = false;
+  cancelAnimationFrame(raf);
+  stopSounds();
+  $("play").textContent = "Putar";
+  render();
+}
+
+function stop() {
+  S.playing = false;
+  cancelAnimationFrame(raf);
+  stopSounds();
+  S.t = 0;
+  $("play").textContent = "Putar";
+  if (S.rec) {
+    S.rec = false;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  }
+  render();
+}
+
+function seek(t) {
+  const was = S.playing;
+  S.t = clamp(t, 0, total());
+  if (was) play(S.t);
+  else { stopSounds(); render(); }
+}
+
+$("play").onclick = () => S.playing ? pause() : play(S.t);
+$("b-stop").onclick = stop;
+$("seek").oninput = e => seek(+e.target.value / 1000);
+$("loop").onchange = e => { S.loop = e.target.checked; };
+
+const starts = () => [...new Set(S.els.map(e => e.start))].sort((a, b) => a - b);
+$("b-next").onclick = () => { const n = starts().find(v => v > S.t + 1e-3); seek(n === undefined ? 0 : n); };
+$("b-prev").onclick = () => { const p = starts().reverse().find(v => v < S.t - 1e-3); seek(p === undefined ? 0 : p); };
+$("b-full").onclick = () => document.fullscreenElement ? document.exitFullscreen() : $("stage").requestFullscreen().catch(e => toast("Layar penuh gagal: " + e.message, true));
+document.addEventListener("fullscreenchange", () => { $("b-full").textContent = document.fullscreenElement ? "Keluar Layar Penuh" : "Layar Penuh"; });
+
+/* ==========================================================================
+   10. INSPECTOR & MANAJEMEN ELEMEN
+   ========================================================================== */
+const cur = () => S.els.find(e => e.id === S.sel);
+
+function fillSelects() {
+  document.querySelectorAll("select[data-fx]").forEach(sel => {
+    sel.innerHTML = "";
+    for (const k in FX[sel.dataset.fx]) sel.add(new Option(FX[sel.dataset.fx][k].l, k));
+  });
+  const nSel = $("k-note"); nSel.innerHTML = "";
+  for (let m = 36; m <= 84; m++) nSel.add(new Option(midiName(m) + ` (${m})`, m));
+  const tSel = $("k-track"); tSel.innerHTML = "";
+  for (let i = 0; i < 4; i++) tSel.add(new Option("Jalur " + (i + 1), i));
+}
+
+function select(id, keep) {
+  S.sel = id;
+  const el = cur();
+  $("insp").classList.toggle("hide", !el);
+  if (el) {
+    $("i-title").textContent = el.name;
+    $("g-text").classList.toggle("hide", el.type !== "text");
+    $("b-clip-del").classList.toggle("hide", !el.clip);
+    $("rev-val").textContent = el.rev;
+    document.querySelectorAll("[data-k]").forEach(i => {
+      const v = el[i.dataset.k];
+      if (i.type === "checkbox") i.checked = v;
+      else i.value = v;
+    });
+  }
+  if (!keep) drawClips();
+  render();
+}
+
+document.querySelectorAll("[data-k]").forEach(i => {
+  const evt = (i.tagName === "SELECT" || i.type === "checkbox") ? "change" : "input";
+  i.addEventListener(evt, () => {
+    const el = cur(), k = i.dataset.k;
+    if (!el) return;
+    if (i.type === "checkbox") el[k] = i.checked;
+    else if (i.type === "number" || i.type === "range") {
+      const v = parseFloat(i.value);
+      if (!Number.isFinite(v)) return;
+      el[k] = clamp(v, +i.min, +i.max);
+      if (k === "h") {
+        el.w = (el.type === "shape" && el.shape !== "rect") ? el.h : Math.round(el.h * (el.type === "text" ? 2.6 : 1.6));
+      }
+      if (k === "rev") $("rev-val").textContent = el.rev;
+    } else {
+      el[k] = (k === "note" || k === "track") ? +i.value : i.value;
+    }
+    drawClips();
+    render();
+    History.push(true);
+  });
+});
+
+function drawClips() {
+  const box = $("clips");
+  box.textContent = "";
+  $("n-clip").textContent = S.els.length;
+  $("empty").classList.toggle("hide", S.els.length > 0);
+  S.els.forEach(el => {
+    const d = document.createElement("div");
+    d.className = "clip" + (el.id === S.sel ? " sel" : "");
+    d.tabIndex = 0;
+    d.role = "button";
+    const a = document.createElement("span");
+    a.textContent = el.name;
+    const b = document.createElement("small");
+    b.textContent = el.start.toFixed(1) + "–" + (el.start + el.dIn + el.dHold + el.dOut).toFixed(1) + " s";
+    d.append(a, b);
+    d.onclick = () => { if (S.playing) return; select(el.id); };
+    d.onkeydown = e => { if (e.key === "Enter") d.onclick(); };
+    box.appendChild(d);
+  });
+  drawTL();
+}
+
+function refresh() { drawClips(); render(); }
+
+$("b-test").onclick = () => { const el = cur(); if (el) tone(el, audio().currentTime + 0.02); };
+$("b-del").onclick = () => {
+  const el = cur(); if (!el) return;
+  S.els = S.els.filter(e => e !== el);
+  imgs.delete(el.id); clips.delete(el.id);
+  if (S.t > total()) S.t = 0;
+  select(null);
+  toast("Elemen dihapus.");
+  History.push();
+};
+$("b-clip-del").onclick = () => {
+  const el = cur(); if (!el) return;
+  el.clip = null; clips.delete(el.id);
+  select(el.id);
+  toast("Audio dilepas.");
+  History.push();
+};
+
+$("b-dup").onclick = () => {
+  const el = cur();
+  if (!el) return;
+  const clone = JSON.parse(JSON.stringify(el));
+  clone.id = "e" + (++S.seq);
+  clone.name = el.name + " (Copy)";
+  clone.x = Math.min(W - el.w, el.x + 20);
+  clone.y = Math.min(H - el.h, el.y + 20);
+  clone.start = +(el.start + 0.2).toFixed(1);
+  addEl(clone);
+  toast("Elemen diduplikasi.");
+};
+
+$("b-center").onclick = () => {
+  const el = cur();
+  if (!el) return;
+  el.x = Math.round((W - el.w) / 2);
+  el.y = Math.round((H - el.h) / 2);
+  render();
+  History.push();
+  toast("Elemen diposisikan ke tengah.");
+};
+
+/* ==========================================================================
+   11. INPUT ELEMEN & INTERAKSI DRAG KANVAS
+   ========================================================================== */
+$("a-text").onclick = () => addEl(newEl("text", { w: 220, h: 64, color: "#818cf8" }));
+document.querySelectorAll("[data-shape]").forEach(b => {
+  b.onclick = () => {
+    const sh = b.dataset.shape;
+    addEl(newEl("shape", { shape: sh, w: 90, h: 90, color: SHAPE_COLOR[sh], name: b.textContent + " " + (S.els.length + 1) }));
+  };
+});
+
+function readFile(file, cb) {
+  const r = new FileReader();
+  r.onload = () => cb(r.result);
+  r.onerror = () => toast("Berkas tidak dapat dibaca.", true);
+  r.readAsDataURL(file);
+}
+
+function addImageFile(file, x = 100, y = 100) {
+  if (!file.type.startsWith("image/")) { toast("Berkas bukan gambar.", true); return; }
+  readFile(file, data => addEl(newEl("image", { image: data, x, y, w: 140, h: 120 })));
+}
+
+function attachAudio(file) {
+  const el = cur();
+  if (!el) { toast("Pilih elemen terlebih dahulu di kanvas atau daftar klip.", true); return; }
+  if (!file.type.startsWith("audio/")) { toast("Berkas bukan audio.", true); return; }
+  readFile(file, data => {
+    el.clip = data;
+    decodeClip(el);
+    select(el.id);
+    History.push();
+    toast("Audio dilampirkan ke " + el.name + ".");
+  });
+}
+
+$("f-img").onchange = e => { if (e.target.files[0]) addImageFile(e.target.files[0]); e.target.value = ""; };
+$("f-aud").onchange = e => { if (e.target.files[0]) attachAudio(e.target.files[0]); e.target.value = ""; };
+
+cv.addEventListener("dragover", e => e.preventDefault());
+cv.addEventListener("drop", e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  const p = pt(e);
+  if (f.type.startsWith("image/")) addImageFile(f, Math.max(0, p.x - 70), Math.max(0, p.y - 60));
+  else attachAudio(f);
+});
+
+const pt = e => {
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+};
+
+let drag = null;
+cv.addEventListener("pointerdown", e => {
+  if (!isEdit()) return;
+  const p = pt(e);
+  const hit = [...S.els].reverse().find(el => p.x >= el.x && p.x <= el.x + el.w && p.y >= el.y && p.y <= el.y + el.h);
+  if (!hit) { select(null); return; }
+  select(hit.id);
+  drag = { el: hit, dx: p.x - hit.x, dy: p.y - hit.y, moved: false };
+  cv.setPointerCapture(e.pointerId);
+});
+
+cv.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const p = pt(e);
+  drag.el.x = Math.round(clamp(p.x - drag.dx, 0, W - drag.el.w));
+  drag.el.y = Math.round(clamp(p.y - drag.dy, 0, H - drag.el.h));
+  drag.moved = true;
+  render();
+});
+
+cv.addEventListener("pointerup", () => {
+  if (drag && drag.moved) History.push();
+  drag = null;
+});
+
+/* ==========================================================================
+   12. TIMELINE MULTI-JALUR & MIXER
+   ========================================================================== */
+const GUT = 124;
+let drag2 = null;
+
+function drawTL() {
+  const pps = S.pps, T = total() + 4, rows = $("tl-rows"), ruler = $("ruler");
+  $("tl-in").style.width = (GUT + T * pps) + "px";
+  rows.textContent = ""; ruler.textContent = "";
+
+  for (let k = 0; k < T; k++) {
+    const m = document.createElement("span");
+    m.className = "tk";
+    m.style.left = k * pps + "px";
+    m.textContent = k + "s";
+    ruler.appendChild(m);
+  }
+
+  S.tracks.forEach((tr, i) => {
+    const row = document.createElement("div"); row.className = "trk";
+    const g = document.createElement("div"); g.className = "gut";
+    const nm = document.createElement("span"); nm.textContent = "Track " + (i + 1);
+    const mu = document.createElement("button");
+    mu.textContent = tr.mute ? "Muted" : "M";
+    mu.title = tr.mute ? "Bunyikan jalur" : "Bisukan jalur";
+    mu.setAttribute("aria-pressed", tr.mute);
+    mu.onclick = () => {
+      tr.mute = !tr.mute;
+      applyMix();
+      mu.setAttribute("aria-pressed", tr.mute);
+      mu.textContent = tr.mute ? "Muted" : "M";
+      History.push();
+    };
+    const v = document.createElement("input");
+    v.type = "range"; v.min = 0; v.max = 1; v.step = 0.01; v.value = tr.vol;
+    v.setAttribute("aria-label", "Volume track " + (i + 1));
+    v.oninput = () => { tr.vol = +v.value; applyMix(); };
+    v.onchange = () => History.push();
+    g.append(nm, mu, v);
+
+    const lane = document.createElement("div"); lane.className = "lane";
+    S.els.filter(e => e.track === i).forEach(el => {
+      const d = document.createElement("div"), rz = document.createElement("div");
+      d.className = "tc" + (el.id === S.sel ? " sel" : "");
+      rz.className = "rz";
+      rz.title = "Tarik untuk ubah durasi";
+      d.style.left = el.start * pps + "px";
+      d.style.width = Math.max(16, (el.dIn + el.dHold + el.dOut) * pps) + "px";
+      d.textContent = el.name;
+      d.title = el.name + ` (${el.start.toFixed(1)}s)`;
+      d.appendChild(rz);
+
+      d.onpointerdown = e => {
+        if (S.playing) return;
+        select(el.id, true);
+        drag2 = {
+          el, d, rz: e.target === rz, x: e.clientX, y: e.clientY,
+          s: el.start, h: el.dHold, tr: el.track, nt: el.track, changed: false
+        };
+        d.setPointerCapture(e.pointerId);
+      };
+
+      d.onpointermove = e => {
+        if (!drag2 || drag2.d !== d) return;
+        const dx = (e.clientX - drag2.x) / S.pps;
+        if (drag2.rz) {
+          el.dHold = clamp(+(drag2.h + dx).toFixed(1), 0.1, 30);
+          d.style.width = (el.dIn + el.dHold + el.dOut) * S.pps + "px";
+        } else {
+          el.start = Math.max(0, +(drag2.s + dx).toFixed(1));
+          d.style.left = el.start * S.pps + "px";
+          drag2.nt = clamp(drag2.tr + Math.round((e.clientY - drag2.y) / 35), 0, 3);
+        }
+        drag2.changed = true;
+        render();
+      };
+
+      d.onpointerup = d.onpointercancel = () => {
+        if (!drag2 || drag2.d !== d) return;
+        el.track = drag2.nt;
+        const changed = drag2.changed;
+        drag2 = null;
+        select(el.id);
+        if (changed) History.push();
+      };
+
+      lane.appendChild(d);
+    });
+
+    row.append(g, lane);
+    rows.appendChild(row);
+  });
+}
+
+$("tl-scroll").addEventListener("pointerdown", e => {
+  if (e.target.closest(".tc, .gut")) return;
+  seek((e.clientX - $("tl-in").getBoundingClientRect().left - GUT) / S.pps);
+});
+
+$("zoom").oninput = e => { S.pps = +e.target.value; drawTL(); render(); };
+$("mvol").oninput = e => { S.mvol = +e.target.value; applyMix(); };
+$("mvol").onchange = () => History.push();
+
+/* ==========================================================================
+   13. PEREKAM VIDEO (KANVAS + AUDIO WAKTU NYATA)
+   ========================================================================== */
+$("b-rec").onclick = () => {
+  closeDropdowns();
+  if (S.rec) { stop(); return; }
+  if (!window.MediaRecorder || !cv.captureStream) { toast("Browser ini tidak mendukung perekaman kanvas.", true); return; }
+  if (!S.els.length) { toast("Tambahkan elemen terlebih dahulu.", true); return; }
+  stop(); audio();
+  const st = cv.captureStream(30);
+  streamDest.stream.getAudioTracks().forEach(t => st.addTrack(t));
+  const mime = ["video/mp4;codecs=avc1", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find(m => MediaRecorder.isTypeSupported(m));
+  const parts = [];
+  try {
+    recorder = new MediaRecorder(st, mime ? { mimeType: mime, videoBitsPerSecond: 8e6 } : undefined);
+  } catch (err) {
+    toast("Perekam video gagal dibuat: " + err.message, true);
+    return;
+  }
+  recorder.ondataavailable = e => { if (e.data.size) parts.push(e.data); };
+  recorder.onstop = () => {
+    $("b-rec").textContent = "🎥 Rekam Video (MP4/WebM)";
+    if (!parts.length) { toast("Tidak ada data video yang terekam.", true); return; }
+    const type = recorder.mimeType || "video/webm";
+    const blob = new Blob(parts, { type });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "effector-" + Date.now() + (type.includes("mp4") ? ".mp4" : ".webm");
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2500);
+    toast("Video berhasil diekspor!", "succ");
+  };
+  S.rec = true;
+  $("b-rec").textContent = "⏹ Hentikan Perekaman";
+  recorder.start();
+  play(0);
+};
+
+/* ==========================================================================
+   14. EKSPOR ZIP DENGAN ASET TERPISAH & IMPOR BERKAS
+   ========================================================================== */
+function dataUrlToBinary(dataUrl) {
+  const parts = dataUrl.split(",");
+  const mime = parts[0].split(":")[1].split(";")[0];
+  const bstr = atob(parts[1]);
+  const u8 = new Uint8Array(bstr.length);
+  for (let i = 0; i < bstr.length; i++) u8[i] = bstr.charCodeAt(i);
+  let ext = "bin";
+  if (mime.includes("png")) ext = "png";
+  else if (mime.includes("jpeg") || mime.includes("jpg")) ext = "jpg";
+  else if (mime.includes("webp")) ext = "webp";
+  else if (mime.includes("svg")) ext = "svg";
+  else if (mime.includes("wav")) ext = "wav";
+  else if (mime.includes("mpeg") || mime.includes("mp3")) ext = "mp3";
+  else if (mime.includes("ogg")) ext = "ogg";
+  return { bytes: u8, mime, ext };
+}
+
+$("b-export-zip").onclick = async () => {
+  closeDropdowns();
+  if (!S.els.length) { toast("Tidak ada elemen untuk diekspor.", true); return; }
+
+  toast("Mengemas arsip ZIP dengan aset terpisah...");
+  const useJSZip = typeof JSZip !== "undefined";
+  const zip = useJSZip ? new JSZip() : new MiniZip();
+
+  // Salin elemen dan pisahkan aset
+  const cleanEls = JSON.parse(JSON.stringify(S.els));
+  let assetCount = 0;
+
+  cleanEls.forEach(el => {
+    if (el.image && el.image.startsWith("data:")) {
+      assetCount++;
+      const { bytes, ext } = dataUrlToBinary(el.image);
+      const filename = `assets/image_${el.id}.${ext}`;
+      zip.file(filename, bytes);
+      el.image = filename;
+    }
+    if (el.clip && el.clip.startsWith("data:")) {
+      assetCount++;
+      const { bytes, ext } = dataUrlToBinary(el.clip);
+      const filename = `assets/audio_${el.id}.${ext}`;
+      zip.file(filename, bytes);
+      el.clip = filename;
+    }
+  });
+
+  const projectData = {
+    schema: SCHEMA,
+    generator: "Effector Studio",
+    exportedAt: new Date().toISOString(),
+    elements: cleanEls,
+    tracks: S.tracks,
+    mvol: S.mvol
+  };
+
+  zip.file("project.json", JSON.stringify(projectData, null, 2));
+  zip.file("README.txt", `Effector Motion Studio Project Archive
+=======================================
+Waktu Ekspor : ${new Date().toLocaleString()}
+Jumlah Klip  : ${cleanEls.length}
+Durasi Total : ${total().toFixed(1)} detik
+Aset Eksternal: ${assetCount} berkas di dalam folder /assets
+
+Petunjuk Pemakaian:
+Arsip ZIP ini dapat diimpor kembali ke Effector Studio kapan saja dengan memilih "Impor > Impor ZIP".
+Seluruh aset biner di folder 'assets/' akan dimuat dan dihubungkan secara otomatis.`);
+
+  try {
+    let blob;
+    if (useJSZip) {
+      blob = await zip.generateAsync({ type: "blob" });
+    } else {
+      blob = zip.generateBlob();
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "effector-project-" + Date.now() + ".zip";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast("Paket ZIP proyek berhasil diunduh!", "succ");
+  } catch (err) {
+    toast("Gagal membuat berkas ZIP: " + err.message, true);
+  }
+};
+
+$("b-export").onclick = () => {
+  closeDropdowns();
+  const payload = {
+    schema: SCHEMA,
+    generator: "Effector Studio",
+    exportedAt: new Date().toISOString(),
+    elements: S.els,
+    tracks: S.tracks,
+    mvol: S.mvol
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "effector-" + Date.now() + ".json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  toast("Proyek diekspor ke JSON.");
+};
+
+// Impor ZIP
+$("f-import-zip").onchange = async e => {
+  closeDropdowns();
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+
+  if (typeof JSZip === "undefined") {
+    toast("Pustaka pembaca ZIP belum siap atau sedang offline. Gunakan impor JSON.", true);
+    return;
+  }
+
+  try {
+    toast("Mengekstrak paket ZIP...");
+    const zip = await JSZip.loadAsync(file);
+    const jsonFile = zip.file("project.json") || Object.values(zip.files).find(f => f.name.endsWith(".json"));
+    if (!jsonFile) throw new Error("project.json tidak ditemukan di dalam berkas ZIP");
+
+    const jsonStr = await jsonFile.async("string");
+    const d = JSON.parse(jsonStr);
+    const list = Array.isArray(d) ? d : d.elements;
+    if (!Array.isArray(list)) throw new Error("Format daftar elemen tidak valid");
+
+    stop();
+    S.els = []; imgs.clear(); clips.clear(); S.seq = 0;
+    if (!Array.isArray(d) && Array.isArray(d.tracks)) {
+      S.tracks = S.tracks.map((t, i) => ({ vol: clamp(Number(d.tracks[i] && d.tracks[i].vol) || 0, 0, 1), mute: !!(d.tracks[i] && d.tracks[i].mute) }));
+    }
+    if (!Array.isArray(d) && Number.isFinite(+d.mvol)) S.mvol = clamp(+d.mvol, 0, 1);
+    $("mvol").value = S.mvol;
+    applyMix();
+
+    // Pulihkan elemen & hubungkan kembali aset dari ZIP
+    for (const raw of list.slice(0, 200)) {
+      const el = sanitize(raw);
+      if (!el) continue;
+
+      // Jika merujuk ke berkas gambar di zip
+      if (el.image && !el.image.startsWith("data:")) {
+        const imgEntry = zip.file(el.image) || zip.file(el.image.replace(/^\//, ""));
+        if (imgEntry) {
+          const b64 = await imgEntry.async("base64");
+          const ext = el.image.split(".").pop().toLowerCase();
+          const mime = ext === "png" ? "image/png" : ext === "svg" ? "image/svg+xml" : ext === "webp" ? "image/webp" : "image/jpeg";
+          el.image = `data:${mime};base64,${b64}`;
+        }
+      }
+
+      // Jika merujuk ke berkas audio di zip
+      if (el.clip && !el.clip.startsWith("data:")) {
+        const audEntry = zip.file(el.clip) || zip.file(el.clip.replace(/^\//, ""));
+        if (audEntry) {
+          const b64 = await audEntry.async("base64");
+          const ext = el.clip.split(".").pop().toLowerCase();
+          const mime = ext === "wav" ? "audio/wav" : ext === "ogg" ? "audio/ogg" : "audio/mpeg";
+          el.clip = `data:${mime};base64,${b64}`;
+        }
+      }
+
+      S.els.push(el);
+      if (el.image) loadImg(el);
+      if (el.clip) decodeClip(el);
+    }
+
+    select(null);
+    History.commit();
+    toast("Paket ZIP berhasil dimuat!", "succ");
+  } catch (err) {
+    toast("Gagal mengimpor ZIP: " + err.message, true);
+  }
+};
+
+// Impor JSON
+$("f-import").onchange = e => {
+  closeDropdowns();
+  const f = e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      const list = Array.isArray(d) ? d : d.elements;
+      if (!Array.isArray(list)) throw new Error("Daftar elemen tidak ditemukan.");
+      stop();
+      S.els = []; imgs.clear(); clips.clear(); S.seq = 0;
+      if (!Array.isArray(d) && Array.isArray(d.tracks)) {
+        S.tracks = S.tracks.map((t, i) => ({ vol: clamp(Number(d.tracks[i] && d.tracks[i].vol) || 0, 0, 1), mute: !!(d.tracks[i] && d.tracks[i].mute) }));
+      }
+      if (!Array.isArray(d) && Number.isFinite(+d.mvol)) S.mvol = clamp(+d.mvol, 0, 1);
+      $("mvol").value = S.mvol;
+      applyMix();
+      let bad = 0;
+      list.slice(0, 200).forEach(o => {
+        const el = sanitize(o);
+        if (el) {
+          S.els.push(el);
+          if (el.image) loadImg(el);
+          if (el.clip) decodeClip(el);
+        } else bad++;
+      });
+      select(null);
+      History.commit();
+      toast("Proyek dimuat dari JSON" + (bad ? `, ${bad} dilewati.` : "."), bad ? "error" : "succ");
+    } catch (err) {
+      toast("Berkas tidak valid: " + err.message, true);
+    }
+  };
+  r.readAsText(f);
+};
+
+/* ==========================================================================
+   15. MENU DROPDOWN & AKSI UMUM
+   ========================================================================== */
+function closeDropdowns() {
+  $("m-export-menu").classList.remove("show");
+  $("m-import-menu").classList.remove("show");
+}
+
+$("m-export-btn").onclick = e => {
+  e.stopPropagation();
+  $("m-import-menu").classList.remove("show");
+  $("m-export-menu").classList.toggle("show");
+};
+
+$("m-import-btn").onclick = e => {
+  e.stopPropagation();
+  $("m-export-menu").classList.remove("show");
+  $("m-import-menu").classList.toggle("show");
+};
+
+window.addEventListener("click", () => closeDropdowns());
+
+$("b-grid").onclick = e => {
+  S.grid = !S.grid;
+  e.target.setAttribute("aria-pressed", S.grid);
+  render();
+};
+
+$("b-clear").onclick = () => {
+  if (S.els.length && !confirm("Kosongkan kanvas dan hapus semua elemen?")) return;
+  stop();
+  S.els = [];
+  imgs.clear();
+  clips.clear();
+  select(null);
+  History.push();
+  toast("Kanvas dikosongkan.");
+};
+
+$("b-demo").onclick = () => {
+  stop();
+  S.els = []; imgs.clear(); clips.clear(); S.seq = 0;
+  const d = [
+    { type: "text", name: "Judul Utama", text: "Effector Studio", x: 260, y: 70, w: 340, h: 84, color: "#818cf8", fxIn: "glitch", fxLoop: "glow", fxOut: "blur", start: 0, dIn: 0.6, dHold: 2.4, dOut: 0.6, note: 60, wave: "sawtooth" },
+    { type: "shape", shape: "star", name: "Bintang Ungu", x: 375, y: 195, w: 110, h: 110, color: "#ec4899", fxIn: "pop", fxLoop: "spin", fxOut: "shrink", start: 0.8, dIn: 0.5, dHold: 1.8, dOut: 0.5, note: 64, wave: "square" },
+    { type: "shape", shape: "circle", name: "Lingkaran Cyan", x: 190, y: 215, w: 90, h: 90, color: "#06b6d4", fxIn: "zoom", fxLoop: "pulse", fxOut: "zoom", start: 1.4, dIn: 0.4, dHold: 1.5, dOut: 0.4, note: 67, wave: "triangle" },
+    { type: "shape", shape: "triangle", name: "Segitiga Emas", x: 580, y: 215, w: 90, h: 90, color: "#fbbf24", fxIn: "slide", fxLoop: "wobble", fxOut: "slide", start: 2.0, dIn: 0.4, dHold: 1.5, dOut: 0.4, note: 71, wave: "triangle" },
+    { type: "text", name: "Subjudul", text: "Motion Graphics, Web Audio, & Dynamic Rendering", x: 160, y: 390, w: 540, h: 48, color: "#34d399", fxIn: "fade", fxLoop: "float", fxOut: "fade", start: 2.5, dIn: 0.5, dHold: 1.8, dOut: 0.6, note: 72, wave: "sine" }
+  ];
+  d.forEach((o, i) => {
+    o.track = [0, 1, 2, 3, 1][i];
+    o.rev = i % 2 ? 0.4 : 0.2;
+    S.els.push(sanitize(o));
+  });
+  select(S.els[0].id);
+  History.commit();
+  toast("Contoh proyek dimuat.");
+};
+
+/* ==========================================================================
+   16. PINTASAN KEYBOARD GLOBAL
+   ========================================================================== */
+window.addEventListener("keydown", e => {
+  const isInput = ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName);
+
+  // Undo / Redo
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+    e.preventDefault();
+    if (e.shiftKey) History.redo();
+    else History.undo();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+    e.preventDefault();
+    History.redo();
+    return;
+  }
+
+  // Duplikat
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && !isInput) {
+    e.preventDefault();
+    $("b-dup").click();
+    return;
+  }
+
+  if (isInput) return;
+
+  if (e.code === "Space") {
+    e.preventDefault();
+    $("play").click();
+  } else if (e.code === "Delete" && S.sel && !S.playing) {
+    e.preventDefault();
+    $("b-del").click();
+  } else if (e.code === "Escape") {
+    select(null);
+  }
+});
+
+/* ==========================================================================
+   17. INISIALISASI APLIKASI
+   ========================================================================== */
+(async function initApp() {
+  fillSelects();
+  await AutoSave.init();
+
+  // Coba pulihkan sesi autosave terakhir jika ada
+  const saved = await AutoSave.load();
+  if (saved && Array.isArray(saved.elements) && saved.elements.length > 0) {
+    try {
+      S.els = []; imgs.clear(); clips.clear(); S.seq = saved.seq || 0;
+      if (Array.isArray(saved.tracks)) {
+        S.tracks = saved.tracks.map(t => ({ vol: clamp(+t.vol, 0, 1), mute: !!t.mute }));
+      }
+      if (Number.isFinite(+saved.mvol)) S.mvol = clamp(+saved.mvol, 0, 1);
+      $("mvol").value = S.mvol;
+      applyMix();
+      saved.elements.forEach(o => {
+        const el = sanitize(o);
+        if (el) {
+          S.els.push(el);
+          if (el.image) loadImg(el);
+          if (el.clip) decodeClip(el);
+        }
+      });
+      select(S.els[0]?.id || null);
+      History.commit();
+      toast("Sesi sebelumnya berhasil dipulihkan otomatis.");
+      return;
+    } catch (err) {
+      console.warn("Gagal memuat autosave:", err);
+    }
+  }
+
+  // Jika tidak ada data tersimpan, muat contoh demo
+  $("b-demo").click();
+})();
+</script>
+</body>
+</html>

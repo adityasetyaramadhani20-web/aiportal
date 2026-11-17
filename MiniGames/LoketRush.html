@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loket Rush</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @keyframes slideDown {
+      from { transform: translate(-50%, -100%); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+    .animate-slide-down {
+      animation: slideDown 0.3s ease-out forwards;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px) rotate(-1deg); }
+      75% { transform: translateX(5px) rotate(1deg); }
+    }
+    .animate-shake {
+      animation: shake 0.4s ease-in-out;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.8); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-pop-in {
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    
+    /* Custom Scrollbar for Queue */
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-800">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ==========================================
+    // 1. IKON SVG (Custom & Lucide Inspired)
+    // ==========================================
+    const IconWrapper = ({ children, size = 24, className = "" }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {children}
+      </svg>
+    );
+
+    const User = (props) => <IconWrapper {...props}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></IconWrapper>;
+    const FileText = (props) => <IconWrapper {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></IconWrapper>;
+    const Stamp = (props) => <IconWrapper {...props}><path d="M5 22h14"></path><path d="M19.27 13.73A2.665 2.665 0 0 1 21 16v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-2c0-.73.29-1.4.75-1.92L12 11l-3.75 3.08c.46.52.75 1.19.75 1.92v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2c0-1.1.6-2.06 1.5-2.5l5.5-6.5C10.6 5.6 11.25 5 12 5s1.4.6 2 1.5l1.5 1.5"></path><path d="M14.1 6.5l-2.2-2.2"></path></IconWrapper>;
+    const PenTool = (props) => <IconWrapper {...props}><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></IconWrapper>;
+    const Camera = (props) => <IconWrapper {...props}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></IconWrapper>;
+    const Clock = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></IconWrapper>;
+    const AlertCircle = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></IconWrapper>;
+    const CheckCircle = (props) => <IconWrapper {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></IconWrapper>;
+    const XCircle = (props) => <IconWrapper {...props}><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></IconWrapper>;
+    const Trash2 = (props) => <IconWrapper {...props}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></IconWrapper>;
+    const Building = (props) => <IconWrapper {...props}><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="9" y1="22" x2="9" y2="22"></line><line x1="15" y1="22" x2="15" y2="22"></line><path d="M9 6h.01M15 6h.01M9 10h.01M15 10h.01M9 14h.01M15 14h.01M9 18h.01M15 18h.01"></path></IconWrapper>;
+    const Mail = (props) => <IconWrapper {...props}><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></IconWrapper>;
+    const Package = (props) => <IconWrapper {...props}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></IconWrapper>;
+    const Scale = (props) => <IconWrapper {...props}><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="M7 21h10"></path><path d="M12 3v18"></path><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path></IconWrapper>;
+    const Calculator = (props) => <IconWrapper {...props}><rect width="16" height="20" x="4" y="2" rx="2"></rect><line x1="8" x2="16" y1="6" y2="6"></line><line x1="16" x2="16" y1="14" y2="18"></line><path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"></path></IconWrapper>;
+    const Banknote = (props) => <IconWrapper {...props}><rect width="20" height="12" x="2" y="6" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></IconWrapper>;
+    const BadgeCheck = (props) => <IconWrapper {...props}><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"></path><path d="m9 12 2 2 4-4"></path></IconWrapper>;
+
+
+    // ==========================================
+    // 2. KONFIGURASI LEVEL & GAME
+    // ==========================================
+    const GAME_DURATION = 90;
+    const CITIZEN_NAMES = ["Pak Budi", "Bu Siti", "Mas Joko", "Mbak Rina", "Pak RT", "Dek Tono", "Bu Lurah", "Opa Hans", "Tante Lala"];
+
+    const LEVELS = {
+      LURAH: {
+        id: 'LURAH',
+        name: "Kantor Lurah",
+        subtitle: "Pusat Administrasi Warga",
+        icon: Building,
+        theme: {
+          main: "bg-blue-600",
+          hover: "hover:bg-blue-700",
+          light: "bg-blue-100",
+          border: "border-blue-600",
+          bgGradient: "from-blue-100 to-slate-200",
+          trayBg: "bg-slate-800",
+        },
+        ingredients: {
+          'form_ktp': { label: 'Form KTP', icon: FileText, color: 'bg-blue-200', text: 'text-blue-900' },
+          'form_kk': { label: 'Form KK', icon: FileText, color: 'bg-green-200', text: 'text-green-900' },
+          'form_surat': { label: 'Form Surat', icon: FileText, color: 'bg-yellow-200', text: 'text-yellow-900' },
+          'foto': { label: 'Foto 3x4', icon: Camera, color: 'bg-purple-200', text: 'text-purple-900' },
+          'ttd': { label: 'Tanda Tangan', icon: PenTool, color: 'bg-gray-200', text: 'text-gray-900' },
+          'stempel': { label: 'Stempel', icon: Stamp, color: 'bg-red-200', text: 'text-red-900' },
+        },
+        forms: ['form_ktp', 'form_kk', 'form_surat'],
+        tools: ['foto', 'ttd', 'stempel'],
+        requests: [
+          { name: 'Buat KTP', type: 'KTP', reqs: ['form_ktp', 'foto', 'stempel'], color: 'bg-blue-100 border-blue-500 text-blue-800' },
+          { name: 'Urus KK', type: 'KK', reqs: ['form_kk', 'ttd', 'stempel'], color: 'bg-green-100 border-green-500 text-green-800' },
+          { name: 'Surat Pengantar', type: 'SURAT', reqs: ['form_surat', 'ttd'], color: 'bg-yellow-100 border-yellow-500 text-yellow-800' }
+        ]
+      },
+      PAJAK: {
+        id: 'PAJAK',
+        name: "Kantor Pajak",
+        subtitle: "Lapor SPT & Bayar Pajak",
+        icon: Calculator,
+        theme: {
+          main: "bg-orange-600",
+          hover: "hover:bg-orange-700",
+          light: "bg-orange-100",
+          border: "border-orange-600",
+          bgGradient: "from-orange-100 to-slate-200",
+          trayBg: "bg-stone-800",
+        },
+        ingredients: {
+          'form_npwp': { label: 'Form NPWP', icon: FileText, color: 'bg-orange-200', text: 'text-orange-900' },
+          'form_spt': { label: 'SPT Tahunan', icon: FileText, color: 'bg-yellow-200', text: 'text-yellow-900' },
+          'form_setoran': { label: 'Surat Setoran', icon: FileText, color: 'bg-rose-200', text: 'text-rose-900' },
+          'kalkulator': { label: 'Hitung', icon: Calculator, color: 'bg-slate-300', text: 'text-slate-900' },
+          'uang': { label: 'Bayar', icon: Banknote, color: 'bg-emerald-200', text: 'text-emerald-900' },
+          'stempel_pajak': { label: 'Stempel Lunas', icon: BadgeCheck, color: 'bg-red-200', text: 'text-red-900' },
+        },
+        forms: ['form_npwp', 'form_spt', 'form_setoran'],
+        tools: ['kalkulator', 'uang', 'stempel_pajak'],
+        requests: [
+          { name: 'Buat NPWP', type: 'NPWP', reqs: ['form_npwp', 'stempel_pajak'], color: 'bg-orange-100 border-orange-500 text-orange-800' },
+          { name: 'Lapor SPT', type: 'SPT', reqs: ['form_spt', 'kalkulator', 'stempel_pajak'], color: 'bg-yellow-100 border-yellow-500 text-yellow-800' },
+          { name: 'Bayar Pajak', type: 'BAYAR', reqs: ['form_setoran', 'kalkulator', 'uang', 'stempel_pajak'], color: 'bg-rose-100 border-rose-500 text-rose-800' }
+        ]
+      },
+      POS: {
+        id: 'POS',
+        name: "Kantor Pos",
+        subtitle: "Kirim Paket & Surat",
+        icon: Package,
+        theme: {
+          main: "bg-amber-500",
+          hover: "hover:bg-amber-600",
+          light: "bg-amber-100",
+          border: "border-amber-500",
+          bgGradient: "from-amber-100 to-slate-200",
+          trayBg: "bg-neutral-800",
+        },
+        ingredients: {
+          'amplop': { label: 'Amplop', icon: Mail, color: 'bg-white', text: 'text-slate-800' },
+          'kardus': { label: 'Kardus', icon: Package, color: 'bg-amber-200', text: 'text-amber-900' },
+          'form_wesel': { label: 'Form Wesel', icon: FileText, color: 'bg-blue-200', text: 'text-blue-900' },
+          'perangko': { label: 'Perangko', icon: Stamp, color: 'bg-red-200', text: 'text-red-900' },
+          'timbangan': { label: 'Timbang', icon: Scale, color: 'bg-gray-300', text: 'text-gray-900' },
+          'stempel_pos': { label: 'Stempel Pos', icon: BadgeCheck, color: 'bg-orange-300', text: 'text-orange-900' },
+        },
+        forms: ['amplop', 'kardus', 'form_wesel'],
+        tools: ['perangko', 'timbangan', 'stempel_pos'],
+        requests: [
+          { name: 'Kirim Surat', type: 'SURAT', reqs: ['amplop', 'perangko', 'stempel_pos'], color: 'bg-slate-100 border-slate-500 text-slate-800' },
+          { name: 'Kirim Paket', type: 'PAKET', reqs: ['kardus', 'timbangan', 'perangko', 'stempel_pos'], color: 'bg-amber-100 border-amber-500 text-amber-800' },
+          { name: 'Cairkan Wesel', type: 'WESEL', reqs: ['form_wesel', 'stempel_pos'], color: 'bg-blue-100 border-blue-500 text-blue-800' }
+        ]
+      }
+    };
+
+    // ==========================================
+    // 3. KOMPONEN UTAMA (APP)
+    // ==========================================
+    function App() {
+      const [gameState, setGameState] = useState('MENU'); // MENU, SELECT_LEVEL, PLAYING, GAMEOVER
+      const [levelId, setLevelId] = useState('LURAH');
+      const [score, setScore] = useState(0);
+      const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
+      const [lives, setLives] = useState(3);
+      const [queue, setQueue] = useState([]);
+      const [tray, setTray] = useState([]);
+      const [notification, setNotification] = useState(null);
+      const [isShaking, setIsShaking] = useState(false);
+
+      // Menggunakan ref untuk state yang diakses di dalam interval 
+      // agar tidak terjadi stale closure / interval reset terus menerus
+      const scoreRef = useRef(score);
+      useEffect(() => { scoreRef.current = score; }, [score]);
+
+      const gameLoopRef = useRef(null);
+      const spawnRef = useRef(null);
+
+      const lvl = LEVELS[levelId]; // Konfigurasi level aktif
+
+      // --- LOGIKA GAME ---
+      const startGame = (selectedLvl) => {
+        setLevelId(selectedLvl);
+        setGameState('PLAYING');
+        setScore(0);
+        setTimeLeft(GAME_DURATION);
+        setLives(3);
+        setQueue([]);
+        setTray([]);
+        spawnCitizen(selectedLvl);
+      };
+
+      const spawnCitizen = (activeLvl = levelId) => {
+        const config = LEVELS[activeLvl];
+        setQueue(prev => {
+          if (prev.length >= 4) return prev; 
+          const randomRequest = config.requests[Math.floor(Math.random() * config.requests.length)];
+          const randomName = CITIZEN_NAMES[Math.floor(Math.random() * CITIZEN_NAMES.length)];
+          const newCitizen = {
+            id: Date.now() + Math.random(),
+            name: randomName,
+            request: randomRequest,
+            patience: 100,
+            appearanceId: Math.floor(Math.random() * 5)
+          };
+          return [...prev, newCitizen];
+        });
+      };
+
+      useEffect(() => {
+        if (gameState !== 'PLAYING') {
+          clearInterval(gameLoopRef.current);
+          clearInterval(spawnRef.current);
+          return;
+        }
+
+        // Loop Waktu & Kesabaran (Interval aman tanpa dependency statis)
+        gameLoopRef.current = setInterval(() => {
+          setTimeLeft(t => {
+            if (t <= 1) {
+              setGameState('GAMEOVER');
+              return 0;
+            }
+            return t - 1;
+          });
+
+          setQueue(prevQueue => {
+            // Tingkat kesulitan berdasarkan skor
+            const difficultyMultiplier = 1.2 + (scoreRef.current / 400); 
+            
+            let livesToDeduct = 0;
+            const newQueue = prevQueue.map(c => {
+              const newPatience = c.patience - difficultyMultiplier;
+              if (newPatience <= 0) livesToDeduct++;
+              return { ...c, patience: newPatience };
+            }).filter(c => c.patience > 0);
+
+            if (livesToDeduct > 0) {
+              setLives(l => {
+                const newLives = l - livesToDeduct;
+                if (newLives <= 0) setGameState('GAMEOVER');
+                return newLives;
+              });
+              showNotification("Warga pergi karena terlalu lama!", 'error');
+            }
+
+            return newQueue;
+          });
+        }, 1000);
+
+        // Loop Kedatangan Warga
+        spawnRef.current = setInterval(() => {
+          if (Math.random() > 0.35) spawnCitizen();
+        }, 3000);
+
+        return () => {
+          clearInterval(gameLoopRef.current);
+          clearInterval(spawnRef.current);
+        };
+      }, [gameState, levelId]);
+
+      const addToTray = (ingredient) => {
+        if (tray.length >= 4) {
+          showNotification("Meja penuh! Hapus dokumen.", 'error');
+          triggerShake();
+          return;
+        }
+        setTray([...tray, ingredient]);
+      };
+
+      const clearTray = () => setTray([]);
+
+      const serveCitizen = (citizenId) => {
+        const citizen = queue.find(c => c.id === citizenId);
+        if (!citizen) return;
+
+        const required = citizen.request.reqs;
+        const sortedTray = [...tray].sort();
+        const sortedReq = [...required].sort();
+        const isCorrect = JSON.stringify(sortedTray) === JSON.stringify(sortedReq);
+
+        if (isCorrect) {
+          const pointsEarned = 100 + Math.floor(citizen.patience);
+          setScore(s => s + pointsEarned);
+          setQueue(prev => prev.filter(c => c.id !== citizenId));
+          setTray([]);
+          showNotification(`+${pointsEarned} Poin! Lanjut.`, 'success');
+          setTimeLeft(t => Math.min(t + 4, GAME_DURATION)); // Tambah waktu sedikit
+        } else {
+          showNotification("Dokumen salah / tidak lengkap!", 'error');
+          triggerShake();
+          setTray([]);
+          setQueue(prev => prev.map(c => c.id === citizenId ? {...c, patience: Math.max(0, c.patience - 25)} : c));
+        }
+      };
+
+      const showNotification = (msg, type) => {
+        setNotification({ msg, type, id: Date.now() });
+        setTimeout(() => setNotification(null), 2000);
+      };
+
+      const triggerShake = () => {
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 400);
+      };
+
+      const getPatienceColor = (p) => {
+        if (p > 55) return 'bg-emerald-500';
+        if (p > 25) return 'bg-yellow-400';
+        return 'bg-red-500';
+      };
+
+      // ==========================================
+      // RENDER: MENU UTAMA
+      // ==========================================
+      if (gameState === 'MENU') {
+        return (
+          <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans text-slate-800 relative overflow-hidden">
+            {/* Dekorasi BG */}
+            <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-64 h-64 bg-orange-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+
+            <div className="bg-white max-w-sm w-full p-8 rounded-3xl shadow-2xl text-center z-10 animate-pop-in border-b-8 border-slate-300">
+              <div className="flex justify-center mb-6">
+                <div className="bg-slate-800 p-5 rounded-2xl shadow-inner transform rotate-3">
+                  <Stamp size={56} className="text-white transform -rotate-6" />
+                </div>
+              </div>
+              <h1 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">LOKET <span className="text-blue-600">RUSH</span></h1>
+              <p className="text-slate-500 font-medium mb-8 uppercase tracking-widest text-sm"></p>
+              
+              <button 
+                onClick={() => setGameState('SELECT_LEVEL')} 
+                className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 rounded-xl shadow-[0_4px_0_0_rgba(15,23,42,1)] active:shadow-none active:translate-y-1 transition-all text-lg mb-4"
+              >
+                Mulai Bekerja
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // ==========================================
+      // RENDER: PILIH LEVEL
+      // ==========================================
+      if (gameState === 'SELECT_LEVEL') {
+        return (
+          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 font-sans">
+            <div className="max-w-2xl w-full">
+              <div className="flex items-center justify-between mb-8 text-white">
+                <button onClick={() => setGameState('MENU')} className="text-slate-400 hover:text-white flex items-center bg-slate-800 px-4 py-2 rounded-lg transition">
+                  <IconWrapper size={18} className="mr-2"><path d="m15 18-6-6 6-6"/></IconWrapper> Kembali
+                </button>
+                <h2 className="text-2xl font-bold">Pilih Instansi</h2>
+                <div className="w-24"></div> {/* Spacer */}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {Object.values(LEVELS).map((level) => {
+                  const LvlIcon = level.icon;
+                  return (
+                    <div key={level.id} 
+                         onClick={() => startGame(level.id)}
+                         className={`bg-white rounded-2xl p-6 cursor-pointer transform hover:-translate-y-2 transition-all duration-300 shadow-xl border-b-8 ${level.theme.border} group`}>
+                      <div className={`w-16 h-16 rounded-xl flex items-center justify-center mb-4 ${level.theme.light} ${level.theme.text} group-hover:scale-110 transition-transform`}>
+                        <LvlIcon size={32} />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-800 mb-1">{level.name}</h3>
+                      <p className="text-sm text-slate-500 font-medium">{level.subtitle}</p>
+                      
+                      <div className="mt-6 pt-4 border-t border-slate-100">
+                        <span className={`text-xs font-bold uppercase tracking-wider ${level.theme.text} bg-slate-50 px-3 py-1 rounded-full`}>
+                          Pilih Kantor
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ==========================================
+      // RENDER: GAME OVER
+      // ==========================================
+      if (gameState === 'GAMEOVER') {
+        return (
+          <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans relative">
+             <div className="absolute inset-0 bg-red-900/20"></div>
+            <div className={`bg-white max-w-sm w-full p-8 rounded-3xl shadow-2xl text-center border-t-8 ${lvl.theme.border} animate-pop-in z-10`}>
+              <div className="flex justify-center mb-4">
+                <div className="bg-red-100 p-4 rounded-full">
+                  <AlertCircle size={56} className="text-red-500" />
+                </div>
+              </div>
+              <h1 className="text-3xl font-extrabold text-slate-800 mb-1">Loket Ditutup!</h1>
+              <p className="text-slate-500 font-medium mb-6">({lvl.name})</p>
+              
+              <div className="bg-slate-100 p-6 rounded-2xl mb-8 border border-slate-200">
+                <p className="text-sm text-slate-500 uppercase tracking-widest font-bold mb-1">Total Kinerja</p>
+                <p className="text-6xl font-black text-slate-800">{score}</p>
+                <p className="text-xs text-slate-400 mt-2">Poin Reputasi</p>
+              </div>
+              
+              <div className="space-y-3">
+                <button onClick={() => startGame(levelId)} className={`w-full ${lvl.theme.main} ${lvl.theme.hover} text-white font-bold py-4 rounded-xl shadow-lg transition`}>
+                  Kerja Lembur (Main Lagi)
+                </button>
+                <button onClick={() => setGameState('SELECT_LEVEL')} className="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-xl transition">
+                  Pindah Kantor
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ==========================================
+      // RENDER: PLAYING (GAME UTAMA)
+      // ==========================================
+      return (
+        <div className="min-h-screen bg-slate-900 flex justify-center font-sans sm:py-4">
+          <div className={`w-full max-w-md sm:max-w-xl bg-gradient-to-b ${lvl.theme.bgGradient} sm:rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden relative`}>
+            
+            {/* Header Status */}
+            <div className={`${lvl.theme.main} text-white p-4 flex justify-between items-center z-10 shadow-md`}>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold uppercase opacity-80">{lvl.name}</span>
+                <span className="text-xl font-black tracking-wide">SKOR: {score}</span>
+              </div>
+              <div className="flex flex-col items-end">
+                <div className="flex items-center font-bold bg-black/20 px-3 py-1 rounded-full mb-1">
+                  <Clock size={16} className="mr-2" />
+                  {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                </div>
+                <div className="flex space-x-1">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className={`w-4 h-4 rounded-full border border-white/30 shadow-inner ${i < lives ? 'bg-red-400' : 'bg-black/30'}`} />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Toast Notification */}
+            {notification && (
+              <div key={notification.id} className={`absolute top-24 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 text-white font-bold animate-slide-down flex items-center text-sm ${notification.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                {notification.type === 'success' ? <CheckCircle size={18} className="mr-2" /> : <XCircle size={18} className="mr-2" />}
+                {notification.msg}
+              </div>
+            )}
+
+            {/* Area Antrean Warga */}
+            <div className="flex-1 relative p-4 overflow-hidden flex flex-col justify-end min-h-[280px]">
+              {/* Garis Lantai */}
+              <div className="absolute bottom-0 left-0 w-full h-8 bg-black/5"></div>
+              
+              <div className="flex space-x-4 overflow-x-auto hide-scrollbar pb-2 items-end h-full px-2">
+                {queue.length === 0 && (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-500/70 opacity-70">
+                    <Clock size={48} className="mb-2" />
+                    <span className="font-medium italic">Menunggu warga datang...</span>
+                  </div>
+                )}
+                {queue.map((citizen) => (
+                  <div key={citizen.id} className="relative flex-shrink-0 w-36 flex flex-col items-center group animate-pop-in">
+                    
+                    {/* Bubble Permintaan */}
+                    <div className={`mb-3 p-2.5 rounded-xl shadow-lg border-2 w-full text-center relative bg-white ${lvl.theme.text} ${lvl.theme.border} transform transition-transform group-hover:-translate-y-1`}>
+                       <div className="flex justify-center flex-wrap gap-1 mb-1.5 bg-slate-50 rounded-lg p-1.5 border border-slate-100">
+                          {citizen.request.reqs.map((ing, idx) => {
+                             const IngIcon = lvl.ingredients[ing].icon;
+                             return (
+                               <div key={idx} className={`w-6 h-6 flex items-center justify-center rounded-md ${lvl.ingredients[ing].color} ${lvl.ingredients[ing].text} shadow-sm`} title={lvl.ingredients[ing].label}>
+                                 <IngIcon size={14} />
+                               </div>
+                             );
+                          })}
+                       </div>
+                       <div className="font-bold text-[11px] leading-tight uppercase tracking-wide">{citizen.request.name}</div>
+                       <div className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white"></div>
+                       {/* Border Segitiga */}
+                       <div className={`absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent ${citizen.request.color.split(' ')[1].replace('border-', 'border-t-')} -z-10`}></div>
+                    </div>
+
+                    {/* Karakter */}
+                    <button onClick={() => serveCitizen(citizen.id)} className="w-24 h-24 rounded-t-full relative cursor-pointer transform transition-transform hover:scale-105 active:scale-95 group/btn focus:outline-none">
+                      <div className={`w-full h-full rounded-t-full flex items-end justify-center overflow-hidden border-4 border-white shadow-md bg-gradient-to-t ${['from-sky-200', 'from-emerald-200', 'from-rose-200', 'from-amber-200', 'from-indigo-200'][citizen.appearanceId]} to-slate-50`}>
+                        <User size={64} className="text-slate-700 mb-[-8px] group-hover/btn:-translate-y-2 transition-transform duration-300" />
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/btn:opacity-100 bg-black/30 rounded-t-full transition-opacity backdrop-blur-[1px]">
+                        <span className="text-white font-black text-xs bg-slate-900/80 px-3 py-1.5 rounded-full shadow-lg border border-white/20">SERAHKAN</span>
+                      </div>
+                    </button>
+
+                    {/* Bar Kesabaran */}
+                    <div className="w-24 h-2.5 bg-white rounded-full mt-3 overflow-hidden border-2 border-slate-200 shadow-sm">
+                      <div className={`h-full transition-all duration-1000 ease-linear ${getPatienceColor(citizen.patience)}`} style={{ width: `${citizen.patience}%` }} />
+                    </div>
+                    <div className="text-[11px] text-slate-600 mt-1 font-bold bg-white/50 px-2 py-0.5 rounded-full backdrop-blur-sm">{citizen.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Area Kerja (Workstation) */}
+            <div className={`${lvl.theme.trayBg} rounded-t-[2rem] p-5 flex flex-col shadow-[0_-10px_20px_rgba(0,0,0,0.15)] z-20 ${isShaking ? 'animate-shake' : ''}`}>
+              
+              {/* Nampan / Tray */}
+              <div className="bg-black/30 rounded-2xl p-3 mb-5 flex items-center justify-between min-h-[70px] border border-white/10 shadow-inner">
+                 <div className="flex items-center space-x-2 overflow-x-auto hide-scrollbar px-1 flex-1">
+                    {tray.length === 0 ? (
+                      <span className="text-white/40 text-sm italic font-medium mx-auto flex items-center">
+                         <IconWrapper size={16} className="mr-2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></IconWrapper>
+                         Meja Kerja Kosong
+                      </span>
+                    ) : (
+                      tray.map((item, index) => {
+                        const ItemIcon = lvl.ingredients[item].icon;
+                        return (
+                          <div key={index} className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl shadow-md text-xs font-bold animate-pop-in ${lvl.ingredients[item].color} ${lvl.ingredients[item].text}`}>
+                            <ItemIcon size={14} />
+                            <span className="whitespace-nowrap">{lvl.ingredients[item].label}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                 </div>
+                 {tray.length > 0 && (
+                    <button onClick={clearTray} className="text-rose-400 hover:text-white hover:bg-rose-500 ml-2 p-2.5 rounded-xl transition-colors shadow-sm bg-black/20" title="Bersihkan Meja">
+                      <Trash2 size={20} />
+                    </button>
+                 )}
+              </div>
+
+              {/* Tombol Form & Alat */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Kolom Kiri: Form/Dokumen */}
+                <div className="bg-white/5 p-2 rounded-2xl border border-white/5">
+                  <div className="text-[10px] text-white/50 font-bold uppercase tracking-widest text-center mb-2">Dokumen</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {lvl.forms.map(formKey => {
+                       const item = lvl.ingredients[formKey];
+                       const ItemIcon = item.icon;
+                       return (
+                         <button key={formKey} onClick={() => addToTray(formKey)} className={`${item.color} hover:brightness-95 rounded-xl flex flex-col items-center justify-center p-2.5 transition-transform active:scale-90 group shadow-sm h-16`}>
+                           <ItemIcon className={`${item.text} mb-1.5 group-hover:scale-110 transition-transform`} size={22} />
+                           <span className={`text-[9px] font-black uppercase leading-tight text-center ${item.text}`}>{item.label}</span>
+                         </button>
+                       )
+                    })}
+                  </div>
+                </div>
+
+                {/* Kolom Kanan: Alat/Aksi */}
+                <div className="bg-white/5 p-2 rounded-2xl border border-white/5">
+                  <div className="text-[10px] text-white/50 font-bold uppercase tracking-widest text-center mb-2">Peralatan</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {lvl.tools.map(toolKey => {
+                       const item = lvl.ingredients[toolKey];
+                       const ItemIcon = item.icon;
+                       return (
+                         <button key={toolKey} onClick={() => addToTray(toolKey)} className={`${item.color} hover:brightness-95 rounded-xl flex flex-col items-center justify-center p-2.5 transition-transform active:scale-90 group shadow-sm h-16`}>
+                           <ItemIcon className={`${item.text} mb-1.5 group-hover:-translate-y-1 transition-transform`} size={22} />
+                           <span className={`text-[9px] font-black uppercase leading-tight text-center ${item.text}`}>{item.label}</span>
+                         </button>
+                       )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Info Bar Bawah */}
+            <div className="bg-black p-2 text-center text-[10px] text-white/50 font-medium tracking-wide">
+              Tips: Siapkan semua bahan di meja kerja, lalu klik warga untuk menyerahkan.
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

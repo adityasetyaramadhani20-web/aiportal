@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Duo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0f172a; /* Slate 900 */
+            color: white;
+            font-family: 'Courier New', Courier, monospace; /* Tampilan agak retro/hacker */
+            overflow: hidden; /* Penting untuk fullscreen game */
+            touch-action: none;
+        }
+
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Klik tembus ke kanvas/tombol mobile */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+        }
+
+        /* Mobile Controls */
+        #mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            padding: 0 30px;
+            box-sizing: border-box;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        .d-pad, .action-pad {
+            display: flex;
+            gap: 15px;
+            pointer-events: auto;
+        }
+
+        .btn-control {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(4px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .btn-control:active {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0.95);
+        }
+
+        @media (max-width: 768px) {
+            #mobile-controls { display: flex; }
+        }
+        
+        /* CRT overlay for retro feel (optional) */
+        .crt-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="crt-overlay"></div>
+        
+        <div id="uiOverlay" class="ui-layer">
+            <!-- UI Injeksi -->
+        </div>
+
+        <div id="mobile-controls">
+            <div class="d-pad">
+                <button class="btn-control" id="btnLeft">←</button>
+                <button class="btn-control" id="btnRight">→</button>
+            </div>
+            <div class="action-pad">
+                <button class="btn-control" id="btnJump">↑</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const uiOverlay = document.getElementById('uiOverlay');
+
+    // Menyesuaikan ukuran kanvas dengan window
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Konstanta Fisika & Game
+    const GRAVITY = 0.5;
+    const JUMP_FORCE = 11;
+    const MOVE_SPEED = 5;
+    const MAX_FALL_SPEED = 15;
+    const TILE_SIZE = 40; // Ukuran dasar balok grid
+    
+    // Setting PiP (Picture in Picture) untuk Retro View
+    const PIP_WIDTH = 320;
+    const PIP_HEIGHT = 240;
+    const PIP_MARGIN = 20;
+
+    let gameState = 'START'; // START, PLAYING, GAMEOVER, LEVEL_CLEAR
+    let levelNumber = 1;
+    let cameraFG = { x: 0, y: 0 };
+    let cameraBG = { x: 0, y: 0 };
+
+    const keys = { left: false, right: false, jump: false };
+
+    class Player {
+        constructor(color, isRetro) {
+            this.width = 24;
+            this.height = 36;
+            this.color = color;
+            this.isRetro = isRetro;
+            this.reset(0, 0);
+        }
+
+        reset(x, y) {
+            this.x = x;
+            this.y = y;
+            this.vx = 0;
+            this.vy = 0;
+            this.isGrounded = false;
+            this.isAtFinish = false;
+            this.isDead = false;
+        }
+
+        update(levelMap) {
+            if (this.isDead || gameState !== 'PLAYING') return;
+
+            // Horizontal
+            if (keys.left) this.vx = -MOVE_SPEED;
+            else if (keys.right) this.vx = MOVE_SPEED;
+            else this.vx = 0;
+
+            this.x += this.vx;
+            this.checkCollisions(levelMap, 'x');
+
+            // Vertikal
+            this.vy += GRAVITY;
+            if (this.vy > MAX_FALL_SPEED) this.vy = MAX_FALL_SPEED;
+            
+            this.y += this.vy;
+            this.isGrounded = false;
+            this.checkCollisions(levelMap, 'y');
+
+            // Cek jatuh (mati)
+            // Asumsikan dasar level terendah adalah y = 1500
+            if (this.y > 1500) {
+                this.isDead = true;
+            }
+        }
+
+        jump() {
+            if (this.isGrounded) {
+                this.vy = -JUMP_FORCE;
+                this.isGrounded = false;
+            }
+        }
+
+        checkCollisions(platforms, axis) {
+            this.isAtFinish = false;
+            
+            for (let p of platforms) {
+                if (this.x < p.x + p.w &&
+                    this.x + this.width > p.x &&
+                    this.y < p.y + p.h &&
+                    this.y + this.height > p.y) {
+                    
+                    if (p.type === 'finish') {
+                        this.isAtFinish = true;
+                    } else if (p.type === 'solid' || p.type === 'wall') {
+                        if (axis === 'x') {
+                            if (this.vx > 0) this.x = p.x - this.width;
+                            else if (this.vx < 0) this.x = p.x + p.w;
+                            this.vx = 0;
+                        } else if (axis === 'y') {
+                            if (this.vy > 0) {
+                                this.y = p.y - this.height;
+                                this.isGrounded = true;
+                            } else if (this.vy < 0) {
+                                this.y = p.y + p.h;
+                            }
+                            this.vy = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        draw(ctx) {
+            if (this.isDead) return;
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            // Mata
+            ctx.fillStyle = this.isRetro ? '#0f0' : 'white'; // Hijau neon untuk retro, putih untuk normal
+            let eyeOffsetX = (keys.right) ? 12 : (keys.left) ? 4 : 8;
+            ctx.fillRect(this.x + eyeOffsetX, this.y + 6, 4, 4);
+            ctx.fillRect(this.x + eyeOffsetX + 6, this.y + 6, 4, 4);
+        }
+    }
+
+    // Generator Level Prosedural
+    function generateLevel(length) {
+        let fgMap = [];
+        let bgMap = [];
+        
+        let startX = 100;
+        let groundY = 500; // Posisi dasar lantai (Y)
+
+        // Platform Awal
+        fgMap.push({x: 0, y: groundY, w: 400, h: 200, type: 'solid'});
+        bgMap.push({x: 0, y: groundY, w: 400, h: 200, type: 'solid'});
+
+        let currentX = 400;
+
+        // Bikin rute berdasarkan chunks
+        for(let i=0; i<length; i++) {
+            let chunkType = Math.floor(Math.random() * 4); // 0, 1, 2, 3
+            let chunkWidth = 250 + Math.random() * 150; // Diperlebar sedikit agar platform aman
+
+            if (chunkType === 0) {
+                // Jalan lurus datar biasa (safe zone)
+                fgMap.push({x: currentX, y: groundY, w: chunkWidth, h: 200, type: 'solid'});
+                bgMap.push({x: currentX, y: groundY, w: chunkWidth, h: 200, type: 'solid'});
+            } 
+            else if (chunkType === 1) {
+                // Jurang di FG, jalan aman di BG (membutuhkan lompatan)
+                bgMap.push({x: currentX, y: groundY, w: chunkWidth, h: 200, type: 'solid'});
+                
+                // Jarak maksimal lompatan adalah ~220px. Kita batasi jurang maksimal 160px agar aman.
+                let gapWidth = 100 + Math.random() * 60; 
+                let platformWidth = (chunkWidth - gapWidth) / 2;
+
+                // Platform sebelum jurang
+                fgMap.push({x: currentX, y: groundY, w: platformWidth, h: 200, type: 'solid'});
+                // Platform sesudah jurang
+                fgMap.push({x: currentX + platformWidth + gapWidth, y: groundY, w: platformWidth, h: 200, type: 'solid'});
+            }
+            else if (chunkType === 2) {
+                // Tembok penghalang di BG untuk memaksa Desync
+                fgMap.push({x: currentX, y: groundY, w: chunkWidth, h: 200, type: 'solid'});
+                bgMap.push({x: currentX, y: groundY, w: chunkWidth, h: 200, type: 'solid'});
+                
+                // Tinggi maksimal lompatan adalah ~120px. Kita set tembok maksimal 100px.
+                // Pemain bisa memilih menabrakkan diri untuk desync, atau melompatinya.
+                let wallHeight = 70 + Math.random() * 30;
+                bgMap.push({x: currentX + chunkWidth/2, y: groundY - wallHeight, w: 40, h: wallHeight, type: 'wall'});
+            }
+            else if (chunkType === 3) {
+                 // Undakan tangga naik/turun pelan-pelan
+                 // Dibatasi maks 90px agar tetap bisa dilompati.
+                 let yOffset = (Math.random() > 0.5 ? 1 : -1) * (50 + Math.random() * 40);
+                 groundY += yOffset;
+                 // Jaga agar tidak terlalu tinggi/rendah
+                 if(groundY > 800) groundY = 800;
+                 if(groundY < 200) groundY = 200;
+
+                 fgMap.push({x: currentX, y: groundY, w: chunkWidth, h: 800, type: 'solid'});
+                 bgMap.push({x: currentX, y: groundY, w: chunkWidth, h: 800, type: 'solid'});
+            }
+            
+            currentX += chunkWidth;
+        }
+
+        // Platform Akhir & Garis Finish
+        fgMap.push({x: currentX, y: groundY, w: 400, h: 200, type: 'solid'});
+        bgMap.push({x: currentX, y: groundY, w: 400, h: 200, type: 'solid'});
+        
+        let finishW = 80;
+        fgMap.push({x: currentX + 150, y: groundY - 100, w: finishW, h: 100, type: 'finish'});
+        bgMap.push({x: currentX + 150, y: groundY - 100, w: finishW, h: 100, type: 'finish'});
+
+        return { fg: fgMap, bg: bgMap, startY: 400 };
+    }
+
+    let playerFG, playerBG;
+    let levelData;
+
+    function initGame() {
+        // Kesulitan meningkat seiring level (level lebih panjang)
+        let mapLength = 4 + (levelNumber * 2); 
+        levelData = generateLevel(mapLength);
+
+        playerFG = new Player('#3b82f6', false); // Biru untuk modern
+        playerBG = new Player('#10b981', true);  // Hijau neon untuk retro
+
+        // Spawn position
+        playerFG.reset(100, levelData.startY);
+        playerBG.reset(100, levelData.startY);
+
+        gameState = 'PLAYING';
+        hideUI();
+    }
+
+    function update() {
+        if (gameState === 'PLAYING') {
+            playerFG.update(levelData.fg);
+            playerBG.update(levelData.bg);
+
+            // Update Kamera: Kamera mengikuti masing-masing pemain
+            // Kamera FG (Layar Penuh) dipusatkan secara horizontal dan vertikal
+            cameraFG.x = playerFG.x - canvas.width / 2 + playerFG.width / 2;
+            cameraFG.y = playerFG.y - canvas.height / 2 + playerFG.height / 2;
+            
+            // Batasi agar kamera tidak kelewatan batas kiri
+            if (cameraFG.x < 0) cameraFG.x = 0;
+
+            // Kamera BG (Retro PiP)
+            cameraBG.x = playerBG.x - PIP_WIDTH / 2 + playerBG.width / 2;
+            cameraBG.y = playerBG.y - PIP_HEIGHT / 2 + playerBG.height / 2;
+            if (cameraBG.x < 0) cameraBG.x = 0;
+
+            // Kondisi Kalah
+            if (playerFG.isDead || playerBG.isDead) {
+                gameState = 'GAMEOVER';
+                showUI('Koneksi Terputus', 'Salah satu avatar jatuh ke dalam void.', 'Restart Level');
+            }
+
+            // Kondisi Menang (Sinkron di finish)
+            if (playerFG.isAtFinish && playerBG.isAtFinish) {
+                gameState = 'LEVEL_CLEAR';
+                showUI('Sinkronisasi Berhasil', `Memuat area selanjutnya...`, 'Lanjut ke Level ' + (levelNumber + 1));
+            }
+        }
+    }
+
+    function drawWorld(ctx, player, platforms, cam, isRetro, width, height) {
+        ctx.save();
+        
+        // Pindahkan origin berdasarkan kamera
+        ctx.translate(-cam.x, -cam.y);
+
+        // Gambar Grid Background (Opsional untuk estetika)
+        if (!isRetro) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            let startCol = Math.floor(cam.x / 100) * 100;
+            let startRow = Math.floor(cam.y / 100) * 100;
+            for(let i=0; i<width+200; i+=100) {
+                ctx.beginPath(); ctx.moveTo(startCol+i, cam.y); ctx.lineTo(startCol+i, cam.y+height); ctx.stroke();
+            }
+            for(let j=0; j<height+200; j+=100) {
+                ctx.beginPath(); ctx.moveTo(cam.x, startRow+j); ctx.lineTo(cam.x+width, startRow+j); ctx.stroke();
+            }
+        }
+
+        // Gambar Platforms
+        for (let p of platforms) {
+            if (p.type === 'solid' || p.type === 'wall') {
+                if (isRetro) {
+                    // Gaya Retro: Wireframe hijau atau padat hijau gelap
+                    ctx.fillStyle = '#022c02';
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.strokeStyle = '#0f0'; // Neon green border
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(p.x, p.y, p.w, p.h);
+                } else {
+                    // Gaya Modern FG: Gradien atau warna solid cerah
+                    ctx.fillStyle = '#1e293b'; // Slate 800
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.fillStyle = '#334155'; // Slate 700 top edge
+                    ctx.fillRect(p.x, p.y, p.w, 10);
+                }
+            } else if (p.type === 'finish') {
+                if (isRetro) {
+                    ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.strokeStyle = '#0f0';
+                    ctx.strokeRect(p.x, p.y, p.w, p.h);
+                    ctx.font = '20px Courier';
+                    ctx.fillStyle = '#0f0';
+                    ctx.fillText('EXIT', p.x + 10, p.y + p.h/2);
+                } else {
+                    let alpha = 0.5 + Math.sin(Date.now() / 200) * 0.3;
+                    ctx.fillStyle = `rgba(56, 189, 248, ${alpha})`; // Biru menyala
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 24px sans-serif';
+                    ctx.fillText('FINISH', p.x + 5, p.y + p.h/2);
+                }
+            }
+        }
+
+        // Gambar Pemain
+        player.draw(ctx);
+
+        ctx.restore();
+    }
+
+    function draw() {
+        // 1. Bersihkan kanvas utama
+        ctx.fillStyle = '#0f172a'; // Background layar penuh
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 2. Gambar Dunia Utama (Foreground) secara penuh
+        drawWorld(ctx, playerFG, levelData?.fg || [], cameraFG, false, canvas.width, canvas.height);
+
+        // Info Level di Layar Utama
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.font = 'bold 40px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`DUO - Level ${levelNumber}`, 30, 60);
+
+        // 3. Render Picture-in-Picture (Retro Background)
+        let pipX = canvas.width - PIP_WIDTH - PIP_MARGIN;
+        let pipY = PIP_MARGIN;
+
+        // Gambar bingkai/layar PiP
+        ctx.save();
+        ctx.translate(pipX, pipY);
+        
+        // Background PiP
+        ctx.fillStyle = '#000'; // Layar hitam
+        ctx.fillRect(0, 0, PIP_WIDTH, PIP_HEIGHT);
+        
+        // Clip area agar gambar tidak tumpah dari kotak PiP
+        ctx.beginPath();
+        ctx.rect(0, 0, PIP_WIDTH, PIP_HEIGHT);
+        ctx.clip();
+
+        // Gambar dunia retro di dalam kotak clip
+        drawWorld(ctx, playerBG, levelData?.bg || [], cameraBG, true, PIP_WIDTH, PIP_HEIGHT);
+        
+        // Scanline effect over PiP
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
+        for(let i=0; i<PIP_HEIGHT; i+=4) {
+            ctx.fillRect(0, i, PIP_WIDTH, 2);
+        }
+        
+        // Teks indikator PiP
+        ctx.fillStyle = '#0f0';
+        ctx.font = '12px Courier';
+        ctx.fillText('SYS.B_V1.0', 10, 20);
+
+        ctx.restore();
+
+        // Gambar bingkai monitor/pinggiran untuk PiP
+        ctx.strokeStyle = '#475569'; // Slate 600
+        ctx.lineWidth = 6;
+        ctx.strokeRect(pipX, pipY, PIP_WIDTH, PIP_HEIGHT);
+        ctx.strokeStyle = '#94a3b8'; // Highlight bingkai
+        ctx.lineWidth = 2;
+        ctx.strokeRect(pipX-3, pipY-3, PIP_WIDTH+6, PIP_HEIGHT+6);
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function showUI(title, subtitle, btnText) {
+        uiOverlay.innerHTML = `
+            <div class="bg-slate-900 bg-opacity-95 p-10 border border-slate-700 shadow-2xl pointer-events-auto text-center" style="box-shadow: 0 0 30px rgba(0,0,0,0.8);">
+                <h1 class="text-6xl font-bold mb-4 text-white tracking-widest uppercase" style="text-shadow: 2px 2px 0 #3b82f6, -2px -2px 0 #10b981;">DUO</h1>
+                <h2 class="text-2xl font-bold mb-2 text-blue-400">${title}</h2>
+                <p class="text-slate-400 mb-8 max-w-md mx-auto text-sm font-sans">${subtitle}</p>
+                <button id="uiBtn" class="bg-transparent hover:bg-slate-800 text-white font-bold py-3 px-8 border border-white hover:border-transparent rounded transition duration-300 uppercase tracking-widest text-sm">
+                    ${btnText}
+                </button>
+            </div>
+        `;
+        document.getElementById('uiBtn').addEventListener('click', handleAction);
+    }
+
+    function hideUI() {
+        uiOverlay.innerHTML = '';
+    }
+
+    function handleAction() {
+        if (gameState === 'START' || gameState === 'GAMEOVER') {
+            if(gameState === 'GAMEOVER') {
+               // Kalau kalah, ulangi level yang sama (bisa random map baru atau tidak, kita buat map baru agar seru)
+            }
+            initGame();
+        } else if (gameState === 'LEVEL_CLEAR') {
+            levelNumber++;
+            initGame();
+        }
+    }
+
+    // --- Input Handling ---
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+        
+        if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+            if (!keys.jump) {
+                if (gameState === 'PLAYING') {
+                    playerFG.jump();
+                    playerBG.jump();
+                } else if (gameState !== 'PLAYING' && uiOverlay.innerHTML !== '') {
+                    handleAction(); 
+                }
+            }
+            keys.jump = true;
+            // Hanya cegah default (scrolling) untuk space/arrow jika sedang fokus di body
+            if(document.activeElement === document.body) e.preventDefault(); 
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+        if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') keys.jump = false;
+    });
+
+    // Touch / Mobile
+    const btnLeft = document.getElementById('btnLeft');
+    const btnRight = document.getElementById('btnRight');
+    const btnJump = document.getElementById('btnJump');
+
+    const addTouch = (el, key) => {
+        el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+        el.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
+        // Fallback for mouse testing
+        el.addEventListener('mousedown', (e) => { keys[key] = true; });
+        el.addEventListener('mouseup', (e) => { keys[key] = false; });
+        el.addEventListener('mouseleave', (e) => { keys[key] = false; });
+    };
+
+    addTouch(btnLeft, 'left');
+    addTouch(btnRight, 'right');
+
+    const jumpTrigger = (e) => {
+        if(e) e.preventDefault();
+        if (gameState === 'PLAYING') {
+            playerFG.jump();
+            playerBG.jump();
+        } else {
+            handleAction();
+        }
+    };
+    btnJump.addEventListener('touchstart', jumpTrigger);
+    btnJump.addEventListener('mousedown', jumpTrigger);
+
+    // Boot
+    // Inisialisasi data level dan avatar awal agar objek tidak undefined saat title screen dirender
+    levelData = generateLevel(4);
+    playerFG = new Player('#3b82f6', false);
+    playerBG = new Player('#10b981', true);
+    playerFG.reset(100, levelData.startY);
+    playerBG.reset(100, levelData.startY);
+
+    showUI('Sinkronisasi Paralel', 'Kendalikan kedua avatar. Selesaikan rute prosedural. Gunakan dinding Latar Belakang (PiP) untuk menahan satu avatar guna mengatur jarak antar keduanya agar bisa melewati rintangan di Latar Utama.', 'Mulai Inisialisasi');
+    gameLoop();
+
+</script>
+</body>
+</html>

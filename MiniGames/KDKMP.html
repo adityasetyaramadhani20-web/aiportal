@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KDKMP</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Three.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Press+Start+2P&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #09090b;
+      color: #f4f4f5;
+      user-select: none;
+      overflow-x: hidden;
+    }
+    .font-mono-custom {
+      font-family: 'Fira Code', monospace;
+    }
+    .font-retro {
+      font-family: 'Press Start 2P', monospace;
+    }
+
+    /* CRT Scanline Effect Overlay */
+    .crt-overlay::after {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.04));
+      z-index: 40;
+      background-size: 100% 4px, 6px 100%;
+      pointer-events: none;
+    }
+
+    /* Transition Flash Layers */
+    .flash-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+    .flash-red { background-color: #dc2626; }
+    .flash-green { background-color: #16a34a; }
+    .flash-black { background-color: #000000; }
+
+    /* Shaking Animation for Boss / Detection */
+    .shake {
+      animation: shake 0.4s infinite;
+    }
+    @keyframes shake {
+      0% { transform: translate(1px, 1px) rotate(0deg); }
+      20% { transform: translate(-3px, 0px) rotate(1deg); }
+      40% { transform: translate(1px, -1px) rotate(-1deg); }
+      60% { transform: translate(-3px, 1px) rotate(0deg); }
+      80% { transform: translate(2px, 1px) rotate(-1deg); }
+      100% { transform: translate(1px, -2px) rotate(0deg); }
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #09090b; }
+    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between relative bg-zinc-950 crt-overlay">
+
+  <!-- Screen Flash Overlays -->
+  <div id="flash-red" class="flash-overlay flash-red"></div>
+  <div id="flash-green" class="flash-overlay flash-green"></div>
+  <div id="flash-black" class="flash-overlay flash-black"></div>
+
+  <!-- Audio Synthesizer Script -->
+  <script>
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playSound(type) {
+      if (!audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+
+        if (type === 'beep') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(600, now);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'lock') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(200, now);
+          osc.frequency.exponentialRampToValueAtTime(800, now + 0.3);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === 'jump') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.exponentialRampToValueAtTime(450, now + 0.15);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        } else if (type === 'collect') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(523.25, now);
+          osc.frequency.setValueAtTime(659.25, now + 0.08);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+          osc.start(now);
+          osc.stop(now + 0.2);
+        } else if (type === 'crash') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(120, now);
+          osc.frequency.linearRampToValueAtTime(30, now + 0.4);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        } else if (type === 'type_key') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(800 + Math.random() * 200, now);
+          gain.gain.setValueAtTime(0.05, now);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.04);
+          osc.start(now);
+          osc.stop(now + 0.04);
+        } else if (type === 'boss_alarm') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(900, now);
+          osc.frequency.linearRampToValueAtTime(300, now + 0.5);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+          osc.start(now);
+          osc.stop(now + 0.5);
+        }
+      } catch (e) {
+        console.error("Audio synth error:", e);
+      }
+    }
+  </script>
+
+  <!-- MAIN MENU SCREEN -->
+  <div id="screen-menu" class="min-h-screen w-full flex flex-col justify-center items-center bg-gradient-to-b from-red-950 via-zinc-950 to-black p-4 z-10">
+    <div class="max-w-2xl w-full bg-zinc-900/90 border-2 border-red-600 rounded-2xl p-6 md:p-8 shadow-2xl shadow-red-950/50 text-center relative overflow-hidden backdrop-blur-md">
+      
+      <div class="absolute top-3 left-3 text-[10px] font-mono-custom text-red-500 opacity-70">SISTEM PENGABDIAN v3.0</div>
+      <div class="absolute top-3 right-3 text-[10px] font-mono-custom text-amber-500 opacity-70">STATUS: ENDLESS LOOP</div>
+
+      <div class="my-4">
+        <h1 class="font-retro text-2xl md:text-4xl text-red-500 mb-2 tracking-wider drop-shadow-[0_4px_8px_rgba(239,68,68,0.4)]">KDKMP</h1>
+        <p class="font-mono-custom text-xs md:text-sm text-zinc-300 font-bold uppercase tracking-widest mb-1">Ketika Dipaksa Kerja Mengabdi Prabowo</p>
+        <p class="text-[11px] text-zinc-400 italic">FIVE NIGHTS AT PRABOWO'S</p>
+      </div>
+
+      <div class="my-6 p-4 bg-zinc-950/80 border border-zinc-800 rounded-xl text-left text-xs text-zinc-300 space-y-2 font-mono-custom">
+        <div class="text-amber-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <i data-lucide="shield-alert" class="w-4 h-4"></i> Misi & Alur Permainan:
+        </div>
+        <p>1. <strong class="text-emerald-400">Pindai Sinyal:</strong> Cari frekuensi musuh acak di radio.</p>
+        <p>2. <strong class="text-amber-400">Kabur dari kejaran musuh!</strong> Hindari rintangan di arena 3D.</p>
+        <p>3. <strong class="text-cyan-400">Ketik Menu MBG</strong> dengan cepat dan akurat.</p>
+        <p>4. <strong class="text-red-500 font-bold">WASPADAI BUNA TEDDY!!!!</strong></p>
+      </div>
+
+      <div class="space-y-3 max-w-sm mx-auto">
+        <button onclick="startGame()" class="w-full py-3.5 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-black rounded-xl shadow-lg shadow-red-600/30 border-b-4 border-red-800 transition-all transform hover:-translate-y-0.5 uppercase tracking-wider text-sm flex items-center justify-center gap-2">
+          <i data-lucide="play-circle" class="w-5 h-5"></i> Mulai Misi Pengabdian
+        </button>
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-zinc-800 flex justify-between text-[11px] text-zinc-500 font-mono-custom">
+        <span>© 2026 KOPERASI MERAH PUTIH</span>
+        <span>SIKLUS MULA: NIGHT 1</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 1: RADIO SIGNAL SCANNER SCREEN -->
+  <div id="screen-scanner" class="hidden min-h-screen w-full flex-col justify-between p-4 max-w-5xl mx-auto z-10">
+    <!-- Scanner Top Bar -->
+    <header class="bg-zinc-900/90 border border-zinc-800 p-3 rounded-xl flex justify-between items-center backdrop-blur shadow-md">
+      <div class="flex items-center space-x-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+        <span class="font-mono-custom text-xs font-bold text-emerald-400 uppercase tracking-widest">KONSOL RECEIVER ANGKASA v2.5</span>
+      </div>
+      <div class="text-xs font-mono-custom text-amber-400 font-bold">
+        NIGHT SIKLUS: <span id="scanner-cycle-num" class="text-white font-black">1</span>
+      </div>
+    </header>
+
+    <!-- Main Scanner Console -->
+    <main class="my-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch flex-1">
+      <!-- Left Visualizer & Controls -->
+      <section class="lg:col-span-7 bg-zinc-900 border-2 border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden">
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[10px] font-mono-custom text-zinc-400 uppercase">Frequensi Dial (88.0 - 180.0 MHz)</span>
+            <span id="signal-quality-text" class="text-xs font-mono-custom font-bold text-zinc-500">SINYAL: 0%</span>
+          </div>
+
+          <!-- Waveform Canvas Display -->
+          <div class="relative h-44 bg-zinc-950 border border-emerald-900/50 rounded-lg overflow-hidden mb-4">
+            <canvas id="waveform-canvas" width="600" height="176" class="w-full h-full block"></canvas>
+            <div class="absolute top-2 left-3 font-mono-custom text-xl font-black text-emerald-400">
+              <span id="freq-display-main">120.0</span> <span class="text-xs text-emerald-600">MHz</span>
+            </div>
+          </div>
+
+          <!-- Frequency Slider Control -->
+          <div class="space-y-2 mb-4">
+            <input type="range" id="freq-slider" min="88.0" max="180.0" step="0.1" value="120.0" 
+              class="w-full h-3 accent-emerald-500 bg-zinc-950 rounded-lg cursor-pointer border border-zinc-800"
+              oninput="onFreqSliderChange(this.value)" />
+            
+            <div class="grid grid-cols-4 gap-2">
+              <button onclick="stepFreq(-1.0)" class="py-2 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded text-xs font-mono-custom text-zinc-300 font-bold active:scale-95 transition">-1.0 MHz</button>
+              <button onclick="stepFreq(-0.1)" class="py-2 bg-zinc-950 hover:bg-zinc-800 border border-emerald-900/40 rounded text-xs font-mono-custom text-emerald-400 font-bold active:scale-95 transition">-0.1 MHz</button>
+              <button onclick="stepFreq(0.1)" class="py-2 bg-zinc-950 hover:bg-zinc-800 border border-emerald-900/40 rounded text-xs font-mono-custom text-emerald-400 font-bold active:scale-95 transition">+0.1 MHz</button>
+              <button onclick="stepFreq(1.0)" class="py-2 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded text-xs font-mono-custom text-zinc-300 font-bold active:scale-95 transition">+1.0 MHz</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-zinc-950 rounded-lg border border-zinc-800 text-[11px] font-mono-custom text-zinc-400">
+          💡 <span class="text-emerald-400 font-bold">Instruksi:</span> Geser frekuensi hingga grafik gelombang terkunci. Musuh dan frekuensinya diacak tiap siklus! Jika sinyal terkunci, sistem akan <span class="text-red-400 font-bold">melempar Anda ke Arena 3D</span>!
+        </div>
+      </section>
+
+      <!-- Right Signal Status Log -->
+      <section class="lg:col-span-5 bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between">
+        <div class="space-y-3">
+          <div class="text-xs font-mono-custom font-bold text-zinc-400 uppercase border-b border-zinc-800 pb-2 flex items-center gap-1.5">
+            <i data-lucide="radio-tower" class="w-4 h-4 text-emerald-400"></i> Status Dekoder Realtime
+          </div>
+
+          <div id="scanner-status-idle" class="p-4 bg-zinc-950 border border-dashed border-zinc-800 rounded-lg text-center">
+            <i data-lucide="radar" class="w-8 h-8 text-zinc-600 animate-spin mx-auto mb-2" style="animation-duration: 6s"></i>
+            <div class="text-xs font-mono-custom text-zinc-400 font-bold">Mencari Gelombang Asing...</div>
+            <p class="text-[10px] text-zinc-600 mt-1">Putar kenop untuk mencari transmisi tersembunyi.</p>
+          </div>
+
+          <div id="scanner-status-detected" class="hidden p-4 bg-red-950/40 border-2 border-red-600 rounded-lg text-left space-y-2 shake">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-red-500 uppercase font-mono-custom">
+              <i data-lucide="triangle-alert" class="w-4 h-4 animate-bounce"></i> SINYAL TOKOH TERDETEKSI!
+            </div>
+            <div class="text-sm font-black text-white font-mono-custom" id="detected-character-name">KARAKTER RAHASIA</div>
+            <p class="text-xs text-zinc-300 italic font-mono-custom" id="detected-character-msg">"Pesan sinyal terpotong..."</p>
+            <div class="text-[10px] text-red-400 font-bold font-mono-custom animate-pulse">
+              PERINGATAN: KUNCI SINYAL MEMICU SERANGAN ARENA 3D!
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-zinc-800 text-[10px] font-mono-custom text-zinc-500 flex justify-between">
+          <span>FREKUENSI TERACAK [AKTIF]</span>
+          <span>SQUELCH AUTO [ON]</span>
+        </div>
+      </section>
+    </main>
+
+    <footer class="text-center text-[10px] font-mono-custom text-zinc-600">
+      DEPARTEMEN RADAR PENGABDIAN • KDKMP ENGINE
+    </footer>
+  </div>
+
+  <!-- PHASE 2: 3D PLATFORMER RUNNER SCREEN -->
+  <div id="screen-runner" class="hidden min-h-screen w-full flex-col justify-between p-3 relative z-10 select-none">
+    
+    <!-- Runner HUD Overhead -->
+    <div class="w-full bg-zinc-900/90 border-2 border-amber-500/50 p-3 rounded-xl flex justify-between items-center backdrop-blur shadow-xl relative z-20">
+      <div>
+        <div class="text-[10px] font-mono-custom text-zinc-400 uppercase">TARGET HARI INI (SIKLUS <span id="runner-cycle-num">1</span>)</div>
+        <div class="text-lg font-black text-amber-400 font-mono-custom">
+          SKOR: <span id="runner-score-val" class="text-white">0</span> / <span id="runner-target-val" class="text-amber-400">100</span>
+        </div>
+      </div>
+
+      <!-- Boss Teddy Alert Badge -->
+      <div id="boss-teddy-badge" class="hidden bg-red-950 border-2 border-red-600 px-3 py-1 rounded-lg text-center shake">
+        <div class="text-xs font-black text-red-500 font-mono-custom uppercase animate-pulse">⚠️ BOSS TEDDY CHASE (3X SPEED)</div>
+        <div class="text-[9px] text-red-300 font-mono-custom">KEJARAN KECEPATAN EKSTREM!</div>
+      </div>
+
+      <div class="text-right">
+        <div class="text-[10px] font-mono-custom text-zinc-400 uppercase">JARAK MUSUH</div>
+        <div class="flex items-center gap-2">
+          <div class="w-24 bg-zinc-950 h-3 rounded-full overflow-hidden border border-zinc-800">
+            <div id="proximity-bar" class="bg-red-600 h-full transition-all duration-200" style="width: 15%;"></div>
+          </div>
+          <span id="proximity-text" class="text-xs font-bold text-red-400 font-mono-custom">15%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3D Canvas Rendering Container -->
+    <div id="runner-canvas-container" class="absolute inset-0 w-full h-full z-10"></div>
+
+    <!-- On-Screen Controls for Mobile / Touch -->
+    <div class="relative z-20 mt-auto mb-2 flex justify-between items-end px-4 pointer-events-none">
+      <div class="flex gap-2 pointer-events-auto">
+        <button onclick="triggerRunnerMove(-1)" class="w-14 h-14 bg-zinc-900/80 hover:bg-zinc-800 border-2 border-zinc-700 text-white font-black text-xl rounded-2xl active:scale-95 backdrop-blur flex justify-center items-center">
+          <i data-lucide="arrow-left" class="w-6 h-6"></i>
+        </button>
+        <button onclick="triggerRunnerMove(1)" class="w-14 h-14 bg-zinc-900/80 hover:bg-zinc-800 border-2 border-zinc-700 text-white font-black text-xl rounded-2xl active:scale-95 backdrop-blur flex justify-center items-center">
+          <i data-lucide="arrow-right" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <div class="pointer-events-auto">
+        <button onclick="triggerRunnerJump()" class="px-6 h-14 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-sm rounded-2xl active:scale-95 backdrop-blur border-b-4 border-amber-700 flex items-center gap-2">
+          <i data-lucide="arrow-up-circle" class="w-6 h-6"></i> LOMPAT (SPASI)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 3: FAST TYPING MBG MENU SCREEN -->
+  <div id="screen-typing" class="hidden min-h-screen w-full flex-col justify-center items-center p-4 max-w-3xl mx-auto z-10">
+    <div class="w-full bg-zinc-900 border-2 border-cyan-500/50 rounded-2xl p-6 shadow-2xl backdrop-blur relative overflow-hidden">
+      
+      <div class="flex justify-between items-center border-b border-zinc-800 pb-3 mb-4">
+        <div class="flex items-center gap-2 text-cyan-400 font-mono-custom text-xs font-bold uppercase">
+          <i data-lucide="utensils" class="w-4 h-4"></i> Dapur Ompreng Makan Bergizi Gratis (MBG)
+        </div>
+        <div class="text-xs font-mono-custom text-zinc-400">
+          SIKLUS MALAM: <span id="typing-cycle-num" class="text-white font-bold">1</span>
+        </div>
+      </div>
+
+      <!-- Ompreng Metal Tray Visual Card -->
+      <div class="bg-zinc-950 border-4 border-zinc-800 rounded-xl p-5 mb-6 text-center relative shadow-inner">
+        <div class="text-[10px] font-mono-custom text-zinc-500 uppercase tracking-widest mb-1">MENU OMPRENG TERTERA:</div>
+        
+        <!-- Display Menu Target String -->
+        <div id="typing-target-text" class="text-base md:text-lg font-black font-mono-custom text-amber-400 leading-relaxed my-3 bg-zinc-900/60 p-4 rounded-lg border border-zinc-800 select-none">
+          Nasi Merah + Ayam Goreng + Sayur Bayam + Susu Kotak + Pisang Raja
+        </div>
+
+        <div class="flex justify-center gap-6 text-xs font-mono-custom text-zinc-400">
+          <div>WPM: <span id="typing-wpm-val" class="text-cyan-400 font-bold">0</span></div>
+          <div>Akurasi: <span id="typing-acc-val" class="text-emerald-400 font-bold">100%</span></div>
+        </div>
+      </div>
+
+      <!-- User Realtime Typing Input Box -->
+      <div class="space-y-3">
+        <label for="typing-input" class="block text-xs font-mono-custom text-zinc-300 font-bold uppercase">
+          Ketik Ulang Menu Di Atas Dengan Cepat & Tepat:
+        </label>
+        
+        <input type="text" id="typing-input" autocomplete="off" placeholder="Mulai mengetik di sini..."
+          class="w-full p-4 bg-zinc-950 border-2 border-cyan-500 rounded-xl text-white font-mono-custom text-sm focus:outline-none focus:border-cyan-400 shadow-lg"
+          oninput="onTypingInput(this.value)" />
+        
+        <p class="text-[10px] font-mono-custom text-zinc-500 text-center">
+          Tekan tombol huruf secara berurutan. Setelah selesai, layar akan <span class="text-white font-bold">BERKEDIP HITAM</span> lalu masuk ke siklus berikutnya!
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- GAME OVER MODAL SCREEN -->
+  <div id="screen-gameover" class="hidden fixed inset-0 z-50 bg-black/90 flex justify-center items-center p-4">
+    <div class="max-w-md w-full bg-zinc-900 border-4 border-red-600 rounded-2xl p-6 text-center space-y-4 shadow-2xl shake">
+      <div class="w-16 h-16 bg-red-950 text-red-500 rounded-full flex justify-center items-center mx-auto border-2 border-red-600">
+        <i data-lucide="skull" class="w-8 h-8"></i>
+      </div>
+
+      <h2 class="font-retro text-2xl text-red-500 tracking-wider">GAME OVER</h2>
+      <p id="gameover-reason" class="text-xs font-mono-custom text-zinc-300">HEY ANTEK-ANTEK ASING! KAU AKAN MUSNAH DARI NEGERI INI!!!</p>
+
+      <div class="p-3 bg-zinc-950 rounded-lg border border-zinc-800 text-xs font-mono-custom text-zinc-400 space-y-1">
+        <div>Siklus Terakhir: <span id="gameover-cycle" class="text-amber-400 font-bold">1</span></div>
+        <div>Total Skor Pengabdian: <span id="gameover-score" class="text-emerald-400 font-bold">0</span></div>
+      </div>
+
+      <button onclick="resetToMenu()" class="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold font-mono-custom text-xs rounded-xl border-b-4 border-red-800 uppercase tracking-wider transition active:scale-95">
+        Kembali Ke Menu Utama
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Global Game State
+    let gameState = {
+      cycle: 1,
+      totalScore: 0,
+      currentPhase: 'MENU', // 'MENU', 'SCANNER', 'RUNNER', 'TYPING'
+      
+      // Radio Scanner State
+      frequency: 120.0,
+      detectedTarget: null,
+      signalStrength: 0,
+      
+      // 3D Runner State
+      runnerScore: 0,
+      targetScore: 100,
+      baseSpeed: 16,
+      currentSpeed: 16,
+      isBossCycle: false,
+      proximity: 15, // Enemy proximity %
+      
+      // Typing State
+      typingTarget: "",
+      typingStartTime: null
+    };
+
+    // Database semua musuh/tokoh yang tersedia
+    const ALL_ENEMY_SIGNALS = [
+      { name: "Prabowo (Komando Utama)", tolerance: 0.8, msg: "Saya dapat Laporan Koperasi Merah Putih Sukses Terlaksana! Hidup Jokowi!" },
+      { name: "Gibran (Pengawas Kasir)", tolerance: 0.8, msg: "Insya Allah Akan Tercipta 19 Juta Lapangan Pekerjaan berkat program MBG.." },
+      { name: "Bobby (Kucing Istana)", tolerance: 0.8, msg: "Meowww! Meowww! Grrr!!!! GRRRR!!!! GRRRRRR!!!!!!!" }
+    ];
+
+    // Target sinyal aktif untuk siklus berjalan
+    let TARGET_SIGNALS = [];
+
+    function getRandomFrequency(min = 90.0, max = 175.0) {
+      const rand = Math.random() * (max - min) + min;
+      return parseFloat(rand.toFixed(1));
+    }
+
+    function randomizeActiveEnemy() {
+      // Pilih 1 musuh acak dari basis data
+      const randomEnemy = ALL_ENEMY_SIGNALS[Math.floor(Math.random() * ALL_ENEMY_SIGNALS.length)];
+      
+      // Berikan frekuensi acak pada musuh terpilih
+      TARGET_SIGNALS = [{
+        name: randomEnemy.name,
+        freq: getRandomFrequency(90.0, 175.0),
+        tolerance: randomEnemy.tolerance,
+        msg: randomEnemy.msg
+      }];
+    }
+
+    // Menu list for MBG Fast Typing Phase
+    const MBG_MENUS = [
+      "Nasi Merah + Ayam Goreng Lengkuas + Sayur Bayam + Susu UHT + Pisang Raja",
+      "Nasi Putih + Daging Semur + Capcay Seafood + Susu Kotak + Apel Merah",
+      "Nasi Uduk + Telur Balado + Tumis Buncis + Susu Cokelat + Jeruk Manis",
+      "Nasi Kuning + Ayam Suwir + Sup Wortel + Susu UHT + Buah Naga",
+      "Kentang Panggang + Ikan Bakar Jimbaran + Tumis Kangkung + Susu Kedelai + Pepaya California",
+      "Singkong Rebus + Tempe Bacem + Sayur Asem + Susu Kambing + Semangka Merah",
+      "Nasi Jagung + Empal Daging + Sayur Lodeh + Susu Almond + Mangga Harum Manis",
+      "Ubi Cilembu + Tahu Gejrot + Urap Sayur + Susu Rendah Lemak + Melon Hijau",
+      "Bihun Goreng + Udang Saus Padang + Cah Jamur + Susu Stroberi + Jambu Biji",
+      "Nasi Liwet + Gurame Goreng Terbang + Lalapan Sambal + Susu Pasteurisasi + Alpukat Mentega",
+      "Oatmeal Gurih + Dada Ayam Panggang + Tumis Brokoli + Susu Oat + Buah Pir",
+      "Lontong Sayur + Opor Ayam + Labu Siam Rebus + Susu Sapi Murni + Jeruk Bali",
+      "Nasi Goreng + Cumi Cabai Hijau + Oseng Tauge + Susu Vanila + Salak Pondoh",
+      "Pasta Gandum + Daging Cincang Bolognese + Salad Selada + Susu Skim + Anggur Merah",
+      "Jagung Manis Rebus + Ikan Bandeng Presto + Sup Daun Katuk + Susu Evaporasi + Sirsak Segar",
+      "Kupat Tahu + Telur Puyuh Kecap + Tumis Pakcoy + Susu Gandum + Belimbing Manis",
+      "Roti Gandum + Orak-Arik Telur + Sayur Bening Kelor + Susu Kalsium Tinggi + Buah Kiwi",
+      "Nasi Kebuli + Kambing Bakar + Acar Mentimun + Susu Kurma + Nanas Madu",
+      "Talas Kukus + Pepes Ikan Mas + Sayur Sop Jamur + Susu Kedelai Tawar + Sawo Matang",
+      "Nasi Kangkang + Ayam Cemani + Kembang Makam + Darah Segar + Kepala Tua"
+    ];
+
+    // Navigation & Screen Switcher
+    function showScreen(screenId) {
+      ['screen-menu', 'screen-scanner', 'screen-runner', 'screen-typing', 'screen-gameover'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+        document.getElementById(id).classList.remove('flex');
+      });
+
+      const target = document.getElementById(screenId);
+      target.classList.remove('hidden');
+      if (screenId !== 'screen-runner') {
+        target.classList.add('flex');
+      }
+    }
+
+    // Trigger Screen Flash Overlay
+    function triggerFlash(color, callback) {
+      const flashEl = document.getElementById(`flash-${color}`);
+      if (!flashEl) return;
+      
+      flashEl.style.opacity = '1';
+      setTimeout(() => {
+        flashEl.style.opacity = '0';
+        if (callback) callback();
+      }, 250);
+    }
+
+    // Start Game Sequence
+    function startGame() {
+      initAudio();
+      playSound('beep');
+      gameState.cycle = 1;
+      gameState.totalScore = 0;
+      startScannerPhase();
+    }
+
+    function resetToMenu() {
+      playSound('beep');
+      document.getElementById('screen-gameover').classList.add('hidden');
+      showScreen('screen-menu');
+    }
+  </script>
+
+  <script>
+    let scannerCanvas = document.getElementById('waveform-canvas');
+    let scannerCtx = scannerCanvas.getContext('2d');
+    let scannerAnimPhase = 0;
+    let scannerLockTimeout = null;
+
+    function startScannerPhase() {
+      gameState.currentPhase = 'SCANNER';
+      gameState.detectedTarget = null;
+      gameState.signalStrength = 0;
+      
+      // Acak musuh dan frekuensi target setiap kali fase scanner dimulai
+      randomizeActiveEnemy();
+
+      // Reset frekuensi slider ke titik acak atau standar (120.0 MHz)
+      gameState.frequency = 120.0;
+      const freqSlider = document.getElementById('freq-slider');
+      if (freqSlider) freqSlider.value = 120.0;
+
+      if (scannerLockTimeout) {
+        clearTimeout(scannerLockTimeout);
+        scannerLockTimeout = null;
+      }
+
+      document.getElementById('scanner-cycle-num').innerText = gameState.cycle;
+      document.getElementById('scanner-status-idle').classList.remove('hidden');
+      document.getElementById('scanner-status-detected').classList.add('hidden');
+
+      showScreen('screen-scanner');
+      updateScannerUI();
+      drawScannerWaveform();
+    }
+
+    function onFreqSliderChange(val) {
+      gameState.frequency = parseFloat(val);
+      updateScannerUI();
+    }
+
+    function stepFreq(step) {
+      let newFreq = gameState.frequency + step;
+      if (newFreq < 88.0) newFreq = 88.0;
+      if (newFreq > 180.0) newFreq = 180.0;
+      gameState.frequency = parseFloat(newFreq.toFixed(1));
+      document.getElementById('freq-slider').value = gameState.frequency;
+      playSound('beep');
+      updateScannerUI();
+    }
+
+    function updateScannerUI() {
+      document.getElementById('freq-display-main').innerText = gameState.frequency.toFixed(1);
+
+      // Check distance to character signals
+      let matched = null;
+      let maxStr = 0;
+
+      TARGET_SIGNALS.forEach(sig => {
+        let dist = Math.abs(gameState.frequency - sig.freq);
+        if (dist < sig.tolerance) {
+          matched = sig;
+          let str = Math.round((1 - (dist / sig.tolerance)) * 100);
+          if (str > maxStr) maxStr = str;
+        }
+      });
+
+      gameState.signalStrength = maxStr;
+      gameState.detectedTarget = (matched && maxStr > 30) ? matched : null;
+
+      document.getElementById('signal-quality-text').innerText = `SINYAL: ${maxStr}%`;
+
+      if (gameState.detectedTarget && maxStr >= 85) {
+        // High Signal Locked -> Throw into 3D Runner!
+        document.getElementById('scanner-status-idle').classList.add('hidden');
+        document.getElementById('scanner-status-detected').classList.remove('hidden');
+        document.getElementById('detected-character-name').innerText = gameState.detectedTarget.name;
+        document.getElementById('detected-character-msg').innerText = `"${gameState.detectedTarget.msg}"`;
+        
+        playSound('lock');
+        
+        // Throw into 3D Runner after brief lock delay
+        scannerLockTimeout = setTimeout(() => {
+          if (gameState.currentPhase === 'SCANNER') {
+            triggerFlash('red', () => {
+              startRunnerPhase();
+            });
+          }
+        }, 1200);
+      } else {
+        document.getElementById('scanner-status-idle').classList.remove('hidden');
+        document.getElementById('scanner-status-detected').classList.add('hidden');
+      }
+    }
+
+    function drawScannerWaveform() {
+      if (gameState.currentPhase !== 'SCANNER') return;
+
+      const w = scannerCanvas.width;
+      const h = scannerCanvas.height;
+
+      scannerCtx.fillStyle = 'rgba(9, 9, 11, 0.3)';
+      scannerCtx.fillRect(0, 0, w, h);
+
+      scannerCtx.beginPath();
+      scannerCtx.lineWidth = 2.5;
+
+      if (gameState.detectedTarget && gameState.signalStrength > 30) {
+        scannerCtx.strokeStyle = `rgba(239, 68, 68, ${0.4 + (gameState.signalStrength / 100) * 0.6})`;
+      } else {
+        scannerCtx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
+      }
+
+      const points = 100;
+      const sliceWidth = w / points;
+      let x = 0;
+
+      for (let i = 0; i <= points; i++) {
+        let y = h / 2;
+        const noise = (Math.random() - 0.5) * (30 * (1 - gameState.signalStrength / 100));
+        let wave = 0;
+
+        if (gameState.detectedTarget) {
+          const clean = gameState.signalStrength / 100;
+          wave = Math.sin(i * 0.15 + scannerAnimPhase) * 30 * clean;
+        }
+
+        y += noise + wave;
+        if (i === 0) scannerCtx.moveTo(x, y);
+        else scannerCtx.lineTo(x, y);
+
+        x += sliceWidth;
+      }
+      scannerCtx.stroke();
+
+      scannerAnimPhase += 0.15;
+      requestAnimationFrame(drawScannerWaveform);
+    }
+  </script>
+
+  <script>
+    let runnerScene, runnerCamera, runnerRenderer;
+    let runnerPlayer;
+    let runnerLanes = [-3, 0, 3];
+    let currentLane = 1; // Middle lane
+    let targetX = 0;
+
+    let isJumping = false;
+    let jumpVelocity = 0;
+    const gravity = -0.55;
+
+    let runnerObstacles = [];
+    let runnerPowerups = [];
+    let runnerTracks = [];
+    const TRACK_LENGTH = 100;
+
+    let is3DActive = false;
+    let runnerClock = new THREE.Clock();
+    let runnerSpawnTimer = 0;
+
+    function initThreeEngine() {
+      const container = document.getElementById('runner-canvas-container');
+      container.innerHTML = '';
+
+      runnerScene = new THREE.Scene();
+      runnerScene.fog = new THREE.FogExp2(0x09090b, 0.015);
+
+      runnerCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      runnerCamera.position.set(0, 4.5, 7.5);
+      runnerCamera.lookAt(0, 1.8, -10);
+
+      runnerRenderer = new THREE.WebGLRenderer({ antialias: true });
+      runnerRenderer.setSize(window.innerWidth, window.innerHeight);
+      runnerRenderer.setClearColor(0x09090b, 1);
+      container.appendChild(runnerRenderer.domElement);
+
+      // Lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      runnerScene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xf59e0b, 0.9);
+      dirLight.position.set(5, 10, 5);
+      runnerScene.add(dirLight);
+
+      // Player Box (Worker with Red/White headband emblem)
+      const playerGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+      const playerMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
+      runnerPlayer = new THREE.Mesh(playerGeo, playerMat);
+      runnerPlayer.position.set(0, 0.6, 0);
+
+      // Headband detail
+      const bandGeo = new THREE.BoxGeometry(1.22, 0.25, 1.22);
+      const bandMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const band = new THREE.Mesh(bandGeo, bandMat);
+      band.position.y = 0.3;
+      runnerPlayer.add(band);
+
+      runnerScene.add(runnerPlayer);
+
+      // Initial Tracks
+      createTrackSegment(0);
+      createTrackSegment(-TRACK_LENGTH);
+
+      window.addEventListener('keydown', handleRunnerInput);
+      window.addEventListener('resize', onRunnerResize);
+    }
+
+    function createTrackSegment(zPos) {
+      const group = new THREE.Group();
+      
+      const roadGeo = new THREE.PlaneGeometry(10, TRACK_LENGTH);
+      const roadMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.8 });
+      const road = new THREE.Mesh(roadGeo, roadMat);
+      road.rotation.x = -Math.PI / 2;
+      road.position.z = -TRACK_LENGTH / 2;
+      group.add(road);
+
+      // Lane dividers
+      for (let x of [-1.5, 1.5]) {
+        const lineGeo = new THREE.PlaneGeometry(0.1, TRACK_LENGTH);
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0x3f3f46 });
+        const line = new THREE.Mesh(lineGeo, lineMat);
+        line.rotation.x = -Math.PI / 2;
+        line.position.set(x, 0.01, -TRACK_LENGTH / 2);
+        group.add(line);
+      }
+
+      group.position.z = zPos;
+      runnerScene.add(group);
+      runnerTracks.push(group);
+    }
+
+    function startRunnerPhase() {
+      gameState.currentPhase = 'RUNNER';
+      gameState.runnerScore = 0;
+      gameState.targetScore = gameState.cycle * 100; // +100 pts per night
+      gameState.proximity = 15;
+      
+      currentLane = 1;
+      targetX = runnerLanes[currentLane];
+      isJumping = false;
+      jumpVelocity = 0;
+
+      // Initialize UI screen and Three.js engine
+      showScreen('screen-runner');
+      if (!runnerRenderer) {
+        initThreeEngine();
+      }
+
+      // Reset posisi & elevasi karakter 3D ke darat
+      if (runnerPlayer) {
+        runnerPlayer.position.set(targetX, 0.6, 0);
+      }
+
+      // Boss Teddy Check (Every 10th Cycle)
+      gameState.isBossCycle = (gameState.cycle % 10 === 0);
+      
+      if (gameState.isBossCycle) {
+        gameState.currentSpeed = gameState.baseSpeed * 2.8; // ~3x speed
+        document.getElementById('boss-teddy-badge').classList.remove('hidden');
+        playSound('boss_alarm');
+        if (runnerScene && runnerScene.fog) {
+          runnerScene.fog.color.setHex(0x450a0a); // Red fog
+        }
+      } else {
+        gameState.currentSpeed = gameState.baseSpeed + (gameState.cycle * 0.5);
+        document.getElementById('boss-teddy-badge').classList.add('hidden');
+        if (runnerScene && runnerScene.fog) {
+          runnerScene.fog.color.setHex(0x09090b);
+        }
+      }
+
+      document.getElementById('runner-cycle-num').innerText = gameState.cycle;
+      document.getElementById('runner-score-val').innerText = "0";
+      document.getElementById('runner-target-val').innerText = gameState.targetScore;
+
+      clearRunnerObjects();
+      runnerClock.start(); // Restart clock untuk mencegah lompatan delta time
+      is3DActive = true;
+      updateRunner3D();
+    }
+
+    function handleRunnerInput(e) {
+      if (gameState.currentPhase !== 'RUNNER' || !is3DActive) return;
+
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        triggerRunnerMove(-1);
+      }
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        triggerRunnerMove(1);
+      }
+      if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') && !isJumping) {
+        triggerRunnerJump();
+      }
+    }
+
+    function triggerRunnerMove(dir) {
+      if (dir === -1 && currentLane > 0) currentLane--;
+      if (dir === 1 && currentLane < 2) currentLane++;
+      targetX = runnerLanes[currentLane];
+      playSound('beep');
+    }
+
+    function triggerRunnerJump() {
+      if (!isJumping) {
+        isJumping = true;
+        jumpVelocity = 0.23;
+        playSound('jump');
+      }
+    }
+
+    function handleRunnerSpawning(delta) {
+      runnerSpawnTimer += delta;
+      const spawnInterval = gameState.isBossCycle ? 0.45 : 0.75;
+
+      if (runnerSpawnTimer > spawnInterval) {
+        runnerSpawnTimer = 0;
+        let lane = Math.floor(Math.random() * 3);
+        let spawnZ = -90;
+
+        if (Math.random() > 0.35) {
+          spawnObstacle(lane, spawnZ);
+        } else {
+          spawnPowerup(lane, spawnZ);
+        }
+      }
+    }
+
+    function spawnObstacle(lane, z) {
+      let isTall = Math.random() > 0.5;
+      let height = isTall ? 2.2 : 0.9;
+
+      const obsGeo = new THREE.BoxGeometry(2, height, 1.5);
+      const obsMat = new THREE.MeshStandardMaterial({ 
+        color: gameState.isBossCycle ? 0xd97706 : 0xdc2626, 
+        roughness: 0.2 
+      });
+      const obs = new THREE.Mesh(obsGeo, obsMat);
+      obs.position.set(runnerLanes[lane], height / 2, z);
+
+      runnerScene.add(obs);
+      runnerObstacles.push(obs);
+    }
+
+    function spawnPowerup(lane, z) {
+      const pupGeo = new THREE.OctahedronGeometry(0.5, 0);
+      const pupMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 }); // Susu Kotak Powerup
+      const pup = new THREE.Mesh(pupGeo, pupMat);
+      pup.position.set(runnerLanes[lane], 0.8, z);
+
+      runnerScene.add(pup);
+      runnerPowerups.push(pup);
+    }
+
+    function clearRunnerObjects() {
+      runnerObstacles.forEach(o => runnerScene.remove(o));
+      runnerPowerups.forEach(p => runnerScene.remove(p));
+      runnerObstacles = [];
+      runnerPowerups = [];
+    }
+
+    function updateRunner3D() {
+      if (!is3DActive || gameState.currentPhase !== 'RUNNER') return;
+
+      // Batasi delta time maksimal 0.1 detik untuk mencegah karakter terpental
+      let delta = Math.min(runnerClock.getDelta(), 0.1);
+
+      // Lerp X Position
+      runnerPlayer.position.x = THREE.MathUtils.lerp(runnerPlayer.position.x, targetX, 0.2);
+
+      // Jump Physics
+      if (isJumping) {
+        runnerPlayer.position.y += jumpVelocity;
+        jumpVelocity += gravity * delta;
+        if (runnerPlayer.position.y <= 0.6) {
+          runnerPlayer.position.y = 0.6;
+          isJumping = false;
+          jumpVelocity = 0;
+        }
+      }
+
+      // Track Score Progression
+      gameState.runnerScore += delta * 20;
+      document.getElementById('runner-score-val').innerText = Math.floor(gameState.runnerScore);
+
+      // Check Win Condition (Target Poin Reached)
+      if (gameState.runnerScore >= gameState.targetScore) {
+        is3DActive = false;
+        playSound('collect');
+        triggerFlash('green', () => {
+          startTypingPhase();
+        });
+        return;
+      }
+
+      // Proximity Chaser logic
+      if (gameState.isBossCycle) {
+        gameState.proximity += delta * 3;
+      } else {
+        gameState.proximity = Math.min(100, gameState.proximity + delta * 0.5);
+      }
+
+      document.getElementById('proximity-bar').style.width = `${Math.min(100, gameState.proximity)}%`;
+      document.getElementById('proximity-text').innerText = `${Math.floor(gameState.proximity)}%`;
+
+      if (gameState.proximity >= 100) {
+        triggerRunnerGameOver("HEY ANTEK-ANTEK ASING! KAU AKAN MUSNAH DARI NEGERI INI!!!");
+        return;
+      }
+
+      // Move Tracks
+      runnerTracks.forEach(t => {
+        t.position.z += gameState.currentSpeed * delta;
+        if (t.position.z >= TRACK_LENGTH) {
+          t.position.z -= TRACK_LENGTH * 2;
+        }
+      });
+
+      handleRunnerSpawning(delta);
+
+      // Check Obstacle Collisions
+      for (let i = runnerObstacles.length - 1; i >= 0; i--) {
+        let obs = runnerObstacles[i];
+        obs.position.z += gameState.currentSpeed * delta;
+
+        let playerBox = new THREE.Box3().setFromObject(runnerPlayer);
+        let obsBox = new THREE.Box3().setFromObject(obs);
+
+        if (playerBox.intersectsBox(obsBox)) {
+          playSound('crash');
+          triggerRunnerGameOver("HEY ANTEK-ANTEK ASING! KAU AKAN MUSNAH DARI NEGERI INI!!!");
+          return;
+        }
+
+        if (obs.position.z > 10) {
+          runnerScene.remove(obs);
+          runnerObstacles.splice(i, 1);
+        }
+      }
+
+      // Check Powerup Collects
+      for (let i = runnerPowerups.length - 1; i >= 0; i--) {
+        let pup = runnerPowerups[i];
+        pup.position.z += gameState.currentSpeed * delta;
+        pup.rotation.y += delta * 3;
+
+        let playerBox = new THREE.Box3().setFromObject(runnerPlayer);
+        let pupBox = new THREE.Box3().setFromObject(pup);
+
+        if (playerBox.intersectsBox(pupBox)) {
+          playSound('collect');
+          gameState.proximity = Math.max(0, gameState.proximity - 15);
+          runnerScene.remove(pup);
+          runnerPowerups.splice(i, 1);
+          continue;
+        }
+
+        if (pup.position.z > 10) {
+          runnerScene.remove(pup);
+          runnerPowerups.splice(i, 1);
+        }
+      }
+
+      runnerRenderer.render(runnerScene, runnerCamera);
+      requestAnimationFrame(updateRunner3D);
+    }
+
+    function triggerRunnerGameOver(reason) {
+      is3DActive = false;
+      triggerFlash('red', () => {
+        document.getElementById('gameover-reason').innerText = reason;
+        document.getElementById('gameover-cycle').innerText = gameState.cycle;
+        document.getElementById('gameover-score').innerText = Math.floor(gameState.totalScore + gameState.runnerScore);
+        document.getElementById('screen-gameover').classList.remove('hidden');
+      });
+    }
+
+    function onRunnerResize() {
+      if (runnerCamera && runnerRenderer) {
+        runnerCamera.aspect = window.innerWidth / window.innerHeight;
+        runnerCamera.updateProjectionMatrix();
+        runnerRenderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    }
+  </script>
+
+  <script>
+    function startTypingPhase() {
+      gameState.currentPhase = 'TYPING';
+      gameState.totalScore += gameState.runnerScore;
+
+      // Select random menu
+      let menuIdx = (gameState.cycle - 1) % MBG_MENUS.length;
+      gameState.typingTarget = MBG_MENUS[menuIdx];
+      gameState.typingStartTime = Date.now();
+
+      document.getElementById('typing-cycle-num').innerText = gameState.cycle;
+      document.getElementById('typing-target-text').innerText = gameState.typingTarget;
+      
+      const inputEl = document.getElementById('typing-input');
+      inputEl.value = '';
+      
+      showScreen('screen-typing');
+      setTimeout(() => inputEl.focus(), 100);
+    }
+
+    function onTypingInput(val) {
+      playSound('type_key');
+
+      const target = gameState.typingTarget;
+      const elapsedTime = (Date.now() - gameState.typingStartTime) / 1000 / 60; // in minutes
+      const wordsTyped = val.length / 5;
+      const wpm = elapsedTime > 0 ? Math.round(wordsTyped / elapsedTime) : 0;
+
+      document.getElementById('typing-wpm-val').innerText = wpm;
+
+      // Realtime Accuracy check
+      let correctChars = 0;
+      for (let i = 0; i < val.length; i++) {
+        if (val[i] === target[i]) correctChars++;
+      }
+      let acc = val.length > 0 ? Math.round((correctChars / val.length) * 100) : 100;
+      document.getElementById('typing-acc-val').innerText = `${acc}%`;
+
+      // Check Completion
+      if (val === target) {
+        playSound('collect');
+        
+        // Flash BLACK and Loop to Next Night Cycle!
+        triggerFlash('black', () => {
+          gameState.cycle++;
+          startScannerPhase();
+        });
+      }
+    }
+  </script>
+
+  <script>
+    window.onload = function() {
+      lucide.createIcons();
+    };
+  </script>
+</body>
+</html>

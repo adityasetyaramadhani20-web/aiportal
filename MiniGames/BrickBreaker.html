@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BrickBreaker</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: #1a1a1a;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .score-board {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px black;
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        #startScreen, #gameOverScreen, #levelScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #555;
+            pointer-events: auto;
+            backdrop-filter: blur(8px);
+            min-width: 320px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        h1 { margin-top: 0; color: #ff4444; font-size: 32px; letter-spacing: 2px; }
+        h2 { margin: 10px 0; font-size: 20px; color: #aaa; }
+        p { color: #ddd; margin-bottom: 20px; }
+
+        .btn-container {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: none;
+            padding: 15px 25px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .btn-frenzy {
+            background: linear-gradient(135deg, #ff4444, #cc0000);
+            color: white;
+            box-shadow: 0 4px 0 #990000;
+        }
+        .btn-frenzy:active { transform: translateY(4px); box-shadow: none; }
+
+        .btn-classic {
+            background: linear-gradient(135deg, #4488ff, #0055cc);
+            color: white;
+            box-shadow: 0 4px 0 #003399;
+        }
+        .btn-classic:active { transform: translateY(4px); box-shadow: none; }
+
+        .btn-retry {
+            background: #444;
+            color: white;
+            width: 100%;
+            margin-top: 15px;
+        }
+        .btn-retry:hover { background: #666; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui-layer" class="hidden">
+        <div class="score-board">
+            <span>LVL <span id="levelVal">1</span></span>
+            <span>SKOR: <span id="scoreVal">0</span></span>
+            <span id="livesLabel">BOLA: <span id="livesVal">1</span></span>
+        </div>
+    </div>
+
+    <div id="startScreen">
+        <h1>BRICK BREAKER</h1>
+        <p>Pilih Mode Permainan:</p>
+        <div class="btn-container">
+            <button class="btn-classic" onclick="startGame('classic')">KLASIK<br><span style="font-size:10px; opacity:0.8">Level Standar</span></button>
+            <button class="btn-frenzy" onclick="startGame('frenzy')">FRENZY<br><span style="font-size:10px; opacity:0.8">Level Sulit</span></button>
+        </div>
+        <p style="margin-top: 20px; font-size: 12px; opacity: 0.6;">Kontrol: Mouse / Sentuh / Panah Kiri-Kanan</p>
+    </div>
+
+    <div id="levelScreen" class="hidden">
+        <h1 style="color: #44ff44;">LEVEL SELESAI!</h1>
+        <p>Siap untuk Level <span id="nextLevelVal">2</span>?</p>
+        <button class="btn-retry" onclick="nextLevel()">LANJUT</button>
+    </div>
+
+    <div id="gameOverScreen" class="hidden">
+        <h1>GAME OVER</h1>
+        <p id="modeDisplay">Mode: Frenzy</p>
+        <p>Skor Akhir: <span id="finalScore">0</span></p>
+        <button class="btn-retry" onclick="showMainMenu()">KE MENU UTAMA</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // --- KONFIGURASI UMUM ---
+    const GAME_WIDTH = 800;
+    const GAME_HEIGHT = 1000;
+    const ROWS = 60; 
+
+    // --- VARIABEL GLOBAL ---
+    let COLS = 50; 
+    let BLOCK_W, BLOCK_H;
+    
+    // State Game
+    let gameMode = 'frenzy'; 
+    let animationId;
+    let lastTime = 0;
+    let isGameOver = true;
+    let isPaused = false;
+    let score = 0;
+    let level = 1;
+    let lives = 3; 
+    let redBrickCount = 0;
+    
+    // Input
+    let rightPressed = false;
+    let leftPressed = false;
+    
+    // Entitas
+    let paddle = {};
+    let balls = [];
+    let bricks = []; 
+    let powerups = [];
+
+    // --- SETUP & RESIZE ---
+    function resize() {
+        let scale = Math.min(window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT);
+        canvas.width = GAME_WIDTH;
+        canvas.height = GAME_HEIGHT;
+        canvas.style.width = (GAME_WIDTH * scale) + 'px';
+        canvas.style.height = (GAME_HEIGHT * scale) + 'px';
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- INPUT HANDLERS ---
+    document.addEventListener("keydown", (e) => {
+        if(e.key === "Right" || e.key === "ArrowRight" || e.key === "d" || e.key === "D") rightPressed = true;
+        else if(e.key === "Left" || e.key === "ArrowLeft" || e.key === "a" || e.key === "A") leftPressed = true;
+    }, false);
+
+    document.addEventListener("keyup", (e) => {
+        if(e.key === "Right" || e.key === "ArrowRight" || e.key === "d" || e.key === "D") rightPressed = false;
+        else if(e.key === "Left" || e.key === "ArrowLeft" || e.key === "a" || e.key === "A") leftPressed = false;
+    }, false);
+
+    function updatePaddlePosMouse(clientX) {
+        if (isGameOver || isPaused) return;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        let mouseX = (clientX - rect.left) * scaleX;
+        paddle.x = mouseX - paddle.w / 2;
+        if (paddle.x < 0) paddle.x = 0;
+        if (paddle.x + paddle.w > GAME_WIDTH) paddle.x = GAME_WIDTH - paddle.w;
+    }
+
+    window.addEventListener('mousemove', e => updatePaddlePosMouse(e.clientX));
+    window.addEventListener('touchmove', e => {
+        e.preventDefault();
+        updatePaddlePosMouse(e.touches[0].clientX);
+    }, {passive: false});
+
+    // --- GAME LOGIC ---
+
+    function showMainMenu() {
+        document.getElementById('gameOverScreen').classList.add('hidden');
+        document.getElementById('ui-layer').classList.add('hidden');
+        document.getElementById('startScreen').classList.remove('hidden');
+        isGameOver = true;
+        cancelAnimationFrame(animationId);
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    }
+
+    function startGame(mode) {
+        gameMode = mode;
+        document.getElementById('startScreen').classList.add('hidden');
+        document.getElementById('gameOverScreen').classList.add('hidden');
+        
+        // Setup Mode
+        if (gameMode === 'classic') {
+            COLS = 20; 
+            lives = 3;
+        } else {
+            COLS = 50; 
+            lives = 1;
+        }
+        
+        BLOCK_W = GAME_WIDTH / COLS;
+        BLOCK_H = BLOCK_W; 
+
+        score = 0;
+        level = 1;
+        
+        resetPaddleAndBalls(); 
+        
+        updateUI();
+        initLevel();
+        
+        isGameOver = false;
+        isPaused = false;
+        lastTime = 0;
+        if (animationId) cancelAnimationFrame(animationId);
+        animationId = requestAnimationFrame(loop);
+    }
+
+    function initLevel() {
+        generateLevel(level);
+        document.getElementById('ui-layer').classList.remove('hidden');
+        updateUI();
+    }
+
+    function nextLevel() {
+        level++;
+        document.getElementById('levelScreen').classList.add('hidden');
+        isPaused = false;
+        resetPaddleAndBalls(); 
+        initLevel(); 
+    }
+
+    function resetPaddleAndBalls() {
+        paddle = {
+            w: gameMode === 'classic' ? 140 : 120,
+            h: 15,
+            x: GAME_WIDTH / 2 - 60,
+            y: GAME_HEIGHT - 50,
+            color: gameMode === 'classic' ? '#4488ff' : '#ff4444',
+            speed: 12
+        };
+
+        balls = [];
+        balls.push({
+            x: GAME_WIDTH / 2,
+            y: GAME_HEIGHT - 70,
+            vx: (Math.random() - 0.5) * 8, 
+            vy: -6 - Math.random() * 2,
+            radius: gameMode === 'classic' ? 6 : 4,
+            active: true
+        });
+        
+        powerups = [];
+    }
+
+    function generateLevel(lvl) {
+        bricks = [];
+        redBrickCount = 0;
+        
+        // Init Array Kosong
+        for(let c = 0; c < COLS; c++) {
+            bricks[c] = [];
+            for(let r = 0; r < ROWS; r++) {
+                bricks[c][r] = { status: 0 };
+            }
+        }
+
+        if (gameMode === 'classic') {
+            generateClassicLevel(lvl);
+        } else {
+            generateFrenzyTrapLevel(lvl);
+        }
+    }
+
+    // --- LEVEL GENERATOR: KLASIK (10 VARIATIONS) ---
+    function generateClassicLevel(lvl) {
+        let patternIdx = Math.floor(Math.random() * 10);
+        
+        switch(patternIdx) {
+            case 0: buildClassicStandard(); break;
+            case 1: buildClassicPyramid(); break;
+            case 2: buildClassicChecker(); break;
+            case 3: buildClassicColumns(); break;
+            case 4: buildClassicV(); break;
+            case 5: buildClassicStairs(); break;
+            case 6: buildClassicTunnel(); break;
+            case 7: buildClassicDoubleVision(); break;
+            case 8: buildClassicBox(); break;
+            case 9: buildClassicChaos(); break; // Original random logic
+        }
+    }
+
+    function buildClassicStandard() {
+        for(let c = 1; c < COLS-1; c++) {
+            for(let r = 3; r < 14; r+=2) createBrick(c, r, 1);
+        }
+    }
+
+    function buildClassicPyramid() {
+        let center = COLS/2;
+        let startY = 4;
+        for(let r = 0; r < 12; r++) {
+            let width = r; 
+            for(let c = Math.floor(center - width); c <= Math.ceil(center + width); c++) {
+                createBrick(c, startY + r, 1);
+            }
+        }
+    }
+
+    function buildClassicChecker() {
+        for(let c = 1; c < COLS-1; c++) {
+            for(let r = 3; r < 15; r++) {
+                if ((c + r) % 2 === 0) createBrick(c, r, 1);
+            }
+        }
+    }
+
+    function buildClassicColumns() {
+        for(let c = 2; c < COLS-2; c+=2) {
+            for(let r = 4; r < 16; r++) createBrick(c, r, 1);
+        }
+    }
+
+    function buildClassicV() {
+        let center = COLS/2;
+        for(let r = 0; r < 10; r++) {
+            createBrick(Math.floor(center - r), 5 + r, 1);
+            createBrick(Math.floor(center - r - 1), 5 + r, 1);
+            createBrick(Math.floor(center + r), 5 + r, 1);
+            createBrick(Math.floor(center + r + 1), 5 + r, 1);
+            
+            // Isi sedikit bagian atas
+            if (r < 5) {
+                createBrick(Math.floor(center - 8), 5 + r, 1);
+                createBrick(Math.floor(center + 8), 5 + r, 1);
+            }
+        }
+    }
+
+    function buildClassicStairs() {
+        for(let r = 0; r < 15; r++) {
+            let startX = (r % (COLS/2)) + 2;
+            for(let w = 0; w < 6; w++) {
+                let x = (startX + w) % (COLS-2);
+                if (x==0) x=1;
+                createBrick(x, 4 + r, 1);
+            }
+        }
+    }
+
+    function buildClassicTunnel() {
+        for(let c = 0; c < COLS; c++) {
+            if (c < 6 || c > COLS - 7) {
+                for(let r = 4; r < 16; r++) createBrick(c, r, 1);
+            }
+        }
+    }
+
+    function buildClassicDoubleVision() {
+        // Blok Kiri
+        for(let c = 2; c < COLS/2 - 2; c++) {
+            for(let r = 5; r < 12; r++) createBrick(c, r, 1);
+        }
+        // Blok Kanan
+        for(let c = COLS/2 + 2; c < COLS - 2; c++) {
+            for(let r = 5; r < 12; r++) createBrick(c, r, 1);
+        }
+    }
+
+    function buildClassicBox() {
+        for(let c = 4; c < COLS-4; c++) {
+            createBrick(c, 5, 1); // Atas
+            createBrick(c, 14, 1); // Bawah
+        }
+        for(let r = 5; r <= 14; r++) {
+            createBrick(4, r, 1); // Kiri
+            createBrick(COLS-5, r, 1); // Kanan
+        }
+        // Titik tengah
+        createBrick(Math.floor(COLS/2), 9, 1);
+        createBrick(Math.floor(COLS/2)-1, 9, 1);
+    }
+
+    function buildClassicChaos() {
+        for(let c = 0; c < COLS; c++) {
+            for(let r = 2; r < 14; r++) {
+                if (Math.random() > 0.4) createBrick(c, r, 1);
+            }
+        }
+    }
+
+    // --- LEVEL GENERATOR: FRENZY (TRAP / JEBAKAN - 10 MAPS) ---
+    function generateFrenzyTrapLevel(lvl) {
+        let patternIdx = Math.floor(Math.random() * 10); 
+        
+        switch(patternIdx) {
+            case 0: buildTheVault(); break;
+            case 1: buildTheSpiral(); break;
+            case 2: buildTheSnake(); break;
+            case 3: buildTheFunnel(); break;
+            case 4: buildTheGrid(); break;
+            case 5: buildTheFortress(); break;
+            case 6: buildTheCross(); break;
+            case 7: buildTheCurtains(); break;
+            case 8: buildTheDiamond(); break;
+            case 9: buildTheInvaders(); break;
+        }
+    }
+
+    // Pola 0: The Vault
+    function buildTheVault() {
+        let m = 2; let startY = 4; let h = 40;
+        for(let x = m; x < COLS - m; x++) {
+            for(let y = startY; y < startY + h; y++) {
+                let isBorder = (x === m || x === COLS - m - 1 || y === startY || y === startY + h - 1);
+                let isDoor = (y === startY && x >= (COLS/2)-2 && x <= (COLS/2)+2);
+                if (isBorder && !isDoor) createBrick(x, y, 2); 
+                else if (!isBorder) {
+                    if (x % 6 === 0 && y % 6 === 0) createBrick(x, y, 2);
+                    else createBrick(x, y, 1); 
+                }
+            }
+        }
+    }
+
+    // Pola 1: The Spiral
+    function buildTheSpiral() {
+        let cx = COLS / 2; let cy = 25; let maxR = 22;
+        for (let r = maxR; r > 2; r -= 3) {
+            let left = Math.floor(cx - r); let right = Math.floor(cx + r);
+            let top = Math.floor(cy - r * 0.8); let bottom = Math.floor(cy + r * 0.8);
+            if (top < 2) top = 2;
+            for(let x = left; x <= right; x++) {
+                let ringIdx = Math.floor((maxR - r) / 3); let gapSide = ringIdx % 4;
+                if (!(gapSide === 0 && x > cx-3 && x < cx+3)) createBrick(x, top, 2);
+                if (!(gapSide === 2 && x > cx-3 && x < cx+3)) createBrick(x, bottom, 2);
+            }
+            for(let y = top; y <= bottom; y++) {
+                let ringIdx = Math.floor((maxR - r) / 3); let gapSide = ringIdx % 4;
+                if (!(gapSide === 3 && y > cy-3 && y < cy+3)) createBrick(left, y, 2);
+                if (!(gapSide === 1 && y > cy-3 && y < cy+3)) createBrick(right, y, 2);
+            }
+        }
+        for(let x=2; x<COLS-2; x++) for(let y=5; y<45; y++) if(bricks[x][y].status === 0) createBrick(x, y, 1);
+    }
+
+    // Pola 2: The Snake
+    function buildTheSnake() {
+        for(let x=2; x<COLS-2; x++) { createBrick(x, 4, 2); createBrick(x, 44, 2); }
+        for(let y=4; y<=44; y++) { createBrick(2, y, 2); createBrick(COLS-3, y, 2); }
+        bricks[3][4].status = 0; bricks[4][4].status = 0; bricks[5][4].status = 0;
+        for(let y=10; y<40; y+=6) {
+            let gapLeft = ((y-4)/6) % 2 === 0;
+            for(let x=3; x<COLS-3; x++) {
+                if (gapLeft && x < COLS-8) createBrick(x, y, 2);
+                else if (!gapLeft && x > 7) createBrick(x, y, 2);
+                else createBrick(x, y, 1);
+            }
+        }
+        for(let x=3; x<COLS-3; x++) for(let y=5; y<44; y++) if(bricks[x][y].status === 0) createBrick(x, y, 1);
+    }
+
+    // Pola 3: The Funnel
+    function buildTheFunnel() {
+        let center = COLS/2;
+        for(let y=0; y<35; y++) {
+            let xOffset = y; 
+            if(center - xOffset > 2) createBrick(Math.floor(center - xOffset), y+5, 2);
+            if(center + xOffset < COLS-2) createBrick(Math.floor(center + xOffset), y+5, 2);
+            for(let x = Math.floor(center-xOffset)+1; x < Math.floor(center+xOffset); x++) {
+                 if(x > 2 && x < COLS-2) createBrick(x, y+5, 1);
+            }
+        }
+        for(let x=2; x<COLS-2; x++) if (Math.abs(x - center) > 2) createBrick(x, 5, 2);
+    }
+
+    // Pola 4: The Grid
+    function buildTheGrid() {
+        for(let x=2; x<COLS-2; x++) {
+            for(let y=4; y<40; y++) {
+                if (x % 5 === 0 || y % 5 === 0) {
+                    if ((x+y) % 2 !== 0) createBrick(x, y, 2);
+                } else {
+                    createBrick(x, y, 1);
+                }
+            }
+        }
+    }
+
+    // Pola 5: The Fortress
+    function buildTheFortress() {
+        let pad = 8;
+        for(let x=pad; x<COLS-pad; x++) {
+            createBrick(x, 10, 2); // Atas
+            if (x < COLS/2 - 3 || x > COLS/2 + 3) createBrick(x, 35, 2); // Bawah
+        }
+        for(let y=10; y<=35; y++) {
+            createBrick(pad, y, 2); // Kiri
+            createBrick(COLS-pad, y, 2); // Kanan
+        }
+        for(let x=pad+1; x<COLS-pad-1; x++) {
+            for(let y=11; y<35; y++) {
+                if ((x+y)%2 === 0) createBrick(x, y, 1);
+            }
+        }
+    }
+
+    // Pola 6: The Cross
+    function buildTheCross() {
+        let cx = COLS/2; let cy = 20;
+        for(let i=0; i<25; i++) {
+            createBrick(Math.floor(cx - 15 + i), 10 + i, 2);
+            createBrick(Math.floor(cx - 14 + i), 10 + i, 2);
+            createBrick(Math.floor(cx + 15 - i), 10 + i, 2);
+            createBrick(Math.floor(cx + 14 - i), 10 + i, 2);
+        }
+        for(let x=5; x<COLS-5; x++) {
+            for(let y=5; y<35; y++) {
+                if (bricks[x][y].status === 0 && Math.random() > 0.3) createBrick(x, y, 1);
+            }
+        }
+    }
+
+    // Pola 7: The Curtains
+    function buildTheCurtains() {
+        for(let x=4; x<COLS-4; x+=6) {
+            for(let y=4; y<35; y++) {
+                if (y % 8 < 5) createBrick(x, y, 2);
+            }
+        }
+        for(let x=2; x<COLS-2; x++) {
+            for(let y=4; y<35; y++) {
+                if (bricks[x][y].status === 0 && x%2!==0) createBrick(x, y, 1);
+            }
+        }
+    }
+
+    // Pola 8: The Diamond
+    function buildTheDiamond() {
+        let cx = COLS/2;
+        let cy = 20;
+        let size = 18;
+        
+        for(let x=0; x<COLS; x++) {
+            for(let y=0; y<ROWS; y++) {
+                let dx = Math.abs(x - cx);
+                let dy = Math.abs(y - cy);
+                let dist = dx + dy; 
+                if (Math.abs(dist - size) < 1.5) createBrick(x, y, 2); 
+                else if (dist < size) createBrick(x, y, 1); 
+            }
+        }
+    }
+
+    // Pola 9: The Invaders
+    function buildTheInvaders() {
+        for(let row=0; row<3; row++) {
+            let yOff = 6 + (row * 10);
+            for(let col=0; col<3; col++) {
+                let xOff = 8 + (col * 14);
+                for(let i=0; i<8; i++) {
+                    for(let j=0; j<6; j++) {
+                        if (i===0 || i===7 || j===0 || j===5) createBrick(xOff+i, yOff+j, 2);
+                        else createBrick(xOff+i, yOff+j, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    function createBrick(cx, cy, status) {
+        if (cx >= COLS || cy >= ROWS || cx < 0 || cy < 0) return;
+        if (bricks[cx][cy].status !== 0) return; // Jangan timpa
+        
+        let color = (status === 2) ? '#555' : '#ff4444'; 
+        
+        bricks[cx][cy] = {
+            x: cx * BLOCK_W,
+            y: cy * BLOCK_H,
+            w: BLOCK_W,
+            h: BLOCK_H,
+            status: status,
+            color: color
+        };
+        
+        if (status === 1) redBrickCount++;
+    }
+
+    // --- GAME UPDATE LOOP ---
+
+    function spawnPowerUp(x, y) {
+        if (gameMode !== 'frenzy') return; 
+        if (Math.random() < 0.08) { 
+            powerups.push({ x: x, y: y, w: 15, h: 15, vy: 3, type: 'multiball' });
+        }
+    }
+
+    function applyPowerUp() {
+        let newBalls = [];
+        if (balls.length > 200) return; 
+        balls.forEach(b => {
+            let b2 = { ...b };
+            b2.vx = b.vx + (Math.random() - 0.5) * 4; 
+            b2.vy = b.vy + (Math.random() - 0.5) * 4;
+            newBalls.push(b2);
+        });
+        balls = balls.concat(newBalls);
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('scoreVal').innerText = score;
+        document.getElementById('levelVal').innerText = level;
+        
+        const livesLabel = document.getElementById('livesLabel');
+        
+        if (gameMode === 'classic') {
+            livesLabel.innerHTML = 'NYAWA: <span id="livesVal">' + lives + '</span>';
+        } else {
+            livesLabel.innerHTML = 'BOLA: <span id="livesVal">' + balls.length + '</span>';
+        }
+    }
+
+    function update() {
+        if (isGameOver || isPaused) return;
+
+        // Cek Menang Level
+        if (redBrickCount <= 0) {
+            isPaused = true;
+            document.getElementById('nextLevelVal').innerText = level + 1;
+            document.getElementById('levelScreen').classList.remove('hidden');
+            return;
+        }
+
+        // Paddle Move (Keyboard)
+        if (rightPressed) {
+            paddle.x += paddle.speed;
+            if (paddle.x + paddle.w > GAME_WIDTH) paddle.x = GAME_WIDTH - paddle.w;
+        } else if (leftPressed) {
+            paddle.x -= paddle.speed;
+            if (paddle.x < 0) paddle.x = 0;
+        }
+
+        // Ball Logic
+        for (let i = balls.length - 1; i >= 0; i--) {
+            let b = balls[i];
+            b.x += b.vx;
+            b.y += b.vy;
+
+            // Pantulan Dinding
+            if (b.x - b.radius < 0) { b.x = b.radius; b.vx *= -1; }
+            if (b.x + b.radius > GAME_WIDTH) { b.x = GAME_WIDTH - b.radius; b.vx *= -1; }
+            if (b.y - b.radius < 0) { b.y = b.radius; b.vy *= -1; }
+            
+            // Bola Jatuh (Mati)
+            if (b.y - b.radius > GAME_HEIGHT) {
+                balls.splice(i, 1);
+                
+                // Logic Kematian
+                if (gameMode === 'classic') {
+                    if (balls.length === 0) {
+                        lives--;
+                        if (lives > 0) resetPaddleAndBalls(); 
+                        else endGame();
+                    }
+                } else {
+                    if (balls.length === 0) endGame();
+                }
+                
+                updateUI();
+                continue;
+            }
+
+            // Paddle Hit
+            if (b.x > paddle.x && b.x < paddle.x + paddle.w &&
+                b.y + b.radius > paddle.y && b.y - b.radius < paddle.y + paddle.h) {
+                
+                b.vy = -Math.abs(b.vy);
+                b.y = paddle.y - b.radius - 1;
+                
+                let hitPoint = b.x - (paddle.x + paddle.w / 2);
+                b.vx = hitPoint * 0.15; 
+                
+                let speed = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
+                let maxSpeed = (gameMode === 'classic') ? 10 : 14;
+                speed = Math.max(6, Math.min(speed, maxSpeed)); 
+                
+                let angle = Math.atan2(b.vy, b.vx);
+                b.vx = Math.cos(angle) * speed;
+                b.vy = Math.sin(angle) * speed;
+            }
+
+            // Brick Hit
+            let c = Math.floor(b.x / BLOCK_W);
+            let r = Math.floor(b.y / BLOCK_H);
+            let hit = false;
+            
+            for (let cx = c - 1; cx <= c + 1; cx++) {
+                if(hit) break;
+                for (let ry = r - 1; ry <= r + 1; ry++) {
+                    if (cx >= 0 && cx < COLS && ry >= 0 && ry < ROWS) {
+                        let brick = bricks[cx][ry];
+                        if (brick.status !== 0) {
+                            let closestX = Math.max(brick.x, Math.min(b.x, brick.x + brick.w));
+                            let closestY = Math.max(brick.y, Math.min(b.y, brick.y + brick.h));
+                            let distSq = (b.x - closestX)**2 + (b.y - closestY)**2;
+
+                            if (distSq < b.radius**2) {
+                                let overlapX = b.radius - Math.abs(b.x - closestX);
+                                let overlapY = b.radius - Math.abs(b.y - closestY);
+                                if (overlapX < overlapY) {
+                                    b.vx *= -1;
+                                    b.x += (b.x < closestX) ? -overlapX : overlapX;
+                                } else {
+                                    b.vy *= -1;
+                                    b.y += (b.y < closestY) ? -overlapY : overlapY;
+                                }
+
+                                if (brick.status === 1) { // Merah
+                                    brick.status = 0;
+                                    redBrickCount--;
+                                    score += 10;
+                                    updateUI();
+                                    spawnPowerUp(brick.x+brick.w/2, brick.y+brick.h/2);
+                                }
+                                hit = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Powerups
+        for (let i = powerups.length - 1; i >= 0; i--) {
+            let p = powerups[i];
+            p.y += p.vy;
+            if (p.x + p.w > paddle.x && p.x < paddle.x + paddle.w &&
+                p.y + p.h > paddle.y && p.y < paddle.y + paddle.h) {
+                applyPowerUp();
+                powerups.splice(i, 1);
+            } else if (p.y > GAME_HEIGHT) {
+                powerups.splice(i, 1);
+            }
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+        for(let c = 0; c < COLS; c++) {
+            for(let r = 0; r < ROWS; r++) {
+                let b = bricks[c][r];
+                if (b.status !== 0) {
+                    ctx.fillStyle = b.color;
+                    ctx.fillRect(b.x + 1, b.y + 1, b.w - 1, b.h - 1);
+                    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                    ctx.fillRect(b.x + 1, b.y + 1, b.w - 1, b.h * 0.4);
+                }
+            }
+        }
+
+        ctx.fillStyle = paddle.color;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = paddle.color;
+        ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = '#fff';
+        balls.forEach(b => {
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        powerups.forEach(p => {
+            ctx.fillStyle = '#00ff00';
+            ctx.fillRect(p.x, p.y, 15, 15);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText('+', p.x+3, p.y+11);
+        });
+    }
+
+    function loop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        update();
+        draw();
+        if (!isGameOver) animationId = requestAnimationFrame(loop);
+    }
+
+    function endGame() {
+        isGameOver = true;
+        cancelAnimationFrame(animationId);
+        document.getElementById('gameOverScreen').classList.remove('hidden');
+        document.getElementById('finalScore').innerText = score;
+        document.getElementById('modeDisplay').innerText = "Mode: " + (gameMode === 'classic' ? 'Klasik' : 'Frenzy');
+    }
+    
+    resize();
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    
+</script>
+</body>
+</html>

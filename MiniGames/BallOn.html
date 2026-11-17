@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BallOn</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #87CEEB; touch-action: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { display: block; }
+        .hidden { display: none !important; }
+        
+        /* UI Overlays */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .menu-screen { pointer-events: auto; background: rgba(255, 255, 255, 0.9); border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;}
+        .btn-mode { transition: transform 0.1s, background-color 0.2s; }
+        .btn-mode:active { transform: scale(0.95); }
+        
+        /* Hilangkan scrollbar untuk menu agar lebih rapi di HP */
+        .menu-screen::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer" class="flex items-center justify-center">
+        <!-- Main Menu -->
+        <div id="main-menu" class="menu-screen p-6 max-w-lg w-11/12 text-center">
+            <h1 class="text-4xl font-bold text-blue-600 mb-2">🎈 BallOn</h1>
+            <p class="text-gray-600 mb-6 text-sm">Pilih mode permainanmu!</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button onclick="startGame('JUMP')" class="btn-mode bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-3 rounded-xl shadow-md flex flex-col items-center">
+                    <span class="text-lg">⬆️ Jump</span>
+                    <span class="text-xs font-normal opacity-90">Lompat setinggi mungkin</span>
+                </button>
+                <button onclick="startGame('FALL')" class="btn-mode bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-3 rounded-xl shadow-md flex flex-col items-center">
+                    <span class="text-lg">⬇️ Fall</span>
+                    <span class="text-xs font-normal opacity-90">Terjun hindari awan</span>
+                </button>
+                <button onclick="startGame('FLOAT')" class="btn-mode bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-3 rounded-xl shadow-md flex flex-col items-center">
+                    <span class="text-lg">☁️ Float</span>
+                    <span class="text-xs font-normal opacity-90">Melayang hindari paku</span>
+                </button>
+                <button onclick="startGame('DROP')" class="btn-mode bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-3 rounded-xl shadow-md flex flex-col items-center">
+                    <span class="text-lg">⏬ Drop</span>
+                    <span class="text-xs font-normal opacity-90">Turun hindari paku</span>
+                </button>
+                <button onclick="startGame('FLY')" class="btn-mode bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-3 rounded-xl shadow-md flex flex-col items-center">
+                    <span class="text-lg">⏩ Fly</span>
+                    <span class="text-xs font-normal opacity-90">Terbang lewati awan</span>
+                </button>
+                <button onclick="startGame('DODGE')" class="btn-mode bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-3 rounded-xl shadow-md flex flex-col items-center">
+                    <span class="text-lg">🚀 Dodge</span>
+                    <span class="text-xs font-normal opacity-90">Menghindar super cepat!</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over" class="menu-screen p-8 max-w-sm w-11/12 text-center hidden flex-col items-center">
+            <h2 class="text-3xl font-bold text-red-500 mb-2">Game Over!</h2>
+            <div class="text-xl mb-1">Skor: <span id="final-score" class="font-bold text-blue-600">0</span></div>
+            <div class="text-sm text-gray-500 mb-6">Mode: <span id="final-mode" class="font-semibold"></span></div>
+            
+            <div class="flex gap-4 w-full">
+                <button onclick="retryGame()" class="btn-mode flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl shadow-md">
+                    🔄 Ulangi
+                </button>
+                <button onclick="goToMenu()" class="btn-mode flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-xl shadow-md">
+                    🏠 Menu
+                </button>
+            </div>
+        </div>
+
+        <!-- HUD -->
+        <div id="hud" class="absolute top-0 left-0 w-full p-4 flex justify-between items-start hidden pointer-events-none">
+            <div class="bg-white/90 px-4 py-2 rounded-lg shadow font-bold text-xl text-blue-800">
+                Skor: <span id="score-display">0</span>
+            </div>
+            <div id="hp-display" class="bg-red-100/90 px-4 py-2 rounded-lg shadow font-bold text-xl text-red-600 hidden">
+                HP: <span id="hp-value">10</span>
+            </div>
+            <div id="powerup-display" class="flex flex-col gap-2 items-end"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const uiMainMenu = document.getElementById('main-menu');
+        const uiGameOver = document.getElementById('game-over');
+        const uiHud = document.getElementById('hud');
+        
+        let cw, ch;
+        let gameLoopId;
+        let currentState = 'MENU'; // MENU, PLAYING, GAMEOVER
+        let currentMode = '';
+        const scaleFactor = 1.6; // Scale factor arena
+
+        // Input Terpadu
+        let keys = { left: false, right: false, up: false, down: false };
+
+        // Game Variables Umum
+        let score = 0;
+        let hp = 10;
+        let frameCount = 0;
+        let entities = [];
+        let particles = [];
+        let difficultyMultiplier = 1;
+
+        // Variabel Khusus Mode
+        let lastDropGapX = null; // Untuk mode Drop
+        let slowMoTimer = 0;     // Untuk mode Dodge
+
+        // Player Object
+        const player = {
+            x: 0, y: 0, vx: 0, vy: 0, radius: 15,
+            color: '#FF3366', speed: 5, gravity: 0.5, jumpPower: -10,
+            invincible: 0, shield: false, magnet: 0
+        };
+
+        // Resize Canvas
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            cw = canvas.width / scaleFactor;
+            ch = canvas.height / scaleFactor;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Keyboard Input
+        window.addEventListener('keydown', e => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = true;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
+        });
+        window.addEventListener('keyup', e => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = false;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = false;
+        });
+
+        // Touch & Mouse Input Terpadu (Menyesuaikan dengan arah orientasi game)
+        function handlePointerStart(x, y) {
+            // Jika mode side-scrolling, layar dibagi Atas dan Bawah
+            if (currentMode === 'FLY' || currentMode === 'DODGE') {
+                if (y < canvas.height / 2) keys.up = true;
+                else keys.down = true;
+            } else {
+                // Jika mode vertikal, layar dibagi Kiri dan Kanan
+                if (x < canvas.width / 2) keys.left = true;
+                else keys.right = true;
+            }
+        }
+        function handlePointerEnd() {
+            keys.left = false; keys.right = false; keys.up = false; keys.down = false;
+        }
+
+        canvas.addEventListener('touchstart', e => { handlePointerStart(e.touches[0].clientX, e.touches[0].clientY); });
+        canvas.addEventListener('touchend', handlePointerEnd);
+        canvas.addEventListener('mousedown', e => { handlePointerStart(e.clientX, e.clientY); });
+        canvas.addEventListener('mouseup', handlePointerEnd);
+        canvas.addEventListener('mouseleave', handlePointerEnd);
+
+        // Utilities
+        function random(min, max) { return Math.random() * (max - min) + min; }
+        function rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2) {
+            return x2 < x1 + w1 && x2 + w2 > x1 && y2 < y1 + h1 && y2 + h2 > y1;
+        }
+        function circleRectIntersect(cx, cy, cr, rx, ry, rw, rh) {
+            let testX = cx; let testY = cy;
+            if (cx < rx) testX = rx; else if (cx > rx + rw) testX = rx + rw;
+            if (cy < ry) testY = ry; else if (cy > ry + rh) testY = ry + rh;
+            let distX = cx - testX; let distY = cy - testY;
+            return (distX*distX + distY*distY) <= (cr*cr);
+        }
+
+        // --- DRAWING FUNCTIONS ---
+        function drawPlayer() {
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            
+            // Blink if invincible
+            if (player.invincible > 0 && Math.floor(frameCount / 5) % 2 === 0) {
+                ctx.globalAlpha = 0.5;
+            }
+
+            // Shield visual
+            if (player.shield) {
+                ctx.beginPath();
+                ctx.arc(0, 0, player.radius + 6, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+                ctx.fill();
+                ctx.strokeStyle = '#00FFFF';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Magnet visual (jika ada)
+            if (player.magnet > 0) {
+                ctx.beginPath();
+                ctx.arc(0, 0, player.radius + 10, 0, Math.PI * 2);
+                ctx.strokeStyle = '#FFD700';
+                ctx.setLineDash([5, 5]);
+                ctx.lineDashOffset = -frameCount * 0.5;
+                ctx.stroke();
+            }
+
+            // Tali Balon
+            ctx.beginPath();
+            ctx.moveTo(0, player.radius);
+            ctx.lineTo(0, player.radius + 12);
+            ctx.strokeStyle = '#424242';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Badan Balon
+            ctx.beginPath();
+            ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+            ctx.fillStyle = player.color;
+            ctx.fill();
+            
+            // Highlight Balon
+            ctx.beginPath();
+            ctx.arc(-5, -5, player.radius/3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.fill();
+
+            // Efek SlowMo di player (Aura biru muda)
+            if (slowMoTimer > 0) {
+                ctx.beginPath();
+                ctx.arc(0, 0, player.radius + 15, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(179, 136, 255, 0.6)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        // --- CORE GAME LOOP ---
+        function startGame(mode) {
+            currentMode = mode;
+            currentState = 'PLAYING';
+            score = 0;
+            hp = 10;
+            frameCount = 0;
+            entities = [];
+            particles = [];
+            difficultyMultiplier = 1;
+            
+            // Reset state spesifik mode
+            lastDropGapX = null;
+            slowMoTimer = 0;
+            
+            // Reset input (jaga-jaga tombol nyangkut)
+            keys = { left: false, right: false, up: false, down: false };
+
+            // Reset status player
+            player.vx = 0; player.vy = 0;
+            player.invincible = 0; player.shield = false; player.magnet = 0;
+
+            uiMainMenu.classList.add('hidden');
+            uiGameOver.classList.add('hidden');
+            uiHud.classList.remove('hidden');
+            
+            document.getElementById('hp-display').classList.toggle('hidden', mode !== 'FALL');
+            updateHUD();
+
+            // Initial Mode Setup
+            if (mode === 'JUMP') {
+                player.x = cw / 2; player.y = ch - 100;
+                let lastX = cw / 2 - 30;
+                entities.push(createPlatform(lastX, ch - 20, 0));
+                for(let i=1; i<ch/50; i++) {
+                    let minX = Math.max(10, lastX - 150);
+                    let maxX = Math.min(Math.max(10, cw - 60), lastX + 150);
+                    lastX = random(minX, maxX);
+                    entities.push(createPlatform(lastX, ch - i*60));
+                }
+            } else if (mode === 'FALL') {
+                player.x = cw / 2; player.y = 100;
+            } else if (mode === 'DROP') {
+                player.x = cw / 2; player.y = 100;
+                for(let i=0; i<ch/100 + 1; i++) createMazePlatform(ch + i*150);
+            } else if (mode === 'FLOAT') {
+                player.x = cw / 2; player.y = ch - 100;
+            } else if (mode === 'FLY' || mode === 'DODGE') {
+                // Posisi kiri tengah untuk side-scrolling
+                player.x = 60; 
+                player.y = ch / 2;
+            }
+
+            if(gameLoopId) cancelAnimationFrame(gameLoopId);
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            currentState = 'GAMEOVER';
+            uiHud.classList.add('hidden');
+            uiGameOver.classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('final-mode').innerText = currentMode;
+        }
+
+        function retryGame() { startGame(currentMode); }
+        function goToMenu() {
+            currentState = 'MENU';
+            uiGameOver.classList.add('hidden');
+            uiMainMenu.classList.remove('hidden');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function updateHUD() {
+            document.getElementById('score-display').innerText = score;
+            if(currentMode === 'FALL') document.getElementById('hp-value').innerText = hp;
+            
+            let pUpHtml = '';
+            if(player.shield) pUpHtml += '<div class="bg-cyan-100 px-3 py-1 rounded-full text-cyan-800 text-xs font-bold border border-cyan-400 shadow-sm">🛡️ Shield</div>';
+            if(player.magnet > 0) pUpHtml += '<div class="bg-yellow-100 px-3 py-1 rounded-full text-yellow-800 text-xs font-bold border border-yellow-400 shadow-sm">🧲 Magnet ('+Math.ceil(player.magnet/60)+'s)</div>';
+            if(slowMoTimer > 0) pUpHtml += '<div class="bg-purple-100 px-3 py-1 rounded-full text-purple-800 text-xs font-bold border border-purple-400 shadow-sm">⏱️ SlowMo ('+Math.ceil(slowMoTimer/60)+'s)</div>';
+            
+            document.getElementById('powerup-display').innerHTML = pUpHtml;
+        }
+
+        // --- MODE 1: JUMP ---
+        function createPlatform(x, y, forcedType = -1) {
+            let type = 0; 
+            if (forcedType !== -1) type = forcedType;
+            else {
+                if (score > 1000) type = 1;
+                else {
+                    let r = Math.random();
+                    if (r < 0.2) type = 1; else if (r < 0.3) type = 2;
+                }
+            }
+            return { type: 'platform', pType: type, x: x, y: y, w: 60, h: 15, passed: false, dead: false };
+        }
+
+        function updateJump() {
+            if (keys.left) player.vx = -player.speed;
+            else if (keys.right) player.vx = player.speed;
+            else player.vx *= 0.8;
+
+            player.vy += player.gravity;
+            player.x += player.vx;
+            player.y += player.vy;
+
+            if (player.x < -player.radius) player.x = cw + player.radius;
+            if (player.x > cw + player.radius) player.x = -player.radius;
+
+            if (player.y < ch / 2) {
+                let diff = ch / 2 - player.y;
+                player.y = ch / 2;
+                entities.forEach(e => e.y += diff);
+            }
+
+            if (player.y > ch + player.radius * 2) gameOver();
+
+            let highestY = ch;
+            let highestPlatformX = cw / 2;
+            entities.forEach(p => {
+                if(p.type !== 'platform') return;
+                if(p.y < highestY) { highestY = p.y; highestPlatformX = p.x; }
+                
+                if(!p.passed && p.y > player.y) { p.passed = true; score++; updateHUD(); }
+
+                if (player.vy > 0 && !p.dead && player.y + player.radius > p.y && player.y + player.radius < p.y + p.h + player.vy && player.x + player.radius > p.x && player.x - player.radius < p.x + p.w) {
+                    player.vy = (p.pType === 2) ? player.jumpPower * 1.5 : player.jumpPower;
+                    if (p.pType === 1) p.dead = true; 
+                }
+            });
+
+            if (highestY > 0) {
+                let minX = Math.max(10, highestPlatformX - 150);
+                let maxX = Math.min(Math.max(10, cw - 60), highestPlatformX + 150);
+                entities.push(createPlatform(random(minX, maxX), highestY - random(45, 85)));
+            }
+            entities = entities.filter(e => e.y < ch + 50 && !e.dead);
+        }
+
+        function drawJump() {
+            entities.forEach(p => {
+                ctx.fillStyle = p.pType === 0 ? '#4CAF50' : p.pType === 1 ? '#FFFFFF' : '#FF9800';
+                if(p.pType === 1) {
+                    ctx.beginPath();
+                    ctx.arc(p.x+10, p.y+7, 10, 0, Math.PI*2);
+                    ctx.arc(p.x+30, p.y+5, 12, 0, Math.PI*2);
+                    ctx.arc(p.x+50, p.y+7, 10, 0, Math.PI*2);
+                    ctx.fill();
+                } else if (p.pType === 2) {
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.fillStyle = '#E65100';
+                    ctx.fillRect(p.x+20, p.y-5, 20, 5);
+                } else {
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                }
+            });
+        }
+
+        // --- MODE 2: FALL ---
+        function updateFall() {
+            difficultyMultiplier = 1 + Math.floor(score / 50) * 0.01;
+            let spawnRate = Math.max(20, 60 - Math.floor(score/10));
+
+            if (keys.left) player.x -= player.speed;
+            if (keys.right) player.x += player.speed;
+            player.x = Math.max(player.radius, Math.min(cw - player.radius, player.x));
+            
+            if(player.invincible > 0) player.invincible--;
+
+            if (frameCount % spawnRate === 0) {
+                entities.push({ type: 'dangerCloud', x: random(0, cw), y: ch + 50, radius: random(20, 40), passed: false });
+            }
+
+            entities.forEach(c => {
+                c.y -= 5 * difficultyMultiplier; 
+                
+                if(!c.passed && c.y < player.y) { c.passed = true; score++; updateHUD(); }
+
+                if (player.invincible <= 0 && circleRectIntersect(player.x, player.y, player.radius, c.x-c.radius, c.y-c.radius, c.radius*2, c.radius*1.5)) {
+                    hp--; player.invincible = 60; updateHUD();
+                    if(hp <= 0) gameOver();
+                }
+            });
+            entities = entities.filter(e => e.y > -100);
+        }
+
+        function drawFall() {
+            entities.forEach(c => {
+                ctx.fillStyle = '#78909C';
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, c.radius, 0, Math.PI*2);
+                ctx.arc(c.x-c.radius*0.6, c.y+c.radius*0.2, c.radius*0.8, 0, Math.PI*2);
+                ctx.arc(c.x+c.radius*0.6, c.y+c.radius*0.2, c.radius*0.8, 0, Math.PI*2);
+                ctx.fill();
+            });
+        }
+
+        // --- MODE 3: FLOAT (Dikembalikan seperti semula) ---
+        function updateFloat() {
+            difficultyMultiplier = 1 + Math.floor(score / 50) * 0.01;
+            let spawnRate = Math.max(30, 80 - Math.floor(score/10));
+
+            if (keys.left) player.x -= player.speed;
+            if (keys.right) player.x += player.speed;
+            player.x = Math.max(player.radius, Math.min(cw - player.radius, player.x));
+
+            if(player.magnet > 0) player.magnet--;
+            if(frameCount % 30 === 0) updateHUD(); // update powerup timers
+
+            // Spawn obstacles and powerups
+            if (frameCount % spawnRate === 0) {
+                // Spike cloud
+                entities.push({ type: 'spike', x: random(0, Math.max(0, cw-60)), y: -50, w: 60, h: 20, passed: false });
+                
+                // Powerups / Stars
+                let r = Math.random();
+                if (r < 0.05 && !player.shield) entities.push({ type: 'powerup', pType: 'shield', x: random(20, cw-20), y: -50, radius: 10 });
+                else if (r < 0.1 && player.magnet <= 0) entities.push({ type: 'powerup', pType: 'magnet', x: random(20, cw-20), y: -50, radius: 10 });
+                else if (r < 0.5) entities.push({ type: 'star', x: random(20, cw-20), y: -50, radius: 8 });
+            }
+
+            let baseSpeed = 4 * difficultyMultiplier;
+
+            entities.forEach((e, index) => {
+                e.y += baseSpeed;
+
+                if (e.type === 'spike') {
+                    if(!e.passed && e.y > player.y) {
+                        e.passed = true;
+                        score++;
+                        updateHUD();
+                    }
+                    if (circleRectIntersect(player.x, player.y, player.radius, e.x, e.y, e.w, e.h)) {
+                        if (player.shield) {
+                            player.shield = false;
+                            entities.splice(index, 1);
+                            updateHUD();
+                        } else {
+                            gameOver();
+                        }
+                    }
+                } 
+                else if (e.type === 'star') {
+                    // Magnet logic
+                    if (player.magnet > 0) {
+                        let dx = player.x - e.x;
+                        let dy = player.y - e.y;
+                        let dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist < 150) {
+                            e.x += (dx / dist) * 8;
+                            e.y += (dy / dist) * 8;
+                        }
+                    }
+                    // Collect
+                    if (Math.hypot(player.x - e.x, player.y - e.y) < player.radius + e.radius) {
+                        score += 2;
+                        entities.splice(index, 1);
+                        updateHUD();
+                    }
+                }
+                else if (e.type === 'powerup') {
+                    if (Math.hypot(player.x - e.x, player.y - e.y) < player.radius + e.radius) {
+                        if(e.pType === 'shield') player.shield = true;
+                        if(e.pType === 'magnet') player.magnet = 600; // 10 seconds
+                        entities.splice(index, 1);
+                        updateHUD();
+                    }
+                }
+            });
+
+            entities = entities.filter(e => e.y < ch + 50);
+        }
+
+        function drawFloat() {
+            entities.forEach(e => {
+                if (e.type === 'spike') {
+                    ctx.fillStyle = '#546E7A';
+                    ctx.fillRect(e.x, e.y, e.w, e.h);
+                    ctx.fillStyle = '#D32F2F'; // Spikes
+                    for(let i=0; i<e.w; i+=15) {
+                        ctx.beginPath();
+                        ctx.moveTo(e.x+i, e.y+e.h);
+                        ctx.lineTo(e.x+i+7.5, e.y+e.h+10);
+                        ctx.lineTo(e.x+i+15, e.y+e.h);
+                        ctx.fill();
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(e.x+i, e.y);
+                        ctx.lineTo(e.x+i+7.5, e.y-10);
+                        ctx.lineTo(e.x+i+15, e.y);
+                        ctx.fill();
+                    }
+                } else if (e.type === 'star') {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2);
+                    ctx.fill();
+                } else if (e.type === 'powerup') {
+                    ctx.fillStyle = e.pType === 'shield' ? '#00FFFF' : '#FF00FF';
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(e.pType === 'shield' ? 'S' : 'M', e.x, e.y);
+                }
+            });
+        }
+
+        // --- MODE 4: DROP ---
+        function createMazePlatform(y) {
+            let gapWidth = random(60, 110);
+            let minX = 10;
+            let maxX = Math.max(10, cw - gapWidth - 10);
+            
+            // Aturan 2.5x lebar balon = 2.5 * (radius * 2) = 2.5 * 30 = 75 pixel maksimum jarak
+            let maxJumpDist = player.radius * 2 * 2.5; 
+            let gapX;
+
+            if (lastDropGapX === null) {
+                gapX = random(minX, maxX);
+            } else {
+                let localMin = Math.max(minX, lastDropGapX - maxJumpDist);
+                let localMax = Math.min(maxX, lastDropGapX + maxJumpDist);
+                // Pastikan localMax tidak lebih kecil dari localMin
+                if(localMin > localMax) localMin = localMax;
+                gapX = random(localMin, localMax);
+            }
+            
+            lastDropGapX = gapX;
+
+            entities.push({ type: 'floor', x: 0, y: y, w: gapX, h: 20, passed: false });
+            entities.push({ type: 'floor', x: gapX + gapWidth, y: y, w: Math.max(0, cw - (gapX + gapWidth)), h: 20, passed: false });
+        }
+
+        function updateDrop() {
+            difficultyMultiplier = 1 + Math.floor(score / 50) * 0.01;
+            let platSpeed = 3 * difficultyMultiplier;
+
+            if (keys.left) player.vx = -player.speed;
+            else if (keys.right) player.vx = player.speed;
+            else player.vx *= 0.8;
+
+            player.vy += player.gravity;
+            player.x += player.vx;
+            player.x = Math.max(player.radius, Math.min(cw - player.radius, player.x));
+
+            let onGround = false;
+            let highestY = ch;
+
+            entities.forEach(p => {
+                if (p.type !== 'floor') return;
+                p.y -= platSpeed;
+                if (p.y > highestY) highestY = p.y; 
+
+                if (!p.passed && p.y < player.y - player.radius) {
+                    p.passed = true;
+                    let passedCount = entities.filter(e => e.passed).length;
+                    if(passedCount % 2 === 0) { score++; updateHUD(); }
+                }
+
+                if (player.vy >= 0 && player.y + player.radius >= p.y && player.y + player.radius <= p.y + p.h + 10 && player.x + player.radius > p.x && player.x - player.radius < p.x + p.w) {
+                    player.y = p.y - player.radius;
+                    player.vy = -platSpeed;
+                    onGround = true;
+                }
+            });
+
+            if(!onGround) player.y += player.vy;
+
+            if (entities.length === 0 || entities[entities.length-1].y < ch - 150) {
+                createMazePlatform(ch + 50);
+            }
+
+            entities = entities.filter(e => e.y > -50);
+
+            if (player.y - player.radius <= 20) gameOver(); // Atap duri
+            if (score > 0 && player.y + player.radius >= ch - 20) gameOver(); // Duri bawah (setelah mulai)
+            else if (player.y > ch + player.radius) gameOver(); // Jatuh sebelum duri ada
+        }
+
+        function drawDrop() {
+            ctx.fillStyle = '#D32F2F';
+            for(let i=0; i<cw; i+=20) { // Duri atas
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i+10, 20); ctx.lineTo(i+20, 0); ctx.fill();
+            }
+            if (score > 0) { // Duri bawah
+                for(let i=0; i<cw; i+=20) {
+                    ctx.beginPath(); ctx.moveTo(i, ch); ctx.lineTo(i+10, ch-20); ctx.lineTo(i+20, ch); ctx.fill();
+                }
+            }
+
+            ctx.fillStyle = '#8D6E63';
+            entities.forEach(p => {
+                if(p.type === 'floor') {
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.fillStyle = '#5D4037'; ctx.fillRect(p.x, p.y, p.w, 4); ctx.fillStyle = '#8D6E63';
+                }
+            });
+        }
+
+        // --- MODE 5: FLY (Sebelumnya bernama FLOAT baru) ---
+        function updateFly() {
+            // Gerakan Atas/Bawah
+            if (keys.up) player.y -= player.speed * 0.8;
+            if (keys.down) player.y += player.speed * 0.8;
+            
+            // Batasi agar tidak keluar layar
+            if (player.y - player.radius < 0) player.y = player.radius;
+            if (player.y + player.radius > ch) player.y = ch - player.radius;
+
+            // Skor dihitung dari jarak (waktu bertahan)
+            if (frameCount % 10 === 0) { score++; updateHUD(); }
+
+            // Menghitung penyempitan celah awan
+            // Menyempit 15px (50% dari diameter 30) setiap 100 poin
+            let gapReduction = Math.floor(score / 100) * 15; 
+            // Celah dasar 180, celah minimal = radius * 3 (45 pixel) agar masih bisa lewat
+            let currentGap = Math.max(player.radius * 3, 180 - gapReduction); 
+            let speed = 3 + (score / 300); // Kecepatan sedikit bertambah seiring waktu
+
+            // Spawn Pasangan Awan Atas & Bawah
+            if (frameCount % 70 === 0) {
+                // Tinggi minimum awan atas adalah 20, maksimum sisanya
+                let maxTopH = ch - currentGap - 20;
+                let topH = random(20, Math.max(30, maxTopH));
+                
+                let w = 50;
+                entities.push({type: 'cloudWall', side: 'top', x: cw + 20, y: 0, w: w, h: topH});
+                entities.push({type: 'cloudWall', side: 'bot', x: cw + 20, y: topH + currentGap, w: w, h: ch - (topH + currentGap)});
+            }
+
+            // Gerakkan & Cek Tabrakan
+            entities.forEach(e => {
+                e.x -= speed;
+                
+                // Hitbox balon sedikit diperkecil agar lebih adil (0.8x radius)
+                if (rectIntersect(player.x - player.radius*0.8, player.y - player.radius*0.8, player.radius*1.6, player.radius*1.6, e.x, e.y, e.w, e.h)) {
+                    gameOver();
+                }
+            });
+
+            // Bersihkan awan yang sudah lewat
+            entities = entities.filter(e => e.x + e.w > -50);
+        }
+
+        function drawFly() {
+            entities.forEach(e => {
+                if (e.type === 'cloudWall') {
+                    ctx.fillStyle = '#ECEFF1'; // Warna awan terang
+                    ctx.fillRect(e.x, e.y, e.w, e.h);
+                    
+                    // Efek gumpalan di ujung awan
+                    let yEdge = e.side === 'top' ? e.y + e.h : e.y;
+                    ctx.beginPath();
+                    ctx.arc(e.x + 10, yEdge, 15, 0, Math.PI*2);
+                    ctx.arc(e.x + e.w/2, e.side === 'top' ? yEdge + 5 : yEdge - 5, 20, 0, Math.PI*2);
+                    ctx.arc(e.x + e.w - 10, yEdge, 15, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        // --- MODE 6: DODGE ---
+        function updateDodge() {
+            // Kontrol Atas/Bawah responsif
+            if (keys.up) player.y -= player.speed;
+            if (keys.down) player.y += player.speed;
+            player.y = Math.max(player.radius, Math.min(ch - player.radius, player.y));
+
+            // Tambah skor berdasar jarak bertahan
+            if (frameCount % 5 === 0) { score++; updateHUD(); }
+
+            // Base speed bertambah 5% tiap 100 poin
+            let speedMultiplier = Math.pow(1.05, Math.floor(score / 100));
+            let currentSpeed = 6 * speedMultiplier;
+
+            // Terapkan efek SlowMo
+            if (slowMoTimer > 0) {
+                currentSpeed *= 0.5; // Kecepatan tinggal setengah
+                slowMoTimer--;
+                if (slowMoTimer % 60 === 0) updateHUD(); // update timer UI per detik
+            }
+
+            // Spawn Rate menyesuaikan kecepatan (makin cepat makin sering spawn)
+            let spawnRate = Math.max(15, Math.floor(45 - currentSpeed * 2));
+            
+            if (frameCount % spawnRate === 0) {
+                // Rintangan (70% Duri, 30% Dinding)
+                let isWall = Math.random() < 0.3;
+                if (isWall) {
+                    let isTop = Math.random() < 0.5;
+                    let h = random(60, ch / 2.5); // Dinding panjang
+                    entities.push({type: 'wall', x: cw + 50, y: isTop ? 0 : ch - h, w: 30, h: h});
+                } else {
+                    entities.push({type: 'spikeLine', x: cw + 50, y: random(30, ch-30), radius: 18});
+                }
+
+                // Power-ups (Shield 3%, SlowMo 4%)
+                let pRand = Math.random();
+                if (pRand < 0.03 && !player.shield) {
+                    entities.push({type: 'powerup', pType: 'shield', x: cw + random(50, 150), y: random(30, ch-30), radius: 12});
+                } else if (pRand < 0.07 && slowMoTimer <= 0) {
+                    entities.push({type: 'powerup', pType: 'slowmo', x: cw + random(50, 150), y: random(30, ch-30), radius: 12});
+                }
+            }
+
+            entities.forEach((e, index) => {
+                e.x -= currentSpeed;
+
+                if (e.type === 'wall') {
+                    if (rectIntersect(player.x - player.radius*0.9, player.y - player.radius*0.9, player.radius*1.8, player.radius*1.8, e.x, e.y, e.w, e.h)) {
+                        if (player.shield) { player.shield = false; entities.splice(index, 1); updateHUD(); }
+                        else gameOver();
+                    }
+                } else if (e.type === 'spikeLine') {
+                    // Kotak deteksi untuk bentuk duri kasar
+                    if (circleRectIntersect(e.x, e.y, e.radius*0.8, player.x-player.radius*0.8, player.y-player.radius*0.8, player.radius*1.6, player.radius*1.6)) {
+                        if (player.shield) { player.shield = false; entities.splice(index, 1); updateHUD(); }
+                        else gameOver();
+                    }
+                } else if (e.type === 'powerup') {
+                    if (circleRectIntersect(e.x, e.y, e.radius, player.x-player.radius, player.y-player.radius, player.radius*2, player.radius*2)) {
+                        if(e.pType === 'shield') player.shield = true;
+                        if(e.pType === 'slowmo') slowMoTimer = 300; // 5 detik (asumsi ~60fps)
+                        entities.splice(index, 1);
+                        updateHUD();
+                    }
+                }
+            });
+
+            entities = entities.filter(e => e.x > -100);
+        }
+
+        function drawDodge() {
+            // Efek garis kecepatan di latar (jika tidak slowmo)
+            if (slowMoTimer <= 0 && frameCount % 3 === 0) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillRect(random(0, cw), random(0, ch), random(20, 100), 2);
+            }
+
+            entities.forEach(e => {
+                if (e.type === 'wall') {
+                    ctx.fillStyle = '#263238'; // Abu gelap
+                    ctx.fillRect(e.x, e.y, e.w, e.h);
+                    // Detail dinding
+                    ctx.fillStyle = '#FFEB3B'; // Strip kuning
+                    ctx.fillRect(e.x + 5, e.y, 5, e.h);
+                } else if (e.type === 'spikeLine') {
+                    ctx.fillStyle = '#E53935'; // Merah tajam
+                    ctx.beginPath();
+                    // Menggambar bentuk duri bintang/geometri
+                    ctx.moveTo(e.x, e.y - e.radius);
+                    ctx.lineTo(e.x + e.radius*0.4, e.y - e.radius*0.4);
+                    ctx.lineTo(e.x + e.radius, e.y);
+                    ctx.lineTo(e.x + e.radius*0.4, e.y + e.radius*0.4);
+                    ctx.lineTo(e.x, e.y + e.radius);
+                    ctx.lineTo(e.x - e.radius*0.4, e.y + e.radius*0.4);
+                    ctx.lineTo(e.x - e.radius, e.y);
+                    ctx.lineTo(e.x - e.radius*0.4, e.y - e.radius*0.4);
+                    ctx.fill();
+                } else if (e.type === 'powerup') {
+                    ctx.fillStyle = e.pType === 'shield' ? '#00E5FF' : '#B388FF';
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2);
+                    ctx.fill();
+                    
+                    // Efek denyut
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, e.radius + (Math.sin(frameCount*0.1)*3), 0, Math.PI*2);
+                    ctx.strokeStyle = ctx.fillStyle;
+                    ctx.stroke();
+
+                    // Ikon
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(e.pType === 'shield' ? 'S' : '⏱️', e.x, e.y);
+                }
+            });
+        }
+
+
+        // --- MAIN LOOP ---
+        function update() {
+            if (currentState !== 'PLAYING') return;
+            frameCount++;
+
+            switch(currentMode) {
+                case 'JUMP': updateJump(); break;
+                case 'FALL': updateFall(); break;
+                case 'DROP': updateDrop(); break;
+                case 'FLOAT': updateFloat(); break;
+                case 'FLY': updateFly(); break;
+                case 'DODGE': updateDodge(); break;
+            }
+        }
+
+        function draw() {
+            // Background spesifik mode
+            if(currentMode === 'DROP') ctx.fillStyle = '#FFECB3'; // Gua
+            else if(currentMode === 'FALL') ctx.fillStyle = '#BBDEFB'; // Langit
+            else if(currentMode === 'FLOAT') ctx.fillStyle = '#E1BEE7'; // Senja ungu (Float original)
+            else if(currentMode === 'FLY') ctx.fillStyle = '#FFE0B2'; // Senja cerah
+            else if(currentMode === 'DODGE') ctx.fillStyle = '#4DB6AC'; // Cyberish teal
+            else ctx.fillStyle = '#87CEEB'; // Biru langit normal
+            
+            // Render background penuh
+            ctx.fillRect(0, 0, canvas.width, canvas.height); 
+
+            if (currentState !== 'PLAYING') return;
+
+            ctx.save();
+            ctx.scale(scaleFactor, scaleFactor);
+
+            switch(currentMode) {
+                case 'JUMP': drawJump(); break;
+                case 'FALL': drawFall(); break;
+                case 'DROP': drawDrop(); break;
+                case 'FLOAT': drawFloat(); break;
+                case 'FLY': drawFly(); break;
+                case 'DODGE': drawDodge(); break;
+            }
+
+            drawPlayer();
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            if (currentState === 'PLAYING') {
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+    </script>
+</body>
+</html>

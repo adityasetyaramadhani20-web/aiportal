@@ -1,0 +1,2658 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OnFire</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-panel: rgba(18, 18, 20, 0.92);
+            --border-panel: #2a2a2e;
+            --accent: #f97316;
+            --accent-hover: #ea580c;
+        }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0d0d0f;
+            font-family: 'Inter', sans-serif;
+            color: #e4e4e7;
+        }
+        .font-mono-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .hud-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-panel);
+            backdrop-filter: blur(8px);
+        }
+        .tab-btn {
+            transition: all 0.15s ease;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-btn.active {
+            color: #ffffff;
+            border-bottom-color: var(--accent);
+            background: rgba(249, 115, 22, 0.1);
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #141417;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #323238;
+            border-radius: 3px;
+        }
+        input[type="range"] {
+            accent-color: var(--accent);
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden">
+
+    <!-- Viewport 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- Top Navigation Bar -->
+    <header class="fixed top-0 left-0 right-0 h-12 hud-panel z-30 flex items-center justify-between px-4 border-t-0 border-x-0">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-sm bg-orange-500"></div>
+            <span class="font-bold tracking-tight text-base text-white">OnFire</span>
+        </div>
+
+        <nav class="flex items-center h-full overflow-x-auto no-scrollbar">
+            <button data-mode="builder" class="tab-btn active h-full px-3.5 text-xs sm:text-sm font-medium text-zinc-400 hover:text-zinc-200 whitespace-nowrap">
+                1. 3D Builder
+            </button>
+            <button data-mode="track" class="tab-btn h-full px-3.5 text-xs sm:text-sm font-medium text-zinc-400 hover:text-zinc-200 whitespace-nowrap">
+                2. Track Builder
+            </button>
+            <button data-mode="race" class="tab-btn h-full px-3.5 text-xs sm:text-sm font-medium text-zinc-400 hover:text-zinc-200 whitespace-nowrap">
+                3. Racing Mode
+            </button>
+            <button data-mode="explore" class="tab-btn h-full px-3.5 text-xs sm:text-sm font-medium text-zinc-400 hover:text-zinc-200 whitespace-nowrap">
+                4. Explore Mode
+            </button>
+        </nav>
+
+        <div class="hidden md:flex items-center gap-2">
+            <button id="btn-camera-switch" class="px-2.5 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 transition">
+                Kamera: <span id="lbl-camera">Orbit</span> (C)
+            </button>
+            <button id="btn-open-json" class="px-2.5 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 transition">
+                Impor / Ekspor JSON
+            </button>
+        </div>
+    </header>
+
+    <!-- PANEL MODE 1: 3D BUILDER -->
+    <div id="panel-builder" class="mode-panel fixed top-14 left-3 bottom-3 w-72 sm:w-80 z-20 flex flex-col gap-2 pointer-events-none">
+        <div class="hud-panel rounded-lg p-3 pointer-events-auto flex flex-col gap-3 max-h-full overflow-y-auto custom-scroll">
+            
+            <!-- Target Kategori Rancangan -->
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Target Rancangan</span>
+                    <button id="btn-builder-test" class="px-2 py-0.5 text-[11px] font-medium rounded bg-orange-600 hover:bg-orange-500 text-white transition">
+                        Uji Fisika
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5 bg-zinc-900 p-1 rounded border border-zinc-800">
+                    <button id="tab-cat-vehicle" class="py-1 text-xs font-medium rounded bg-zinc-800 text-white">Kendaraan</button>
+                    <button id="tab-cat-prop" class="py-1 text-xs font-medium rounded text-zinc-400 hover:text-white">Objek Kota</button>
+                </div>
+            </div>
+
+            <!-- Preset Template -->
+            <div>
+                <label class="block text-xs text-zinc-400 mb-1">Muat Sampel / Preset</label>
+                <div class="flex gap-1.5">
+                    <select id="sel-builder-preset" class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-orange-500">
+                    </select>
+                    <button id="btn-load-preset" class="px-2.5 py-1.5 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">
+                        Muat
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tambah Geometri Dasar -->
+            <div class="border-t border-zinc-800 pt-2.5">
+                <span class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">Tambah Blok 3D</span>
+                <div class="grid grid-cols-3 gap-1.5">
+                    <button data-add-shape="box" class="btn-add-part py-1.5 px-2 text-xs rounded bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">+ Kotak</button>
+                    <button data-add-shape="cylinder" class="btn-add-part py-1.5 px-2 text-xs rounded bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">+ Silinder</button>
+                    <button data-add-shape="sphere" class="btn-add-part py-1.5 px-2 text-xs rounded bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">+ Bola</button>
+                    <button data-add-shape="cone" class="btn-add-part py-1.5 px-2 text-xs rounded bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">+ Kerucut</button>
+                    <button data-add-shape="wheel" class="btn-add-part py-1.5 px-2 text-xs rounded bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-orange-400 font-medium">+ Roda</button>
+                    <button data-add-shape="thruster" class="btn-add-part py-1.5 px-2 text-xs rounded bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-amber-400 font-medium">+ Knalpot Api</button>
+                </div>
+            </div>
+
+            <!-- Daftar Komponen -->
+            <div class="border-t border-zinc-800 pt-2.5">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Komponen (<span id="lbl-part-count">0</span>)</span>
+                    <div class="flex gap-1">
+                        <button id="btn-dup-part" class="px-2 py-0.5 text-[11px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700" title="Duplikat">Duplikat</button>
+                        <button id="btn-del-part" class="px-2 py-0.5 text-[11px] rounded bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-800/60" title="Hapus">Hapus</button>
+                    </div>
+                </div>
+                <div id="list-parts" class="max-h-28 overflow-y-auto custom-scroll bg-zinc-950/60 border border-zinc-800 rounded p-1 space-y-1 text-xs">
+                </div>
+            </div>
+
+            <!-- Inspector Komponen Terpilih -->
+            <div id="inspector-part" class="border-t border-zinc-800 pt-2.5 space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Properti Blok</span>
+                    <input id="inp-part-name" type="text" class="w-36 bg-zinc-900 border border-zinc-700 rounded px-2 py-0.5 text-xs text-zinc-200" placeholder="Nama bagian">
+                </div>
+
+                <!-- Posisi (X, Y, Z) -->
+                <div>
+                    <span class="block text-[11px] text-zinc-400 mb-1">Posisi (X, Y, Z)</span>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <input id="inp-pos-x" type="number" step="0.2" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs font-mono-num text-center" title="Posisi X">
+                        <input id="inp-pos-y" type="number" step="0.2" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs font-mono-num text-center" title="Posisi Y">
+                        <input id="inp-pos-z" type="number" step="0.2" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs font-mono-num text-center" title="Posisi Z">
+                    </div>
+                </div>
+
+                <!-- Ukuran / Skala (W, H, D) -->
+                <div>
+                    <span class="block text-[11px] text-zinc-400 mb-1">Ukuran (Lebar, Tinggi, Panjang)</span>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <input id="inp-scl-x" type="number" step="0.2" min="0.1" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs font-mono-num text-center">
+                        <input id="inp-scl-y" type="number" step="0.2" min="0.1" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs font-mono-num text-center">
+                        <input id="inp-scl-z" type="number" step="0.2" min="0.1" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs font-mono-num text-center">
+                    </div>
+                </div>
+
+                <!-- Rotasi Derajat (Rx, Ry, Rz) -->
+                <div>
+                    <span class="block text-[11px] text-zinc-400 mb-1">Rotasi Derajat (X°, Y°, Z°)</span>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <input id="inp-rot-x" type="number" step="15" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs font-mono-num text-center">
+                        <input id="inp-rot-y" type="number" step="15" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs font-mono-num text-center">
+                        <input id="inp-rot-z" type="number" step="15" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs font-mono-num text-center">
+                    </div>
+                </div>
+
+                <!-- Warna & Simulasi Material -->
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">Warna Utama</label>
+                        <input id="inp-mat-color" type="color" class="w-full h-7 rounded bg-zinc-900 border border-zinc-700 cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">Tipe Material</label>
+                        <select id="sel-mat-preset" class="w-full h-7 bg-zinc-900 border border-zinc-700 rounded px-1.5 text-xs text-zinc-200">
+                            <option value="standard">Standar / Cat</option>
+                            <option value="metallic">Logam / Krom</option>
+                            <option value="matte">Matte / Karet</option>
+                            <option value="glass">Kaca Transparan</option>
+                            <option value="neon">Emisif / Menyala</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="flex justify-between text-[11px] text-zinc-400">
+                            <span>Metalness</span>
+                            <span id="val-metal" class="font-mono-num">0.4</span>
+                        </label>
+                        <input id="inp-mat-metal" type="range" min="0" max="1" step="0.05" value="0.4" class="w-full h-1.5">
+                    </div>
+                    <div>
+                        <label class="flex justify-between text-[11px] text-zinc-400">
+                            <span>Roughness</span>
+                            <span id="val-rough" class="font-mono-num">0.3</span>
+                        </label>
+                        <input id="inp-mat-rough" type="range" min="0" max="1" step="0.05" value="0.3" class="w-full h-1.5">
+                    </div>
+                </div>
+
+                <!-- Efek Partikel & Peran -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">Efek Kustom</label>
+                        <select id="sel-part-fx" class="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-zinc-200">
+                            <option value="none">Tanpa Efek</option>
+                            <option value="fire">Semburan Api</option>
+                            <option value="smoke">Asap Knalpot</option>
+                            <option value="spark">Percikan Listrik</option>
+                            <option value="neon">Jejak Cahaya</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">Fungsi Fisika</label>
+                        <select id="sel-part-role" class="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-zinc-200">
+                            <option value="chassis">Bodi / Struktur</option>
+                            <option value="wheel_steer">Roda Depan (Belok)</option>
+                            <option value="wheel_drive">Roda Belakang</option>
+                            <option value="thruster">Pendorong (Boost)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simpan ke Katalog & Ekspor -->
+            <div class="border-t border-zinc-800 pt-2.5 flex flex-col gap-1.5">
+                <div class="flex gap-1.5">
+                    <input id="inp-design-title" type="text" class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white" value="Mobil Kustom">
+                    <button id="btn-save-catalog" class="px-3 py-1 text-xs font-medium rounded bg-orange-600 hover:bg-orange-500 text-white">
+                        Simpan
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button id="btn-export-json-direct" class="py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300">
+                        Unduh JSON
+                    </button>
+                    <button id="btn-import-json-direct" class="py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300">
+                        Muat File JSON
+                    </button>
+                    <input id="file-json-input" type="file" accept=".json" class="hidden">
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- PANEL MODE 2: TRACK BUILDER -->
+    <div id="panel-track" class="mode-panel hidden fixed top-14 left-3 bottom-3 w-72 sm:w-80 z-20 flex flex-col gap-2 pointer-events-none">
+        <div class="hud-panel rounded-lg p-3 pointer-events-auto flex flex-col gap-3 max-h-full overflow-y-auto custom-scroll">
+            <div>
+                <span class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Preset Sirkuit (5 Sirkuit)</span>
+                <div class="flex gap-1.5">
+                    <select id="sel-track-preset" class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200">
+                        <option value="0">1. Sirkuit Oval Cepat</option>
+                        <option value="1">2. Sirkuit Kota Siku</option>
+                        <option value="2">3. Sirkuit Teknis Berkelok</option>
+                        <option value="3">4. Jalur Lompatan Ekstrem</option>
+                        <option value="4">5. Sirkuit Perimeter Kota</option>
+                    </select>
+                    <button id="btn-load-track-preset" class="px-2.5 py-1.5 text-xs rounded bg-orange-600 hover:bg-orange-500 text-white font-medium">
+                        Terapkan
+                    </button>
+                </div>
+            </div>
+
+            <!-- Alat Interaksi Peta -->
+            <div class="border-t border-zinc-800 pt-2.5">
+                <span class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Alat Editor Sirkuit & Kota</span>
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button data-track-tool="draw" class="btn-track-tool py-1.5 px-2 text-xs rounded bg-orange-600 text-white font-medium border border-orange-500">
+                        Gambar Titik Jalur
+                    </button>
+                    <button data-track-tool="place" class="btn-track-tool py-1.5 px-2 text-xs rounded bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700">
+                        Tambah Objek 3D
+                    </button>
+                </div>
+                <p id="lbl-track-hint" class="text-[11px] text-zinc-400 mt-1.5 leading-relaxed">
+                    Klik pada permukaan tanah kota untuk menambahkan titik jalur sirkuit secara berurutan.
+                </p>
+            </div>
+
+            <!-- Pengaturan Jalur Sirkuit -->
+            <div id="subpanel-track-draw" class="border-t border-zinc-800 pt-2.5 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-400">Titik Waypoint: <strong id="lbl-wp-count" class="text-white font-mono-num">0</strong></span>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input id="chk-track-curbs" type="checkbox" checked class="rounded bg-zinc-900 border-zinc-700">
+                        <span class="text-zinc-300">Pembatas Jalan</span>
+                    </label>
+                </div>
+                <div>
+                    <label class="flex justify-between text-[11px] text-zinc-400 mb-1">
+                        <span>Lebar Jalan Sirkuit</span>
+                        <span id="val-track-width" class="font-mono-num">14m</span>
+                    </label>
+                    <input id="inp-track-width" type="range" min="8" max="24" step="1" value="14" class="w-full h-1.5">
+                </div>
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button id="btn-undo-wp" class="py-1.5 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300">
+                        Hapus Titik Terakhir
+                    </button>
+                    <button id="btn-clear-wp" class="py-1.5 text-xs rounded bg-red-950/60 hover:bg-red-900/70 border border-red-800/60 text-red-300">
+                        Kosongkan Jalur
+                    </button>
+                </div>
+            </div>
+
+            <!-- Penempatan Objek 3D -->
+            <div id="subpanel-track-place" class="border-t border-zinc-800 pt-2.5 space-y-2.5 hidden">
+                <div>
+                    <label class="block text-xs text-zinc-400 mb-1">Pilih Objek 3D (Bawaan & Kustom)</label>
+                    <select id="sel-place-prop" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-200">
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">Rotasi Objek (°)</label>
+                        <input id="inp-place-rot" type="number" step="15" value="0" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs font-mono-num">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-zinc-400 mb-1">Skala Ukuran</label>
+                        <input id="inp-place-scale" type="number" step="0.2" min="0.4" max="5" value="1.0" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs font-mono-num">
+                    </div>
+                </div>
+                <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                    <input id="chk-place-dynamic" type="checkbox" checked class="rounded bg-zinc-900 border-zinc-700">
+                    <span>Objek Dinamis (Dapat Ditabrak/Terpental)</span>
+                </label>
+                <div class="flex items-center justify-between pt-1">
+                    <span class="text-xs text-zinc-400">Objek Terpasang: <strong id="lbl-placed-count" class="text-white font-mono-num">0</strong></span>
+                    <button id="btn-clear-props" class="px-2.5 py-1 text-xs rounded bg-red-950/60 hover:bg-red-900/70 border border-red-800/60 text-red-300">
+                        Reset Objek
+                    </button>
+                </div>
+            </div>
+
+            <div class="border-t border-zinc-800 pt-2.5">
+                <button id="btn-track-to-race" class="w-full py-2 text-xs font-semibold rounded bg-orange-600 hover:bg-orange-500 text-white transition">
+                    Mulai Balapan di Sirkuit Ini →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD BALAPAN & EKSPLORASI (Atas & Kanan) -->
+    <div id="hud-driving" class="hidden fixed top-14 left-3 right-3 z-20 pointer-events-none flex flex-col sm:flex-row justify-between items-start gap-2">
+        <!-- Info Balapan / Eksplorasi Kiri -->
+        <div class="hud-panel rounded-lg p-3 pointer-events-auto flex flex-wrap items-center gap-4">
+            <div id="hud-race-stats" class="flex items-center gap-4">
+                <div>
+                    <span class="block text-[10px] uppercase tracking-wider text-zinc-400">Putaran</span>
+                    <span id="lbl-lap" class="text-lg font-bold font-mono-num text-white">1 / 3</span>
+                </div>
+                <div class="h-7 w-px bg-zinc-800"></div>
+                <div>
+                    <span class="block text-[10px] uppercase tracking-wider text-zinc-400">Posisi</span>
+                    <span id="lbl-pos" class="text-lg font-bold font-mono-num text-orange-400">1 / 4</span>
+                </div>
+                <div class="h-7 w-px bg-zinc-800"></div>
+                <div>
+                    <span class="block text-[10px] uppercase tracking-wider text-zinc-400">Waktu Putaran</span>
+                    <span id="lbl-time-cur" class="text-sm font-semibold font-mono-num text-zinc-200">00:00.00</span>
+                </div>
+                <div>
+                    <span class="block text-[10px] uppercase tracking-wider text-zinc-400">Tercepat</span>
+                    <span id="lbl-time-best" class="text-sm font-semibold font-mono-num text-emerald-400">--:--.--</span>
+                </div>
+                <div class="h-7 w-px bg-zinc-800"></div>
+                <div>
+                    <span class="block text-[10px] uppercase tracking-wider text-zinc-400">Checkpoint</span>
+                    <span id="lbl-cp" class="text-sm font-semibold font-mono-num text-zinc-300">0 / 0</span>
+                </div>
+            </div>
+
+            <!-- Kontrol Cepat Explore / Race -->
+            <div class="flex items-center gap-1.5">
+                <select id="sel-active-vehicle" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200" title="Pilih Kendaraan">
+                </select>
+                <button id="btn-reset-car" class="px-2.5 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">
+                    Reset Posisi (R)
+                </button>
+                <button id="btn-restart-race" class="px-2.5 py-1 text-xs rounded bg-orange-600 hover:bg-orange-500 text-white font-medium">
+                    Ulang Balapan
+                </button>
+            </div>
+        </div>
+
+        <!-- Panel Kontrol Spesial Explore Mode -->
+        <div id="hud-explore-tools" class="hidden hud-panel rounded-lg p-2.5 pointer-events-auto flex items-center gap-2">
+            <button id="btn-toggle-fly" class="px-3 py-1.5 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">
+                Mode Terbang: <span id="lbl-fly-state" class="text-zinc-400">Nonaktif</span> (F)
+            </button>
+            <button id="btn-spawn-ramp" class="px-3 py-1.5 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">
+                + Ramp di Depan
+            </button>
+            <button id="btn-spawn-chaos" class="px-3 py-1.5 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">
+                + Hujan Rintangan
+            </button>
+        </div>
+    </div>
+
+    <!-- Speedometer & Panduan Kontrol (Kanan Bawah) -->
+    <div id="hud-speedometer" class="hidden fixed bottom-4 right-4 z-20 pointer-events-none flex flex-col items-end gap-2">
+        <div class="hud-panel rounded-lg p-3 pointer-events-auto w-48">
+            <div class="flex items-baseline justify-between">
+                <span id="lbl-speed" class="text-3xl font-bold font-mono-num text-white">0</span>
+                <span class="text-xs text-zinc-400 font-medium">KM/J</span>
+            </div>
+            <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-1.5">
+                <div id="bar-speed" class="h-full bg-orange-500 transition-all duration-75" style="width: 0%"></div>
+            </div>
+            <div class="flex items-center justify-between mt-2 text-[11px] text-zinc-400">
+                <span>Nitro (Shift)</span>
+                <span id="lbl-nitro" class="font-mono-num text-orange-400">100%</span>
+            </div>
+            <div class="w-full h-1 bg-zinc-800 rounded-full overflow-hidden mt-0.5">
+                <div id="bar-nitro" class="h-full bg-amber-400 transition-all duration-75" style="width: 100%"></div>
+            </div>
+        </div>
+        <div class="hidden sm:block hud-panel rounded px-2.5 py-1.5 text-[11px] text-zinc-400">
+            <span class="text-zinc-200 font-medium">WASD / Panah:</span> Kemudi &bull;
+            <span class="text-zinc-200 font-medium">Shift:</span> Melesat &bull;
+            <span class="text-zinc-200 font-medium">Spasi:</span> Lompat &bull;
+            <span class="text-zinc-200 font-medium">F:</span> Terbang
+        </div>
+    </div>
+
+    <!-- Kontrol Sentuh (Mobile / Tablet) -->
+    <div id="touch-controls" class="hidden fixed bottom-4 left-4 right-4 z-20 pointer-events-none flex justify-between items-end md:hidden">
+        <div class="flex gap-2 pointer-events-auto">
+            <button id="t-left" class="w-14 h-14 rounded-lg hud-panel active:bg-orange-600 flex items-center justify-center text-lg font-bold text-white">◀</button>
+            <button id="t-right" class="w-14 h-14 rounded-lg hud-panel active:bg-orange-600 flex items-center justify-center text-lg font-bold text-white">▶</button>
+        </div>
+        <div class="flex gap-2 pointer-events-auto">
+            <button id="t-jump" class="w-12 h-14 rounded-lg hud-panel active:bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-200">LOMPAT</button>
+            <button id="t-boost" class="w-12 h-14 rounded-lg hud-panel active:bg-orange-600 flex items-center justify-center text-xs font-bold text-orange-400">NITRO</button>
+            <button id="t-brake" class="w-12 h-14 rounded-lg hud-panel active:bg-red-900 flex items-center justify-center text-xs font-bold text-red-300">REM</button>
+            <button id="t-gas" class="w-14 h-14 rounded-lg bg-orange-600 active:bg-orange-500 flex items-center justify-center text-xs font-bold text-white">GAS</button>
+        </div>
+    </div>
+
+    <!-- Countdown Banner Tengah -->
+    <div id="race-banner" class="hidden fixed inset-0 z-25 pointer-events-none flex items-center justify-center">
+        <div id="race-banner-text" class="px-8 py-4 rounded-xl hud-panel text-4xl sm:text-6xl font-bold font-mono-num text-white tracking-wider">
+            3
+        </div>
+    </div>
+
+    <!-- Modal Hasil Balapan -->
+    <div id="modal-race-result" class="hidden fixed inset-0 z-40 bg-black/75 flex items-center justify-center p-4">
+        <div class="hud-panel rounded-xl max-w-md w-full p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <h2 class="text-base font-bold text-white">Hasil Balapan (3 Putaran)</h2>
+                <span id="res-rank-badge" class="px-2.5 py-0.5 text-xs font-bold rounded bg-orange-600 text-white">Posisi #1</span>
+            </div>
+            <div id="res-standings" class="space-y-2 text-xs">
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button id="btn-modal-rematch" class="flex-1 py-2 text-xs font-semibold rounded bg-orange-600 hover:bg-orange-500 text-white">
+                    Balap Ulang
+                </button>
+                <button id="btn-modal-explore" class="flex-1 py-2 text-xs font-medium rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700">
+                    Ke Mode Explore
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Impor / Ekspor JSON -->
+    <div id="modal-json" class="hidden fixed inset-0 z-40 bg-black/75 flex items-center justify-center p-4">
+        <div class="hud-panel rounded-xl max-w-lg w-full p-5 space-y-3">
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-bold text-white">Impor / Ekspor JSON Rancangan</h2>
+                <button id="btn-close-json" class="text-zinc-400 hover:text-white text-sm px-2 py-0.5">✕</button>
+            </div>
+            <p class="text-xs text-zinc-400">
+                Salin teks JSON di bawah ini untuk menyimpan rancangan objek/kendaraan/sirkuit, atau tempel JSON yang valid lalu klik Impor.
+            </p>
+            <textarea id="txt-json-data" rows="9" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2.5 text-xs font-mono-num text-zinc-200 focus:outline-none focus:border-orange-500 custom-scroll"></textarea>
+            <div class="flex flex-wrap justify-between gap-2 pt-1">
+                <div class="flex gap-1.5">
+                    <button id="btn-copy-json" class="px-3 py-1.5 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">
+                        Salin Teks
+                    </button>
+                    <button id="btn-download-json" class="px-3 py-1.5 text-xs rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200">
+                        Unduh Berkas .JSON
+                    </button>
+                </div>
+                <button id="btn-apply-json" class="px-4 py-1.5 text-xs font-semibold rounded bg-orange-600 hover:bg-orange-500 text-white">
+                    Impor JSON
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifikasi Toast -->
+    <div id="toast-msg" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity duration-200 hud-panel px-4 py-2 rounded-lg text-xs font-medium text-white shadow-lg">
+    </div>
+
+    <script>
+        /**
+         * OnFire - 3D Racing Sandbox Engine
+         * Mencakup: 3D Builder, Track Builder, Racing Mode (3 Laps + AI), dan Explore Mode.
+         */
+
+        // --- Utilitas Notifikasi Tanpa Alert ---
+        let toastTimer = null;
+        function showNotice(message) {
+            const el = document.getElementById('toast-msg');
+            if (!el) return;
+            el.textContent = message;
+            el.classList.remove('opacity-0');
+            el.classList.add('opacity-100');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                el.classList.remove('opacity-100');
+                el.classList.add('opacity-0');
+            }, 2600);
+        }
+
+        // --- Katalog Preset Kendaraan & Objek Kota ---
+        const DEFAULT_VEHICLES = {
+            "Sedan OnFire GT": {
+                name: "Sedan OnFire GT",
+                category: "vehicle",
+                parts: [
+                    { id: "p1", name: "Sasis Bawah", shape: "box", pos: [0, 0.55, 0], scl: [2.0, 0.45, 4.4], rot: [0, 0, 0], color: "#f97316", matPreset: "metallic", metal: 0.7, rough: 0.2, fx: "none", role: "chassis" },
+                    { id: "p2", name: "Kabin Kaca", shape: "box", pos: [0, 1.0, -0.2], scl: [1.65, 0.5, 2.1], rot: [0, 0, 0], color: "#18181b", matPreset: "glass", metal: 0.9, rough: 0.1, fx: "none", role: "chassis" },
+                    { id: "p3", name: "Spoiler Belakang", shape: "box", pos: [0, 1.15, -2.0], scl: [1.9, 0.12, 0.45], rot: [10, 0, 0], color: "#27272a", matPreset: "matte", metal: 0.2, rough: 0.8, fx: "neon", role: "chassis" },
+                    { id: "p4", name: "Lampu Depan", shape: "box", pos: [0, 0.65, 2.21], scl: [1.7, 0.15, 0.1], rot: [0, 0, 0], color: "#38bdf8", matPreset: "neon", metal: 0.1, rough: 0.1, fx: "none", role: "chassis" },
+                    { id: "p5", name: "Knalpot Api Kiri", shape: "thruster", pos: [-0.55, 0.45, -2.25], scl: [0.28, 0.28, 0.5], rot: [0, 0, 0], color: "#f59e0b", matPreset: "metallic", metal: 0.8, rough: 0.3, fx: "fire", role: "thruster" },
+                    { id: "p6", name: "Knalpot Api Kanan", shape: "thruster", pos: [0.55, 0.45, -2.25], scl: [0.28, 0.28, 0.5], rot: [0, 0, 0], color: "#f59e0b", matPreset: "metallic", metal: 0.8, rough: 0.3, fx: "fire", role: "thruster" },
+                    { id: "w1", name: "Roda Kiri Depan", shape: "wheel", pos: [-1.05, 0.42, 1.35], scl: [0.42, 0.84, 0.84], rot: [0, 0, 0], color: "#18181b", matPreset: "matte", metal: 0.1, rough: 0.9, fx: "none", role: "wheel_steer" },
+                    { id: "w2", name: "Roda Kanan Depan", shape: "wheel", pos: [1.05, 0.42, 1.35], scl: [0.42, 0.84, 0.84], rot: [0, 0, 0], color: "#18181b", matPreset: "matte", metal: 0.1, rough: 0.9, fx: "none", role: "wheel_steer" },
+                    { id: "w3", name: "Roda Kiri Belakang", shape: "wheel", pos: [-1.05, 0.42, -1.35], scl: [0.45, 0.88, 0.88], rot: [0, 0, 0], color: "#18181b", matPreset: "matte", metal: 0.1, rough: 0.9, fx: "smoke", role: "wheel_drive" },
+                    { id: "w4", name: "Roda Kanan Belakang", shape: "wheel", pos: [1.05, 0.42, -1.35], scl: [0.45, 0.88, 0.88], rot: [0, 0, 0], color: "#18181b", matPreset: "matte", metal: 0.1, rough: 0.9, fx: "smoke", role: "wheel_drive" }
+                ]
+            },
+            "Truk Offroad Titan": {
+                name: "Truk Offroad Titan",
+                category: "vehicle",
+                parts: [
+                    { id: "t1", name: "Sasis Truk", shape: "box", pos: [0, 0.85, 0], scl: [2.3, 0.65, 4.6], rot: [0, 0, 0], color: "#10b981", matPreset: "standard", metal: 0.4, rough: 0.5, fx: "none", role: "chassis" },
+                    { id: "t2", name: "Kabin Truk", shape: "box", pos: [0, 1.5, 0.4], scl: [2.1, 0.75, 2.0], rot: [0, 0, 0], color: "#065f46", matPreset: "glass", metal: 0.6, rough: 0.2, fx: "none", role: "chassis" },
+                    { id: "t3", name: "Bumper Besi", shape: "cylinder", pos: [0, 0.8, 2.45], scl: [2.2, 0.25, 0.25], rot: [0, 0, 90], color: "#d4d4d8", matPreset: "metallic", metal: 0.9, rough: 0.2, fx: "spark", role: "chassis" },
+                    { id: "t4", name: "Knalpot Tegak", shape: "thruster", pos: [-0.9, 1.7, -0.7], scl: [0.25, 0.9, 0.25], rot: [90, 0, 0], color: "#71717a", matPreset: "metallic", metal: 0.8, rough: 0.3, fx: "fire", role: "thruster" },
+                    { id: "tw1", name: "Roda Monster KD", shape: "wheel", pos: [-1.25, 0.6, 1.45], scl: [0.6, 1.2, 1.2], rot: [0, 0, 0], color: "#18181b", matPreset: "matte", metal: 0.1, rough: 0.9, fx: "none", role: "wheel_steer" },
+                    { id: "tw2", name: "Roda Monster KnD", shape: "wheel", pos: [1.25, 0.6, 1.45], scl: [0.6, 1.2, 1.2], rot: [0, 0, 0], color: "#18181b", matPreset: "matte", metal: 0.1, rough: 0.9, fx: "none", role: "wheel_steer" },
+                    { id: "tw3", name: "Roda Monster KB", shape: "wheel", pos: [-1.25, 0.6, -1.45], scl: [0.6, 1.2, 1.2], rot: [0, 0, 0], color: "#18181b", matPreset: "matte", metal: 0.1, rough: 0.9, fx: "smoke", role: "wheel_drive" },
+                    { id: "tw4", name: "Roda Monster KnB", shape: "wheel", pos: [1.25, 0.6, -1.45], scl: [0.6, 1.2, 1.2], rot: [0, 0, 0], color: "#18181b", matPreset: "matte", metal: 0.1, rough: 0.9, fx: "smoke", role: "wheel_drive" }
+                ]
+            },
+            "Jet Aero Hyper": {
+                name: "Jet Aero Hyper",
+                category: "vehicle",
+                parts: [
+                    { id: "j1", name: "Bodi Fuselage", shape: "cylinder", pos: [0, 0.65, 0], scl: [1.3, 4.8, 0.65], rot: [90, 0, 0], color: "#3b82f6", matPreset: "metallic", metal: 0.85, rough: 0.15, fx: "none", role: "chassis" },
+                    { id: "j2", name: "Moncong Kerucut", shape: "cone", pos: [0, 0.65, 2.8], scl: [1.1, 1.2, 0.6], rot: [90, 0, 0], color: "#60a5fa", matPreset: "neon", metal: 0.5, rough: 0.2, fx: "neon", role: "chassis" },
+                    { id: "j3", name: "Sayap Delta", shape: "box", pos: [0, 0.65, -0.5], scl: [3.4, 0.12, 1.8], rot: [0, 0, 0], color: "#1d4ed8", matPreset: "metallic", metal: 0.7, rough: 0.25, fx: "none", role: "chassis" },
+                    { id: "j4", name: "Turbin Jet Utama", shape: "thruster", pos: [0, 0.7, -2.5], scl: [0.65, 0.65, 0.8], rot: [0, 0, 0], color: "#f97316", matPreset: "neon", metal: 0.8, rough: 0.2, fx: "fire", role: "thruster" },
+                    { id: "jw1", name: "Roda Aero KD", shape: "wheel", pos: [-0.95, 0.4, 1.4], scl: [0.35, 0.75, 0.75], rot: [0, 0, 0], color: "#09090b", matPreset: "matte", metal: 0.2, rough: 0.8, fx: "none", role: "wheel_steer" },
+                    { id: "jw2", name: "Roda Aero KnD", shape: "wheel", pos: [0.95, 0.4, 1.4], scl: [0.35, 0.75, 0.75], rot: [0, 0, 0], color: "#09090b", matPreset: "matte", metal: 0.2, rough: 0.8, fx: "none", role: "wheel_steer" },
+                    { id: "jw3", name: "Roda Aero KB", shape: "wheel", pos: [-1.15, 0.42, -1.4], scl: [0.4, 0.82, 0.82], rot: [0, 0, 0], color: "#09090b", matPreset: "matte", metal: 0.2, rough: 0.8, fx: "spark", role: "wheel_drive" },
+                    { id: "jw4", name: "Roda Aero KnB", shape: "wheel", pos: [1.15, 0.42, -1.4], scl: [0.4, 0.82, 0.82], rot: [0, 0, 0], color: "#09090b", matPreset: "matte", metal: 0.2, rough: 0.8, fx: "spark", role: "wheel_drive" }
+                ]
+            }
+        };
+
+        const DEFAULT_PROPS = {
+            "Ramp Lompatan": {
+                name: "Ramp Lompatan",
+                category: "prop",
+                isDynamicDefault: false,
+                parts: [
+                    { id: "r1", name: "Papan Tanjakan", shape: "box", pos: [0, 1.1, 0], scl: [6.0, 0.4, 7.5], rot: [-18, 0, 0], color: "#f97316", matPreset: "standard", metal: 0.3, rough: 0.6, fx: "none", role: "chassis" },
+                    { id: "r2", name: "Penyangga Belakang", shape: "box", pos: [0, 1.0, -3.2], scl: [5.8, 2.0, 0.6], rot: [0, 0, 0], color: "#27272a", matPreset: "matte", metal: 0.2, rough: 0.8, fx: "none", role: "chassis" }
+                ]
+            },
+            "Rintangan Barikade": {
+                name: "Rintangan Barikade",
+                category: "prop",
+                isDynamicDefault: true,
+                parts: [
+                    { id: "b1", name: "Balok Beton", shape: "box", pos: [0, 0.6, 0], scl: [3.2, 1.2, 0.8], rot: [0, 0, 0], color: "#ef4444", matPreset: "standard", metal: 0.1, rough: 0.8, fx: "none", role: "chassis" },
+                    { id: "b2", name: "Garis Peringatan", shape: "box", pos: [0, 0.9, 0], scl: [3.25, 0.3, 0.85], rot: [0, 0, 0], color: "#facc15", matPreset: "neon", metal: 0.1, rough: 0.3, fx: "none", role: "chassis" }
+                ]
+            },
+            "Pohon Kota": {
+                name: "Pohon Kota",
+                category: "prop",
+                isDynamicDefault: true,
+                parts: [
+                    { id: "tr1", name: "Batang Kayu", shape: "cylinder", pos: [0, 1.5, 0], scl: [0.6, 3.0, 0.6], rot: [0, 0, 0], color: "#78350f", matPreset: "matte", metal: 0.0, rough: 0.9, fx: "none", role: "chassis" },
+                    { id: "tr2", name: "Daun Bawah", shape: "cone", pos: [0, 3.8, 0], scl: [2.8, 3.2, 2.8], rot: [0, 0, 0], color: "#15803d", matPreset: "standard", metal: 0.1, rough: 0.7, fx: "none", role: "chassis" },
+                    { id: "tr3", name: "Daun Atas", shape: "cone", pos: [0, 5.4, 0], scl: [2.0, 2.5, 2.0], rot: [0, 0, 0], color: "#22c55e", matPreset: "standard", metal: 0.1, rough: 0.7, fx: "none", role: "chassis" }
+                ]
+            },
+            "Gedung Perkantoran": {
+                name: "Gedung Perkantoran",
+                category: "prop",
+                isDynamicDefault: false,
+                parts: [
+                    { id: "gd1", name: "Struktur Utama", shape: "box", pos: [0, 9.0, 0], scl: [10.0, 18.0, 10.0], rot: [0, 0, 0], color: "#27272a", matPreset: "metallic", metal: 0.6, rough: 0.3, fx: "none", role: "chassis" },
+                    { id: "gd2", name: "Fasad Kaca", shape: "box", pos: [0, 9.5, 0], scl: [10.2, 16.0, 8.5], rot: [0, 0, 0], color: "#38bdf8", matPreset: "glass", metal: 0.9, rough: 0.1, fx: "none", role: "chassis" }
+                ]
+            },
+            "Rambu Lalu Lintas": {
+                name: "Rambu Lalu Lintas",
+                category: "prop",
+                isDynamicDefault: true,
+                parts: [
+                    { id: "sg1", name: "Tiang Besi", shape: "cylinder", pos: [0, 1.6, 0], scl: [0.18, 3.2, 0.18], rot: [0, 0, 0], color: "#a1a1aa", matPreset: "metallic", metal: 0.8, rough: 0.2, fx: "none", role: "chassis" },
+                    { id: "sg2", name: "Papan Rambu", shape: "box", pos: [0, 3.2, 0], scl: [1.2, 1.2, 0.15], rot: [0, 0, 45], color: "#eab308", matPreset: "neon", metal: 0.2, rough: 0.3, fx: "none", role: "chassis" }
+                ]
+            },
+            "Orang Low-Poly": {
+                name: "Orang Low-Poly",
+                category: "prop",
+                isDynamicDefault: true,
+                parts: [
+                    { id: "hm1", name: "Kaki", shape: "box", pos: [0, 0.45, 0], scl: [0.5, 0.9, 0.35], rot: [0, 0, 0], color: "#1e3a8a", matPreset: "standard", metal: 0.1, rough: 0.8, fx: "none", role: "chassis" },
+                    { id: "hm2", name: "Badan", shape: "box", pos: [0, 1.25, 0], scl: [0.65, 0.8, 0.4], rot: [0, 0, 0], color: "#f97316", matPreset: "standard", metal: 0.1, rough: 0.6, fx: "none", role: "chassis" },
+                    { id: "hm3", name: "Kepala", shape: "sphere", pos: [0, 1.9, 0], scl: [0.45, 0.45, 0.45], rot: [0, 0, 0], color: "#fde047", matPreset: "standard", metal: 0.1, rough: 0.4, fx: "none", role: "chassis" }
+                ]
+            }
+        };
+
+        // 5 Preset Sirkuit
+        const TRACK_PRESETS = [
+            {
+                name: "1. Sirkuit Oval Cepat",
+                width: 15,
+                curbs: true,
+                waypoints: [
+                    [0, -90], [85, -80], [120, 0], [85, 80], [0, 90], [-85, 80], [-120, 0], [-85, -80]
+                ],
+                props: [
+                    { propName: "Gedung Perkantoran", x: 0, z: 0, rot: 0, scale: 1.2, dynamic: false },
+                    { propName: "Pohon Kota", x: 45, z: -40, rot: 0, scale: 1.0, dynamic: true },
+                    { propName: "Pohon Kota", x: -45, z: 40, rot: 0, scale: 1.0, dynamic: true },
+                    { propName: "Rambu Lalu Lintas", x: 92, z: -65, rot: 45, scale: 1.0, dynamic: true }
+                ]
+            },
+            {
+                name: "2. Sirkuit Kota Siku",
+                width: 14,
+                curbs: true,
+                waypoints: [
+                    [-70, -95], [70, -95], [105, -60], [105, 20], [35, 20], [35, 95], [-95, 95], [-95, -60]
+                ],
+                props: [
+                    { propName: "Gedung Perkantoran", x: -25, z: -35, rot: 0, scale: 1.3, dynamic: false },
+                    { propName: "Gedung Perkantoran", x: 70, z: -40, rot: 0, scale: 1.1, dynamic: false },
+                    { propName: "Gedung Perkantoran", x: -35, z: 50, rot: 0, scale: 1.2, dynamic: false },
+                    { propName: "Rintangan Barikade", x: 70, z: -95, rot: 45, scale: 1.0, dynamic: true },
+                    { propName: "Orang Low-Poly", x: -50, z: -82, rot: 0, scale: 1.0, dynamic: true }
+                ]
+            },
+            {
+                name: "3. Sirkuit Teknis Berkelok",
+                width: 13,
+                curbs: true,
+                waypoints: [
+                    [0, -110], [95, -100], [115, -35], [40, -10], [110, 45], [65, 110], [-20, 70], [-85, 105], [-115, 30], [-55, -25], [-105, -80]
+                ],
+                props: [
+                    { propName: "Pohon Kota", x: 65, z: -55, rot: 0, scale: 1.2, dynamic: true },
+                    { propName: "Pohon Kota", x: -20, z: 15, rot: 0, scale: 1.2, dynamic: true },
+                    { propName: "Rambu Lalu Lintas", x: 40, z: -22, rot: 90, scale: 1.0, dynamic: true },
+                    { propName: "Rintangan Barikade", x: -55, z: -25, rot: 25, scale: 1.0, dynamic: true }
+                ]
+            },
+            {
+                name: "4. Jalur Lompatan Ekstrem",
+                width: 16,
+                curbs: true,
+                waypoints: [
+                    [-80, -100], [0, -100], [85, -100], [125, -30], [95, 75], [0, 95], [-95, 75], [-125, -30]
+                ],
+                props: [
+                    { propName: "Ramp Lompatan", x: 10, z: -100, rot: -90, scale: 1.0, dynamic: false },
+                    { propName: "Ramp Lompatan", x: -10, z: 95, rot: 90, scale: 1.0, dynamic: false },
+                    { propName: "Rintangan Barikade", x: 45, z: -100, rot: 90, scale: 1.0, dynamic: true },
+                    { propName: "Rintangan Barikade", x: -45, z: 95, rot: 90, scale: 1.0, dynamic: true },
+                    { propName: "Orang Low-Poly", x: 0, z: -86, rot: 0, scale: 1.2, dynamic: true }
+                ]
+            },
+            {
+                name: "5. Sirkuit Perimeter Kota",
+                width: 16,
+                curbs: true,
+                waypoints: [
+                    [-145, -145], [0, -155], [145, -145], [160, 0], [145, 145], [0, 155], [-145, 145], [-160, 0]
+                ],
+                props: [
+                    { propName: "Gedung Perkantoran", x: -50, z: -50, rot: 0, scale: 1.5, dynamic: false },
+                    { propName: "Gedung Perkantoran", x: 50, z: -50, rot: 0, scale: 1.4, dynamic: false },
+                    { propName: "Gedung Perkantoran", x: -50, z: 50, rot: 0, scale: 1.4, dynamic: false },
+                    { propName: "Gedung Perkantoran", x: 50, z: 50, rot: 0, scale: 1.6, dynamic: false },
+                    { propName: "Ramp Lompatan", x: 0, z: -155, rot: -90, scale: 1.0, dynamic: false },
+                    { propName: "Pohon Kota", x: 0, z: 0, rot: 0, scale: 1.6, dynamic: true }
+                ]
+            }
+        ];
+
+        // --- State Aplikasi Utama ---
+        const AppState = {
+            mode: 'builder', // 'builder' | 'track' | 'race' | 'explore'
+            cameraMode: 0,   // 0: Chase/Orbit, 1: Hood/Dekat, 2: Top-Down
+            
+            // Katalog In-Memory
+            vehicles: JSON.parse(JSON.stringify(DEFAULT_VEHICLES)),
+            props: JSON.parse(JSON.stringify(DEFAULT_PROPS)),
+            activeVehicleName: "Sedan OnFire GT",
+
+            // State 3D Builder
+            builderCategory: 'vehicle', // 'vehicle' | 'prop'
+            builderDesign: JSON.parse(JSON.stringify(DEFAULT_VEHICLES["Sedan OnFire GT"])),
+            selectedPartIndex: 0,
+            builderTestPhysics: false,
+
+            // State Track Builder
+            trackTool: 'draw', // 'draw' | 'place'
+            trackWidth: 15,
+            trackCurbs: true,
+            waypoints: JSON.parse(JSON.stringify(TRACK_PRESETS[0].waypoints)),
+            placedProps: JSON.parse(JSON.stringify(TRACK_PRESETS[0].props)),
+            trackCurve: null,
+            checkpoints: [],
+
+            // State Mengemudi / Balapan / Explore
+            keys: { w: false, a: false, s: false, d: false, shift: false, space: false },
+            flyMode: false,
+            raceActive: false,
+            raceCountdown: 0,
+            raceStartTime: 0,
+            lapStartTime: 0,
+            bestLapMs: null,
+            totalLaps: 3
+        };
+
+        // --- Variabel Three.js & Cannon.js ---
+        let scene, camera, renderer;
+        let physicsWorld, groundMaterial, carMaterial, propMaterial;
+        const clock = new THREE.Clock();
+
+        // Grup Scene Berdasarkan Konteks
+        let environmentGroup = new THREE.Group();
+        let builderStageGroup = new THREE.Group();
+        let builderMeshGroup = new THREE.Group();
+        let selectionBoxHelper = null;
+
+        let trackGroup = new THREE.Group();
+        let waypointMarkersGroup = new THREE.Group();
+        let placedPropsGroup = new THREE.Group();
+        let activePhysicsProps = [];
+
+        // Entitas Kendaraan (Pemain & AI)
+        let playerCar = null;
+        let aiCars = [];
+        let particleSystem = [];
+
+        // Kontrol Kamera Orbit (untuk Builder & Track Builder)
+        const orbitCam = {
+            theta: 0.6,
+            phi: 1.05,
+            radius: 7.5,
+            target: new THREE.Vector3(0, 0.8, 0),
+            isDragging: false,
+            isPanning: false,
+            prevX: 0,
+            prevY: 0
+        };
+
+        const raycaster = new THREE.Raycaster();
+        const mouseNDC = new THREE.Vector2();
+        let groundPlaneMesh = null;
+
+        function initEngine() {
+            const container = document.getElementById('canvas-container');
+
+            // 1. Inisialisasi Scene Three.js
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111216);
+            scene.fog = new THREE.FogExp2(0x111216, 0.0022);
+
+            // 2. Kamera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 900);
+
+            // 3. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 4. Pencahayaan
+            const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x18181b, 0.65);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfff7ed, 1.1);
+            dirLight.position.set(80, 140, 90);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.camera.near = 10;
+            dirLight.shadow.camera.far = 400;
+            const d = 170;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            // 5. Inisialisasi Fisika Cannon.js
+            physicsWorld = new CANNON.World();
+            physicsWorld.gravity.set(0, -22, 0);
+            physicsWorld.broadphase = new CANNON.SAPBroadphase(physicsWorld);
+            physicsWorld.defaultContactMaterial.friction = 0.02;
+            physicsWorld.defaultContactMaterial.restitution = 0.25;
+
+            groundMaterial = new CANNON.Material("groundMaterial");
+            carMaterial = new CANNON.Material("carMaterial");
+            propMaterial = new CANNON.Material("propMaterial");
+
+            // Bidang Tanah Fisika
+            const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+            groundBody.addShape(new CANNON.Plane());
+            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+            physicsWorld.addBody(groundBody);
+
+            // Susun Grup Scene
+            scene.add(environmentGroup);
+            scene.add(builderStageGroup);
+            scene.add(trackGroup);
+            scene.add(waypointMarkersGroup);
+            scene.add(placedPropsGroup);
+
+            buildCityEnvironment();
+            buildBuilderStage();
+
+            // Event Listener Resize
+            window.addEventListener('resize', onWindowResize);
+            setupPointerControls();
+            setupKeyboardControls();
+            setupUIHandlers();
+
+            // Sinkronisasi awal
+            populatePresetsDropdown();
+            populatePlacePropsDropdown();
+            populateActiveVehiclesDropdown();
+            rebuildBuilderMesh();
+            rebuildTrackAndProps();
+            switchMode('builder');
+        }
+
+        function buildCityEnvironment() {
+            environmentGroup.clear();
+
+            // Tanah Utama Kota
+            const groundGeo = new THREE.PlaneGeometry(700, 700);
+            const groundMat = new THREE.MeshStandardMaterial({
+                color: 0x18191e,
+                roughness: 0.9,
+                metalness: 0.05
+            });
+            groundPlaneMesh = new THREE.Mesh(groundGeo, groundMat);
+            groundPlaneMesh.rotation.x = -Math.PI / 2;
+            groundPlaneMesh.receiveShadow = true;
+            environmentGroup.add(groundPlaneMesh);
+
+            // Grid Kota Halus
+            const grid = new THREE.GridHelper(500, 100, 0x2e3038, 0x202228);
+            grid.position.y = 0.02;
+            environmentGroup.add(grid);
+
+            // Gedung Latar Perimeter (InstancedMesh untuk performa 60 FPS)
+            const bldgGeo = new THREE.BoxGeometry(1, 1, 1);
+            const bldgMat = new THREE.MeshStandardMaterial({
+                color: 0x23252d,
+                roughness: 0.5,
+                metalness: 0.4
+            });
+            const count = 64;
+            const instancedBldg = new THREE.InstancedMesh(bldgGeo, bldgMat, count);
+            instancedBldg.castShadow = true;
+            instancedBldg.receiveShadow = true;
+
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < count; i++) {
+                const angle = (i / count) * Math.PI * 2;
+                const dist = 215 + (i % 3) * 22;
+                const w = 14 + (i % 5) * 4;
+                const h = 18 + ((i * 7) % 45);
+                const d = 14 + ((i * 3) % 4) * 4;
+                dummy.position.set(Math.cos(angle) * dist, h / 2, Math.sin(angle) * dist);
+                dummy.scale.set(w, h, d);
+                dummy.rotation.y = angle;
+                dummy.updateMatrix();
+                instancedBldg.setMatrixAt(i, dummy.matrix);
+            }
+            environmentGroup.add(instancedBldg);
+        }
+
+        function buildBuilderStage() {
+            builderStageGroup.clear();
+            const pedGeo = new THREE.CylinderGeometry(3.8, 4.1, 0.2, 48);
+            const pedMat = new THREE.MeshStandardMaterial({ color: 0x1e2028, metalness: 0.5, roughness: 0.4 });
+            const pedestal = new THREE.Mesh(pedGeo, pedMat);
+            pedestal.position.y = -0.1;
+            pedestal.receiveShadow = true;
+            builderStageGroup.add(pedestal);
+
+            const ringGeo = new THREE.RingGeometry(3.75, 3.85, 48);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xf97316, side: THREE.DoubleSide });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.01;
+            builderStageGroup.add(ring);
+
+            builderStageGroup.add(builderMeshGroup);
+        }
+
+        function createPartMesh(partData) {
+            let geo;
+            const shape = partData.shape || 'box';
+
+            if (shape === 'box') {
+                geo = new THREE.BoxGeometry(1, 1, 1);
+            } else if (shape === 'cylinder') {
+                geo = new THREE.CylinderGeometry(0.5, 0.5, 1, 20);
+            } else if (shape === 'sphere') {
+                geo = new THREE.SphereGeometry(0.5, 20, 16);
+            } else if (shape === 'cone') {
+                geo = new THREE.ConeGeometry(0.5, 1, 20);
+            } else if (shape === 'wheel') {
+                // Roda adalah silinder yang diputar horizontal pada sumbu X disertai pelek
+                const wheelContainer = new THREE.Group();
+                const tireGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 24);
+                tireGeo.rotateZ(Math.PI / 2);
+                const tireMat = buildPBRMaterial(partData);
+                const tireMesh = new THREE.Mesh(tireGeo, tireMat);
+                tireMesh.castShadow = true;
+                tireMesh.receiveShadow = true;
+                wheelContainer.add(tireMesh);
+
+                const rimGeo = new THREE.CylinderGeometry(0.28, 0.28, 1.04, 12);
+                rimGeo.rotateZ(Math.PI / 2);
+                const rimMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, metalness: 0.85, roughness: 0.2 });
+                const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+                wheelContainer.add(rimMesh);
+
+                applyPartTransforms(wheelContainer, partData);
+                wheelContainer.userData.partData = partData;
+                return wheelContainer;
+            } else if (shape === 'thruster') {
+                geo = new THREE.CylinderGeometry(0.35, 0.5, 1, 16);
+                geo.rotateX(Math.PI / 2);
+            } else {
+                geo = new THREE.BoxGeometry(1, 1, 1);
+            }
+
+            const mat = buildPBRMaterial(partData);
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            applyPartTransforms(mesh, partData);
+            mesh.userData.partData = partData;
+            return mesh;
+        }
+
+        function buildPBRMaterial(partData) {
+            const colorHex = partData.color || '#f97316';
+            const preset = partData.matPreset || 'standard';
+            let metalness = typeof partData.metal === 'number' ? partData.metal : 0.4;
+            let roughness = typeof partData.rough === 'number' ? partData.rough : 0.3;
+            let transparent = false;
+            let opacity = 1.0;
+            let emissive = new THREE.Color(0x000000);
+            let emissiveIntensity = 0;
+
+            if (preset === 'metallic') {
+                metalness = Math.max(metalness, 0.75);
+                roughness = Math.min(roughness, 0.25);
+            } else if (preset === 'matte') {
+                metalness = 0.05;
+                roughness = 0.85;
+            } else if (preset === 'glass') {
+                transparent = true;
+                opacity = 0.58;
+                metalness = 0.8;
+                roughness = 0.1;
+            } else if (preset === 'neon') {
+                emissive = new THREE.Color(colorHex);
+                emissiveIntensity = 0.85;
+            }
+
+            return new THREE.MeshStandardMaterial({
+                color: new THREE.Color(colorHex),
+                metalness,
+                roughness,
+                transparent,
+                opacity,
+                emissive,
+                emissiveIntensity
+            });
+        }
+
+        function applyPartTransforms(obj3d, partData) {
+            const p = partData.pos || [0, 0.5, 0];
+            const s = partData.scl || [1, 1, 1];
+            const r = partData.rot || [0, 0, 0];
+            obj3d.position.set(p[0], p[1], p[2]);
+            obj3d.scale.set(Math.max(0.05, s[0]), Math.max(0.05, s[1]), Math.max(0.05, s[2]));
+            obj3d.rotation.set(
+                THREE.MathUtils.degToRad(r[0]),
+                THREE.MathUtils.degToRad(r[1]),
+                THREE.MathUtils.degToRad(r[2])
+            );
+        }
+
+        function rebuildBuilderMesh() {
+            // Bersihkan mesh sebelumnya
+            while (builderMeshGroup.children.length > 0) {
+                const child = builderMeshGroup.children[0];
+                builderMeshGroup.remove(child);
+            }
+            if (selectionBoxHelper) {
+                scene.remove(selectionBoxHelper);
+                selectionBoxHelper = null;
+            }
+
+            const parts = AppState.builderDesign.parts || [];
+            parts.forEach((part, idx) => {
+                const mesh = createPartMesh(part);
+                mesh.userData.partIndex = idx;
+                builderMeshGroup.add(mesh);
+
+                if (idx === AppState.selectedPartIndex) {
+                    selectionBoxHelper = new THREE.BoxHelper(mesh, 0xf97316);
+                    scene.add(selectionBoxHelper);
+                }
+            });
+
+            renderBuilderPartList();
+            syncInspectorInputs();
+        }
+
+        function renderBuilderPartList() {
+            const listEl = document.getElementById('list-parts');
+            const countEl = document.getElementById('lbl-part-count');
+            const parts = AppState.builderDesign.parts || [];
+            countEl.textContent = parts.length;
+            listEl.innerHTML = '';
+
+            parts.forEach((part, idx) => {
+                const row = document.createElement('button');
+                const isSel = idx === AppState.selectedPartIndex;
+                row.className = `w-full text-left px-2 py-1 rounded flex items-center justify-between transition ${
+                    isSel ? 'bg-orange-600/25 border border-orange-500/60 text-white font-medium' : 'hover:bg-zinc-800/70 text-zinc-300'
+                }`;
+                row.innerHTML = `
+                    <span class="truncate">${idx + 1}. ${part.name || part.shape}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 uppercase">${part.shape}</span>
+                `;
+                row.onclick = () => {
+                    AppState.selectedPartIndex = idx;
+                    rebuildBuilderMesh();
+                };
+                listEl.appendChild(row);
+            });
+        }
+
+        function syncInspectorInputs() {
+            const parts = AppState.builderDesign.parts || [];
+            const part = parts[AppState.selectedPartIndex];
+            const inspector = document.getElementById('inspector-part');
+            if (!part) {
+                inspector.classList.add('opacity-40', 'pointer-events-none');
+                return;
+            }
+            inspector.classList.remove('opacity-40', 'pointer-events-none');
+
+            document.getElementById('inp-part-name').value = part.name || '';
+            document.getElementById('inp-pos-x').value = Number(part.pos[0]).toFixed(2);
+            document.getElementById('inp-pos-y').value = Number(part.pos[1]).toFixed(2);
+            document.getElementById('inp-pos-z').value = Number(part.pos[2]).toFixed(2);
+
+            document.getElementById('inp-scl-x').value = Number(part.scl[0]).toFixed(2);
+            document.getElementById('inp-scl-y').value = Number(part.scl[1]).toFixed(2);
+            document.getElementById('inp-scl-z').value = Number(part.scl[2]).toFixed(2);
+
+            document.getElementById('inp-rot-x').value = Math.round(part.rot[0]);
+            document.getElementById('inp-rot-y').value = Math.round(part.rot[1]);
+            document.getElementById('inp-rot-z').value = Math.round(part.rot[2]);
+
+            document.getElementById('inp-mat-color').value = part.color || '#f97316';
+            document.getElementById('sel-mat-preset').value = part.matPreset || 'standard';
+            document.getElementById('inp-mat-metal').value = part.metal ?? 0.4;
+            document.getElementById('val-metal').textContent = Number(part.metal ?? 0.4).toFixed(2);
+            document.getElementById('inp-mat-rough').value = part.rough ?? 0.3;
+            document.getElementById('val-rough').textContent = Number(part.rough ?? 0.3).toFixed(2);
+
+            document.getElementById('sel-part-fx').value = part.fx || 'none';
+            document.getElementById('sel-part-role').value = part.role || 'chassis';
+        }
+
+        function updateSelectedPartFromUI() {
+            const parts = AppState.builderDesign.parts || [];
+            const part = parts[AppState.selectedPartIndex];
+            if (!part) return;
+
+            part.name = document.getElementById('inp-part-name').value || part.shape;
+            part.pos = [
+                parseFloat(document.getElementById('inp-pos-x').value) || 0,
+                parseFloat(document.getElementById('inp-pos-y').value) || 0,
+                parseFloat(document.getElementById('inp-pos-z').value) || 0
+            ];
+            part.scl = [
+                Math.max(0.1, parseFloat(document.getElementById('inp-scl-x').value) || 0.5),
+                Math.max(0.1, parseFloat(document.getElementById('inp-scl-y').value) || 0.5),
+                Math.max(0.1, parseFloat(document.getElementById('inp-scl-z').value) || 0.5)
+            ];
+            part.rot = [
+                parseFloat(document.getElementById('inp-rot-x').value) || 0,
+                parseFloat(document.getElementById('inp-rot-y').value) || 0,
+                parseFloat(document.getElementById('inp-rot-z').value) || 0
+            ];
+            part.color = document.getElementById('inp-mat-color').value;
+            part.matPreset = document.getElementById('sel-mat-preset').value;
+            part.metal = parseFloat(document.getElementById('inp-mat-metal').value);
+            part.rough = parseFloat(document.getElementById('inp-mat-rough').value);
+            part.fx = document.getElementById('sel-part-fx').value;
+            part.role = document.getElementById('sel-part-role').value;
+
+            document.getElementById('val-metal').textContent = part.metal.toFixed(2);
+            document.getElementById('val-rough').textContent = part.rough.toFixed(2);
+
+            rebuildBuilderMesh();
+        }
+
+        // --- MODE 2: TRACK BUILDER & PROPS ---
+        function rebuildTrackAndProps() {
+            trackGroup.clear();
+            waypointMarkersGroup.clear();
+            AppState.checkpoints = [];
+
+            const pts = AppState.waypoints;
+            document.getElementById('lbl-wp-count').textContent = pts.length;
+
+            // Tampilkan marker titik kontrol (ketika di mode Track Builder)
+            pts.forEach((pt, idx) => {
+                const markerGeo = new THREE.CylinderGeometry(1.2, 1.2, 1.2, 16);
+                const markerMat = new THREE.MeshBasicMaterial({ color: idx === 0 ? 0x22c55e : 0xf97316 });
+                const marker = new THREE.Mesh(markerGeo, markerMat);
+                marker.position.set(pt[0], 0.6, pt[1]);
+                waypointMarkersGroup.add(marker);
+            });
+
+            if (pts.length < 3) {
+                AppState.trackCurve = null;
+                rebuildPlacedPropsInWorld();
+                return;
+            }
+
+            // Buat CatmullRomCurve3 tertutup
+            const vec3Pts = pts.map(p => new THREE.Vector3(p[0], 0.08, p[1]));
+            const curve = new THREE.CatmullRomCurve3(vec3Pts, true, 'catmullrom', 0.5);
+            AppState.trackCurve = curve;
+
+            const segments = Math.max(120, pts.length * 24);
+            const halfW = AppState.trackWidth / 2;
+            const curvePoints = curve.getSpacedPoints(segments);
+
+            // Buat Geometri Ribbon Jalan Sirkuit
+            const roadPositions = [];
+            const roadIndices = [];
+            const curbLeftPos = [];
+            const curbRightPos = [];
+            const curbIndices = [];
+
+            for (let i = 0; i <= segments; i++) {
+                const u = i / segments;
+                const pt = curvePoints[i % segments];
+                const tangent = curve.getTangentAt(u).normalize();
+                const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+                const leftPt = pt.clone().addScaledVector(normal, halfW);
+                const rightPt = pt.clone().addScaledVector(normal, -halfW);
+
+                roadPositions.push(leftPt.x, 0.08, leftPt.z);
+                roadPositions.push(rightPt.x, 0.08, rightPt.z);
+
+                const curbW = 1.1;
+                const cLeftOut = leftPt.clone().addScaledVector(normal, curbW);
+                const cRightOut = rightPt.clone().addScaledVector(normal, -curbW);
+
+                curbLeftPos.push(cLeftOut.x, 0.14, cLeftOut.z, leftPt.x, 0.14, leftPt.z);
+                curbRightPos.push(rightPt.x, 0.14, rightPt.z, cRightOut.x, 0.14, cRightOut.z);
+
+                if (i < segments) {
+                    const base = i * 2;
+                    roadIndices.push(base, base + 1, base + 2);
+                    roadIndices.push(base + 1, base + 3, base + 2);
+                    curbIndices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+                }
+            }
+
+            const roadGeo = new THREE.BufferGeometry();
+            roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(roadPositions, 3));
+            roadGeo.setIndex(roadIndices);
+            roadGeo.computeVertexNormals();
+
+            const roadMat = new THREE.MeshStandardMaterial({
+                color: 0x26272e,
+                roughness: 0.75,
+                metalness: 0.1,
+                side: THREE.DoubleSide
+            });
+            const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+            roadMesh.receiveShadow = true;
+            trackGroup.add(roadMesh);
+
+            // Garis Tengah Putus-putus & Checkpoints
+            const cpCount = Math.max(6, pts.length * 2);
+            for (let c = 0; c < cpCount; c++) {
+                const t = c / cpCount;
+                const cpPos = curve.getPointAt(t);
+                const cpTan = curve.getTangentAt(t).normalize();
+                AppState.checkpoints.push({
+                    position: cpPos.clone(),
+                    tangent: cpTan.clone(),
+                    radius: AppState.trackWidth * 0.85
+                });
+            }
+
+            // Garis Tengah Visual
+            for (let i = 0; i < segments; i += 2) {
+                const u = i / segments;
+                const p = curve.getPointAt(u);
+                const tan = curve.getTangentAt(u);
+                const dashGeo = new THREE.PlaneGeometry(0.4, 2.2);
+                const dashMat = new THREE.MeshBasicMaterial({ color: 0x71717a, side: THREE.DoubleSide });
+                const dash = new THREE.Mesh(dashGeo, dashMat);
+                dash.position.set(p.x, 0.11, p.z);
+                dash.rotation.x = -Math.PI / 2;
+                dash.rotation.z = -Math.atan2(tan.x, tan.z);
+                trackGroup.add(dash);
+            }
+
+            // Curbs (Pembatas Merah-Oranye)
+            if (AppState.trackCurbs) {
+                const curbMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.5, side: THREE.DoubleSide });
+                const cLGeo = new THREE.BufferGeometry();
+                cLGeo.setAttribute('position', new THREE.Float32BufferAttribute(curbLeftPos, 3));
+                cLGeo.setIndex(curbIndices);
+                cLGeo.computeVertexNormals();
+                trackGroup.add(new THREE.Mesh(cLGeo, curbMat));
+
+                const cRGeo = new THREE.BufferGeometry();
+                cRGeo.setAttribute('position', new THREE.Float32BufferAttribute(curbRightPos, 3));
+                cRGeo.setIndex(curbIndices);
+                cRGeo.computeVertexNormals();
+                trackGroup.add(new THREE.Mesh(cRGeo, curbMat));
+            }
+
+            // Gerbang Start / Finish di titik 0
+            buildStartFinishGantry(curve.getPointAt(0), curve.getTangentAt(0), AppState.trackWidth);
+            rebuildPlacedPropsInWorld();
+        }
+
+        function buildStartFinishGantry(pos, tangent, width) {
+            const gantry = new THREE.Group();
+            const pillarGeo = new THREE.BoxGeometry(0.8, 6.5, 0.8);
+            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x27272a, metalness: 0.6, roughness: 0.3 });
+
+            const pL = new THREE.Mesh(pillarGeo, pillarMat);
+            pL.position.set(-width / 2 - 0.5, 3.25, 0);
+            gantry.add(pL);
+
+            const pR = new THREE.Mesh(pillarGeo, pillarMat);
+            pR.position.set(width / 2 + 0.5, 3.25, 0);
+            gantry.add(pR);
+
+            const bannerGeo = new THREE.BoxGeometry(width + 2, 1.3, 0.9);
+            const bannerMat = new THREE.MeshStandardMaterial({
+                color: 0xf97316,
+                emissive: 0xf97316,
+                emissiveIntensity: 0.35
+            });
+            const banner = new THREE.Mesh(bannerGeo, bannerMat);
+            banner.position.set(0, 6.2, 0);
+            gantry.add(banner);
+
+            // Garis Start Kotak-kotak di Aspal
+            const startLineGeo = new THREE.PlaneGeometry(width, 2.2);
+            const startLineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+            const startLine = new THREE.Mesh(startLineGeo, startLineMat);
+            startLine.rotation.x = -Math.PI / 2;
+            startLine.position.y = 0.13;
+            gantry.add(startLine);
+
+            gantry.position.copy(pos);
+            const angle = Math.atan2(tangent.x, tangent.z);
+            gantry.rotation.y = angle;
+            trackGroup.add(gantry);
+        }
+
+        function clearWorldPhysicsProps() {
+            activePhysicsProps.forEach(item => {
+                if (item.body) physicsWorld.removeBody(item.body);
+                if (item.mesh) placedPropsGroup.remove(item.mesh);
+            });
+            activePhysicsProps = [];
+            placedPropsGroup.clear();
+        }
+
+        function rebuildPlacedPropsInWorld() {
+            clearWorldPhysicsProps();
+            document.getElementById('lbl-placed-count').textContent = AppState.placedProps.length;
+
+            AppState.placedProps.forEach((placed) => {
+                const template = AppState.props[placed.propName] || DEFAULT_PROPS["Rintangan Barikade"];
+                if (!template) return;
+
+                const propRoot = new THREE.Group();
+                const scale = placed.scale || 1.0;
+
+                // Hitung bounding box ukuran gabungan untuk collider Cannon.js
+                let minX = Infinity, minY = Infinity, minZ = Infinity;
+                let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+                (template.parts || []).forEach(p => {
+                    const partMesh = createPartMesh(p);
+                    propRoot.add(partMesh);
+
+                    const hw = (p.scl[0] * scale) / 2;
+                    const hh = (p.scl[1] * scale) / 2;
+                    const hd = (p.scl[2] * scale) / 2;
+                    minX = Math.min(minX, p.pos[0] * scale - hw);
+                    maxX = Math.max(maxX, p.pos[0] * scale + hw);
+                    minY = Math.min(minY, p.pos[1] * scale - hh);
+                    maxY = Math.max(maxY, p.pos[1] * scale + hh);
+                    minZ = Math.min(minZ, p.pos[2] * scale - hd);
+                    maxZ = Math.max(maxZ, p.pos[2] * scale + hd);
+                });
+
+                propRoot.scale.set(scale, scale, scale);
+                const sizeX = Math.max(0.6, maxX - minX);
+                const sizeY = Math.max(0.6, maxY - minY);
+                const sizeZ = Math.max(0.6, maxZ - minZ);
+
+                const isRamp = placed.propName.toLowerCase().includes("ramp");
+                const isDynamic = placed.dynamic && !isRamp;
+                const mass = isDynamic ? 3.5 : 0;
+
+                const body = new CANNON.Body({
+                    mass: mass,
+                    material: propMaterial,
+                    linearDamping: 0.25,
+                    angularDamping: 0.35
+                });
+
+                const halfExtents = new CANNON.Vec3(sizeX / 2, sizeY / 2, sizeZ / 2);
+                const boxShape = new CANNON.Box(halfExtents);
+                const centerY = sizeY / 2;
+
+                if (isRamp) {
+                    // Miringkan collider untuk ramp agar mobil bisa melompatinya
+                    const qRamp = new CANNON.Quaternion();
+                    qRamp.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), THREE.MathUtils.degToRad(-18));
+                    body.addShape(boxShape, new CANNON.Vec3(0, 0.8 * scale, 0), qRamp);
+                } else {
+                    body.addShape(boxShape, new CANNON.Vec3(0, centerY, 0));
+                }
+
+                body.position.set(placed.x, 0, placed.z);
+                const rotRad = THREE.MathUtils.degToRad(placed.rot || 0);
+                body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), rotRad);
+
+                physicsWorld.addBody(body);
+                propRoot.position.copy(body.position);
+                propRoot.quaternion.copy(body.quaternion);
+                placedPropsGroup.add(propRoot);
+
+                activePhysicsProps.push({
+                    mesh: propRoot,
+                    body: body,
+                    isDynamic: isDynamic,
+                    isRamp: isRamp,
+                    initialPos: new CANNON.Vec3(placed.x, 0, placed.z),
+                    initialQuat: body.quaternion.clone()
+                });
+            });
+        }
+
+        // --- PEMBUATAN KENDARAAN FISIKA (PEMAIN & AI) ---
+        function createVehicleEntity(designData, startPos, startAngle, isAI = false, aiColorOverride = null) {
+            const rootMesh = new THREE.Group();
+            const wheelMeshes = [];
+            const thrusterEmitters = [];
+
+            const parts = designData.parts || [];
+            parts.forEach(part => {
+                const clonedPart = JSON.parse(JSON.stringify(part));
+                if (aiColorOverride && clonedPart.role === 'chassis' && clonedPart.matPreset !== 'glass') {
+                    clonedPart.color = aiColorOverride;
+                }
+                const pMesh = createPartMesh(clonedPart);
+                rootMesh.add(pMesh);
+
+                if (clonedPart.shape === 'wheel' || (clonedPart.role && clonedPart.role.startsWith('wheel'))) {
+                    wheelMeshes.push({
+                        mesh: pMesh,
+                        canSteer: clonedPart.role === 'wheel_steer' || clonedPart.pos[2] > 0.2,
+                        baseRotY: pMesh.rotation.y
+                    });
+                }
+                if (clonedPart.fx && clonedPart.fx !== 'none') {
+                    thrusterEmitters.push({
+                        localPos: new THREE.Vector3(clonedPart.pos[0], clonedPart.pos[1], clonedPart.pos[2]),
+                        type: clonedPart.fx
+                    });
+                }
+            });
+
+            // Jika pengguna tidak menambahkan efek sama sekali, tambahkan emitter knalpot default saat boost
+            if (thrusterEmitters.length === 0) {
+                thrusterEmitters.push({ localPos: new THREE.Vector3(0, 0.5, -2.1), type: 'fire' });
+            }
+
+            scene.add(rootMesh);
+
+            // Collider Fisika Sasis (Sphere/Box hybrid agar stabil saat lompat & tabrakan)
+            const body = new CANNON.Body({
+                mass: 28,
+                material: carMaterial,
+                linearDamping: 0.15,
+                angularDamping: 0.65
+            });
+            body.addShape(new CANNON.Box(new CANNON.Vec3(1.05, 0.55, 2.15)), new CANNON.Vec3(0, 0.65, 0));
+            body.position.set(startPos.x, startPos.y, startPos.z);
+            body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), startAngle);
+
+            // Listener Tabrakan untuk Efek Percikan Api
+            body.addEventListener("collide", (ev) => {
+                const relVel = ev.contact.getImpactVelocityAlongNormal();
+                if (Math.abs(relVel) > 6.5) {
+                    const hitPos = new THREE.Vector3(body.position.x, body.position.y + 0.7, body.position.z);
+                    spawnParticles(hitPos, 'spark', 8);
+                }
+            });
+
+            physicsWorld.addBody(body);
+
+            return {
+                isAI,
+                name: isAI ? designData.aiLabel : designData.name,
+                mesh: rootMesh,
+                body: body,
+                wheels: wheelMeshes,
+                emitters: thrusterEmitters,
+                heading: startAngle,
+                speed: 0,
+                steerAngle: 0,
+                pitchAngle: 0,
+                rollAngle: 0,
+                nitro: 100,
+                lap: 1,
+                nextCheckpoint: 1,
+                checkpointsPassed: 0,
+                finished: false,
+                finishTimeMs: 0,
+                aiTargetU: 0.02,
+                aiSpeedFactor: 0.88 + Math.random() * 0.14,
+                aiLaneOffset: (Math.random() - 0.5) * 5.5
+            };
+        }
+
+        function clearActiveVehicles() {
+            if (playerCar) {
+                scene.remove(playerCar.mesh);
+                physicsWorld.removeBody(playerCar.body);
+                playerCar = null;
+            }
+            aiCars.forEach(ai => {
+                scene.remove(ai.mesh);
+                physicsWorld.removeBody(ai.body);
+            });
+            aiCars = [];
+        }
+
+        function setupDrivingSession(withAI = false) {
+            clearActiveVehicles();
+            rebuildTrackAndProps();
+
+            // Tentukan posisi awal dan arah berdasarkan kurva sirkuit
+            let startPt = new THREE.Vector3(0, 0.5, 0);
+            let startTan = new THREE.Vector3(0, 0, 1);
+
+            if (AppState.trackCurve) {
+                startPt = AppState.trackCurve.getPointAt(0);
+                startTan = AppState.trackCurve.getTangentAt(0).normalize();
+            }
+            const startHeading = Math.atan2(startTan.x, startTan.z);
+            const rightVec = new THREE.Vector3(-startTan.z, 0, startTan.x).normalize();
+
+            const chosenVehicle = AppState.vehicles[AppState.activeVehicleName] || DEFAULT_VEHICLES["Sedan OnFire GT"];
+            const pPos = startPt.clone()
+                .addScaledVector(rightVec, -2.6)
+                .addScaledVector(startTan, -3.5);
+            pPos.y = 0.6;
+
+            playerCar = createVehicleEntity(chosenVehicle, pPos, startHeading, false);
+
+            if (withAI) {
+                const aiSpecs = [
+                    { label: "AI Apex (Merah)", template: "Sedan OnFire GT", color: "#ef4444", right: 2.6, back: -3.5 },
+                    { label: "AI Vortex (Biru)", template: "Jet Aero Hyper", color: "#3b82f6", right: -2.6, back: -10.0 },
+                    { label: "AI Titan (Hijau)", template: "Truk Offroad Titan", color: "#10b981", right: 2.6, back: -10.0 }
+                ];
+
+                aiSpecs.forEach((spec, idx) => {
+                    const tpl = JSON.parse(JSON.stringify(DEFAULT_VEHICLES[spec.template]));
+                    tpl.aiLabel = spec.label;
+                    const aiPos = startPt.clone()
+                        .addScaledVector(rightVec, spec.right)
+                        .addScaledVector(startTan, spec.back);
+                    aiPos.y = 0.6;
+                    const aiCar = createVehicleEntity(tpl, aiPos, startHeading, true, spec.color);
+                    aiCar.aiSpeedFactor = 0.92 + idx * 0.04;
+                    aiCar.aiLaneOffset = spec.right;
+                    aiCars.push(aiCar);
+                });
+
+                startRaceCountdown();
+            } else {
+                AppState.raceActive = true;
+            }
+        }
+
+        let countdownInterval = null;
+        function startRaceCountdown() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            AppState.raceActive = false;
+            document.getElementById('modal-race-result').classList.add('hidden');
+
+            const banner = document.getElementById('race-banner');
+            const bannerTxt = document.getElementById('race-banner-text');
+            banner.classList.remove('hidden');
+
+            let count = 3;
+            bannerTxt.textContent = count;
+            bannerTxt.className = "px-8 py-4 rounded-xl hud-panel text-4xl sm:text-6xl font-bold font-mono-num text-orange-400 tracking-wider";
+
+            countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    bannerTxt.textContent = count;
+                } else if (count === 0) {
+                    bannerTxt.textContent = "MULAI!";
+                    bannerTxt.className = "px-8 py-4 rounded-xl hud-panel text-4xl sm:text-6xl font-bold font-mono-num text-emerald-400 tracking-wider";
+                    AppState.raceActive = true;
+                    const now = performance.now();
+                    AppState.raceStartTime = now;
+                    AppState.lapStartTime = now;
+                } else {
+                    banner.classList.add('hidden');
+                    clearInterval(countdownInterval);
+                }
+            }, 900);
+        }
+
+        function updateVehiclePhysics(car, dt) {
+            if (!car || !car.body) return;
+
+            let throttle = 0;
+            let steerInput = 0;
+            let boosting = false;
+            let jumping = false;
+
+            if (!car.isAI) {
+                if (AppState.mode === 'race' && !AppState.raceActive) {
+                    throttle = 0;
+                } else {
+                    if (AppState.keys.w) throttle += 1;
+                    if (AppState.keys.s) throttle -= 1;
+                    if (AppState.keys.a) steerInput += 1;
+                    if (AppState.keys.d) steerInput -= 1;
+                    boosting = AppState.keys.shift && car.nitro > 1;
+                    jumping = AppState.keys.space;
+                }
+            } else {
+                // Navigasi AI mengikuti CatmullRomCurve3
+                if (AppState.raceActive && !car.finished && AppState.trackCurve) {
+                    const curve = AppState.trackCurve;
+                    const targetPt = curve.getPointAt(car.aiTargetU % 1);
+                    const targetTan = curve.getTangentAt(car.aiTargetU % 1);
+                    const rightN = new THREE.Vector3(-targetTan.z, 0, targetTan.x).normalize();
+                    const dest = targetPt.clone().addScaledVector(rightN, car.aiLaneOffset);
+
+                    const dx = dest.x - car.body.position.x;
+                    const dz = dest.z - car.body.position.z;
+                    const dist = Math.hypot(dx, dz);
+
+                    if (dist < 14) {
+                        car.aiTargetU = (car.aiTargetU + 0.018) % 1;
+                    }
+
+                    const desiredHeading = Math.atan2(dx, dz);
+                    let diff = desiredHeading - car.heading;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+
+                    steerInput = THREE.MathUtils.clamp(diff * 2.2, -1, 1);
+                    throttle = Math.abs(diff) > 0.65 ? 0.65 : 1.0;
+                    boosting = Math.abs(diff) < 0.15 && Math.random() < 0.35;
+                }
+            }
+
+            // Manajemen Nitro
+            if (boosting) {
+                car.nitro = Math.max(0, car.nitro - 28 * dt);
+            } else {
+                car.nitro = Math.min(100, car.nitro + 14 * dt);
+            }
+
+            const maxSpeed = (boosting ? 62 : 42) * (car.isAI ? car.aiSpeedFactor : 1.0);
+            const accel = boosting ? 52 : 30;
+
+            if (throttle !== 0) {
+                car.speed += throttle * accel * dt;
+            } else {
+                // Gesekan alami
+                car.speed *= Math.pow(0.25, dt);
+            }
+            car.speed = THREE.MathUtils.clamp(car.speed, -22, maxSpeed);
+
+            // Belok (Steering)
+            const turnRate = 2.45;
+            const speedFactor = Math.min(1, Math.abs(car.speed) / 6 + 0.25);
+            const dirSign = car.speed >= -0.5 ? 1 : -1;
+            car.heading += steerInput * turnRate * speedFactor * dirSign * dt;
+            car.steerAngle = THREE.MathUtils.lerp(car.steerAngle, steerInput * 0.45, 10 * dt);
+
+            // Mode Terbang vs Mode Darat
+            const isGround = car.body.position.y <= 1.25;
+            if (!car.isAI && AppState.flyMode && AppState.mode === 'explore') {
+                // Kontrol Terbang Bebas di Kota
+                const lift = AppState.keys.space ? 18 : (AppState.keys.w ? 9 : 2);
+                car.body.velocity.y = THREE.MathUtils.lerp(car.body.velocity.y, lift, 4 * dt);
+                car.pitchAngle = THREE.MathUtils.lerp(car.pitchAngle, AppState.keys.space ? -0.32 : 0.1, 5 * dt);
+                car.rollAngle = THREE.MathUtils.lerp(car.rollAngle, -steerInput * 0.45, 6 * dt);
+            } else {
+                // Lompatan Darat
+                if (jumping && isGround) {
+                    car.body.velocity.y = 14.5;
+                    AppState.keys.space = false;
+                    spawnParticles(new THREE.Vector3(car.body.position.x, car.body.position.y, car.body.position.z), 'smoke', 10);
+                }
+                car.pitchAngle = THREE.MathUtils.lerp(car.pitchAngle, THREE.MathUtils.clamp(-car.body.velocity.y * 0.025, -0.35, 0.35), 8 * dt);
+                car.rollAngle = THREE.MathUtils.lerp(car.rollAngle, -steerInput * Math.min(0.18, Math.abs(car.speed) * 0.004), 8 * dt);
+            }
+
+            // Terapkan Kecepatan Horizontal ke Cannon Body
+            const vx = Math.sin(car.heading) * car.speed;
+            const vz = Math.cos(car.heading) * car.speed;
+            car.body.velocity.x = THREE.MathUtils.lerp(car.body.velocity.x, vx, 10 * dt);
+            car.body.velocity.z = THREE.MathUtils.lerp(car.body.velocity.z, vz, 10 * dt);
+
+            // Jaga agar mobil tidak jatuh di bawah tanah
+            if (car.body.position.y < 0.45) {
+                car.body.position.y = 0.45;
+                if (car.body.velocity.y < 0) car.body.velocity.y = 0;
+            }
+
+            // Sinkronisasi Transformasi Mesh 3D dengan Body Fisika
+            car.mesh.position.set(car.body.position.x, car.body.position.y - 0.42, car.body.position.z);
+            const euler = new THREE.Euler(car.pitchAngle, car.heading, car.rollAngle, 'YXZ');
+            car.mesh.quaternion.setFromEuler(euler);
+            car.body.quaternion.copy(car.mesh.quaternion);
+
+            // Animasi Putaran Roda
+            car.wheels.forEach(w => {
+                w.mesh.rotation.x += car.speed * dt * 1.4;
+                if (w.canSteer) {
+                    w.mesh.rotation.y = w.baseRotY + car.steerAngle;
+                }
+            });
+
+            // Efek Partikel dari Komponen Kendaraan
+            if (boosting || Math.abs(car.speed) > 10 || (!car.isAI && AppState.flyMode)) {
+                car.emitters.forEach(em => {
+                    if (Math.random() < (boosting ? 0.9 : 0.35)) {
+                        const worldPos = em.localPos.clone().applyMatrix4(car.mesh.matrixWorld);
+                        spawnParticles(worldPos, boosting ? 'fire' : em.type, boosting ? 2 : 1);
+                    }
+                });
+            }
+
+            // Cek Kemajuan Checkpoint & Putaran
+            if (AppState.mode === 'race' && AppState.raceActive && !car.finished) {
+                updateCarRaceProgress(car);
+            }
+        }
+
+        function updateCarRaceProgress(car) {
+            const cps = AppState.checkpoints;
+            if (!cps || cps.length === 0) return;
+
+            const targetCp = cps[car.nextCheckpoint % cps.length];
+            const dx = car.body.position.x - targetCp.position.x;
+            const dz = car.body.position.z - targetCp.position.z;
+            const dist = Math.hypot(dx, dz);
+
+            if (dist < targetCp.radius) {
+                car.checkpointsPassed++;
+                if (car.nextCheckpoint === 0 && car.checkpointsPassed >= cps.length) {
+                    // Menyelesaikan 1 Putaran
+                    const now = performance.now();
+                    if (!car.isAI) {
+                        const lapMs = now - AppState.lapStartTime;
+                        AppState.lapStartTime = now;
+                        if (AppState.bestLapMs === null || lapMs < AppState.bestLapMs) {
+                            AppState.bestLapMs = lapMs;
+                            document.getElementById('lbl-time-best').textContent = formatTimeMs(lapMs);
+                        }
+                    }
+
+                    if (car.lap >= AppState.totalLaps) {
+                        car.finished = true;
+                        car.finishTimeMs = now - AppState.raceStartTime;
+                        if (!car.isAI) {
+                            showRaceResultsModal();
+                        }
+                    } else {
+                        car.lap++;
+                        if (!car.isAI) {
+                            showNotice(`Putaran ${car.lap} / ${AppState.totalLaps}`);
+                        }
+                    }
+                }
+                car.nextCheckpoint = (car.nextCheckpoint + 1) % cps.length;
+            }
+        }
+
+        function updateRaceHUD() {
+            if (!playerCar) return;
+
+            // Speedometer
+            const kmh = Math.round(Math.abs(playerCar.speed) * 3.2);
+            document.getElementById('lbl-speed').textContent = kmh;
+            document.getElementById('bar-speed').style.width = `${Math.min(100, (kmh / 200) * 100)}%`;
+
+            const nitroPct = Math.round(playerCar.nitro);
+            document.getElementById('lbl-nitro').textContent = `${nitroPct}%`;
+            document.getElementById('bar-nitro').style.width = `${nitroPct}%`;
+
+            if (AppState.mode !== 'race') return;
+
+            document.getElementById('lbl-lap').textContent = `${Math.min(playerCar.lap, AppState.totalLaps)} / ${AppState.totalLaps}`;
+            const totalCps = AppState.checkpoints.length;
+            const curCpInLap = playerCar.checkpointsPassed % Math.max(1, totalCps);
+            document.getElementById('lbl-cp').textContent = `${curCpInLap} / ${totalCps}`;
+
+            if (AppState.raceActive && !playerCar.finished) {
+                const curLapMs = performance.now() - AppState.lapStartTime;
+                document.getElementById('lbl-time-cur').textContent = formatTimeMs(curLapMs);
+            }
+
+            // Hitung Posisi Balap
+            const allCars = [playerCar, ...aiCars];
+            allCars.sort((a, b) => {
+                if (a.finished && b.finished) return a.finishTimeMs - b.finishTimeMs;
+                if (a.finished) return -1;
+                if (b.finished) return 1;
+                return b.checkpointsPassed - a.checkpointsPassed;
+            });
+            const rank = allCars.indexOf(playerCar) + 1;
+            document.getElementById('lbl-pos').textContent = `${rank} / ${allCars.length}`;
+        }
+
+        function showRaceResultsModal() {
+            const modal = document.getElementById('modal-race-result');
+            const list = document.getElementById('res-standings');
+            const badge = document.getElementById('res-rank-badge');
+
+            const allCars = [playerCar, ...aiCars];
+            allCars.forEach(c => {
+                if (!c.finished) {
+                    c.FinishEstimate = (performance.now() - AppState.raceStartTime) + (AppState.totalLaps * 6 + 15 - c.checkpointsPassed) * 1200;
+                } else {
+                    c.FinishEstimate = c.finishTimeMs;
+                }
+            });
+            allCars.sort((a, b) => a.FinishEstimate - b.FinishEstimate);
+
+            const playerRank = allCars.indexOf(playerCar) + 1;
+            badge.textContent = `Posisi #${playerRank}`;
+
+            list.innerHTML = '';
+            allCars.forEach((c, idx) => {
+                const isPlayer = !c.isAI;
+                const row = document.createElement('div');
+                row.className = `flex items-center justify-between p-2.5 rounded border ${
+                    isPlayer ? 'bg-orange-600/20 border-orange-500 text-white font-semibold' : 'bg-zinc-900/80 border-zinc-800 text-zinc-300'
+                }`;
+                row.innerHTML = `
+                    <span>#${idx + 1} ${isPlayer ? c.name + ' (Anda)' : c.name}</span>
+                    <span class="font-mono-num">${formatTimeMs(c.FinishEstimate)}</span>
+                `;
+                list.appendChild(row);
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        function formatTimeMs(ms) {
+            const totalSec = ms / 1000;
+            const mins = Math.floor(totalSec / 60);
+            const secs = Math.floor(totalSec % 60);
+            const hundredths = Math.floor((ms % 1000) / 10);
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(hundredths).padStart(2, '0')}`;
+        }
+
+        // --- SISTEM PARTIKEL 3D ---
+        const particleGeo = new THREE.BoxGeometry(0.28, 0.28, 0.28);
+        function spawnParticles(origin, type = 'fire', count = 1) {
+            if (particleSystem.length > 180) return;
+
+            for (let i = 0; i < count; i++) {
+                let colorHex = 0xf97316;
+                if (type === 'fire') colorHex = Math.random() > 0.4 ? 0xf97316 : 0xfacc15;
+                else if (type === 'smoke') colorHex = 0x71717a;
+                else if (type === 'spark') colorHex = 0x38bdf8;
+                else if (type === 'neon') colorHex = 0xa855f7;
+
+                const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.9 });
+                const mesh = new THREE.Mesh(particleGeo, mat);
+                mesh.position.copy(origin);
+                mesh.position.x += (Math.random() - 0.5) * 0.35;
+                mesh.position.y += (Math.random() - 0.5) * 0.25;
+                mesh.position.z += (Math.random() - 0.5) * 0.35;
+
+                const vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * (type === 'spark' ? 10 : 2.5),
+                    type === 'smoke' ? 2.2 : (Math.random() * 4),
+                    (Math.random() - 0.5) * (type === 'spark' ? 10 : 2.5)
+                );
+
+                scene.add(mesh);
+                particleSystem.push({
+                    mesh,
+                    vel,
+                    life: 0.45 + Math.random() * 0.25,
+                    maxLife: 0.65
+                });
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = particleSystem.length - 1; i >= 0; i--) {
+                const p = particleSystem[i];
+                p.life -= dt;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    p.mesh.material.dispose();
+                    particleSystem.splice(i, 1);
+                } else {
+                    p.mesh.position.addScaledVector(p.vel, dt);
+                    const ratio = p.life / p.maxLife;
+                    p.mesh.scale.setScalar(ratio * 1.4);
+                    p.mesh.material.opacity = ratio;
+                }
+            }
+        }
+
+        // --- MANAJEMEN MODE & KAMERA ---
+        function switchMode(newMode) {
+            AppState.mode = newMode;
+            AppState.builderTestPhysics = false;
+            document.getElementById('modal-race-result').classList.add('hidden');
+            document.getElementById('race-banner').classList.add('hidden');
+
+            // Update tombol navigasi
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mode === newMode);
+            });
+
+            // Sembunyikan/tampilkan panel
+            document.getElementById('panel-builder').classList.toggle('hidden', newMode !== 'builder');
+            document.getElementById('panel-track').classList.toggle('hidden', newMode !== 'track');
+            document.getElementById('hud-driving').classList.toggle('hidden', newMode !== 'race' && newMode !== 'explore');
+            document.getElementById('hud-speedometer').classList.toggle('hidden', newMode !== 'race' && newMode !== 'explore');
+            document.getElementById('touch-controls').classList.toggle('hidden', newMode !== 'race' && newMode !== 'explore');
+
+            document.getElementById('hud-race-stats').classList.toggle('hidden', newMode !== 'race');
+            document.getElementById('btn-restart-race').classList.toggle('hidden', newMode !== 'race');
+            document.getElementById('hud-explore-tools').classList.toggle('hidden', newMode !== 'explore');
+
+            // Atur visibilitas Grup 3D
+            builderStageGroup.visible = (newMode === 'builder');
+            trackGroup.visible = (newMode !== 'builder');
+            placedPropsGroup.visible = (newMode !== 'builder');
+            waypointMarkersGroup.visible = (newMode === 'track');
+            if (selectionBoxHelper) selectionBoxHelper.visible = (newMode === 'builder');
+
+            if (newMode === 'builder') {
+                clearActiveVehicles();
+                orbitCam.target.set(0, 0.8, 0);
+                orbitCam.radius = 7.2;
+                orbitCam.phi = 1.1;
+                document.getElementById('lbl-camera').textContent = 'Orbit Studio';
+                rebuildBuilderMesh();
+            } else if (newMode === 'track') {
+                clearActiveVehicles();
+                orbitCam.target.set(0, 0, 0);
+                orbitCam.radius = 185;
+                orbitCam.phi = 0.45;
+                document.getElementById('lbl-camera').textContent = 'Peta Atas';
+                rebuildTrackAndProps();
+            } else if (newMode === 'race') {
+                AppState.flyMode = false;
+                AppState.cameraMode = 0;
+                document.getElementById('lbl-camera').textContent = 'Chase';
+                setupDrivingSession(true);
+            } else if (newMode === 'explore') {
+                AppState.cameraMode = 0;
+                document.getElementById('lbl-camera').textContent = 'Chase';
+                setupDrivingSession(false);
+            }
+        }
+
+        function updateCamera(dt) {
+            if ((AppState.mode === 'builder' && !AppState.builderTestPhysics) || AppState.mode === 'track') {
+                const x = orbitCam.target.x + orbitCam.radius * Math.sin(orbitCam.phi) * Math.sin(orbitCam.theta);
+                const y = orbitCam.target.y + orbitCam.radius * Math.cos(orbitCam.phi);
+                const z = orbitCam.target.z + orbitCam.radius * Math.sin(orbitCam.phi) * Math.cos(orbitCam.theta);
+                camera.position.set(x, Math.max(0.5, y), z);
+                camera.lookAt(orbitCam.target);
+                return;
+            }
+
+            if (!playerCar) return;
+            const carPos = playerCar.mesh.position;
+            const heading = playerCar.heading;
+
+            if (AppState.cameraMode === 0) {
+                // Chase Camera Dinamis
+                const dist = 8.5 + Math.min(3.0, Math.abs(playerCar.speed) * 0.05);
+                const idealPos = new THREE.Vector3(
+                    carPos.x - Math.sin(heading) * dist,
+                    carPos.y + 3.6,
+                    carPos.z - Math.cos(heading) * dist
+                );
+                camera.position.lerp(idealPos, 8 * dt);
+                const lookTarget = new THREE.Vector3(
+                    carPos.x + Math.sin(heading) * 4,
+                    carPos.y + 1.1,
+                    carPos.z + Math.cos(heading) * 4
+                );
+                camera.lookAt(lookTarget);
+            } else if (AppState.cameraMode === 1) {
+                // Hood / First-Person Camera
+                const hoodPos = new THREE.Vector3(
+                    carPos.x + Math.sin(heading) * 0.6,
+                    carPos.y + 1.55,
+                    carPos.z + Math.cos(heading) * 0.6
+                );
+                camera.position.copy(hoodPos);
+                const lookTarget = new THREE.Vector3(
+                    carPos.x + Math.sin(heading) * 20,
+                    carPos.y + 1.2,
+                    carPos.z + Math.cos(heading) * 20
+                );
+                camera.lookAt(lookTarget);
+            } else {
+                // Helicopter / Top-Down Camera
+                const topPos = new THREE.Vector3(carPos.x, carPos.y + 42, carPos.z - 18);
+                camera.position.lerp(topPos, 6 * dt);
+                camera.lookAt(carPos);
+            }
+        }
+
+        function setupPointerControls() {
+            const dom = renderer.domElement;
+
+            dom.addEventListener('pointerdown', (e) => {
+                orbitCam.prevX = e.clientX;
+                orbitCam.prevY = e.clientY;
+
+                if (e.button === 2 || e.shiftKey) {
+                    orbitCam.isPanning = true;
+                } else {
+                    orbitCam.isDragging = true;
+                }
+
+                // Klik di Track Builder untuk menambah titik sirkuit atau menaruh objek
+                if (AppState.mode === 'track' && e.button === 0 && !e.shiftKey) {
+                    const rect = dom.getBoundingClientRect();
+                    mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                    mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                    raycaster.setFromCamera(mouseNDC, camera);
+
+                    const hits = raycaster.intersectObject(groundPlaneMesh);
+                    if (hits.length > 0) {
+                        const pt = hits[0].point;
+                        if (AppState.trackTool === 'draw') {
+                            AppState.waypoints.push([Math.round(pt.x), Math.round(pt.z)]);
+                            rebuildTrackAndProps();
+                        } else if (AppState.trackTool === 'place') {
+                            const propName = document.getElementById('sel-place-prop').value;
+                            const rot = parseFloat(document.getElementById('inp-place-rot').value) || 0;
+                            const scale = parseFloat(document.getElementById('inp-place-scale').value) || 1.0;
+                            const dynamic = document.getElementById('chk-place-dynamic').checked;
+                            AppState.placedProps.push({
+                                propName,
+                                x: Math.round(pt.x),
+                                z: Math.round(pt.z),
+                                rot,
+                                scale,
+                                dynamic
+                            });
+                            rebuildPlacedPropsInWorld();
+                            showNotice(`${propName} ditambahkan ke kota`);
+                        }
+                    }
+                }
+
+                // Klik Raycast untuk memilih blok di 3D Builder
+                if (AppState.mode === 'builder' && !AppState.builderTestPhysics && e.button === 0) {
+                    const rect = dom.getBoundingClientRect();
+                    mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                    mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                    raycaster.setFromCamera(mouseNDC, camera);
+                    const hits = raycaster.intersectObjects(builderMeshGroup.children, true);
+                    if (hits.length > 0) {
+                        let obj = hits[0].object;
+                        while (obj && obj.parent !== builderMeshGroup) {
+                            obj = obj.parent;
+                        }
+                        if (obj && typeof obj.userData.partIndex === 'number') {
+                            AppState.selectedPartIndex = obj.userData.partIndex;
+                            rebuildBuilderMesh();
+                        }
+                    }
+                }
+            });
+
+            window.addEventListener('pointermove', (e) => {
+                if (!orbitCam.isDragging && !orbitCam.isPanning) return;
+                const dx = e.clientX - orbitCam.prevX;
+                const dy = e.clientY - orbitCam.prevY;
+                orbitCam.prevX = e.clientX;
+                orbitCam.prevY = e.clientY;
+
+                if (orbitCam.isDragging) {
+                    orbitCam.theta -= dx * 0.007;
+                    orbitCam.phi = THREE.MathUtils.clamp(orbitCam.phi - dy * 0.007, 0.15, Math.PI / 2 - 0.04);
+                } else if (orbitCam.isPanning) {
+                    const panFactor = orbitCam.radius * 0.0015;
+                    orbitCam.target.x -= dx * panFactor;
+                    orbitCam.target.z -= dy * panFactor;
+                }
+            });
+
+            window.addEventListener('pointerup', () => {
+                orbitCam.isDragging = false;
+                orbitCam.isPanning = false;
+            });
+
+            dom.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const minR = AppState.mode === 'builder' ? 3.2 : 25;
+                const maxR = AppState.mode === 'builder' ? 28 : 340;
+                orbitCam.radius = THREE.MathUtils.clamp(orbitCam.radius + e.deltaY * (AppState.mode === 'builder' ? 0.01 : 0.12), minR, maxR);
+            }, { passive: false });
+
+            dom.addEventListener('contextmenu', e => e.preventDefault());
+        }
+
+        function setupKeyboardControls() {
+            window.addEventListener('keydown', (e) => {
+                if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+                const k = e.key.toLowerCase();
+                if (k === 'w' || e.key === 'ArrowUp') AppState.keys.w = true;
+                if (k === 's' || e.key === 'ArrowDown') AppState.keys.s = true;
+                if (k === 'a' || e.key === 'ArrowLeft') AppState.keys.a = true;
+                if (k === 'd' || e.key === 'ArrowRight') AppState.keys.d = true;
+                if (e.key === 'Shift') AppState.keys.shift = true;
+                if (e.key === ' ') AppState.keys.space = true;
+
+                if (k === 'c') cycleCameraMode();
+                if (k === 'r') resetPlayerCarPosition();
+                if (k === 'f' && AppState.mode === 'explore') toggleFlyMode();
+            });
+
+            window.addEventListener('keyup', (e) => {
+                const k = e.key.toLowerCase();
+                if (k === 'w' || e.key === 'ArrowUp') AppState.keys.w = false;
+                if (k === 's' || e.key === 'ArrowDown') AppState.keys.s = false;
+                if (k === 'a' || e.key === 'ArrowLeft') AppState.keys.a = false;
+                if (k === 'd' || e.key === 'ArrowRight') AppState.keys.d = false;
+                if (e.key === 'Shift') AppState.keys.shift = false;
+                if (e.key === ' ') AppState.keys.space = false;
+            });
+
+            // Kontrol Sentuh Mobile
+            const bindTouch = (id, keyProp) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.addEventListener('pointerdown', (e) => { e.preventDefault(); AppState.keys[keyProp] = true; });
+                btn.addEventListener('pointerup', (e) => { e.preventDefault(); AppState.keys[keyProp] = false; });
+                btn.addEventListener('pointerleave', () => { AppState.keys[keyProp] = false; });
+            };
+            bindTouch('t-gas', 'w');
+            bindTouch('t-brake', 's');
+            bindTouch('t-left', 'a');
+            bindTouch('t-right', 'd');
+            bindTouch('t-boost', 'shift');
+            bindTouch('t-jump', 'space');
+        }
+
+        function cycleCameraMode() {
+            AppState.cameraMode = (AppState.cameraMode + 1) % 3;
+            const names = ['Chase', 'Kap Mesin', 'Atas'];
+            document.getElementById('lbl-camera').textContent = names[AppState.cameraMode];
+        }
+
+        function resetPlayerCarPosition() {
+            if (!playerCar) return;
+            let resetPt = new THREE.Vector3(0, 1.5, 0);
+            let resetHeading = 0;
+
+            if (AppState.checkpoints.length > 0) {
+                const cpIdx = (playerCar.nextCheckpoint - 1 + AppState.checkpoints.length) % AppState.checkpoints.length;
+                const cp = AppState.checkpoints[cpIdx];
+                resetPt.copy(cp.position);
+                resetPt.y = 1.2;
+                resetHeading = Math.atan2(cp.tangent.x, cp.tangent.z);
+            }
+            playerCar.body.position.set(resetPt.x, resetPt.y, resetPt.z);
+            playerCar.body.velocity.set(0, 0, 0);
+            playerCar.body.angularVelocity.set(0, 0, 0);
+            playerCar.speed = 0;
+            playerCar.heading = resetHeading;
+            showNotice("Posisi kendaraan direset ke jalur");
+        }
+
+        function toggleFlyMode() {
+            AppState.flyMode = !AppState.flyMode;
+            const lbl = document.getElementById('lbl-fly-state');
+            lbl.textContent = AppState.flyMode ? "Aktif" : "Nonaktif";
+            lbl.className = AppState.flyMode ? "text-orange-400 font-bold" : "text-zinc-400";
+            showNotice(AppState.flyMode ? "Mode Terbang Aktif (Gunakan Spasi & WASD)" : "Mode Terbang Nonaktif");
+        }
+
+        function populatePresetsDropdown() {
+            const sel = document.getElementById('sel-builder-preset');
+            sel.innerHTML = '';
+            const source = AppState.builderCategory === 'vehicle' ? AppState.vehicles : AppState.props;
+            Object.keys(source).forEach(key => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = key;
+                sel.appendChild(opt);
+            });
+        }
+
+        function populatePlacePropsDropdown() {
+            const sel = document.getElementById('sel-place-prop');
+            sel.innerHTML = '';
+            Object.keys(AppState.props).forEach(key => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = key;
+                sel.appendChild(opt);
+            });
+        }
+
+        function populateActiveVehiclesDropdown() {
+            const sel = document.getElementById('sel-active-vehicle');
+            sel.innerHTML = '';
+            Object.keys(AppState.vehicles).forEach(key => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = key;
+                if (key === AppState.activeVehicleName) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        function setupUIHandlers() {
+            // Navigasi Tab Utama
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => switchMode(btn.dataset.mode));
+            });
+
+            document.getElementById('btn-camera-switch').addEventListener('click', cycleCameraMode);
+
+            // Kategori Builder (Kendaraan vs Objek Kota)
+            const tabVeh = document.getElementById('tab-cat-vehicle');
+            const tabProp = document.getElementById('tab-cat-prop');
+            tabVeh.addEventListener('click', () => {
+                AppState.builderCategory = 'vehicle';
+                tabVeh.className = "py-1 text-xs font-medium rounded bg-zinc-800 text-white";
+                tabProp.className = "py-1 text-xs font-medium rounded text-zinc-400 hover:text-white";
+                populatePresetsDropdown();
+                const firstKey = Object.keys(AppState.vehicles)[0];
+                AppState.builderDesign = JSON.parse(JSON.stringify(AppState.vehicles[firstKey]));
+                document.getElementById('inp-design-title').value = AppState.builderDesign.name;
+                AppState.selectedPartIndex = 0;
+                rebuildBuilderMesh();
+            });
+
+            tabProp.addEventListener('click', () => {
+                AppState.builderCategory = 'prop';
+                tabProp.className = "py-1 text-xs font-medium rounded bg-zinc-800 text-white";
+                tabVeh.className = "py-1 text-xs font-medium rounded text-zinc-400 hover:text-white";
+                populatePresetsDropdown();
+                const firstKey = Object.keys(AppState.props)[0];
+                AppState.builderDesign = JSON.parse(JSON.stringify(AppState.props[firstKey]));
+                document.getElementById('inp-design-title').value = AppState.builderDesign.name;
+                AppState.selectedPartIndex = 0;
+                rebuildBuilderMesh();
+            });
+
+            // Muat Preset di Builder
+            document.getElementById('btn-load-preset').addEventListener('click', () => {
+                const key = document.getElementById('sel-builder-preset').value;
+                const source = AppState.builderCategory === 'vehicle' ? AppState.vehicles : AppState.props;
+                if (source[key]) {
+                    AppState.builderDesign = JSON.parse(JSON.stringify(source[key]));
+                    document.getElementById('inp-design-title').value = AppState.builderDesign.name;
+                    AppState.selectedPartIndex = 0;
+                    rebuildBuilderMesh();
+                    showNotice(`Preset "${key}" dimuat`);
+                }
+            });
+
+            // Uji Fisika Instan dari Builder
+            document.getElementById('btn-builder-test').addEventListener('click', () => {
+                const btn = document.getElementById('btn-builder-test');
+                if (!AppState.builderTestPhysics) {
+                    AppState.builderTestPhysics = true;
+                    btn.textContent = "Hentikan Uji";
+                    builderStageGroup.visible = false;
+                    playerCar = createVehicleEntity(AppState.builderDesign, new THREE.Vector3(0, 2.5, 0), 0, false);
+                    showNotice("Uji Fisika Aktif: Gunakan WASD, Shift, dan Spasi");
+                } else {
+                    AppState.builderTestPhysics = false;
+                    btn.textContent = "Uji Fisika";
+                    clearActiveVehicles();
+                    builderStageGroup.visible = true;
+                }
+            });
+
+            // Tambah Blok Geometri
+            document.querySelectorAll('.btn-add-part').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const shape = btn.dataset.addShape;
+                    const isWheel = shape === 'wheel';
+                    const isThruster = shape === 'thruster';
+                    const newPart = {
+                        id: 'p_' + Date.now(),
+                        name: shape.toUpperCase() + ' ' + (AppState.builderDesign.parts.length + 1),
+                        shape: shape,
+                        pos: [0, isWheel ? 0.45 : 1.2, 0],
+                        scl: isWheel ? [0.42, 0.85, 0.85] : (isThruster ? [0.35, 0.35, 0.6] : [1.0, 1.0, 1.0]),
+                        rot: [0, 0, 0],
+                        color: isWheel ? '#18181b' : '#f97316',
+                        matPreset: isWheel ? 'matte' : 'standard',
+                        metal: 0.4,
+                        rough: 0.3,
+                        fx: isThruster ? 'fire' : 'none',
+                        role: isWheel ? 'wheel_drive' : (isThruster ? 'thruster' : 'chassis')
+                    };
+                    AppState.builderDesign.parts.push(newPart);
+                    AppState.selectedPartIndex = AppState.builderDesign.parts.length - 1;
+                    rebuildBuilderMesh();
+                });
+            });
+
+            // Duplikat & Hapus Blok
+            document.getElementById('btn-dup-part').addEventListener('click', () => {
+                const parts = AppState.builderDesign.parts;
+                const cur = parts[AppState.selectedPartIndex];
+                if (!cur) return;
+                const copy = JSON.parse(JSON.stringify(cur));
+                copy.id = 'p_' + Date.now();
+                copy.name = cur.name + ' (Salinan)';
+                copy.pos[0] = Number((copy.pos[0] + 0.4).toFixed(2));
+                parts.push(copy);
+                AppState.selectedPartIndex = parts.length - 1;
+                rebuildBuilderMesh();
+            });
+
+            document.getElementById('btn-del-part').addEventListener('click', () => {
+                const parts = AppState.builderDesign.parts;
+                if (parts.length <= 1) {
+                    showNotice("Minimal harus terdapat 1 komponen blok");
+                    return;
+                }
+                parts.splice(AppState.selectedPartIndex, 1);
+                AppState.selectedPartIndex = Math.max(0, AppState.selectedPartIndex - 1);
+                rebuildBuilderMesh();
+            });
+
+            // Binding Input Inspector
+            const inspectorIds = [
+                'inp-part-name', 'inp-pos-x', 'inp-pos-y', 'inp-pos-z',
+                'inp-scl-x', 'inp-scl-y', 'inp-scl-z',
+                'inp-rot-x', 'inp-rot-y', 'inp-rot-z',
+                'inp-mat-color', 'sel-mat-preset', 'inp-mat-metal', 'inp-mat-rough',
+                'sel-part-fx', 'sel-part-role'
+            ];
+            inspectorIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', updateSelectedPartFromUI);
+            });
+
+            // Simpan Rancangan ke Katalog Sesi
+            document.getElementById('btn-save-catalog').addEventListener('click', () => {
+                const title = document.getElementById('inp-design-title').value.trim() || 'Rancangan Kustom';
+                AppState.builderDesign.name = title;
+                AppState.builderDesign.category = AppState.builderCategory;
+
+                if (AppState.builderCategory === 'vehicle') {
+                    AppState.vehicles[title] = JSON.parse(JSON.stringify(AppState.builderDesign));
+                    AppState.activeVehicleName = title;
+                    populateActiveVehiclesDropdown();
+                } else {
+                    AppState.props[title] = JSON.parse(JSON.stringify(AppState.builderDesign));
+                    populatePlacePropsDropdown();
+                }
+                populatePresetsDropdown();
+                showNotice(`"${title}" disimpan ke katalog aktif`);
+            });
+
+            // Track Builder Handlers
+            document.getElementById('btn-load-track-preset').addEventListener('click', () => {
+                const idx = parseInt(document.getElementById('sel-track-preset').value, 10) || 0;
+                const preset = TRACK_PRESETS[idx];
+                if (!preset) return;
+                AppState.trackWidth = preset.width;
+                AppState.trackCurbs = preset.curbs;
+                AppState.waypoints = JSON.parse(JSON.stringify(preset.waypoints));
+                AppState.placedProps = JSON.parse(JSON.stringify(preset.props));
+
+                document.getElementById('inp-track-width').value = preset.width;
+                document.getElementById('val-track-width').textContent = preset.width + 'm';
+                document.getElementById('chk-track-curbs').checked = preset.curbs;
+                rebuildTrackAndProps();
+                showNotice(`Sirkuit "${preset.name}" diterapkan`);
+            });
+
+            document.querySelectorAll('.btn-track-tool').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    AppState.trackTool = btn.dataset.trackTool;
+                    document.querySelectorAll('.btn-track-tool').forEach(b => {
+                        const active = b.dataset.trackTool === AppState.trackTool;
+                        b.className = active
+                            ? "btn-track-tool py-1.5 px-2 text-xs rounded bg-orange-600 text-white font-medium border border-orange-500"
+                            : "btn-track-tool py-1.5 px-2 text-xs rounded bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700";
+                    });
+                    const isDraw = AppState.trackTool === 'draw';
+                    document.getElementById('subpanel-track-draw').classList.toggle('hidden', !isDraw);
+                    document.getElementById('subpanel-track-place').classList.toggle('hidden', isDraw);
+                    document.getElementById('lbl-track-hint').textContent = isDraw
+                        ? "Klik pada permukaan tanah kota untuk menambahkan titik jalur sirkuit secara berurutan."
+                        : "Klik pada area kota atau sirkuit untuk menempatkan objek 3D yang dipilih.";
+                });
+            });
+
+            document.getElementById('inp-track-width').addEventListener('input', (e) => {
+                AppState.trackWidth = parseInt(e.target.value, 10) || 14;
+                document.getElementById('val-track-width').textContent = AppState.trackWidth + 'm';
+                rebuildTrackAndProps();
+            });
+
+            document.getElementById('chk-track-curbs').addEventListener('change', (e) => {
+                AppState.trackCurbs = e.target.checked;
+                rebuildTrackAndProps();
+            });
+
+            document.getElementById('btn-undo-wp').addEventListener('click', () => {
+                AppState.waypoints.pop();
+                rebuildTrackAndProps();
+            });
+
+            document.getElementById('btn-clear-wp').addEventListener('click', () => {
+                AppState.waypoints = [];
+                rebuildTrackAndProps();
+                showNotice("Klik pada peta untuk menggambar titik sirkuit baru");
+            });
+
+            document.getElementById('btn-clear-props').addEventListener('click', () => {
+                AppState.placedProps = [];
+                rebuildPlacedPropsInWorld();
+                showNotice("Semua objek tambahan dihapus");
+            });
+
+            document.getElementById('btn-track-to-race').addEventListener('click', () => {
+                if (AppState.waypoints.length < 3) {
+                    showNotice("Tambahkan minimal 3 titik jalur sebelum memulai balapan");
+                    return;
+                }
+                switchMode('race');
+            });
+
+            // Kontrol Balapan & Explore
+            document.getElementById('sel-active-vehicle').addEventListener('change', (e) => {
+                AppState.activeVehicleName = e.target.value;
+                setupDrivingSession(AppState.mode === 'race');
+            });
+
+            document.getElementById('btn-reset-car').addEventListener('click', resetPlayerCarPosition);
+            document.getElementById('btn-restart-race').addEventListener('click', () => setupDrivingSession(true));
+            document.getElementById('btn-modal-rematch').addEventListener('click', () => setupDrivingSession(true));
+            document.getElementById('btn-modal-explore').addEventListener('click', () => switchMode('explore'));
+
+            document.getElementById('btn-toggle-fly').addEventListener('click', toggleFlyMode);
+
+            document.getElementById('btn-spawn-ramp').addEventListener('click', () => {
+                if (!playerCar) return;
+                const pos = playerCar.body.position;
+                const h = playerCar.heading;
+                const rx = Math.round(pos.x + Math.sin(h) * 20);
+                const rz = Math.round(pos.z + Math.cos(h) * 20);
+                AppState.placedProps.push({
+                    propName: "Ramp Lompatan",
+                    x: rx,
+                    z: rz,
+                    rot: THREE.MathUtils.radToDeg(h),
+                    scale: 1.0,
+                    dynamic: false
+                });
+                rebuildPlacedPropsInWorld();
+                showNotice("Ramp lompatan dipasang tepat di depan Anda");
+            });
+
+            document.getElementById('btn-spawn-chaos').addEventListener('click', () => {
+                if (!playerCar) return;
+                const pos = playerCar.body.position;
+                const h = playerCar.heading;
+                const dynamicNames = ["Rintangan Barikade", "Orang Low-Poly", "Rambu Lalu Lintas", "Pohon Kota"];
+                for (let i = 0; i < 6; i++) {
+                    const pName = dynamicNames[i % dynamicNames.length];
+                    AppState.placedProps.push({
+                        propName: pName,
+                        x: Math.round(pos.x + Math.sin(h) * (16 + i * 3) + (Math.random() - 0.5) * 10),
+                        z: Math.round(pos.z + Math.cos(h) * (16 + i * 3) + (Math.random() - 0.5) * 10),
+                        rot: Math.round(Math.random() * 180),
+                        scale: 1.0,
+                        dynamic: true
+                    });
+                }
+                rebuildPlacedPropsInWorld();
+                showNotice("Rintangan dinamis ditambahkan di depan");
+            });
+
+            // --- Impor & Ekspor JSON ---
+            const openJsonModal = () => {
+                const exportPayload = {
+                    app: "OnFire",
+                    type: "sandbox_bundle",
+                    activeDesign: AppState.builderDesign,
+                    track: {
+                        width: AppState.trackWidth,
+                        curbs: AppState.trackCurbs,
+                        waypoints: AppState.waypoints,
+                        placedProps: AppState.placedProps
+                    }
+                };
+                document.getElementById('txt-json-data').value = JSON.stringify(exportPayload, null, 2);
+                document.getElementById('modal-json').classList.remove('hidden');
+            };
+
+            document.getElementById('btn-open-json').addEventListener('click', openJsonModal);
+            document.getElementById('btn-close-json').addEventListener('click', () => {
+                document.getElementById('modal-json').classList.add('hidden');
+            });
+
+            const triggerDownloadJson = () => {
+                const exportPayload = {
+                    app: "OnFire",
+                    type: "sandbox_bundle",
+                    activeDesign: AppState.builderDesign,
+                    track: {
+                        width: AppState.trackWidth,
+                        curbs: AppState.trackCurbs,
+                        waypoints: AppState.waypoints,
+                        placedProps: AppState.placedProps
+                    }
+                };
+                const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${(AppState.builderDesign.name || 'OnFire').replace(/\s+/g, '_')}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showNotice("Berkas JSON diunduh");
+            };
+
+            document.getElementById('btn-export-json-direct').addEventListener('click', triggerDownloadJson);
+            document.getElementById('btn-download-json').addEventListener('click', triggerDownloadJson);
+
+            document.getElementById('btn-copy-json').addEventListener('click', () => {
+                const txt = document.getElementById('txt-json-data');
+                txt.select();
+                document.execCommand('copy');
+                showNotice("JSON disalin ke papan klip");
+            });
+
+            const processImportedJsonString = (rawStr) => {
+                try {
+                    const parsed = JSON.parse(rawStr);
+                    if (parsed.activeDesign && Array.isArray(parsed.activeDesign.parts)) {
+                        AppState.builderDesign = parsed.activeDesign;
+                        const name = parsed.activeDesign.name || "Impor Kustom";
+                        document.getElementById('inp-design-title').value = name;
+                        if (parsed.activeDesign.category === 'prop') {
+                            AppState.props[name] = parsed.activeDesign;
+                            populatePlacePropsDropdown();
+                        } else {
+                            AppState.vehicles[name] = parsed.activeDesign;
+                            AppState.activeVehicleName = name;
+                            populateActiveVehiclesDropdown();
+                        }
+                        AppState.selectedPartIndex = 0;
+                        rebuildBuilderMesh();
+                    } else if (Array.isArray(parsed.parts)) {
+                        AppState.builderDesign = parsed;
+                        AppState.selectedPartIndex = 0;
+                        rebuildBuilderMesh();
+                    }
+
+                    if (parsed.track && Array.isArray(parsed.track.waypoints)) {
+                        AppState.trackWidth = Number(parsed.track.width) || 14;
+                        AppState.trackCurbs = Boolean(parsed.track.curbs);
+                        AppState.waypoints = parsed.track.waypoints;
+                        AppState.placedProps = Array.isArray(parsed.track.placedProps) ? parsed.track.placedProps : [];
+                        rebuildTrackAndProps();
+                    }
+                    document.getElementById('modal-json').classList.add('hidden');
+                    showNotice("Data JSON berhasil diimpor");
+                } catch (err) {
+                    showNotice("Format JSON tidak valid");
+                }
+            };
+
+            document.getElementById('btn-apply-json').addEventListener('click', () => {
+                processImportedJsonString(document.getElementById('txt-json-data').value);
+            });
+
+            document.getElementById('btn-import-json-direct').addEventListener('click', () => {
+                document.getElementById('file-json-input').click();
+            });
+
+            document.getElementById('file-json-input').addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => processImportedJsonString(ev.target.result);
+                reader.readAsText(file);
+                e.target.value = '';
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.05);
+
+            // Step Fisika Cannon.js
+            if (AppState.mode === 'race' || AppState.mode === 'explore' || AppState.builderTestPhysics) {
+                physicsWorld.step(1 / 60, dt, 3);
+
+                if (playerCar) updateVehiclePhysics(playerCar, dt);
+                aiCars.forEach(ai => updateVehiclePhysics(ai, dt));
+
+                // Sinkronisasi Objek Kota Dinamis (Pohon, Rambu, Barikade, Orang)
+                activePhysicsProps.forEach(item => {
+                    if (item.isDynamic) {
+                        item.mesh.position.copy(item.body.position);
+                        item.mesh.quaternion.copy(item.body.quaternion);
+                    }
+                });
+
+                updateRaceHUD();
+            }
+
+            if (selectionBoxHelper && AppState.mode === 'builder') {
+                selectionBoxHelper.update();
+            }
+
+            updateParticles(dt);
+            updateCamera(dt);
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function () {
+            initEngine();
+            animate();
+        };
+    </script>
+</body>
+</html>

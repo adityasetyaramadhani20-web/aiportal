@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SpaceStecu</title>
+    <!-- Tailwind CSS untuk Layout & UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            background-color: #050510;
+            color: #0f0;
+            font-family: 'Press Start 2P', monospace; /* Font gaya retro */
+            margin: 0;
+            overflow: hidden;
+            touch-action: none; /* Mencegah pull-to-refresh di mobile */
+            user-select: none;
+        }
+
+        #gameCanvas {
+            display: none; /* Disembunyikan awalnya */
+            background-color: transparent;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+            border: 2px solid #0f0;
+            border-radius: 8px;
+            image-rendering: pixelated;
+        }
+
+        /* Efek neon untuk UI */
+        .neon-text {
+            text-shadow: 0 0 5px #0f0, 0 0 10px #0f0, 0 0 20px #0f0;
+        }
+        
+        .neon-text-red {
+            color: #ff0055;
+            text-shadow: 0 0 5px #ff0055, 0 0 10px #ff0055;
+        }
+        
+        .neon-text-yellow {
+            color: #ffdd00;
+            text-shadow: 0 0 5px #ffdd00, 0 0 10px #ffdd00;
+        }
+
+        .neon-btn {
+            background-color: transparent;
+            color: #0f0;
+            border: 2px solid #0f0;
+            box-shadow: 0 0 10px #0f0, inset 0 0 10px #0f0;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .neon-btn:hover, .neon-btn:active {
+            background-color: #0f0;
+            color: #000;
+            box-shadow: 0 0 20px #0f0, inset 0 0 20px #0f0;
+            transform: scale(1.05);
+        }
+        
+        .neon-btn-frenzy {
+            color: #ff0055;
+            border-color: #ff0055;
+            box-shadow: 0 0 10px #ff0055, inset 0 0 10px #ff0055;
+        }
+        
+        .neon-btn-frenzy:hover, .neon-btn-frenzy:active {
+            background-color: #ff0055;
+            color: #fff;
+            box-shadow: 0 0 20px #ff0055, inset 0 0 20px #ff0055;
+        }
+
+        /* Menu overlays */
+        .overlay-menu {
+            background: rgba(5, 5, 16, 0.9);
+            border: 2px solid #0f0;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        /* Animasi goncangan layar */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .shake-active {
+            animation: shake 0.3s;
+        }
+
+        /* Tombol Kontrol Mobile */
+        .mobile-btn {
+            background: rgba(0, 255, 0, 0.1);
+            border: 2px solid rgba(0, 255, 0, 0.5);
+            color: rgba(0, 255, 0, 0.8);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+        .mobile-btn:active {
+            background: rgba(0, 255, 0, 0.4);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center h-screen w-screen relative">
+
+    <!-- Latar Belakang Animasi Bintang -->
+    <canvas id="bgCanvas" class="absolute top-0 left-0 w-full h-full -z-10"></canvas>
+
+    <!-- Header Stats (Saat Bermain) -->
+    <div id="gameStats" class="hidden absolute top-4 left-0 w-full px-4 md:px-10 flex justify-between items-center text-[10px] md:text-sm lg:text-base z-10 pointer-events-none">
+        <div class="flex flex-col gap-2">
+            <div id="score" class="text-white">Skor: <span class="text-[#0f0]">0</span></div>
+            <div id="highScore" class="text-white opacity-70 text-[8px] md:text-xs">Hi-Skor: <span class="text-[#0f0]">0</span></div>
+        </div>
+        <div class="flex flex-col gap-2 text-right">
+            <div id="modeDisplay" class="text-[#ffdd00] text-[8px] md:text-xs mb-1">MODE</div>
+            <div id="level" class="text-[#0ff]">Level 1</div>
+            <div id="lives" class="text-[#ff0055]">Nyawa: ♥♥♥</div>
+        </div>
+    </div>
+
+    <!-- Container Game Utama -->
+    <div id="gameContainer" class="relative">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- Overlay Kontrol Mobile (Hanya muncul di layar kecil saat main) -->
+    <div id="mobileControls" class="hidden absolute bottom-8 left-0 w-full px-8 flex justify-between items-end z-20 md:hidden">
+        <div class="flex gap-4">
+            <button id="btnLeft" class="mobile-btn">◀</button>
+            <button id="btnRight" class="mobile-btn">▶</button>
+        </div>
+        <button id="btnShoot" class="mobile-btn" style="width: 70px; height: 70px; font-size: 16px;">FIRE</button>
+    </div>
+
+    <!-- Tombol Pause -->
+    <button id="pauseBtn" class="hidden absolute top-4 right-4 md:right-10 text-white opacity-50 hover:opacity-100 z-20 text-xl pointer-events-auto">⏸</button>
+
+    <!-- MENU UTAMA -->
+    <div id="mainMenu" class="overlay-menu rounded-xl p-8 flex flex-col items-center max-w-[90%] md:max-w-md w-full absolute z-50">
+        <h1 class="text-3xl md:text-4xl text-center mb-2 neon-text tracking-widest leading-tight">SPACE<br>STECU</h1>
+        <p class="text-xs md:text-sm text-gray-400 mb-8 tracking-widest"></p>
+        
+        <div class="flex flex-col w-full gap-4">
+            <button id="normalModeBtn" class="neon-btn py-4 px-6 rounded text-sm md:text-base cursor-pointer">MODE KLASIK</button>
+            <button id="frenzyModeBtn" class="neon-btn neon-btn-frenzy py-4 px-6 rounded text-sm md:text-base cursor-pointer">MODE FRENZY</button>
+        </div>
+        <p class="mt-8 text-[10px] text-gray-500 text-center leading-relaxed">
+            Kontrol: A/D atau Panah, Spasi menembak.<br><br>
+            <span class="text-[#0f0]">Klasik:</span> Santai, musuh & peluru bertambah bertahap.<br>
+            <span class="text-[#ff0055]">Frenzy:</span> Chaos, musuh banyak, aktifkan Machine Gun!
+        </p>
+    </div>
+
+    <!-- MESSAGE BOX (Game Over / Level Up / Pause) -->
+    <div id="messageBox" class="overlay-menu rounded-xl p-8 hidden flex-col items-center max-w-[90%] md:max-w-sm w-full absolute z-50">
+        <h2 id="messageTitle" class="text-2xl md:text-3xl mb-4 text-center neon-text-red">PERMAINAN BERAKHIR</h2>
+        <p id="messageText" class="text-sm md:text-base mb-8 text-center text-white"></p>
+        <div class="flex flex-col w-full gap-3">
+            <button id="resumeButton" class="neon-btn py-3 px-6 rounded text-sm cursor-pointer hidden">LANJUTKAN</button>
+            <button id="restartButton" class="neon-btn py-3 px-6 rounded text-sm cursor-pointer">MULAI ULANG</button>
+            <button id="quitButton" class="neon-btn py-3 px-6 rounded text-sm cursor-pointer text-gray-400 border-gray-400 shadow-none hover:bg-gray-800 hover:text-white hover:border-white hover:shadow-none">KELUAR</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Setup Canvas Utama & Latar Belakang ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const bgCanvas = document.getElementById('bgCanvas');
+        const bgCtx = bgCanvas.getContext('2d');
+
+        // --- Elemen UI ---
+        const ui = {
+            mainMenu: document.getElementById('mainMenu'),
+            messageBox: document.getElementById('messageBox'),
+            stats: document.getElementById('gameStats'),
+            mobileControls: document.getElementById('mobileControls'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            gameContainer: document.getElementById('gameContainer'),
+            score: document.querySelector('#score span'),
+            highScore: document.querySelector('#highScore span'),
+            level: document.getElementById('level'),
+            lives: document.getElementById('lives'),
+            modeDisplay: document.getElementById('modeDisplay'),
+            msgTitle: document.getElementById('messageTitle'),
+            msgText: document.getElementById('messageText'),
+            
+            // Buttons
+            btnNormal: document.getElementById('normalModeBtn'),
+            btnFrenzy: document.getElementById('frenzyModeBtn'),
+            btnRestart: document.getElementById('restartButton'),
+            btnResume: document.getElementById('resumeButton'),
+            btnQuit: document.getElementById('quitButton'),
+            
+            // Mobile Buttons
+            btnLeft: document.getElementById('btnLeft'),
+            btnRight: document.getElementById('btnRight'),
+            btnShoot: document.getElementById('btnShoot')
+        };
+
+        // --- State Game ---
+        let gameState = {
+            status: 'MENU', // MENU, PLAYING, PAUSED, GAMEOVER, TRANSITION
+            mode: 'NORMAL', // NORMAL, FRENZY
+            score: 0,
+            highScore: parseInt(localStorage.getItem('spaceStecuHighScore')) || 0,
+            level: 1,
+            lives: 3,
+            lastTime: 0,
+            animationId: null,
+            bgAnimationId: null,
+            lastAlienShot: 0,
+            alienShootInterval: 3000
+        };
+
+        ui.highScore.textContent = gameState.highScore;
+
+        // Entitas Game
+        let player;
+        let invaders = [];
+        let bullets = [];
+        let particles = [];
+        let stars = [];
+
+        // Konstanta Kesulitan
+        const BASE_INVADER_SPEED = 0.3;
+
+        // --- Sistem Audio Sederhana (Web Audio API) ---
+        let audioCtx = null;
+        const sfx = {
+            shoot: () => playTone(800, 'square', 0.05, -2000),
+            alienShoot: () => playTone(300, 'sawtooth', 0.1, -500),
+            hit: () => playTone(150, 'sawtooth', 0.1, -100, 'lowpass', 400),
+            explosion: () => playNoise(0.2),
+            levelUp: () => { playTone(400, 'sine', 0.1, 200); setTimeout(() => playTone(600, 'sine', 0.1, 200), 100); setTimeout(() => playTone(800, 'sine', 0.2, 200), 200); },
+            gameOver: () => { playTone(300, 'sawtooth', 0.4, -100); setTimeout(() => playTone(250, 'sawtooth', 0.6, -100), 300); }
+        };
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTone(freq, type, duration, freqSlide = 0, filterType = null, filterFreq = 1000) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            if (freqSlide !== 0) {
+                osc.frequency.exponentialRampToValueAtTime(Math.max(10, freq + freqSlide), audioCtx.currentTime + duration);
+            }
+
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+            osc.connect(gain);
+            
+            if (filterType) {
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = filterType;
+                filter.frequency.value = filterFreq;
+                gain.connect(filter);
+                filter.connect(audioCtx.destination);
+            } else {
+                gain.connect(audioCtx.destination);
+            }
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playNoise(duration) {
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * duration;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 1000;
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            noise.start();
+        }
+
+        // --- Ukuran Kanvas Responsif ---
+        function resizeCanvas() {
+            // Background kanvas selalu full screen
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+
+            // Game kanvas dengan rasio aspek tetap
+            const paddingX = window.innerWidth < 768 ? 20 : 100;
+            const paddingY = window.innerWidth < 768 ? 150 : 100; // Ruang ekstra untuk kontrol mobile
+            
+            canvas.width = Math.min(800, window.innerWidth - paddingX);
+            canvas.height = Math.min(600, window.innerHeight - paddingY);
+            
+            // Re-inisialisasi bintang saat di-resize
+            initStars();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Latar Belakang Bintang ---
+        function initStars() {
+            stars = [];
+            const numStars = window.innerWidth < 768 ? 50 : 150;
+            for (let i = 0; i < numStars; i++) {
+                stars.push({
+                    x: Math.random() * bgCanvas.width,
+                    y: Math.random() * bgCanvas.height,
+                    size: Math.random() * 2,
+                    speed: Math.random() * 0.5 + 0.1,
+                    brightness: Math.random()
+                });
+            }
+        }
+
+        function drawBackground() {
+            bgCtx.fillStyle = '#050510';
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            
+            stars.forEach(star => {
+                // Kecepatan bintang menyesuaikan mode dan status game
+                let speedFactor = gameState.status === 'PLAYING' ? 2 : 0.5;
+                if (gameState.mode === 'FRENZY' && gameState.status === 'PLAYING') speedFactor = 4;
+
+                star.y += star.speed * speedFactor;
+                if (star.y > bgCanvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * bgCanvas.width;
+                }
+                
+                // Kedipan bintang
+                star.brightness += (Math.random() - 0.75) * 0.05;
+                star.brightness = Math.max(0.1, Math.min(1, star.brightness));
+                
+                bgCtx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+                bgCtx.beginPath();
+                bgCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                bgCtx.fill();
+            });
+            gameState.bgAnimationId = requestAnimationFrame(drawBackground);
+        }
+
+        // --- Kelas Entitas Utama ---
+
+        class Player {
+            constructor() {
+                this.width = 30;
+                this.height = 30;
+                this.x = canvas.width / 2 - this.width / 2;
+                this.y = canvas.height - this.height - 10;
+                this.speed = window.innerWidth < 768 ? 4 : 6;
+                this.dx = 0;
+                this.color = '#0f0';
+                this.lastShot = 0;
+                // Di Mode Frenzy, tembakan machine gun aktif. Mode Klasik lebih santai.
+                this.fireCooldown = gameState.mode === 'FRENZY' ? 60 : 250; 
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                
+                // Gambar pesawat bentuk segitiga/roket
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width / 2, this.y); // Ujung atas
+                ctx.lineTo(this.x + this.width, this.y + this.height); // Kanan bawah
+                ctx.lineTo(this.x + this.width/2 + 5, this.y + this.height - 8); // Celah tengah kanan
+                ctx.lineTo(this.x + this.width/2 - 5, this.y + this.height - 8); // Celah tengah kiri
+                ctx.lineTo(this.x, this.y + this.height); // Kiri bawah
+                ctx.closePath();
+                ctx.fill();
+                
+                // Mesin api (jika sedang bergerak atau idle)
+                ctx.fillStyle = Math.random() > 0.5 ? '#ff9900' : '#ff0000';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#ff0000';
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width/2 - 4, this.y + this.height - 5);
+                ctx.lineTo(this.x + this.width/2 + 4, this.y + this.height - 5);
+                ctx.lineTo(this.x + this.width/2, this.y + this.height + (Math.random() * 10 + 5));
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.shadowBlur = 0; // Reset
+            }
+
+            update(time) {
+                this.x += this.dx;
+                // Batasan layar
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+                // Tembak secara terus menerus jika tombol spasi ditahan
+                if (keys[' ']) {
+                    this.shoot(time);
+                }
+            }
+
+            shoot(time) {
+                if (time - this.lastShot > this.fireCooldown) {
+                    bullets.push(new Bullet(this.x + this.width / 2 - 2, this.y, -7, '#0f0', true));
+                    sfx.shoot();
+                    this.lastShot = time;
+                }
+            }
+        }
+
+        class Invader {
+            constructor(x, y, type) {
+                this.width = 24;
+                this.height = 20;
+                this.x = x;
+                this.y = y;
+                this.type = type; // 0, 1, atau 2 untuk jenis alien yang berbeda
+                this.colors = ['#ff0055', '#00ffff', '#ffdd00'];
+                this.color = this.colors[this.type % this.colors.length];
+                this.animationTimer = 0;
+                this.frame = 0;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                
+                // Gambar alien sederhana dengan path
+                const w = this.width;
+                const h = this.height;
+                const cx = this.x;
+                const cy = this.y;
+
+                ctx.beginPath();
+                // Menggambar bentuk pixel-art style disederhanakan menggunakan rects
+                const p = w / 6; // ukuran pixel
+                
+                // Pola dasar Alien tergantung frame
+                if (this.frame === 0) {
+                    ctx.fillRect(cx+p*1, cy, p*4, p); // Atas
+                    ctx.fillRect(cx, cy+p, p*6, p*2); // Badan
+                    ctx.clearRect(cx+p*1.5, cy+p, p, p); // Mata kiri
+                    ctx.clearRect(cx+p*3.5, cy+p, p, p); // Mata kanan
+                    ctx.fillRect(cx+p*1, cy+p*3, p*1.5, p*2); // Kaki kiri
+                    ctx.fillRect(cx+p*3.5, cy+p*3, p*1.5, p*2); // Kaki kanan
+                } else {
+                    ctx.fillRect(cx+p*1, cy, p*4, p);
+                    ctx.fillRect(cx, cy+p, p*6, p*2);
+                    ctx.clearRect(cx+p*1.5, cy+p, p, p);
+                    ctx.clearRect(cx+p*3.5, cy+p, p, p);
+                    ctx.fillRect(cx, cy+p*3, p*1.5, p*1.5); // Kaki luar kiri
+                    ctx.fillRect(cx+p*4.5, cy+p*3, p*1.5, p*1.5); // Kaki luar kanan
+                }
+                ctx.shadowBlur = 0;
+            }
+
+            update(time) {
+                // Ganti frame animasi setiap 500ms
+                if (time - this.animationTimer > 500) {
+                    this.frame = this.frame === 0 ? 1 : 0;
+                    this.animationTimer = time;
+                }
+            }
+        }
+
+        class Bullet {
+            constructor(x, y, dy, color, isPlayer) {
+                this.x = x;
+                this.y = y;
+                this.width = 4;
+                this.height = isPlayer ? 15 : 10;
+                this.dy = dy;
+                this.color = color;
+                this.isPlayer = isPlayer;
+                this.markedForDeletion = false;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.shadowBlur = 0;
+            }
+
+            update() {
+                this.y += this.dy;
+                if (this.y < 0 || this.y > canvas.height) {
+                    this.markedForDeletion = true;
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 3 + 1;
+                this.dx = (Math.random() - 0.5) * 6;
+                this.dy = (Math.random() - 0.5) * 6;
+                this.color = color;
+                this.life = 1.0; // Opacity
+                this.decay = Math.random() * 0.03 + 0.02;
+            }
+            draw() {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1.0;
+            }
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+                this.life -= this.decay;
+            }
+        }
+
+        // --- Logika Game Inti ---
+
+        let invaderDirection = 1; // 1 = kanan, -1 = kiri
+        let invaderDrop = false;
+        let invaderSpeedMult = 1;
+
+        function initLevel() {
+            player = new Player();
+            invaders = [];
+            bullets = [];
+            particles = [];
+            invaderDirection = 1;
+            
+            // Pergerakan bertambah 0.1x (10%) setiap naik level dari dasar kecepatan
+            invaderSpeedMult = 1 + ((gameState.level - 1) * 0.1);
+
+            // Perhitungan Tembakan Alien: bertambah 0.1x tiap naik level (Interval mengecil)
+            let baseShootInterval = 3000 / (1 + ((gameState.level - 1) * 0.1));
+            
+            // Jika Frenzy, alien tembak 1,5x lebih sering sejak awal
+            if (gameState.mode === 'FRENZY') {
+                baseShootInterval = baseShootInterval / 1.5;
+            }
+            gameState.alienShootInterval = Math.max(200, baseShootInterval); // Minimum cap 200ms
+            gameState.lastAlienShot = performance.now();
+
+            // Tata letak musuh
+            const cols = Math.max(4, Math.floor((canvas.width - 40) / 45)); 
+            
+            // Baris musuh bertambah sesuai level. Di Mode Frenzy, musuh jauh lebih banyak.
+            let rows = 3 + Math.floor(gameState.level / 3);
+            if (gameState.mode === 'FRENZY') {
+                rows += 2; // Extra pasukan di mode frenzy
+            }
+            rows = Math.min(8, rows); // Maksimal 8 baris agar muat di layar
+
+            const startX = (canvas.width - (cols * 45)) / 2 + 10;
+            const startY = 40;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    // Type alien berdasar baris
+                    let type = 0;
+                    if (r > 1) type = 1;
+                    if (r > 3) type = 2;
+                    invaders.push(new Invader(startX + c * 45, startY + r * 35, type));
+                }
+            }
+
+            ui.level.textContent = `Level ${gameState.level}`;
+            ui.modeDisplay.textContent = gameState.mode === 'FRENZY' ? 'MODE FRENZY' : 'MODE KLASIK';
+            ui.modeDisplay.className = gameState.mode === 'FRENZY' ? 'text-[#ff0055] text-[10px] md:text-xs mb-1 neon-text-red' : 'text-[#0f0] text-[10px] md:text-xs mb-1';
+            updateLivesDisplay();
+        }
+
+        function createExplosion(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function shakeScreen() {
+            ui.gameContainer.classList.add('shake-active');
+            setTimeout(() => {
+                ui.gameContainer.classList.remove('shake-active');
+            }, 300);
+        }
+
+        function updateLivesDisplay() {
+            ui.lives.textContent = 'Nyawa: ' + '♥'.repeat(Math.max(0, gameState.lives));
+        }
+
+        function handleCollisions() {
+            // Peluru
+            bullets.forEach(bullet => {
+                if (bullet.isPlayer) {
+                    // Cek tabrakan dengan alien
+                    invaders.forEach((invader, i) => {
+                        if (!bullet.markedForDeletion &&
+                            bullet.x < invader.x + invader.width &&
+                            bullet.x + bullet.width > invader.x &&
+                            bullet.y < invader.y + invader.height &&
+                            bullet.height + bullet.y > invader.y) {
+                                
+                            bullet.markedForDeletion = true;
+                            createExplosion(invader.x + invader.width/2, invader.y + invader.height/2, invader.color);
+                            invaders.splice(i, 1);
+                            sfx.hit();
+                            
+                            // Tambah skor dan percepat sisa alien sedikit
+                            gameState.score += (10 * gameState.level);
+                            if (gameState.mode === 'FRENZY') gameState.score += 5; // Bonus skor frenzy
+                            ui.score.textContent = gameState.score;
+                            invaderSpeedMult += 0.02; 
+                        }
+                    });
+                } else {
+                    // Peluru alien ke player
+                    if (!bullet.markedForDeletion &&
+                        bullet.x < player.x + player.width &&
+                        bullet.x + bullet.width > player.x &&
+                        bullet.y < player.y + player.height &&
+                        bullet.height + bullet.y > player.y) {
+                            
+                        bullet.markedForDeletion = true;
+                        playerHit();
+                    }
+                }
+            });
+
+            // Alien ke player (Game Over instan jika tertabrak)
+            invaders.forEach(invader => {
+                if (invader.y + invader.height >= player.y) {
+                    playerHit(true); // true = mati instan
+                }
+            });
+        }
+
+        function playerHit(instantDeath = false) {
+            createExplosion(player.x + player.width/2, player.y + player.height/2, '#0f0', 30);
+            sfx.explosion();
+            shakeScreen();
+
+            if (instantDeath) {
+                gameState.lives = 0;
+            } else {
+                gameState.lives--;
+            }
+            
+            updateLivesDisplay();
+
+            if (gameState.lives <= 0) {
+                gameOver();
+            } else {
+                // Reset posisi player & bersihkan peluru alien
+                player.x = canvas.width / 2 - player.width / 2;
+                bullets = bullets.filter(b => b.isPlayer);
+            }
+        }
+
+        function updateEntities(time) {
+            player.update(time);
+
+            // Gerakan Invader
+            let hitEdge = false;
+            invaders.forEach(invader => {
+                invader.update(time);
+                invader.x += BASE_INVADER_SPEED * invaderSpeedMult * invaderDirection;
+                if (invader.x <= 0 || invader.x + invader.width >= canvas.width) {
+                    hitEdge = true;
+                }
+            });
+
+            if (hitEdge) {
+                invaderDirection *= -1;
+                invaders.forEach(invader => {
+                    invader.y += 20; // Turun ke bawah
+                });
+            }
+
+            // Sistem Tembakan Alien Klasik (1 per 1 berdasarkan interval)
+            if (time - gameState.lastAlienShot > gameState.alienShootInterval && invaders.length > 0) {
+                const shooter = invaders[Math.floor(Math.random() * invaders.length)];
+                bullets.push(new Bullet(shooter.x + shooter.width/2, shooter.y + shooter.height, 4 + (gameState.level * 0.2), '#ff0055', false));
+                if (Math.random() < 0.5) sfx.alienShoot(); // Putar suara sesekali agar tidak bising
+                gameState.lastAlienShot = time;
+            }
+
+            // Peluru
+            bullets.forEach(bullet => bullet.update());
+            bullets = bullets.filter(b => !b.markedForDeletion);
+
+            // Partikel
+            particles.forEach(p => p.update());
+            particles = particles.filter(p => p.life > 0);
+
+            // Cek Menang Level
+            if (invaders.length === 0 && gameState.status === 'PLAYING') {
+                levelUp();
+            }
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Transparan, karena bg diurus canvas belakang
+            
+            if (gameState.status !== 'GAMEOVER' || particles.length > 0) {
+                if (gameState.lives > 0) player.draw();
+            }
+            
+            invaders.forEach(invader => invader.draw());
+            bullets.forEach(bullet => bullet.draw());
+            particles.forEach(particle => particle.draw());
+        }
+
+        function gameLoop(time) {
+            if (gameState.status === 'PLAYING') {
+                updateEntities(time);
+                handleCollisions();
+                drawGame();
+            } else if (gameState.status === 'GAMEOVER' || gameState.status === 'TRANSITION') {
+                // Tetap gambar sisa partikel saat transisi/game over
+                particles.forEach(p => p.update());
+                particles = particles.filter(p => p.life > 0);
+                drawGame();
+            }
+
+            if (gameState.status !== 'MENU') {
+                gameState.animationId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // --- Kontrol Transisi Game ---
+
+        function startGame(startLvl, mode) {
+            initAudio();
+            gameState.mode = mode;
+            gameState.level = startLvl;
+            gameState.score = 0;
+            gameState.lives = 3;
+            gameState.status = 'PLAYING';
+            ui.score.textContent = '0';
+            
+            hideAllMenus();
+            ui.stats.classList.remove('hidden');
+            ui.pauseBtn.classList.remove('hidden');
+            canvas.style.display = 'block';
+            
+            // Cek apakah perangkat mobile, jika iya tampilkan kontrol sentuh
+            if (window.innerWidth < 768 || ('ontouchstart' in window)) {
+                ui.mobileControls.classList.remove('hidden');
+            }
+
+            resizeCanvas();
+            initLevel();
+            
+            if (gameState.animationId) cancelAnimationFrame(gameState.animationId);
+            gameState.animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function levelUp() {
+            gameState.status = 'TRANSITION';
+            sfx.levelUp();
+            
+            ui.msgTitle.textContent = "MISI SELESAI";
+            ui.msgTitle.className = "text-2xl md:text-3xl mb-4 text-center neon-text"; // Warna hijau
+            ui.msgText.textContent = `Persiapan menuju Level ${gameState.level + 1}...`;
+            ui.btnResume.classList.add('hidden');
+            ui.btnRestart.classList.add('hidden');
+            ui.btnQuit.classList.add('hidden');
+            ui.messageBox.style.display = 'flex';
+
+            setTimeout(() => {
+                if(gameState.status === 'MENU') return; // Jika user menekan sesuatu saat jeda
+                gameState.level++;
+                ui.messageBox.style.display = 'none';
+                initLevel();
+                gameState.status = 'PLAYING';
+            }, 2500);
+        }
+
+        function gameOver() {
+            gameState.status = 'GAMEOVER';
+            sfx.gameOver();
+            
+            if (gameState.score > gameState.highScore) {
+                gameState.highScore = gameState.score;
+                localStorage.setItem('spaceStecuHighScore', gameState.highScore);
+                ui.highScore.textContent = gameState.highScore;
+            }
+
+            ui.msgTitle.textContent = "PERMAINAN BERAKHIR";
+            ui.msgTitle.className = "text-2xl md:text-3xl mb-4 text-center neon-text-red";
+            ui.msgText.innerHTML = `Layar Radar Mati.<br><br>Skor Akhir: <span class="text-[#0f0]">${gameState.score}</span>`;
+            
+            ui.btnResume.classList.add('hidden');
+            ui.btnRestart.classList.remove('hidden');
+            ui.btnQuit.classList.remove('hidden');
+            ui.messageBox.style.display = 'flex';
+        }
+
+        function pauseGame() {
+            if (gameState.status === 'PLAYING') {
+                gameState.status = 'PAUSED';
+                ui.msgTitle.textContent = "JEDA TACTICAL";
+                ui.msgTitle.className = "text-2xl md:text-3xl mb-4 text-center text-white";
+                ui.msgText.textContent = "Menunggu arahan komandan...";
+                
+                ui.btnResume.classList.remove('hidden');
+                ui.btnRestart.classList.remove('hidden');
+                ui.btnQuit.classList.remove('hidden');
+                ui.messageBox.style.display = 'flex';
+            } else if (gameState.status === 'PAUSED') {
+                resumeGame();
+            }
+        }
+
+        function resumeGame() {
+            ui.messageBox.style.display = 'none';
+            gameState.status = 'PLAYING';
+        }
+
+        function hideAllMenus() {
+            ui.mainMenu.style.display = 'none';
+            ui.messageBox.style.display = 'none';
+        }
+
+        function showMainMenu() {
+            gameState.status = 'MENU';
+            hideAllMenus();
+            ui.stats.classList.add('hidden');
+            ui.mobileControls.classList.add('hidden');
+            ui.pauseBtn.classList.add('hidden');
+            canvas.style.display = 'none';
+            ui.mainMenu.style.display = 'flex';
+            if (gameState.animationId) cancelAnimationFrame(gameState.animationId);
+        }
+
+        // --- Event Listeners Input ---
+        
+        // Keyboard
+        const keys = { ArrowLeft: false, ArrowRight: false, a: false, d: false, ' ': false };
+        window.addEventListener('keydown', (e) => {
+            if (gameState.status !== 'PLAYING') {
+                if (e.key === 'Escape' && gameState.status === 'PAUSED') resumeGame();
+                else if (e.key === 'Escape' && gameState.status === 'PLAYING') pauseGame();
+                return;
+            }
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+            if (e.key === 'Escape') pauseGame();
+            updatePlayerDx();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+            updatePlayerDx();
+        });
+
+        function updatePlayerDx() {
+            if (!player) return;
+            if (keys.ArrowLeft || keys.a) player.dx = -player.speed;
+            else if (keys.ArrowRight || keys.d) player.dx = player.speed;
+            else player.dx = 0;
+        }
+
+        // Kontrol Mobile (Tombol)
+        function setupMobileBtn(btn, isLeft) {
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); if(player) player.dx = isLeft ? -player.speed : player.speed; }, {passive: false});
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); if(player) player.dx = 0; }, {passive: false});
+            btn.addEventListener('mousedown', (e) => { if(player) player.dx = isLeft ? -player.speed : player.speed; });
+            btn.addEventListener('mouseup', (e) => { if(player) player.dx = 0; });
+            btn.addEventListener('mouseleave', (e) => { if(player) player.dx = 0; });
+        }
+        setupMobileBtn(ui.btnLeft, true);
+        setupMobileBtn(ui.btnRight, false);
+
+        let shootInterval;
+        ui.btnShoot.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState.status !== 'PLAYING') return;
+            player.shoot(performance.now());
+            // Auto fire saat ditekan tahan (interval menyesuaikan cooldown mode yang dipilih)
+            shootInterval = setInterval(() => {
+                if (gameState.status === 'PLAYING') player.shoot(performance.now());
+            }, player.fireCooldown);
+        }, {passive: false});
+        ui.btnShoot.addEventListener('touchend', (e) => { e.preventDefault(); clearInterval(shootInterval); }, {passive: false});
+
+        // Event Menu
+        ui.btnNormal.addEventListener('click', () => startGame(1, 'NORMAL'));
+        ui.btnFrenzy.addEventListener('click', () => startGame(1, 'FRENZY'));
+        
+        ui.pauseBtn.addEventListener('click', pauseGame);
+        ui.btnResume.addEventListener('click', resumeGame);
+        ui.btnRestart.addEventListener('click', () => startGame(1, gameState.mode)); // Restart menggunakan mode yang sama
+        ui.btnQuit.addEventListener('click', showMainMenu);
+
+        // --- Inisialisasi Pertama ---
+        resizeCanvas();
+        drawBackground(); // Mulai animasi bintang background
+        showMainMenu();
+    </script>
+</body>
+</html>

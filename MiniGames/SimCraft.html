@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SimCraft</title>
+    <!-- Tailwind CSS untuk estetika antarmuka -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 untuk mesin rendering WebGL -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0f19;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        #game-canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        .pixel-art {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        /* Custom Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 0 2px rgba(0,0,0,0.8);
+        }
+        #crosshair::before {
+            top: 7px;
+            left: 0;
+            width: 16px;
+            height: 2px;
+        }
+        #crosshair::after {
+            top: 0;
+            left: 7px;
+            width: 2px;
+            height: 16px;
+        }
+        /* Slot Hotbar */
+        .hotbar-slot {
+            width: 48px;
+            height: 48px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 3px solid #64748b;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.1s;
+        }
+        .hotbar-slot.active {
+            border-color: #facc15;
+            background: rgba(51, 65, 85, 0.95);
+            transform: scale(1.12);
+            box-shadow: 0 0 12px rgba(250, 204, 21, 0.6);
+            z-index: 5;
+        }
+        .touch-button {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white select-none">
+
+    <!-- Kanvas Utama Tiga Dimensi -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Crosshair Bidikan -->
+    <div id="crosshair"></div>
+
+    <!-- Panel Informasi & Debug HUD -->
+    <div id="hud-stats" class="absolute top-3 left-3 bg-black/60 backdrop-blur-sm p-3 rounded-lg border border-slate-700/60 text-xs sm:text-sm font-mono space-y-1 z-20 pointer-events-none">
+        <div class="flex items-center space-x-2">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="font-bold text-emerald-400">SimCraft</span>
+        </div>
+        <div id="fps-display" class="text-slate-300">FPS: 60</div>
+        <div id="pos-display" class="text-slate-300">XYZ: 0, 0, 0</div>
+        <div id="target-display" class="text-amber-400">Target: Udara</div>
+        <div id="time-display" class="text-cyan-300">Waktu: Siang (12:00)</div>
+    </div>
+
+    <div class="absolute top-3 right-3 flex items-center space-x-2 z-20">
+        <button id="btn-save" class="bg-slate-800/80 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded text-xs font-mono transition flex items-center space-x-1 backdrop-blur-sm">
+            <span>💾</span> <span>Simpan</span>
+        </button>
+        <button id="btn-reset" class="bg-slate-800/80 hover:bg-slate-700 border border-slate-600 px-3 py-1.5 rounded text-xs font-mono transition flex items-center space-x-1 backdrop-blur-sm">
+            <span>🔄</span> <span>Reset Dunia</span>
+        </button>
+        <button id="btn-help" class="bg-amber-600/80 hover:bg-amber-500 border border-amber-500 px-3 py-1.5 rounded text-xs font-mono transition flex items-center space-x-1 backdrop-blur-sm">
+            <span>❓</span> <span>Bantuan</span>
+        </button>
+    </div>
+
+    <!-- Notifikasi Toast In-Game (Tanpa alert bawaan) -->
+    <div id="toast-msg" class="absolute top-16 left-1/2 transform -translate-x-1/2 bg-slate-900/90 border border-amber-500/80 text-amber-300 px-4 py-2 rounded-lg text-sm shadow-xl font-mono opacity-0 transition-opacity duration-300 pointer-events-none z-30">
+        Pesan Notifikasi
+    </div>
+
+    <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 flex flex-col items-center">
+        <div id="hotbar" class="flex items-center space-x-1 bg-black/75 p-1.5 rounded-xl border-2 border-slate-700 backdrop-blur-md shadow-2xl">
+            <!-- 9 Slot Hotbar akan di-generate via JavaScript -->
+        </div>
+        <div class="text-[11px] text-slate-400 font-mono mt-1 hidden sm:block">
+            Tekan [1-9] atau Scroll Mouse untuk ganti blok
+        </div>
+    </div>
+
+    <div id="mobile-controls" class="absolute inset-0 pointer-events-none z-20 sm:hidden">
+        <!-- D-Pad Virtual Kiri -->
+        <div class="absolute bottom-24 left-4 grid grid-cols-3 gap-1 pointer-events-auto">
+            <div></div>
+            <button id="btn-m-fwd" class="touch-button w-12 h-12 bg-slate-800/80 border border-slate-600 rounded-lg text-xl flex items-center justify-center active:bg-slate-600">▲</button>
+            <div></div>
+            <button id="btn-m-left" class="touch-button w-12 h-12 bg-slate-800/80 border border-slate-600 rounded-lg text-xl flex items-center justify-center active:bg-slate-600">◀</button>
+            <button id="btn-m-back" class="touch-button w-12 h-12 bg-slate-800/80 border border-slate-600 rounded-lg text-xl flex items-center justify-center active:bg-slate-600">▼</button>
+            <button id="btn-m-right" class="touch-button w-12 h-12 bg-slate-800/80 border border-slate-600 rounded-lg text-xl flex items-center justify-center active:bg-slate-600">▶</button>
+        </div>
+
+        <!-- Tombol Aksi Kanan -->
+        <div class="absolute bottom-24 right-4 flex flex-col space-y-2 pointer-events-auto items-end">
+            <button id="btn-m-jump" class="touch-button w-14 h-14 bg-emerald-700/80 border border-emerald-500 rounded-full font-bold text-sm flex items-center justify-center shadow-lg active:bg-emerald-500">LOMPAT</button>
+            <div class="flex space-x-2">
+                <button id="btn-m-break" class="touch-button w-14 h-14 bg-rose-700/80 border border-rose-500 rounded-2xl font-bold text-xs flex items-center justify-center shadow-lg active:bg-rose-500">HANCUR</button>
+                <button id="btn-m-place" class="touch-button w-14 h-14 bg-amber-700/80 border border-amber-500 rounded-2xl font-bold text-xs flex items-center justify-center shadow-lg active:bg-amber-500">PASANG</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-overlay" class="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-40">
+        <div class="max-w-md w-11/12 bg-slate-900 border-2 border-slate-700 rounded-2xl p-6 text-center shadow-2xl relative">
+            <h1 class="text-3xl font-extrabold text-amber-400 mb-2 tracking-wider flex items-center justify-center gap-2">
+                <span>⛏️</span>SimCraft
+            </h1>
+            <p class="text-slate-300 text-xs sm:text-sm mb-5 leading-relaxed">
+                Jelajahi dunia 3D langsung di peramban web Anda!
+            </p>
+
+            <div class="bg-slate-950/80 rounded-xl p-3.5 border border-slate-800 text-left text-xs space-y-1.5 text-slate-300 mb-6 font-mono">
+                <div class="text-amber-400 font-bold mb-1 border-b border-slate-800 pb-1">Panduan Kontrol:</div>
+                <div><span class="text-white font-bold">[W, A, S, D]</span> : Bergerak maju, kiri, mundur, kanan</div>
+                <div><span class="text-white font-bold">[SPASI]</span> : Melompat</div>
+                <div><span class="text-white font-bold">[F]</span> : Mode Terbang Bebas (Fly mode)</div>
+                <div><span class="text-white font-bold">[SHIFT]</span> : Berlari Cepat (Sprint)</div>
+                <div><span class="text-white font-bold">[Klik Kiri]</span> : Menghancurkan blok target</div>
+                <div><span class="text-white font-bold">[Klik Kanan]</span> : Memasang blok yang dipilih</div>
+                <div><span class="text-white font-bold">[1 - 9 / Scroll]</span> : Memilih tipe blok aktif</div>
+                <div><span class="text-white font-bold">[ESC]</span> : Menjeda permainan / Menu</div>
+            </div>
+
+            <button id="btn-start" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl text-base shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
+                Mulai Bermain (Klik untuk Kunci Kursor)
+            </button>
+        </div>
+    </div>
+
+    <!-- Script Utama Game -->
+    <script>
+        const SoundFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playBreak() {
+                if (!this.ctx) return;
+                const bufferSize = this.ctx.sampleRate * 0.08;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 650;
+                filter.Q.value = 1.8;
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start();
+            },
+            playPlace() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.06);
+                gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.06);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.06);
+            },
+            playStep() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(90, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.05);
+            },
+            playJump() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(320, this.ctx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.12);
+            }
+        };
+
+        const BLOCK = {
+            AIR: 0,
+            GRASS: 1,
+            DIRT: 2,
+            STONE: 3,
+            WOOD: 4,
+            LEAVES: 5,
+            SAND: 6,
+            COBBLESTONE: 7,
+            PLANKS: 8,
+            GLASS: 9
+        };
+
+        const BLOCK_INFO = {
+            [BLOCK.GRASS]: { name: 'Rumput', top: 0, side: 1, bottom: 2, transparent: false },
+            [BLOCK.DIRT]: { name: 'Tanah', top: 2, side: 2, bottom: 2, transparent: false },
+            [BLOCK.STONE]: { name: 'Batu', top: 3, side: 3, bottom: 3, transparent: false },
+            [BLOCK.WOOD]: { name: 'Kayu Oak', top: 5, side: 4, bottom: 5, transparent: false },
+            [BLOCK.LEAVES]: { name: 'Dedaunan', top: 6, side: 6, bottom: 6, transparent: true },
+            [BLOCK.SAND]: { name: 'Pasir', top: 7, side: 7, bottom: 7, transparent: false },
+            [BLOCK.COBBLESTONE]: { name: 'Batu Bulat', top: 8, side: 8, bottom: 8, transparent: false },
+            [BLOCK.PLANKS]: { name: 'Papan Kayu', top: 9, side: 9, bottom: 9, transparent: false },
+            [BLOCK.GLASS]: { name: 'Kaca', top: 10, side: 10, bottom: 10, transparent: true }
+        };
+
+        const ATLAS_SIZE = 256;
+        const TILE_SIZE = 16;
+        const TILES_PER_ROW = ATLAS_SIZE / TILE_SIZE; // 16 tiles
+
+        function createAtlasTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = ATLAS_SIZE;
+            canvas.height = ATLAS_SIZE;
+            const ctx = canvas.getContext('2d');
+
+            function drawTile(tileIndex, drawFunc) {
+                const tx = (tileIndex % TILES_PER_ROW) * TILE_SIZE;
+                const ty = Math.floor(tileIndex / TILES_PER_ROW) * TILE_SIZE;
+                ctx.save();
+                ctx.translate(tx, ty);
+                drawFunc(ctx);
+                ctx.restore();
+            }
+
+            function noiseRect(ctx, w, h, baseR, baseG, baseB, variance) {
+                for (let x = 0; x < w; x++) {
+                    for (let y = 0; y < h; y++) {
+                        const v = (Math.random() - 0.5) * variance;
+                        const r = Math.min(255, Math.max(0, Math.floor(baseR + v)));
+                        const g = Math.min(255, Math.max(0, Math.floor(baseG + v)));
+                        const b = Math.min(255, Math.max(0, Math.floor(baseB + v)));
+                        ctx.fillStyle = `rgb(${r},${g},${b})`;
+                        ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+
+            // Tile 0: Grass Top
+            drawTile(0, (c) => noiseRect(c, 16, 16, 76, 150, 48, 40));
+
+            // Tile 1: Grass Side
+            drawTile(1, (c) => {
+                noiseRect(c, 16, 16, 134, 96, 67, 30); // Dirt base
+                for (let x = 0; x < 16; x++) {
+                    const depth = 3 + Math.floor(Math.random() * 2);
+                    for (let y = 0; y < depth; y++) {
+                        const v = (Math.random() - 0.5) * 35;
+                        c.fillStyle = `rgb(${Math.floor(76+v)},${Math.floor(150+v)},${Math.floor(48+v)})`;
+                        c.fillRect(x, y, 1, 1);
+                    }
+                }
+            });
+
+            // Tile 2: Dirt
+            drawTile(2, (c) => noiseRect(c, 16, 16, 134, 96, 67, 35));
+
+            // Tile 3: Stone
+            drawTile(3, (c) => noiseRect(c, 16, 16, 125, 125, 125, 35));
+
+            // Tile 4: Wood Trunk Side
+            drawTile(4, (c) => {
+                noiseRect(c, 16, 16, 110, 80, 50, 20);
+                c.fillStyle = 'rgba(60, 40, 20, 0.4)';
+                for (let x = 0; x < 16; x += 3) c.fillRect(x, 0, 1, 16);
+            });
+
+            // Tile 5: Wood Trunk Top
+            drawTile(5, (c) => {
+                noiseRect(c, 16, 16, 175, 140, 95, 20);
+                c.strokeStyle = '#5a3d1c';
+                c.lineWidth = 1;
+                c.strokeRect(3.5, 3.5, 9, 9);
+                c.strokeRect(6.5, 6.5, 3, 3);
+            });
+
+            // Tile 6: Leaves
+            drawTile(6, (c) => {
+                c.clearRect(0, 0, 16, 16);
+                for (let x = 0; x < 16; x++) {
+                    for (let y = 0; y < 16; y++) {
+                        if (Math.random() > 0.15) {
+                            const v = (Math.random() - 0.5) * 45;
+                            c.fillStyle = `rgb(${Math.floor(52+v)},${Math.floor(138+v)},${Math.floor(40+v)})`;
+                            c.fillRect(x, y, 1, 1);
+                        }
+                    }
+                }
+            });
+
+            // Tile 7: Sand
+            drawTile(7, (c) => noiseRect(c, 16, 16, 218, 200, 145, 25));
+
+            // Tile 8: Cobblestone
+            drawTile(8, (c) => {
+                noiseRect(c, 16, 16, 110, 110, 110, 30);
+                c.strokeStyle = '#444';
+                c.lineWidth = 1;
+                c.strokeRect(1, 1, 6, 6);
+                c.strokeRect(8, 2, 6, 5);
+                c.strokeRect(2, 9, 7, 5);
+                c.strokeRect(10, 8, 5, 6);
+            });
+
+            // Tile 9: Planks
+            drawTile(9, (c) => {
+                noiseRect(c, 16, 16, 185, 145, 90, 25);
+                c.fillStyle = '#6e4f20';
+                for (let y = 3; y < 16; y += 4) c.fillRect(0, y, 16, 1);
+            });
+
+            // Tile 10: Glass
+            drawTile(10, (c) => {
+                c.fillStyle = 'rgba(215, 240, 255, 0.2)';
+                c.fillRect(0, 0, 16, 16);
+                c.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+                c.lineWidth = 1;
+                c.strokeRect(0.5, 0.5, 15, 15);
+                c.beginPath();
+                c.moveTo(3, 12); c.lineTo(12, 3);
+                c.moveTo(5, 13); c.lineTo(13, 5);
+                c.stroke();
+            });
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.NearestFilter;
+            return { texture, canvas };
+        }
+
+        const WORLD_W = 48; // Lebar X
+        const WORLD_H = 32; // Tinggi Y
+        const WORLD_D = 48; // Kedalaman Z
+        const CHUNK_SIZE = 16;
+
+        class VoxelWorld {
+            constructor(w, h, d) {
+                this.w = w;
+                this.h = h;
+                this.d = d;
+                this.voxels = new Uint8Array(w * h * d);
+            }
+
+            getIndex(x, y, z) {
+                if (x < 0 || x >= this.w || y < 0 || y >= this.h || z < 0 || z >= this.d) return -1;
+                return x + y * this.w + z * this.w * this.h;
+            }
+
+            getVoxel(x, y, z) {
+                const idx = this.getIndex(x, y, z);
+                return idx === -1 ? BLOCK.AIR : this.voxels[idx];
+            }
+
+            setVoxel(x, y, z, value) {
+                const idx = this.getIndex(x, y, z);
+                if (idx !== -1) {
+                    this.voxels[idx] = value;
+                }
+            }
+        }
+
+        function generateTerrain(world) {
+            // Pseudo-Perlin noise menggunakan kombinasi harmonik sinusoidal berbobot
+            function getHeight(x, z) {
+                const n1 = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 4.5;
+                const n2 = Math.sin(x * 0.18 + 1.2) * Math.cos(z * 0.16 + 2.1) * 2.2;
+                const n3 = Math.cos((x + z) * 0.04) * 3.5;
+                return Math.floor(10 + n1 + n2 + n3);
+            }
+
+            for (let x = 0; x < world.w; x++) {
+                for (let z = 0; z < world.d; z++) {
+                    const surfaceY = getHeight(x, z);
+
+                    for (let y = 0; y < world.h; y++) {
+                        if (y === 0) {
+                            world.setVoxel(x, y, z, BLOCK.STONE); // Dasar batuan
+                        } else if (y < surfaceY - 3) {
+                            world.setVoxel(x, y, z, BLOCK.STONE);
+                        } else if (y < surfaceY) {
+                            world.setVoxel(x, y, z, BLOCK.DIRT);
+                        } else if (y === surfaceY) {
+                            if (surfaceY <= 8) {
+                                world.setVoxel(x, y, z, BLOCK.SAND);
+                            } else {
+                                world.setVoxel(x, y, z, BLOCK.GRASS);
+                            }
+                        }
+                    }
+
+                    // Tanam pohon secara prosedural di area rumput
+                    if (surfaceY > 8 && Math.random() < 0.025 && x > 3 && x < world.w - 4 && z > 3 && z < world.d - 4) {
+                        const trunkHeight = 4 + Math.floor(Math.random() * 2);
+                        // Batang kayu
+                        for (let ty = 1; ty <= trunkHeight; ty++) {
+                            world.setVoxel(x, surfaceY + ty, z, BLOCK.WOOD);
+                        }
+                        // Dedaunan mahkota pohon
+                        const leafStartY = surfaceY + trunkHeight - 1;
+                        for (let lx = -2; lx <= 2; lx++) {
+                            for (let lz = -2; lz <= 2; lz++) {
+                                for (let ly = 0; ly < 3; ly++) {
+                                    if (Math.abs(lx) === 2 && Math.abs(lz) === 2 && ly > 1) continue;
+                                    const vx = x + lx, vy = leafStartY + ly, vz = z + lz;
+                                    if (world.getVoxel(vx, vy, vz) === BLOCK.AIR) {
+                                        world.setVoxel(vx, vy, vz, BLOCK.LEAVES);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        const FACES = [
+            { // +Y: Top
+                dir: [0, 1, 0],
+                corners: [ [0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0] ],
+                getTile: (info) => info.top
+            },
+            { // -Y: Bottom
+                dir: [0, -1, 0],
+                corners: [ [0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1] ],
+                getTile: (info) => info.bottom
+            },
+            { // +X: Right
+                dir: [1, 0, 0],
+                corners: [ [1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1] ],
+                getTile: (info) => info.side
+            },
+            { // -X: Left
+                dir: [-1, 0, 0],
+                corners: [ [0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0] ],
+                getTile: (info) => info.side
+            },
+            { // +Z: Front
+                dir: [0, 0, 1],
+                corners: [ [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1] ],
+                getTile: (info) => info.side
+            },
+            { // -Z: Back
+                dir: [0, 0, -1],
+                corners: [ [1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0] ],
+                getTile: (info) => info.side
+            }
+        ];
+
+        class ChunkManager {
+            constructor(world, scene, material) {
+                this.world = world;
+                this.scene = scene;
+                this.material = material;
+                this.chunks = new Map();
+            }
+
+            getChunkKey(cx, cz) {
+                return `${cx},${cz}`;
+            }
+
+            buildAll() {
+                const chunksX = Math.ceil(this.world.w / CHUNK_SIZE);
+                const chunksZ = Math.ceil(this.world.d / CHUNK_SIZE);
+
+                for (let cx = 0; cx < chunksX; cx++) {
+                    for (let cz = 0; cz < chunksZ; cz++) {
+                        this.rebuildChunk(cx, cz);
+                    }
+                }
+            }
+
+            rebuildChunk(cx, cz) {
+                const key = this.getChunkKey(cx, cz);
+                const oldMesh = this.chunks.get(key);
+                if (oldMesh) {
+                    this.scene.remove(oldMesh);
+                    oldMesh.geometry.dispose();
+                    this.chunks.delete(key);
+                }
+
+                const startX = cx * CHUNK_SIZE;
+                const endX = Math.min(startX + CHUNK_SIZE, this.world.w);
+                const startZ = cz * CHUNK_SIZE;
+                const endZ = Math.min(startZ + CHUNK_SIZE, this.world.d);
+
+                const positions = [];
+                const normals = [];
+                const uvs = [];
+                const indices = [];
+                let vertexOffset = 0;
+
+                const tileSizeNorm = 1 / TILES_PER_ROW;
+
+                for (let x = startX; x < endX; x++) {
+                    for (let y = 0; y < this.world.h; y++) {
+                        for (let z = startZ; z < endZ; z++) {
+                            const voxel = this.world.getVoxel(x, y, z);
+                            if (voxel === BLOCK.AIR) continue;
+
+                            const info = BLOCK_INFO[voxel];
+                            if (!info) continue;
+
+                            for (const face of FACES) {
+                                const nx = x + face.dir[0];
+                                const ny = y + face.dir[1];
+                                const nz = z + face.dir[2];
+
+                                const neighbor = this.world.getVoxel(nx, ny, nz);
+                                const neighborInfo = BLOCK_INFO[neighbor];
+
+                                // Hidden Face Culling: Hanya gambar sisi jika tetangga adalah udara atau transparan
+                                const isVisible = (neighbor === BLOCK.AIR) || 
+                                    (neighborInfo && neighborInfo.transparent && !info.transparent);
+
+                                if (isVisible) {
+                                    const tileIndex = face.getTile(info);
+                                    const tx = (tileIndex % TILES_PER_ROW) * tileSizeNorm;
+                                    const ty = 1 - (Math.floor(tileIndex / TILES_PER_ROW) + 1) * tileSizeNorm;
+
+                                    // 4 Titik sudut (corners)
+                                    for (const c of face.corners) {
+                                        positions.push(x + c[0], y + c[1], z + c[2]);
+                                        normals.push(face.dir[0], face.dir[1], face.dir[2]);
+                                    }
+
+                                    // Pemetaan UV Atlas
+                                    uvs.push(
+                                        tx, ty,
+                                        tx + tileSizeNorm, ty,
+                                        tx + tileSizeNorm, ty + tileSizeNorm,
+                                        tx, ty + tileSizeNorm
+                                    );
+
+                                    // Indeks segitiga (2 segitiga per face)
+                                    indices.push(
+                                        vertexOffset, vertexOffset + 1, vertexOffset + 2,
+                                        vertexOffset, vertexOffset + 2, vertexOffset + 3
+                                    );
+                                    vertexOffset += 4;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (positions.length > 0) {
+                    const geometry = new THREE.BufferGeometry();
+                    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+                    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+                    geometry.setIndex(indices);
+
+                    const mesh = new THREE.Mesh(geometry, this.material);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    this.scene.add(mesh);
+                    this.chunks.set(key, mesh);
+                }
+            }
+
+            markDirtyAt(x, z) {
+                const cx = Math.floor(x / CHUNK_SIZE);
+                const cz = Math.floor(z / CHUNK_SIZE);
+                this.rebuildChunk(cx, cz);
+
+                // Periksa batas tepi chunk agar dinding batas ikut diperbarui
+                if (x % CHUNK_SIZE === 0 && cx > 0) this.rebuildChunk(cx - 1, cz);
+                if (x % CHUNK_SIZE === CHUNK_SIZE - 1) this.rebuildChunk(cx + 1, cz);
+                if (z % CHUNK_SIZE === 0 && cz > 0) this.rebuildChunk(cx, cz - 1);
+                if (z % CHUNK_SIZE === CHUNK_SIZE - 1) this.rebuildChunk(cx, cz + 1);
+            }
+        }
+
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Warna langit
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.022);
+
+        const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 150);
+
+        // Pencahayaan
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfff5e6, 1.1);
+        sunLight.position.set(30, 60, 30);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 1024;
+        sunLight.shadow.mapSize.height = 1024;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 120;
+        sunLight.shadow.camera.left = -30;
+        sunLight.shadow.camera.right = 30;
+        sunLight.shadow.camera.top = 30;
+        sunLight.shadow.camera.bottom = -30;
+        scene.add(sunLight);
+
+        // Model visual Matahari dan Bulan
+        const sunMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(4, 4, 4),
+            new THREE.MeshBasicMaterial({ color: 0xfff380 })
+        );
+        scene.add(sunMesh);
+
+        // Pembuatan Texture Atlas
+        const { texture: atlasTexture, canvas: atlasCanvas } = createAtlasTexture();
+        const worldMaterial = new THREE.MeshLambertMaterial({
+            map: atlasTexture,
+            transparent: true,
+            alphaTest: 0.1
+        });
+
+        // Inisialisasi Voxel World
+        const world = new VoxelWorld(WORLD_W, WORLD_H, WORLD_D);
+        generateTerrain(world);
+
+        const chunkManager = new ChunkManager(world, scene, worldMaterial);
+        chunkManager.buildAll();
+
+        const player = {
+            pos: new THREE.Vector3(WORLD_W / 2 + 0.5, 22, WORLD_D / 2 + 0.5),
+            vel: new THREE.Vector3(0, 0, 0),
+            width: 0.6,
+            height: 1.8,
+            onGround: false,
+            isFlying: false,
+            speed: 5.5,
+            sprintMultiplier: 1.5,
+            jumpStrength: 8.5
+        };
+
+        // Deteksi tabrakan AABB terhadap kubus padat dunia
+        function checkCollision(pos) {
+            const minX = Math.floor(pos.x - player.width / 2);
+            const maxX = Math.floor(pos.x + player.width / 2);
+            const minY = Math.floor(pos.y);
+            const maxY = Math.floor(pos.y + player.height);
+            const minZ = Math.floor(pos.z - player.width / 2);
+            const maxZ = Math.floor(pos.z + player.width / 2);
+
+            for (let x = minX; x <= maxX; x++) {
+                for (let y = minY; y <= maxY; y++) {
+                    for (let z = minZ; z <= maxZ; z++) {
+                        const voxel = world.getVoxel(x, y, z);
+                        if (voxel !== BLOCK.AIR) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        const keys = {};
+        let isPointerLocked = false;
+        let pitch = 0;
+        let yaw = 0;
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            SoundFX.init();
+
+            // Toggle mode terbang dengan tombol F
+            if (e.code === 'KeyF') {
+                player.isFlying = !player.isFlying;
+                player.vel.set(0, 0, 0);
+                showToast(player.isFlying ? "🚀 Mode Terbang Aktif" : "🚶 Mode Berjalan Aktif");
+            }
+            // Pemilihan hotbar 1 - 9
+            if (e.key >= '1' && e.key <= '9') {
+                setActiveHotbarIndex(parseInt(e.key) - 1);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Kontrol Tetikus Pointer Lock
+        document.addEventListener('pointerlockchange', () => {
+            isPointerLocked = (document.pointerLockElement === canvas);
+            const modal = document.getElementById('modal-overlay');
+            if (isPointerLocked) {
+                modal.classList.add('hidden');
+            } else {
+                modal.classList.remove('hidden');
+            }
+        });
+
+        canvas.addEventListener('click', () => {
+            if (!isPointerLocked) {
+                canvas.requestPointerLock();
+                SoundFX.init();
+            }
+        });
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            canvas.requestPointerLock();
+            SoundFX.init();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isPointerLocked) return;
+            const sensitivity = 0.0024;
+            yaw -= e.movementX * sensitivity;
+            pitch -= e.movementY * sensitivity;
+            pitch = Math.max(-Math.PI / 2.05, Math.min(Math.PI / 2.05, pitch));
+        });
+
+        // Scroll Mouse untuk Hotbar
+        window.addEventListener('wheel', (e) => {
+            let nextIndex = activeHotbarIndex + (e.deltaY > 0 ? 1 : -1);
+            if (nextIndex < 0) nextIndex = hotbarItems.length - 1;
+            if (nextIndex >= hotbarItems.length) nextIndex = 0;
+            setActiveHotbarIndex(nextIndex);
+        });
+
+        const selectionBox = new THREE.BoxHelper(new THREE.Mesh(new THREE.BoxGeometry(1.002, 1.002, 1.002)), 0x000000);
+        selectionBox.material.linewidth = 2;
+        selectionBox.material.depthTest = true;
+        selectionBox.visible = false;
+        scene.add(selectionBox);
+
+        const raycaster = new THREE.Raycaster();
+        let targetBlock = null;
+
+        function updateRaycast() {
+            camera.position.set(player.pos.x, player.pos.y + player.height * 0.88, player.pos.z);
+            camera.rotation.set(0, 0, 0);
+            camera.rotation.y = yaw;
+            camera.rotation.x = pitch;
+            camera.rotation.order = 'YXZ';
+
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            raycaster.far = 6.0;
+
+            const chunkMeshes = Array.from(chunkManager.chunks.values());
+            const intersects = raycaster.intersectObjects(chunkMeshes);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const hitNormal = hit.face.normal.clone();
+                // Titik voxel yang dituju
+                const hitVoxel = hit.point.clone().sub(hitNormal.clone().multiplyScalar(0.001)).floor();
+                // Titik voxel untuk penempatan balok baru
+                const placeVoxel = hitVoxel.clone().add(hitNormal);
+
+                const blockId = world.getVoxel(hitVoxel.x, hitVoxel.y, hitVoxel.z);
+                if (blockId !== BLOCK.AIR) {
+                    targetBlock = {
+                        hit: hitVoxel,
+                        place: placeVoxel,
+                        blockId: blockId
+                    };
+                    selectionBox.position.set(hitVoxel.x + 0.5, hitVoxel.y + 0.5, hitVoxel.z + 0.5);
+                    selectionBox.visible = true;
+                    document.getElementById('target-display').innerText = `Target: ${BLOCK_INFO[blockId]?.name || 'Blok'}`;
+                    return;
+                }
+            }
+
+            targetBlock = null;
+            selectionBox.visible = false;
+            document.getElementById('target-display').innerText = "Target: Tidak Ada";
+        }
+
+        const particles = [];
+        const particleGeometry = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+
+        function createBlockParticles(pos, blockId) {
+            const count = 12;
+            const info = BLOCK_INFO[blockId];
+            const color = (blockId === BLOCK.LEAVES || blockId === BLOCK.GRASS) ? 0x4caf50 :
+                          (blockId === BLOCK.STONE || blockId === BLOCK.COBBLESTONE) ? 0x888888 :
+                          (blockId === BLOCK.SAND) ? 0xd4b886 : 0x8d6e63;
+            const pMat = new THREE.MeshBasicMaterial({ color });
+
+            for (let i = 0; i < count; i++) {
+                const p = new THREE.Mesh(particleGeometry, pMat);
+                p.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+                const vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 4.5,
+                    Math.random() * 4.0 + 1.0,
+                    (Math.random() - 0.5) * 4.5
+                );
+                scene.add(p);
+                particles.push({ mesh: p, vel, life: 0.6 });
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.vel.y -= 15.0 * dt; // Gravitasi partikel
+                p.mesh.position.addScaledVector(p.vel, dt);
+                p.life -= dt;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    p.mesh.geometry.dispose();
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function breakBlock() {
+            if (!targetBlock) return;
+            const { hit, blockId } = targetBlock;
+            world.setVoxel(hit.x, hit.y, hit.z, BLOCK.AIR);
+            chunkManager.markDirtyAt(hit.x, hit.z);
+            SoundFX.playBreak();
+            createBlockParticles(hit, blockId);
+        }
+
+        function placeBlock() {
+            if (!targetBlock) return;
+            const { place } = targetBlock;
+            const activeId = hotbarItems[activeHotbarIndex];
+
+            // Cegah memasang balok tepat di dalam tubuh pemain jika bukan mode terbang
+            const pBoxMin = new THREE.Vector3(player.pos.x - player.width / 2, player.pos.y, player.pos.z - player.width / 2);
+            const pBoxMax = new THREE.Vector3(player.pos.x + player.width / 2, player.pos.y + player.height, player.pos.z + player.width / 2);
+
+            const isInsidePlayer = (
+                place.x + 1 > pBoxMin.x && place.x < pBoxMax.x &&
+                place.y + 1 > pBoxMin.y && place.y < pBoxMax.y &&
+                place.z + 1 > pBoxMin.z && place.z < pBoxMax.z
+            );
+
+            if (isInsidePlayer && !player.isFlying) {
+                return;
+            }
+
+            world.setVoxel(place.x, place.y, place.z, activeId);
+            chunkManager.markDirtyAt(place.x, place.z);
+            SoundFX.playPlace();
+        }
+
+        window.addEventListener('mousedown', (e) => {
+            if (!isPointerLocked) return;
+            if (e.button === 0) {
+                breakBlock();
+            } else if (e.button === 2) {
+                placeBlock();
+            }
+        });
+
+        // Nonaktifkan menu klik kanan standar
+        window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        const hotbarItems = [
+            BLOCK.GRASS,
+            BLOCK.DIRT,
+            BLOCK.STONE,
+            BLOCK.WOOD,
+            BLOCK.LEAVES,
+            BLOCK.SAND,
+            BLOCK.COBBLESTONE,
+            BLOCK.PLANKS,
+            BLOCK.GLASS
+        ];
+        let activeHotbarIndex = 0;
+
+        function initHotbar() {
+            const container = document.getElementById('hotbar');
+            container.innerHTML = '';
+
+            hotbarItems.forEach((blockId, index) => {
+                const info = BLOCK_INFO[blockId];
+                const slot = document.createElement('div');
+                slot.className = `hotbar-slot rounded-lg flex items-center justify-center ${index === 0 ? 'active' : ''}`;
+                slot.dataset.index = index;
+
+                // Mini preview canvas untuk icon slot hotbar
+                const iconCanvas = document.createElement('canvas');
+                iconCanvas.width = 32;
+                iconCanvas.height = 32;
+                iconCanvas.className = 'w-7 h-7 pixel-art';
+                const ictx = iconCanvas.getContext('2d');
+                ictx.imageSmoothingEnabled = false;
+
+                const tileIndex = info.side;
+                const sx = (tileIndex % TILES_PER_ROW) * TILE_SIZE;
+                const sy = Math.floor(tileIndex / TILES_PER_ROW) * TILE_SIZE;
+                ictx.drawImage(atlasCanvas, sx, sy, TILE_SIZE, TILE_SIZE, 0, 0, 32, 32);
+
+                const num = document.createElement('span');
+                num.className = 'absolute top-0.5 left-1 text-[10px] font-bold text-slate-300 font-mono';
+                num.innerText = index + 1;
+
+                slot.appendChild(iconCanvas);
+                slot.appendChild(num);
+
+                slot.addEventListener('click', () => {
+                    setActiveHotbarIndex(index);
+                });
+
+                container.appendChild(slot);
+            });
+        }
+
+        function setActiveHotbarIndex(idx) {
+            activeHotbarIndex = idx;
+            document.querySelectorAll('.hotbar-slot').forEach((slot, i) => {
+                if (i === idx) slot.classList.add('active');
+                else slot.classList.remove('active');
+            });
+            SoundFX.playStep();
+        }
+
+        initHotbar();
+
+        let gameTime = 0.25; // 0.25 = Jam 12 siang (puncak terang)
+        const dayDurationSeconds = 180; // 3 menit per hari penuh
+
+        function updateDayNightCycle(dt) {
+            gameTime = (gameTime + dt / dayDurationSeconds) % 1.0;
+            const angle = gameTime * Math.PI * 2;
+
+            // Orbit Matahari
+            const sunDistance = 75;
+            const sunX = Math.cos(angle) * sunDistance + WORLD_W / 2;
+            const sunY = Math.sin(angle) * sunDistance;
+            const sunZ = WORLD_D / 2;
+            sunLight.position.set(sunX, sunY, sunZ);
+            sunMesh.position.set(sunX, sunY, sunZ);
+
+            // Interpolasi warna langit & cahaya
+            const heightFactor = Math.sin(angle); // > 0 = Siang, < 0 = Malam
+            if (heightFactor > 0) {
+                // Siang cerah
+                const t = heightFactor;
+                scene.background.setRGB(0.53 * t + 0.05, 0.81 * t + 0.05, 0.92 * t + 0.12);
+                scene.fog.color.copy(scene.background);
+                ambientLight.intensity = 0.3 + 0.4 * t;
+                sunLight.intensity = 1.0 * t;
+            } else {
+                // Malam gelap berbintang
+                scene.background.setRGB(0.04, 0.06, 0.14);
+                scene.fog.color.copy(scene.background);
+                ambientLight.intensity = 0.18;
+                sunLight.intensity = 0.05;
+            }
+
+            // Tampilan jam HUD
+            const hour = Math.floor((gameTime * 24 + 6) % 24);
+            const minute = Math.floor((gameTime * 24 * 60) % 60);
+            const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            const phaseStr = heightFactor > 0.2 ? 'Siang' : (heightFactor < -0.2 ? 'Malam' : 'Senja');
+            document.getElementById('time-display').innerText = `Waktu: ${phaseStr} (${timeStr})`;
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('toast-msg');
+            toast.innerText = text;
+            toast.style.opacity = '1';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 2400);
+        }
+
+        document.getElementById('btn-save').addEventListener('click', () => {
+            try {
+                const voxelData = Array.from(world.voxels);
+                localStorage.setItem('voxelcraft_world', JSON.stringify({
+                    voxels: voxelData,
+                    playerPos: { x: player.pos.x, y: player.pos.y, z: player.pos.z },
+                    time: gameTime
+                }));
+                showToast("✅ Dunia Berhasil Disimpan!");
+            } catch (err) {
+                showToast("❌ Gagal Menyimpan: Penyimpanan Penuh");
+            }
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            localStorage.removeItem('voxelcraft_world');
+            generateTerrain(world);
+            chunkManager.buildAll();
+            player.pos.set(WORLD_W / 2 + 0.5, 22, WORLD_D / 2 + 0.5);
+            player.vel.set(0, 0, 0);
+            showToast("🔄 Dunia Direset ke Awal!");
+        });
+
+        document.getElementById('btn-help').addEventListener('click', () => {
+            document.exitPointerLock();
+            document.getElementById('modal-overlay').classList.remove('hidden');
+        });
+
+        // Muat data penyimpanan jika ada
+        try {
+            const saved = localStorage.getItem('voxelcraft_world');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed.voxels && parsed.voxels.length === world.voxels.length) {
+                    world.voxels.set(parsed.voxels);
+                    chunkManager.buildAll();
+                    if (parsed.playerPos) player.pos.set(parsed.playerPos.x, parsed.playerPos.y, parsed.playerPos.z);
+                    if (parsed.time) gameTime = parsed.time;
+                    showToast("📁 Dunia Tersimpan Berhasil Dimuat");
+                }
+            }
+        } catch (e) {
+            console.warn("Storage load skipped", e);
+        }
+
+        const touchState = { fwd: false, back: false, left: false, right: false };
+        function bindTouchBtn(id, onDown, onUp) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); onDown(); SoundFX.init(); });
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); onUp(); });
+        }
+        bindTouchBtn('btn-m-fwd', () => touchState.fwd = true, () => touchState.fwd = false);
+        bindTouchBtn('btn-m-back', () => touchState.back = true, () => touchState.back = false);
+        bindTouchBtn('btn-m-left', () => touchState.left = true, () => touchState.left = false);
+        bindTouchBtn('btn-m-right', () => touchState.right = true, () => touchState.right = false);
+
+        document.getElementById('btn-m-jump')?.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (player.onGround || player.isFlying) {
+                player.vel.y = player.jumpStrength;
+                SoundFX.playJump();
+            }
+        });
+        document.getElementById('btn-m-break')?.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            breakBlock();
+        });
+        document.getElementById('btn-m-place')?.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            placeBlock();
+        });
+
+        let stepSoundTimer = 0;
+
+        function updatePlayer(dt) {
+            const isSprint = keys['ShiftLeft'] || keys['ShiftRight'];
+            const moveSpeed = player.speed * (isSprint ? player.sprintMultiplier : 1.0);
+
+            // Arah pandang horizontal
+            const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
+            const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)).normalize();
+            const moveDir = new THREE.Vector3(0, 0, 0);
+
+            if (keys['KeyW'] || touchState.fwd) moveDir.add(forward);
+            if (keys['KeyS'] || touchState.back) moveDir.sub(forward);
+            if (keys['KeyD'] || touchState.right) moveDir.add(right);
+            if (keys['KeyA'] || touchState.left) moveDir.sub(right);
+
+            if (moveDir.lengthSq() > 0) moveDir.normalize();
+
+            if (player.isFlying) {
+                // Fisika Terbang Bebas (No gravity)
+                player.vel.x = moveDir.x * moveSpeed * 1.5;
+                player.vel.z = moveDir.z * moveSpeed * 1.5;
+                if (keys['Space']) player.vel.y = moveSpeed * 1.2;
+                else if (keys['ShiftLeft']) player.vel.y = -moveSpeed * 1.2;
+                else player.vel.y = 0;
+
+                player.pos.addScaledVector(player.vel, dt);
+            } else {
+                // Fisika Gravitasi & Pergerakan Berjalan Standar
+                const accel = 35.0;
+                player.vel.x = THREE.MathUtils.lerp(player.vel.x, moveDir.x * moveSpeed, accel * dt);
+                player.vel.z = THREE.MathUtils.lerp(player.vel.z, moveDir.z * moveSpeed, accel * dt);
+                player.vel.y -= 22.0 * dt; // Gravitasi
+
+                // Lompatan
+                if (keys['Space'] && player.onGround) {
+                    player.vel.y = player.jumpStrength;
+                    player.onGround = false;
+                    SoundFX.playJump();
+                }
+
+                // Resolusi Tabrakan per sumbu (Axis-Aligned Bounding Box sliding)
+                // 1. Sumbu X
+                const newPosX = player.pos.clone();
+                newPosX.x += player.vel.x * dt;
+                if (!checkCollision(newPosX)) {
+                    player.pos.x = newPosX.x;
+                } else {
+                    player.vel.x = 0;
+                }
+
+                // 2. Sumbu Z
+                const newPosZ = player.pos.clone();
+                newPosZ.z += player.vel.z * dt;
+                if (!checkCollision(newPosZ)) {
+                    player.pos.z = newPosZ.z;
+                } else {
+                    player.vel.z = 0;
+                }
+
+                // 3. Sumbu Y
+                const newPosY = player.pos.clone();
+                newPosY.y += player.vel.y * dt;
+                if (!checkCollision(newPosY)) {
+                    player.pos.y = newPosY.y;
+                    player.onGround = false;
+                } else {
+                    if (player.vel.y < 0) {
+                        player.onGround = true;
+                    }
+                    player.vel.y = 0;
+                }
+
+                // Suara langkah kaki
+                if (player.onGround && moveDir.lengthSq() > 0) {
+                    stepSoundTimer += dt;
+                    if (stepSoundTimer > (isSprint ? 0.28 : 0.42)) {
+                        SoundFX.playStep();
+                        stepSoundTimer = 0;
+                    }
+                }
+
+                // Reset jika pemain jatuh ke jurang di bawah dunia
+                if (player.pos.y < -10) {
+                    player.pos.set(WORLD_W / 2, 22, WORLD_D / 2);
+                    player.vel.set(0, 0, 0);
+                    showToast("⚠️ Anda Terjatuh ke Void! Teleportasi ke Atas");
+                }
+            }
+
+            // Perbarui teks koordinat HUD
+            document.getElementById('pos-display').innerText = 
+                `XYZ: ${player.pos.x.toFixed(1)}, ${player.pos.y.toFixed(1)}, ${player.pos.z.toFixed(1)}`;
+        }
+
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fpsTimer = 0;
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            // Perhitungan FPS
+            frameCount++;
+            fpsTimer += dt;
+            if (fpsTimer >= 0.5) {
+                const fps = Math.round(frameCount / fpsTimer);
+                document.getElementById('fps-display').innerText = `FPS: ${fps}`;
+                frameCount = 0;
+                fpsTimer = 0;
+            }
+
+            updatePlayer(dt);
+            updateRaycast();
+            updateParticles(dt);
+            updateDayNightCycle(dt);
+
+            renderer.render(scene, camera);
+        }
+
+        // Penanganan responsif saat ukuran jendela berubah
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Jalankan animasi loop utama
+        window.onload = function() {
+            animate(performance.now());
+        };
+    </script>
+</body>
+</html>

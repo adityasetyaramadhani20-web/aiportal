@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrainGame</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        
+        body { font-family: 'Poppins', sans-serif; user-select: none; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .game-cell { transition: all 0.2s; }
+        .sudoku-cell input:focus { outline: none; background-color: #e0e7ff; }
+        
+        /* Word Search Selection Highlight */
+        .ws-selected { background-color: #fca5a5; color: #7f1d1d; }
+        .ws-found { background-color: #86efac; color: #14532d; text-decoration: line-through; }
+        
+        .hidden-page { display: none; }
+        .active-page { display: flex; animation: fadeIn 0.3s ease-in-out; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="bg-indigo-600 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold cursor-pointer" onclick="showMenu()">BrainGame 🧠</h1>
+            <button onclick="showMenu()" class="text-sm bg-indigo-500 hover:bg-indigo-700 px-3 py-1 rounded">Menu Utama</button>
+        </div>
+    </nav>
+
+    <!-- MAIN MENU -->
+    <div id="menu-page" class="active-page container mx-auto p-4 flex-col items-center justify-center flex-grow">
+        <div class="text-center mb-8">
+            <h2 class="text-3xl font-bold text-indigo-900 mb-2">Pilih Permainan</h2>
+            <p class="text-slate-500">Asah otakmu dengan berbagai tantangan seru!</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full">
+            <!-- Card 1: Cari Kata -->
+            <div onclick="setupCariKata()" class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl cursor-pointer transform hover:-translate-y-1 transition border-l-4 border-blue-500">
+                <div class="flex items-center mb-3">
+                    <span class="text-3xl mr-3">🔍</span>
+                    <h3 class="text-xl font-bold">Cari Kata</h3>
+                </div>
+                <p class="text-sm text-slate-600">Temukan kata tersembunyi secara horizontal, vertikal, atau diagonal.</p>
+            </div>
+
+            <!-- Card 2: Gantung Kata -->
+            <div onclick="setupGantungKata()" class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl cursor-pointer transform hover:-translate-y-1 transition border-l-4 border-red-500">
+                <div class="flex items-center mb-3">
+                    <span class="text-3xl mr-3">😵</span>
+                    <h3 class="text-xl font-bold">Gantung Kata</h3>
+                </div>
+                <p class="text-sm text-slate-600">Tebak kata sebelum kesempatanmu habis (10 nyawa).</p>
+            </div>
+
+            <!-- Card 3: Sudoku -->
+            <div onclick="setupSudokuMenu()" class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl cursor-pointer transform hover:-translate-y-1 transition border-l-4 border-green-500">
+                <div class="flex items-center mb-3">
+                    <span class="text-3xl mr-3">🔢</span>
+                    <h3 class="text-xl font-bold">Sudoku</h3>
+                </div>
+                <p class="text-sm text-slate-600">Isi angka dengan logika. Tersedia mode 4x4, 6x6, dan 9x9.</p>
+            </div>
+
+            <!-- Card 4: Tic Tac Toe -->
+            <div onclick="setupTicTacMenu()" class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl cursor-pointer transform hover:-translate-y-1 transition border-l-4 border-yellow-500">
+                <div class="flex items-center mb-3">
+                    <span class="text-3xl mr-3">❌</span>
+                    <h3 class="text-xl font-bold">Tic Tac Toe</h3>
+                </div>
+                <p class="text-sm text-slate-600">Mainkan klasik 3x3 atau tantangan besar hingga 12x12 (vs Teman atau AI).</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME CONTAINER -->
+    <div id="game-container" class="hidden-page container mx-auto p-4 flex-col items-center flex-grow w-full max-w-5xl">
+        <!-- Dynamic Content will be injected here -->
+    </div>
+
+    <!-- Modal Input Kata (Shared for Word Search & Hangman) -->
+    <div id="input-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-xl font-bold mb-2" id="modal-title">Masukkan Kata</h3>
+            <p class="text-sm text-gray-500 mb-4">Pisahkan dengan koma (maks 20 kata).</p>
+            <textarea id="word-input" class="w-full border rounded p-2 mb-4 h-32" placeholder="Contoh: KUCING, AYAM, GAJAH"></textarea>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Batal</button>
+                <button onclick="processWordInput()" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Mulai Main</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Mode Tic Tac Toe -->
+    <div id="tictac-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg p-6 w-full max-w-sm shadow-2xl text-center">
+            <h3 class="text-xl font-bold mb-4">Pilih Lawan</h3>
+            <div class="grid gap-3">
+                <button onclick="selectTicTacMode(false)" class="p-3 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 font-semibold">👥 Lawan Teman (2P)</button>
+                <button onclick="selectTicTacMode(true)" class="p-3 bg-red-100 text-red-800 rounded hover:bg-red-200 font-semibold">🤖 Lawan Komputer (AI)</button>
+            </div>
+            <button onclick="document.getElementById('tictac-modal').classList.add('hidden')" class="mt-4 text-sm text-gray-500 underline">Batal</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE & UTILS ---
+        const pages = ['menu-page', 'game-container'];
+        let currentGame = null;
+        let gameData = {}; // Stores current game state
+
+        function showPage(pageId) {
+            pages.forEach(p => {
+                const el = document.getElementById(p);
+                if(p === pageId) {
+                    el.classList.remove('hidden-page');
+                    el.classList.add('active-page');
+                } else {
+                    el.classList.add('hidden-page');
+                    el.classList.remove('active-page');
+                }
+            });
+        }
+
+        function showMenu() {
+            showPage('menu-page');
+            document.getElementById('game-container').innerHTML = '';
+            currentGame = null;
+        }
+
+        function closeModal() {
+            document.getElementById('input-modal').classList.add('hidden');
+        }
+
+        function showAlert(msg, color='blue') {
+            const div = document.createElement('div');
+            div.className = `fixed top-20 left-1/2 transform -translate-x-1/2 bg-${color}-600 text-white px-6 py-3 rounded-full shadow-lg z-50 animate-bounce`;
+            div.innerText = msg;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        // --- 1. CARI KATA (WORD SEARCH) ---
+        
+        function setupCariKata() {
+            document.getElementById('modal-title').innerText = "Cari Kata: Masukkan Kata";
+            document.getElementById('word-input').value = "PROGRAM, HTML, JAVASCRIPT, KOMPUTER, MOUSE, KEYBOARD, LAYAR, DATA, INTERNET, WIFI"; 
+            currentGame = 'carikata';
+            document.getElementById('input-modal').classList.remove('hidden');
+        }
+
+        class WordSearchGame {
+            constructor(words) {
+                this.words = words.map(w => w.toUpperCase().trim()).filter(w => w.length > 0).slice(0, 20);
+                this.size = 15; 
+                this.grid = [];
+                this.foundWords = new Set();
+                this.selectionStart = null;
+                this.isSelecting = false;
+                this.selectionPath = [];
+                
+                this.generateGrid();
+                this.render();
+            }
+
+            generateGrid() {
+                this.grid = Array(this.size).fill(null).map(() => Array(this.size).fill(''));
+                for (let word of this.words) {
+                    this.placeWord(word);
+                }
+                const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                for(let r=0; r<this.size; r++){
+                    for(let c=0; c<this.size; c++){
+                        if(this.grid[r][c] === '') {
+                            this.grid[r][c] = alphabet[Math.floor(Math.random() * alphabet.length)];
+                        }
+                    }
+                }
+            }
+
+            placeWord(word) {
+                const directions = [
+                    [0, 1], [1, 0], [1, 1], [-1, 1], 
+                    [0, -1], [-1, 0], [-1, -1], [1, -1] 
+                ];
+                
+                let placed = false;
+                let attempts = 0;
+
+                while(!placed && attempts < 100) {
+                    const dir = directions[Math.floor(Math.random() * directions.length)];
+                    const startR = Math.floor(Math.random() * this.size);
+                    const startC = Math.floor(Math.random() * this.size);
+                    
+                    if (this.canPlace(word, startR, startC, dir)) {
+                        for(let i=0; i<word.length; i++) {
+                            this.grid[startR + i*dir[0]][startC + i*dir[1]] = word[i];
+                        }
+                        placed = true;
+                    }
+                    attempts++;
+                }
+            }
+
+            canPlace(word, r, c, dir) {
+                if (r + (word.length-1)*dir[0] < 0 || r + (word.length-1)*dir[0] >= this.size) return false;
+                if (c + (word.length-1)*dir[1] < 0 || c + (word.length-1)*dir[1] >= this.size) return false;
+
+                for(let i=0; i<word.length; i++) {
+                    const charAtGrid = this.grid[r + i*dir[0]][c + i*dir[1]];
+                    if (charAtGrid !== '' && charAtGrid !== word[i]) return false;
+                }
+                return true;
+            }
+
+            render() {
+                const container = document.getElementById('game-container');
+                container.innerHTML = `
+                    <h2 class="text-2xl font-bold mb-4 text-indigo-800">Cari Kata</h2>
+                    <div class="flex flex-col md:flex-row gap-6">
+                        <div id="ws-grid" class="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-0 border-2 border-slate-800 bg-white select-none touch-none" 
+                             style="width: min(90vw, 500px); height: min(90vw, 500px);"></div>
+                        <div class="w-full md:w-48 bg-white p-4 rounded shadow">
+                            <h3 class="font-bold mb-2 border-b">Daftar Kata</h3>
+                            <ul id="ws-list" class="text-sm grid grid-cols-2 md:grid-cols-1 gap-1"></ul>
+                        </div>
+                    </div>
+                    <p class="mt-4 text-sm text-gray-500">Tarik jari/mouse dari huruf awal ke huruf akhir.</p>
+                `;
+
+                const gridEl = document.getElementById('ws-grid');
+                
+                for(let r=0; r<this.size; r++){
+                    for(let c=0; c<this.size; c++){
+                        const cell = document.createElement('div');
+                        cell.className = 'flex items-center justify-center text-xs md:text-base font-bold cursor-pointer hover:bg-indigo-100';
+                        cell.innerText = this.grid[r][c];
+                        cell.dataset.r = r;
+                        cell.dataset.c = c;
+                        
+                        const startHandler = (e) => this.handleStart(r, c, e);
+                        
+                        cell.addEventListener('mousedown', startHandler);
+                        cell.addEventListener('touchstart', startHandler, {passive: false});
+                        
+                        gridEl.appendChild(cell);
+                    }
+                }
+
+                document.body.addEventListener('mouseup', () => this.handleEnd());
+                document.body.addEventListener('touchend', () => this.handleEnd());
+                gridEl.addEventListener('mousemove', (e) => this.handleMove(e));
+                gridEl.addEventListener('touchmove', (e) => this.handleMove(e), {passive: false});
+
+                this.updateList();
+            }
+
+            handleStart(r, c, e) {
+                if(e.type === 'touchstart') e.preventDefault();
+                this.isSelecting = true;
+                this.selectionStart = {r, c};
+                this.highlightSelection(r, c);
+            }
+
+            handleMove(e) {
+                if(!this.isSelecting) return;
+                
+                let target;
+                if(e.type === 'touchmove') {
+                    const touch = e.touches[0];
+                    target = document.elementFromPoint(touch.clientX, touch.clientY);
+                } else {
+                    target = e.target;
+                }
+
+                if(target && target.dataset.r) {
+                    const r = parseInt(target.dataset.r);
+                    const c = parseInt(target.dataset.c);
+                    this.highlightSelection(r, c);
+                }
+            }
+
+            handleEnd() {
+                if(!this.isSelecting) return;
+                this.isSelecting = false;
+                
+                const selectedWord = this.currentSelectionWord;
+                if(this.words.includes(selectedWord) && !this.foundWords.has(selectedWord)) {
+                    this.foundWords.add(selectedWord);
+                    this.markFound();
+                    this.updateList();
+                    if(this.foundWords.size === this.words.length) {
+                        showAlert('Selamat! Semua kata ditemukan!', 'green');
+                    }
+                }
+                
+                this.clearHighlight();
+            }
+
+            highlightSelection(currR, currC) {
+                this.clearHighlight();
+                const start = this.selectionStart;
+                if(!start) return;
+
+                const dr = currR - start.r;
+                const dc = currC - start.c;
+                
+                if(dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc)) {
+                    const steps = Math.max(Math.abs(dr), Math.abs(dc));
+                    const stepR = steps === 0 ? 0 : dr/steps;
+                    const stepC = steps === 0 ? 0 : dc/steps;
+                    
+                    this.selectionPath = [];
+                    let word = "";
+                    
+                    for(let i=0; i<=steps; i++) {
+                        const r = start.r + i*stepR;
+                        const c = start.c + i*stepC;
+                        const cell = document.querySelector(`div[data-r="${r}"][data-c="${c}"]`);
+                        if(cell) {
+                            cell.classList.add('bg-indigo-300');
+                            this.selectionPath.push(cell);
+                            word += this.grid[r][c];
+                        }
+                    }
+                    this.currentSelectionWord = word;
+                    if(this.words.includes(word.split('').reverse().join(''))) {
+                         this.currentSelectionWord = word.split('').reverse().join('');
+                    }
+                }
+            }
+
+            clearHighlight() {
+                document.querySelectorAll('#ws-grid div').forEach(d => {
+                    d.classList.remove('bg-indigo-300');
+                });
+            }
+
+            markFound() {
+                this.selectionPath.forEach(cell => {
+                    cell.classList.add('bg-green-200', 'text-green-900');
+                });
+            }
+
+            updateList() {
+                const list = document.getElementById('ws-list');
+                list.innerHTML = this.words.map(w => 
+                    `<li class="${this.foundWords.has(w) ? 'line-through text-green-600 font-bold' : 'text-slate-700'}">${w}</li>`
+                ).join('');
+            }
+        }
+
+        // --- 2. GANTUNG KATA (HANGMAN) ---
+
+        function setupGantungKata() {
+            document.getElementById('modal-title').innerText = "Gantung Kata: Masukkan Kata (Acak)";
+            document.getElementById('word-input').value = "INDONESIA, MERDEKA, GARUDA, PANCASILA, NUSANTARA, BELAJAR, SUKSES, JUARA";
+            currentGame = 'gantungkata';
+            document.getElementById('input-modal').classList.remove('hidden');
+        }
+
+        class HangmanGame {
+            constructor(words) {
+                this.words = words.map(w => w.toUpperCase().trim()).filter(w => w.length > 0);
+                this.lives = 10;
+                this.currentWord = "";
+                this.guessedLetters = new Set();
+                this.gameStatus = 'playing'; // playing, win, lose
+                
+                this.startNewRound();
+            }
+
+            startNewRound() {
+                if(this.words.length === 0) {
+                    showAlert("Semua kata sudah dimainkan!", "indigo");
+                    return;
+                }
+                const idx = Math.floor(Math.random() * this.words.length);
+                this.currentWord = this.words[idx];
+                this.words.splice(idx, 1);
+                
+                this.guessedLetters.clear();
+                this.lives = 10;
+                this.gameStatus = 'playing';
+                this.render();
+            }
+
+            guess(letter) {
+                if(this.gameStatus !== 'playing' || this.guessedLetters.has(letter)) return;
+                
+                this.guessedLetters.add(letter);
+                
+                if(!this.currentWord.includes(letter)) {
+                    this.lives--;
+                }
+
+                this.checkWinLoss();
+                this.render();
+            }
+
+            checkWinLoss() {
+                const isWin = this.currentWord.split('').every(l => this.guessedLetters.has(l) || l === ' ');
+                if(isWin) {
+                    this.gameStatus = 'win';
+                    showAlert("Benar!", "green");
+                } else if (this.lives <= 0) {
+                    this.gameStatus = 'lose';
+                    showAlert(`Game Over! Kata: ${this.currentWord}`, "red");
+                }
+            }
+
+            render() {
+                const container = document.getElementById('game-container');
+                
+                const wordDisplay = this.currentWord.split('').map(char => {
+                    if(char === ' ') return '&nbsp;&nbsp;';
+                    return this.guessedLetters.has(char) || this.gameStatus === 'lose' 
+                        ? `<span class="border-b-4 border-slate-800 mx-1 w-8 text-center inline-block ${!this.guessedLetters.has(char) && this.gameStatus === 'lose' ? 'text-red-500' : ''}">${char}</span>`
+                        : `<span class="border-b-4 border-slate-800 mx-1 w-8 h-8 inline-block"></span>`;
+                }).join('');
+
+                const keyboard = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('').map(char => {
+                    let statusClass = "bg-white text-slate-800 hover:bg-slate-100";
+                    if(this.guessedLetters.has(char)) {
+                        if(this.currentWord.includes(char)) statusClass = "bg-green-500 text-white";
+                        else statusClass = "bg-red-500 text-white opacity-50";
+                    }
+                    return `<button onclick="gameData.guess('${char}')" class="w-10 h-10 rounded shadow font-bold m-1 ${statusClass}" ${this.guessedLetters.has(char) || this.gameStatus !== 'playing' ? 'disabled' : ''}>${char}</button>`;
+                }).join('');
+
+                container.innerHTML = `
+                    <h2 class="text-2xl font-bold mb-4 text-red-800">Gantung Kata</h2>
+                    <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-2xl text-center">
+                        <div class="mb-4 text-lg font-semibold">Nyawa: <span class="text-red-600 text-2xl">${'❤'.repeat(this.lives)}</span> (${this.lives})</div>
+                        
+                        <div class="text-3xl md:text-5xl font-mono my-8 min-h-[60px] flex flex-wrap justify-center">
+                            ${wordDisplay}
+                        </div>
+
+                        <div class="flex flex-wrap justify-center mt-8">
+                            ${keyboard}
+                        </div>
+
+                        ${this.gameStatus !== 'playing' ? `
+                            <button onclick="gameData.startNewRound()" class="mt-6 bg-indigo-600 text-white px-6 py-2 rounded-full shadow hover:bg-indigo-700 animate-pulse">
+                                Kata Selanjutnya ➡
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }
+        }
+
+        // --- 3. SUDOKU ---
+
+        function setupSudokuMenu() {
+            showPage('game-container');
+            const container = document.getElementById('game-container');
+            container.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6 text-green-800">Pilih Ukuran Sudoku</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-2xl">
+                    <button onclick="startSudoku(4)" class="p-6 bg-white rounded shadow hover:bg-green-50 text-xl font-bold border-2 border-green-200">
+                        Mudah (4x4)
+                    </button>
+                    <button onclick="startSudoku(6)" class="p-6 bg-white rounded shadow hover:bg-green-50 text-xl font-bold border-2 border-green-200">
+                        Sedang (6x6)
+                    </button>
+                    <button onclick="startSudoku(9)" class="p-6 bg-white rounded shadow hover:bg-green-50 text-xl font-bold border-2 border-green-200">
+                        Klasik (9x9)
+                    </button>
+                </div>
+            `;
+        }
+
+        function startSudoku(size) {
+            gameData = new SudokuGame(size);
+        }
+
+        class SudokuGame {
+            constructor(size) {
+                this.size = size;
+                if (size === 4) { this.boxH = 2; this.boxW = 2; }
+                else if (size === 6) { this.boxH = 2; this.boxW = 3; }
+                else { this.boxH = 3; this.boxW = 3; }
+
+                this.generateBoard();
+                this.render();
+            }
+
+            generateBoard() {
+                this.solution = Array(this.size).fill().map(() => Array(this.size).fill(0));
+                
+                const isValid = (board, r, c, num) => {
+                    for (let x = 0; x < this.size; x++) if (board[r][x] === num || board[x][c] === num) return false;
+                    const startRow = r - r % this.boxH, startCol = c - c % this.boxW;
+                    for (let i = 0; i < this.boxH; i++)
+                        for (let j = 0; j < this.boxW; j++)
+                            if (board[i + startRow][j + startCol] === num) return false;
+                    return true;
+                };
+
+                const solve = (board) => {
+                    for (let r = 0; r < this.size; r++) {
+                        for (let c = 0; c < this.size; c++) {
+                            if (board[r][c] === 0) {
+                                let nums = Array.from({length: this.size}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+                                for (let num of nums) {
+                                    if (isValid(board, r, c, num)) {
+                                        board[r][c] = num;
+                                        if (solve(board)) return true;
+                                        board[r][c] = 0;
+                                    }
+                                }
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                };
+
+                solve(this.solution);
+
+                this.puzzle = JSON.parse(JSON.stringify(this.solution));
+                const attempts = this.size * this.size * 0.5; 
+                for(let i=0; i<attempts; i++) {
+                    let r = Math.floor(Math.random() * this.size);
+                    let c = Math.floor(Math.random() * this.size);
+                    this.puzzle[r][c] = 0;
+                }
+                
+                this.userGrid = JSON.parse(JSON.stringify(this.puzzle));
+            }
+
+            updateCell(r, c, val) {
+                val = parseInt(val);
+                if(isNaN(val)) val = 0;
+                this.userGrid[r][c] = val;
+                this.render(false);
+                
+                let isFull = true;
+                for(let i=0; i<this.size; i++) for(let j=0; j<this.size; j++) if(this.userGrid[i][j] === 0) isFull = false;
+                
+                if(isFull) {
+                    this.checkWin();
+                }
+            }
+
+            checkWin() {
+                let win = true;
+                for(let i=0; i<this.size; i++) 
+                    for(let j=0; j<this.size; j++) 
+                        if(this.userGrid[i][j] !== this.solution[i][j]) win = false;
+                
+                if(win) showAlert("Sudoku Selesai! Luar Biasa!", "green");
+                else showAlert("Masih ada yang salah, cek lagi.", "red");
+            }
+
+            render(fullRender = true) {
+                if(!fullRender) return;
+                
+                const container = document.getElementById('game-container');
+                let gridHtml = '';
+                
+                for(let r=0; r<this.size; r++) {
+                    gridHtml += `<div class="flex">`;
+                    for(let c=0; c<this.size; c++) {
+                        const isFixed = this.puzzle[r][c] !== 0;
+                        const value = this.userGrid[r][c] === 0 ? '' : this.userGrid[r][c];
+                        
+                        let classes = "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center border border-gray-300 text-lg md:text-xl ";
+                        if ((c + 1) % this.boxW === 0 && c !== this.size - 1) classes += "border-r-4 border-r-slate-800 ";
+                        if ((r + 1) % this.boxH === 0 && r !== this.size - 1) classes += "border-b-4 border-b-slate-800 ";
+                        
+                        if (isFixed) {
+                            gridHtml += `<div class="${classes} bg-slate-200 font-bold text-slate-700">${value}</div>`;
+                        } else {
+                            gridHtml += `<input type="number" min="1" max="${this.size}" value="${value}" 
+                                oninput="gameData.updateCell(${r},${c}, this.value)" 
+                                class="${classes} bg-white text-indigo-600 text-center focus:z-10 appearance-none m-0 p-0 rounded-none"/>`;
+                        }
+                    }
+                    gridHtml += `</div>`;
+                }
+
+                container.innerHTML = `
+                    <h2 class="text-2xl font-bold mb-4 text-green-800">Sudoku ${this.size}x${this.size}</h2>
+                    <div class="bg-white p-1 border-4 border-slate-800 inline-block shadow-2xl">
+                        ${gridHtml}
+                    </div>
+                    <div class="mt-4 flex gap-4">
+                        <button onclick="gameData.checkWin()" class="bg-green-600 text-white px-4 py-2 rounded shadow">Cek Jawaban</button>
+                        <button onclick="startSudoku(${this.size})" class="bg-slate-500 text-white px-4 py-2 rounded shadow">Reset</button>
+                    </div>
+                `;
+            }
+        }
+
+        // --- 4. TIC TAC TOE ---
+
+        let ticTacSizeTemp = 3;
+
+        function setupTicTacMenu() {
+            showPage('game-container');
+            const container = document.getElementById('game-container');
+            container.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6 text-yellow-800">Pilih Ukuran Papan</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-3xl">
+                    ${[3, 6, 9, 12].map(s => `
+                        <button onclick="askTicTacMode(${s})" class="p-4 bg-white rounded shadow hover:bg-yellow-50 font-bold border-2 border-yellow-200">
+                            ${s}x${s}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function askTicTacMode(size) {
+            ticTacSizeTemp = size;
+            document.getElementById('tictac-modal').classList.remove('hidden');
+        }
+
+        function selectTicTacMode(isAI) {
+            document.getElementById('tictac-modal').classList.add('hidden');
+            startTicTac(ticTacSizeTemp, isAI);
+        }
+
+        function startTicTac(size, isAI) {
+            gameData = new TicTacGame(size, isAI);
+        }
+
+        class TicTacGame {
+            constructor(size, isAI) {
+                this.size = size;
+                this.isAI = isAI;
+                this.board = Array(size).fill().map(() => Array(size).fill(null));
+                this.turn = 'X'; // X is always Player
+                this.aiTurn = 'O';
+                this.gameOver = false;
+                this.winLength = size === 3 ? 3 : (size === 6 ? 4 : 5);
+                this.render();
+            }
+
+            move(r, c) {
+                if (this.board[r][c] || this.gameOver) return;
+                
+                // Player Move
+                this.board[r][c] = this.turn;
+                if(this.processGameEnd(r, c)) return;
+
+                // Switch Turn
+                this.turn = this.turn === 'X' ? 'O' : 'X';
+                this.render();
+
+                // AI Move
+                if(this.isAI && this.turn === this.aiTurn && !this.gameOver) {
+                    setTimeout(() => this.makeAIMove(), 500);
+                }
+            }
+
+            makeAIMove() {
+                if(this.gameOver) return;
+                
+                let move = null;
+
+                // 1. Try to Win
+                move = this.findBestMove(this.aiTurn);
+                
+                // 2. Block Opponent
+                if (!move) move = this.findBestMove('X'); // Check if X is about to win
+
+                // 3. Random Valid Move
+                if (!move) {
+                    const emptyCells = [];
+                    for(let r=0; r<this.size; r++)
+                        for(let c=0; c<this.size; c++)
+                            if(!this.board[r][c]) emptyCells.push({r,c});
+                    
+                    if(emptyCells.length > 0) {
+                        move = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                    }
+                }
+
+                if(move) {
+                    this.board[move.r][move.c] = this.aiTurn;
+                    if(this.processGameEnd(move.r, move.c)) return;
+                    this.turn = 'X';
+                    this.render();
+                }
+            }
+
+            // Simple heuristic to find win/block
+            findBestMove(player) {
+                for(let r=0; r<this.size; r++) {
+                    for(let c=0; c<this.size; c++) {
+                        if(!this.board[r][c]) {
+                            this.board[r][c] = player;
+                            if(this.checkWin(r, c)) {
+                                this.board[r][c] = null; // Revert
+                                return {r, c};
+                            }
+                            this.board[r][c] = null; // Revert
+                        }
+                    }
+                }
+                return null;
+            }
+
+            processGameEnd(r, c) {
+                if (this.checkWin(r, c)) {
+                    this.gameOver = true;
+                    this.render();
+                    const winner = this.board[r][c];
+                    const msg = this.isAI && winner === this.aiTurn ? "Komputer Menang! 🤖" : `Pemain ${winner} Menang! 🎉`;
+                    showAlert(msg, winner === 'X' ? 'blue' : 'red');
+                    return true;
+                } else if (this.board.flat().every(c => c)) {
+                    this.gameOver = true;
+                    this.render();
+                    showAlert("Seri!", "gray");
+                    return true;
+                }
+                return false;
+            }
+
+            checkWin(r, c) {
+                const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+                const player = this.board[r][c];
+
+                for (let [dr, dc] of directions) {
+                    let count = 1;
+                    let i = 1;
+                    while (true) {
+                        const nr = r + dr * i, nc = c + dc * i;
+                        if (nr >= 0 && nr < this.size && nc >= 0 && nc < this.size && this.board[nr][nc] === player) {
+                            count++; i++;
+                        } else break;
+                    }
+                    i = 1;
+                    while (true) {
+                        const nr = r - dr * i, nc = c - dc * i;
+                        if (nr >= 0 && nr < this.size && nc >= 0 && nc < this.size && this.board[nr][nc] === player) {
+                            count++; i++;
+                        } else break;
+                    }
+                    if (count >= this.winLength) return true;
+                }
+                return false;
+            }
+
+            render() {
+                const container = document.getElementById('game-container');
+                const cellSize = this.size > 9 ? 'w-8 h-8 text-sm' : (this.size > 6 ? 'w-10 h-10 text-lg' : 'w-16 h-16 text-3xl');
+                
+                let boardHtml = `<div class="grid gap-1 bg-yellow-900 p-2 rounded" style="grid-template-columns: repeat(${this.size}, min-content);">`;
+                
+                for(let r=0; r<this.size; r++){
+                    for(let c=0; c<this.size; c++){
+                        const val = this.board[r][c];
+                        const colorClass = val === 'X' ? 'text-blue-600' : 'text-red-600';
+                        boardHtml += `
+                            <div onclick="gameData.move(${r}, ${c})" 
+                                 class="${cellSize} bg-yellow-50 flex items-center justify-center font-bold cursor-pointer hover:bg-white ${val ? colorClass : ''}">
+                                ${val || ''}
+                            </div>
+                        `;
+                    }
+                }
+                boardHtml += `</div>`;
+
+                container.innerHTML = `
+                    <h2 class="text-2xl font-bold mb-2 text-yellow-800">Tic Tac Toe ${this.size}x${this.size}</h2>
+                    <p class="mb-4 text-sm text-gray-600">
+                        ${this.isAI ? '<span class="bg-red-100 text-red-800 px-2 py-1 rounded">Mode: Lawan Komputer</span>' : '<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">Mode: 2 Pemain</span>'}
+                        <br>Syarat Menang: ${this.winLength} berderet. 
+                        Giliran: <span class="font-bold text-xl">${this.turn}</span>
+                    </p>
+                    <div class="overflow-auto max-w-full p-2 flex justify-center">
+                        ${boardHtml}
+                    </div>
+                    ${this.gameOver ? `<button onclick="startTicTac(${this.size}, ${this.isAI})" class="mt-4 bg-yellow-600 text-white px-6 py-2 rounded shadow">Main Lagi</button>` : ''}
+                `;
+            }
+        }
+
+        function processWordInput() {
+            const raw = document.getElementById('word-input').value;
+            const words = raw.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+            
+            closeModal();
+            showPage('game-container'); // FIX: Ensure game page is shown
+            
+            if(currentGame === 'carikata') {
+                gameData = new WordSearchGame(words);
+            } else if (currentGame === 'gantungkata') {
+                gameData = new HangmanGame(words);
+            }
+        }
+
+    </script>
+</body>
+</html>

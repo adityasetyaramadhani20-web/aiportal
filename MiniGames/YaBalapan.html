@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>YaBalapan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;700&display=swap');
+
+        :root {
+            --road-color: #2D3748;
+            --road-line: #A0AEC0;
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-green: #00ff00;
+            --neon-red: #ff0000;
+        }
+
+        body {
+            background-color: #111827;
+            font-family: 'Roboto', sans-serif;
+            color: white;
+            overflow: hidden; /* Prevent scroll bouncing on mobile */
+            touch-action: none;
+        }
+
+        /* --- UI Elements --- */
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .neon-text {
+            font-family: 'Orbitron', sans-serif;
+            text-shadow: 0 0 5px currentColor;
+        }
+
+        /* --- Game Area --- */
+        #game-container {
+            position: relative;
+            background-color: var(--road-color);
+            border-left: 8px solid #4A5568;
+            border-right: 8px solid #4A5568;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+            overflow: hidden;
+            transition: width 0.3s ease; /* Smooth transition for Frenzy mode */
+            margin: 0 auto;
+        }
+
+        .road-line {
+            position: absolute;
+            width: 8px;
+            height: 60px;
+            background-color: var(--road-line);
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 4px;
+        }
+
+        /* --- Entities --- */
+        .entity {
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+
+        /* Player Car */
+        .player {
+            z-index: 50;
+            background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+            border-radius: 8px 8px 4px 4px;
+            border: 2px solid #fecaca;
+        }
+        
+        .player.shielded {
+            box-shadow: 0 0 0 4px var(--neon-blue), 0 0 20px var(--neon-blue);
+        }
+
+        /* Enemy Car */
+        .enemy {
+            z-index: 40;
+            background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+            border-radius: 4px 4px 8px 8px; /* Reversed for facing down */
+            border: 2px solid #bfdbfe;
+        }
+
+        /* Powerups (Frenzy) */
+        .powerup {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            z-index: 30;
+            animation: pulse 1s infinite;
+            font-size: 18px;
+        }
+        .powerup-shield { background: var(--neon-blue); box-shadow: 0 0 10px var(--neon-blue); }
+        .powerup-coin { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
+
+        /* Math Gates (Tol Mode) */
+        .math-gate {
+            width: 60px;
+            height: 40px;
+            border-radius: 8px;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            z-index: 30;
+            border: 2px solid white;
+        }
+        .gate-good { background-color: rgba(16, 185, 129, 0.8); border-color: #34d399; } /* Green */
+        .gate-bad { background-color: rgba(239, 68, 68, 0.8); border-color: #f87171; } /* Red */
+        .gate-neutral { background-color: rgba(59, 130, 246, 0.8); border-color: #60a5fa; } /* Blue */
+
+        /* Toll Barrier */
+        .toll-barrier {
+            background: repeating-linear-gradient(
+                45deg,
+                #000,
+                #000 10px,
+                #fbbf24 10px,
+                #fbbf24 20px
+            );
+            border-top: 4px solid #fff;
+            border-bottom: 4px solid #fff;
+            color: white;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col items-center justify-center">
+
+    <!-- Header / HUD -->
+    <div id="ui-header" class="w-full max-w-md flex justify-between items-center p-4 mb-2 z-50">
+        <div>
+            <h1 class="text-2xl font-bold italic neon-text text-yellow-400">YA<span class="text-white">BALAPAN</span></h1>
+            <div id="mode-badge" class="text-xs uppercase tracking-widest text-gray-400">Mode Klasik</div>
+        </div>
+        <div class="text-right">
+            <div id="score-label" class="text-sm text-gray-400">SKOR</div>
+            <div id="score-display" class="text-3xl font-bold neon-text text-white">0</div>
+        </div>
+    </div>
+
+    <!-- HUD Tambahan untuk Mode Tol -->
+    <div id="tol-hud" class="hidden w-full max-w-md flex justify-between items-center px-4 mb-2 bg-gray-800 rounded p-2 border border-gray-600">
+        <div class="flex flex-col items-center w-1/2 border-r border-gray-600">
+            <span class="text-xs text-gray-400">ANGKA MOBIL</span>
+            <span id="player-value-display" class="text-2xl font-bold text-green-400">10</span>
+        </div>
+        <div class="flex flex-col items-center w-1/2">
+            <span class="text-xs text-gray-400">TARGET TOL BERIKUTNYA</span>
+            <span id="next-toll-display" class="text-2xl font-bold text-red-400">15</span>
+        </div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="game-wrapper" class="relative">
+        <div id="game-container" style="width: 320px; height: 550px;">
+            <div id="game-area" class="w-full h-full relative">
+                <!-- Entities will be injected here -->
+            </div>
+            
+            <!-- Message Overlay -->
+            <div id="message-overlay" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50 glass-panel rounded-lg transition-all duration-300">
+                <h2 id="msg-title" class="text-4xl font-bold text-white mb-2 neon-text">SIAP?</h2>
+                <p id="msg-desc" class="text-gray-300 mb-6 text-center px-4">Hindari tabrakan!</p>
+                
+                <!-- Mode Selector -->
+                <div id="mode-selector" class="flex flex-col space-y-2 mb-6 w-3/4">
+                    <button onclick="selectMode('classic')" class="p-3 bg-gray-700 hover:bg-gray-600 rounded text-left border-l-4 border-blue-500 transition">
+                        <span class="font-bold block">🏁 Klasik</span>
+                        <span class="text-xs text-gray-400">Pengalaman original. Hindari lalu lintas.</span>
+                    </button>
+                    <button onclick="selectMode('frenzy')" class="p-3 bg-gray-700 hover:bg-gray-600 rounded text-left border-l-4 border-purple-500 transition">
+                        <span class="font-bold block text-purple-400">⚡ Mode Frenzy</span>
+                        <span class="text-xs text-gray-400">Arena lebar, cepat, power-ups!</span>
+                    </button>
+                    <button onclick="selectMode('tol')" class="p-3 bg-gray-700 hover:bg-gray-600 rounded text-left border-l-4 border-green-500 transition">
+                        <span class="font-bold block text-green-400">🔢 Mode Tol</span>
+                        <span class="text-xs text-gray-400">Hitung angkamu untuk bayar gerbang tol.</span>
+                    </button>
+                </div>
+
+                <!-- Difficulty Selector (Only for Classic) -->
+                <div id="difficulty-container" class="hidden w-3/4 mb-6">
+                    <label class="block text-gray-400 text-xs font-bold mb-2 uppercase tracking-wide">Pilih Tingkat Kesulitan:</label>
+                    <select id="difficulty-select" class="w-full p-3 bg-gray-800 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                        <option value="1">Level 1 - Jalan Santai</option>
+                        <option value="2">Level 2 - Pemula</option>
+                        <option value="3">Level 3 - Normal</option>
+                        <option value="4">Level 4 - Cepat</option>
+                        <option value="5" selected>Level 5 - Menantang</option>
+                        <option value="6">Level 6 - Ngebut</option>
+                        <option value="7">Level 7 - Bahaya</option>
+                        <option value="8">Level 8 - Ekstrim</option>
+                        <option value="9">Level 9 - Gila</option>
+                        <option value="10">Level 10 - MUSTAHIL</option>
+                    </select>
+                </div>
+
+                <div class="flex space-x-2">
+                    <button id="btn-back" onclick="resetMenu()" class="hidden px-4 py-3 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded-lg transition">
+                        ↩
+                    </button>
+                    <button id="btn-start" class="px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full shadow-lg transform hover:scale-105 transition text-xl hidden">
+                        GAS POL! 🚀
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div class="w-full max-w-md flex justify-between mt-4 px-4 md:hidden">
+        <button id="btn-left" class="w-20 h-20 bg-gray-700/50 rounded-full border-2 border-gray-500 text-3xl flex items-center justify-center active:bg-gray-600">⬅️</button>
+        <button id="btn-right" class="w-20 h-20 bg-gray-700/50 rounded-full border-2 border-gray-500 text-3xl flex items-center justify-center active:bg-gray-600">➡️</button>
+    </div>
+
+    <div class="mt-4 text-gray-500 text-xs text-center">
+        Gunakan Panah Kiri/Kanan atau Tombol di Layar untuk bergerak.
+    </div>
+
+    <script>
+        /**
+         * YaBalapan v2.1 - Added Custom Speed for Classic Mode
+         */
+
+        // --- CONFIGURATION ---
+        // Base configurations
+        const CONFIG = {
+            classic: { width: 320, carSpeed: 7, spawnRate: 1500, obstacleSpeed: 4 },
+            frenzy: { width: 400, carSpeed: 14, spawnRate: 500, obstacleSpeed: 12 },
+            tol: { width: 320, carSpeed: 7, spawnRate: 1800, obstacleSpeed: 3.5 }
+        };
+
+        const CAR_SIZE = { w: 40, h: 70 };
+        const POWERUP_SIZE = 30;
+        const GATE_SIZE = { w: 60, h: 40 };
+        const GAME_HEIGHT = 550;
+
+        // --- STATE ---
+        let state = {
+            mode: 'classic', // classic, frenzy, tol
+            isRunning: false,
+            score: 0,
+            playerX: 0,
+            playerValue: 10, // For Tol mode
+            tollTarget: 15, // For Tol mode
+            tollGateCount: 0,
+            hasShield: false,
+            entities: [], // obstacles, powerups, gates
+            roadLines: [],
+            lastTime: 0,
+            keys: {},
+            speedMultiplier: 1,
+            spawnRateOffset: 0 // New state for adjusting difficulty
+        };
+
+        // --- DOM ELEMENTS ---
+        const elContainer = document.getElementById('game-container');
+        const elArea = document.getElementById('game-area');
+        const elScore = document.getElementById('score-display');
+        const elOverlay = document.getElementById('message-overlay');
+        const elTitle = document.getElementById('msg-title');
+        const elDesc = document.getElementById('msg-desc');
+        const elStartBtn = document.getElementById('btn-start');
+        const elBackBtn = document.getElementById('btn-back');
+        const elModeBadge = document.getElementById('mode-badge');
+        const elTolHud = document.getElementById('tol-hud');
+        const elPlayerVal = document.getElementById('player-value-display');
+        const elTollTarget = document.getElementById('next-toll-display');
+        const elModeSelector = document.getElementById('mode-selector');
+        const elDiffContainer = document.getElementById('difficulty-container');
+        const elDiffSelect = document.getElementById('difficulty-select');
+
+        let playerEl = null;
+        let animationFrameId = null;
+
+        // --- INITIALIZATION ---
+
+        function init() {
+            createRoadLines();
+            setupInputs();
+        }
+
+        function resetMenu() {
+            // Reset UI to initial state
+            elModeSelector.classList.remove('hidden');
+            elStartBtn.classList.add('hidden');
+            elBackBtn.classList.add('hidden');
+            elDiffContainer.classList.add('hidden');
+            elTitle.innerText = "SIAP?";
+            elTitle.className = "text-4xl font-bold text-white mb-2 neon-text"; // Reset colors
+            elDesc.innerText = "Pilih mode balapanmu.";
+            elOverlay.classList.remove('hidden');
+        }
+
+        function selectMode(modeName) {
+            state.mode = modeName;
+            
+            // Hide mode selectors, show Start/Back/Difficulty
+            elModeSelector.classList.add('hidden');
+            elStartBtn.classList.remove('hidden');
+            elBackBtn.classList.remove('hidden');
+            
+            // Apply config container width
+            const cfg = CONFIG[modeName];
+            elContainer.style.width = `${cfg.width}px`;
+            
+            // Reset Difficulty Selector
+            elDiffContainer.classList.add('hidden');
+
+            // Mode Specific Setup
+            if (modeName === 'classic') {
+                elTitle.innerText = "MODE KLASIK";
+                elDesc.innerText = "Atur level kesulitanmu.";
+                elModeBadge.innerText = "KLASIK";
+                elTolHud.classList.add('hidden');
+                // Show difficulty selector ONLY for classic
+                elDiffContainer.classList.remove('hidden');
+            } else if (modeName === 'frenzy') {
+                elTitle.innerText = "MODE FRENZY";
+                elTitle.classList.replace('text-white', 'text-purple-400');
+                elDesc.innerText = "Arena lebar. Ambil Power-up!";
+                elModeBadge.innerText = "FRENZY";
+                elTolHud.classList.add('hidden');
+            } else if (modeName === 'tol') {
+                elTitle.innerText = "MODE TOL";
+                elTitle.classList.replace('text-white', 'text-green-400');
+                elDesc.innerText = "Hitung angkamu. Jangan sampai kurang bayar!";
+                elModeBadge.innerText = "MATEMATIKA";
+                elTolHud.classList.remove('hidden');
+            }
+        }
+
+        elStartBtn.addEventListener('click', startGame);
+
+        function startGame() {
+            if (state.isRunning) return;
+
+            // Apply Difficulty if Classic
+            state.speedMultiplier = 1;
+            state.spawnRateOffset = 0;
+
+            if (state.mode === 'classic') {
+                const level = parseInt(elDiffSelect.value);
+                // Level 1: Multiplier 1.0, Offset 0
+                // Level 10: Multiplier ~2.3, Offset 900 (Faster spawn)
+                state.speedMultiplier = 1 + ((level - 1) * 0.15);
+                state.spawnRateOffset = (level - 1) * 100;
+            }
+
+            // Reset State
+            state.isRunning = true;
+            state.score = 0;
+            state.playerValue = 10;
+            state.tollTarget = 15;
+            state.tollGateCount = 0;
+            state.hasShield = false;
+            
+            // Clear entities
+            state.entities.forEach(e => e.el.remove());
+            state.entities = [];
+            
+            // Reset Player
+            if (playerEl) playerEl.remove();
+            createPlayer();
+
+            // Hide UI
+            elOverlay.classList.add('hidden');
+            updateHUD();
+
+            // Loop
+            state.lastTime = performance.now();
+            state.lastSpawn = 0;
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function createPlayer() {
+            playerEl = document.createElement('div');
+            playerEl.className = 'entity player';
+            playerEl.style.width = `${CAR_SIZE.w}px`;
+            playerEl.style.height = `${CAR_SIZE.h}px`;
+            
+            // Center player
+            const cfg = CONFIG[state.mode];
+            state.playerX = (cfg.width / 2) - (CAR_SIZE.w / 2);
+            
+            updatePlayerPos();
+            
+            // Add number for Tol mode
+            if (state.mode === 'tol') {
+                playerEl.innerText = state.playerValue;
+                playerEl.style.color = 'white';
+                playerEl.style.fontSize = '18px';
+            }
+
+            elArea.appendChild(playerEl);
+        }
+
+        function createRoadLines() {
+            for(let i=0; i<8; i++) {
+                const line = document.createElement('div');
+                line.className = 'road-line';
+                line.style.top = `${i * 80}px`;
+                elArea.appendChild(line);
+                state.roadLines.push({ el: line, y: i * 80 });
+            }
+        }
+
+        // --- GAME LOOP ---
+
+        function gameLoop(timestamp) {
+            if (!state.isRunning) return;
+
+            const dt = timestamp - state.lastTime;
+            state.lastTime = timestamp;
+
+            handleInput();
+            handleSpawning(timestamp);
+            updateEntities();
+            animateRoad();
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function handleInput() {
+            const cfg = CONFIG[state.mode];
+            const speed = cfg.carSpeed; // Car speed constant for control feel
+
+            if (state.keys['ArrowLeft'] || state.keys['a']) {
+                state.playerX -= speed;
+            }
+            if (state.keys['ArrowRight'] || state.keys['d']) {
+                state.playerX += speed;
+            }
+
+            if (state.playerX < 5) state.playerX = 5;
+            if (state.playerX > cfg.width - CAR_SIZE.w - 5) state.playerX = cfg.width - CAR_SIZE.w - 5;
+
+            updatePlayerPos();
+        }
+
+        function updatePlayerPos() {
+            if (playerEl) {
+                playerEl.style.left = `${state.playerX}px`;
+                playerEl.style.bottom = `20px`;
+                
+                if (state.mode === 'tol') {
+                    playerEl.innerText = state.playerValue;
+                }
+            }
+        }
+
+        function animateRoad() {
+            // Road moves faster with difficulty
+            const speed = CONFIG[state.mode].obstacleSpeed * state.speedMultiplier;
+            state.roadLines.forEach(line => {
+                line.y += speed;
+                if (line.y > GAME_HEIGHT) line.y = -60;
+                line.el.style.top = `${line.y}px`;
+            });
+        }
+
+        // --- SPAWNING LOGIC ---
+
+        function handleSpawning(timestamp) {
+            if (!state.lastSpawn) state.lastSpawn = timestamp;
+            
+            const cfg = CONFIG[state.mode];
+            
+            // Calculate spawn rate based on CONFIG, DIFFICULTY OFFSET, and CURRENT SCORE
+            let baseRate = cfg.spawnRate - state.spawnRateOffset;
+            let currentSpawnRate = baseRate - (state.score * 5); 
+            
+            // Safety cap for speed
+            let minRate = 400;
+            if (currentSpawnRate < minRate) currentSpawnRate = minRate;
+
+            if (timestamp - state.lastSpawn > currentSpawnRate) {
+                spawnEntity();
+                state.lastSpawn = timestamp;
+            }
+        }
+
+        function spawnEntity() {
+            const cfg = CONFIG[state.mode];
+            const type = determineSpawnType();
+            
+            const entity = {
+                type: type,
+                y: -100,
+                x: 0,
+                w: 0,
+                h: 0,
+                el: document.createElement('div'),
+                value: 0
+            };
+
+            if (type === 'enemy') {
+                entity.w = CAR_SIZE.w;
+                entity.h = CAR_SIZE.h;
+                entity.x = Math.random() * (cfg.width - entity.w - 20) + 10;
+                entity.el.className = 'entity enemy';
+                entity.el.innerHTML = '<div style="position:absolute; bottom:2px; left:4px; width:6px; height:4px; background:yellow; border-radius:2px;"></div><div style="position:absolute; bottom:2px; right:4px; width:6px; height:4px; background:yellow; border-radius:2px;"></div>';
+            } 
+            else if (type === 'shield' || type === 'coin') {
+                entity.w = POWERUP_SIZE;
+                entity.h = POWERUP_SIZE;
+                entity.x = Math.random() * (cfg.width - entity.w - 20) + 10;
+                entity.el.className = `entity powerup ${type === 'shield' ? 'powerup-shield' : 'powerup-coin'}`;
+                entity.el.innerText = type === 'shield' ? '🛡️' : '💰';
+            }
+            else if (type === 'math_gate') {
+                entity.w = GATE_SIZE.w;
+                entity.h = GATE_SIZE.h;
+                entity.x = Math.random() * (cfg.width - entity.w - 20) + 10;
+                
+                const ops = ['+', '-', 'x', ':'];
+                const op = ops[Math.floor(Math.random() * ops.length)];
+                let val = Math.floor(Math.random() * 5) + 1;
+                
+                if (op === 'x') val = Math.floor(Math.random() * 2) + 2; 
+                if (op === ':') val = 2; 
+                if (op === '-') val = Math.floor(Math.random() * 5) + 2;
+
+                entity.value = { op: op, val: val };
+                entity.el.innerText = `${op}${val}`;
+                
+                if (op === '+') entity.el.className = 'entity math-gate gate-good';
+                else if (op === 'x') entity.el.className = 'entity math-gate gate-good';
+                else if (op === '-') entity.el.className = 'entity math-gate gate-bad';
+                else entity.el.className = 'entity math-gate gate-neutral';
+            }
+            else if (type === 'toll_barrier') {
+                entity.w = cfg.width; 
+                entity.h = 40;
+                entity.x = 0;
+                entity.value = state.tollTarget;
+                entity.el.className = 'entity toll-barrier';
+                entity.el.innerText = `BAYAR: ${state.tollTarget}`;
+            }
+
+            entity.el.style.width = `${entity.w}px`;
+            entity.el.style.height = `${entity.h}px`;
+            entity.el.style.left = `${entity.x}px`;
+            entity.el.style.top = `${entity.y}px`;
+
+            elArea.appendChild(entity.el);
+            state.entities.push(entity);
+        }
+
+        function determineSpawnType() {
+            const r = Math.random();
+            if (state.mode === 'classic') return 'enemy';
+            
+            if (state.mode === 'frenzy') {
+                if (r < 0.1) return 'shield';
+                if (r < 0.2) return 'coin';
+                return 'enemy';
+            }
+
+            if (state.mode === 'tol') {
+                state.tollGateCount++;
+                if (state.tollGateCount % 6 === 0) {
+                    return 'toll_barrier';
+                }
+                return 'math_gate';
+            }
+        }
+
+        // --- UPDATE & COLLISION ---
+
+        function updateEntities() {
+            const cfg = CONFIG[state.mode];
+            const speed = cfg.obstacleSpeed * state.speedMultiplier;
+            const playerRect = { x: state.playerX, y: GAME_HEIGHT - CAR_SIZE.h - 20, w: CAR_SIZE.w, h: CAR_SIZE.h };
+
+            for (let i = state.entities.length - 1; i >= 0; i--) {
+                const ent = state.entities[i];
+                ent.y += speed;
+                ent.el.style.top = `${ent.y}px`;
+
+                if (ent.y > GAME_HEIGHT) {
+                    ent.el.remove();
+                    state.entities.splice(i, 1);
+                    if (state.mode !== 'tol' || ent.type !== 'toll_barrier') {
+                        state.score++; 
+                        updateHUD();
+                    }
+                    continue;
+                }
+
+                const entRect = { x: ent.x, y: ent.y, w: ent.w, h: ent.h };
+                if (isColliding(playerRect, entRect)) {
+                    handleCollision(ent, i);
+                }
+            }
+        }
+
+        function isColliding(a, b) {
+            return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+        }
+
+        function handleCollision(ent, index) {
+            if (ent.type === 'enemy') {
+                if (state.hasShield) {
+                    state.hasShield = false;
+                    playerEl.classList.remove('shielded');
+                    ent.el.remove();
+                    state.entities.splice(index, 1);
+                    createExplosion(ent.x, ent.y);
+                } else {
+                    gameOver("TERTABRAK!");
+                }
+            }
+            else if (ent.type === 'shield') {
+                state.hasShield = true;
+                playerEl.classList.add('shielded');
+                ent.el.remove();
+                state.entities.splice(index, 1);
+            }
+            else if (ent.type === 'coin') {
+                state.score += 10;
+                updateHUD();
+                ent.el.remove();
+                state.entities.splice(index, 1);
+            }
+            else if (ent.type === 'math_gate') {
+                const op = ent.value.op;
+                const val = ent.value.val;
+                if (op === '+') state.playerValue += val;
+                if (op === '-') state.playerValue -= val;
+                if (op === 'x') state.playerValue *= val;
+                if (op === ':') state.playerValue = Math.floor(state.playerValue / val);
+                
+                if (state.playerValue < 0) state.playerValue = 0; 
+                
+                updateHUD();
+                ent.el.remove();
+                state.entities.splice(index, 1);
+            }
+            else if (ent.type === 'toll_barrier') {
+                if (state.playerValue >= ent.value) {
+                    state.playerValue -= ent.value;
+                    state.score += 50; 
+                    state.tollTarget += 5;
+                    
+                    ent.el.style.backgroundColor = 'green';
+                    ent.el.innerText = 'LUNAS!';
+                    setTimeout(() => {
+                        if(ent.el) ent.el.remove();
+                    }, 100);
+                    state.entities.splice(index, 1);
+                    updateHUD();
+                } else {
+                    gameOver(`SALDO KURANG! Butuh: ${ent.value}`);
+                }
+            }
+        }
+
+        function createExplosion(x, y) {
+            const exp = document.createElement('div');
+            exp.style.position = 'absolute';
+            exp.style.left = x + 'px';
+            exp.style.top = y + 'px';
+            exp.style.width = '40px';
+            exp.style.height = '40px';
+            exp.style.background = 'radial-gradient(circle, yellow, red)';
+            exp.style.borderRadius = '50%';
+            exp.style.opacity = '0.8';
+            exp.style.zIndex = '100';
+            exp.className = 'shake';
+            elArea.appendChild(exp);
+            setTimeout(() => exp.remove(), 200);
+        }
+
+        // --- GAME OVER & UTILS ---
+
+        function gameOver(reason) {
+            state.isRunning = false;
+            cancelAnimationFrame(animationFrameId);
+            
+            // Reset UI to initial state when Game Over
+            elModeSelector.classList.remove('hidden');
+            elStartBtn.classList.add('hidden');
+            elBackBtn.classList.add('hidden');
+            elDiffContainer.classList.add('hidden');
+            elTitle.innerText = "GAME OVER";
+            elTitle.className = "text-4xl font-bold text-white mb-2 neon-text"; // Reset colors
+            elTitle.classList.remove('text-purple-400', 'text-green-400');
+            elTitle.classList.add('text-red-500');			
+            elDesc.innerText = `${reason} -  Skor Akhir: ${state.score}`;
+            elOverlay.classList.remove('hidden');
+        }
+
+        function updateHUD() {
+            elScore.innerText = state.score;
+            if (state.mode === 'tol') {
+                elPlayerVal.innerText = state.playerValue;
+                elTollTarget.innerText = state.tollTarget;
+            }
+        }
+
+        function setupInputs() {
+            document.addEventListener('keydown', (e) => {
+                state.keys[e.key] = true;
+            });
+            document.addEventListener('keyup', (e) => {
+                state.keys[e.key] = false;
+            });
+
+            const leftBtn = document.getElementById('btn-left');
+            const rightBtn = document.getElementById('btn-right');
+
+            const addTouch = (elem, key) => {
+                elem.addEventListener('touchstart', (e) => { e.preventDefault(); state.keys[key] = true; });
+                elem.addEventListener('touchend', (e) => { e.preventDefault(); state.keys[key] = false; });
+                elem.addEventListener('mousedown', () => state.keys[key] = true);
+                elem.addEventListener('mouseup', () => state.keys[key] = false);
+            };
+
+            addTouch(leftBtn, 'ArrowLeft');
+            addTouch(rightBtn, 'ArrowRight');
+        }
+
+        init();
+
+    </script>
+</body>
+</html>

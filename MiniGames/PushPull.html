@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PushPull</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
+            color: white;
+            overflow: hidden; 
+            touch-action: none; 
+            user-select: none;
+        }
+        h1, h2, h3, .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        #game-container {
+            aspect-ratio: 1 / 1;
+            max-width: 600px;
+            width: 95vw;
+            background: #111827;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.8);
+            position: relative;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 1rem;
+        }
+        .btn {
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+        .modal {
+            backdrop-filter: blur(5px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        select {
+            background-color: rgba(30, 41, 59, 0.8);
+            color: white;
+            border: 2px solid #3b82f6;
+            outline: none;
+        }
+        select option {
+            background-color: #1e293b;
+        }
+        /* Toggle Switch CSS */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #ef4444;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #ef4444;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center">
+
+    <!-- Header / HUD -->
+    <div id="hud" class="w-full max-w-[600px] flex justify-between items-center p-4 hidden z-10">
+        <div>
+            <span class="text-gray-300 text-xs font-bold uppercase tracking-wider" id="hud-mode-label">Mode</span>
+            <div id="hud-level" class="text-2xl title-font text-blue-400">Lv 1</div>
+        </div>
+        
+        <div id="timer-container" class="text-center hidden">
+            <span class="text-gray-300 text-xs font-bold uppercase tracking-wider">Frenzy</span>
+            <div id="hud-time" class="text-3xl title-font text-red-500 drop-shadow-md">15.0</div>
+        </div>
+
+        <div class="flex gap-2">
+            <button onclick="restartLevel()" class="btn bg-gray-600 hover:bg-gray-500 text-white p-2 rounded-lg" title="Restart Level">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+            <button onclick="showMenu()" class="btn bg-red-600 hover:bg-red-500 text-white p-2 rounded-lg" title="Quit to Menu">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game-container" class="hidden">
+        <canvas id="gameCanvas"></canvas>
+        <div id="swipe-hint" class="absolute bottom-4 left-0 w-full text-center text-white/50 text-sm hidden pointer-events-none">
+            Swipe or use WASD/Arrows to move
+        </div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="fixed inset-0 flex flex-col items-center justify-center bg-gray-900 z-40">
+        <div class="text-center mb-8">
+            <h1 class="text-6xl md:text-7xl text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-500 to-red-500 mb-2 drop-shadow-lg title-font tracking-wider">PushPull</h1>
+            <p class="text-gray-400 text-lg">Push Boxes. Pull Pins.</p>
+        </div>
+        
+        <div class="glass-panel p-6 rounded-2xl w-80 flex flex-col gap-5">
+            <!-- Game Type Select -->
+            <div>
+                <label class="block text-gray-300 text-sm font-bold mb-2 uppercase tracking-wide">Select Game</label>
+                <select id="game-type-select" class="w-full p-3 rounded-xl font-bold text-lg cursor-pointer">
+                    <option value="pushbox">📦 Push Box (Sokoban)</option>
+                    <option value="pinpull">📍 Pin Pull (Physics)</option>
+                </select>
+            </div>
+
+            <!-- Level Select -->
+            <div>
+                <label class="block text-gray-300 text-sm font-bold mb-2 uppercase tracking-wide">Starting Level</label>
+                <select id="level-select-dropdown" class="w-full p-3 rounded-xl font-bold text-lg cursor-pointer">
+                    <!-- Populated by JS -->
+                </select>
+            </div>
+
+            <!-- Frenzy Toggle -->
+            <div class="flex items-center justify-between mt-2 bg-gray-800/50 p-3 rounded-xl border border-gray-700">
+                <span class="text-white font-bold title-font text-lg">Frenzy Mode ⏱️</span>
+                <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" name="toggle" id="frenzy-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-gray-600 appearance-none cursor-pointer z-10 transition-transform duration-200 ease-in-out"/>
+                    <label for="frenzy-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer transition-colors duration-200 ease-in-out"></label>
+                </div>
+            </div>
+
+            <button onclick="startGameFromMenu()" class="btn mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold py-4 px-6 rounded-xl text-2xl title-font shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                PLAY NOW
+            </button>
+        </div>
+    </div>
+
+    <!-- Message Modal (Win/Lose) -->
+    <div id="msg-modal" class="modal fixed inset-0 flex items-center justify-center z-50 bg-black/80">
+        <div class="glass-panel p-8 rounded-2xl max-w-sm w-full text-center border-t-4" id="msg-box">
+            <h2 class="text-4xl title-font mb-2" id="msg-title">Title</h2>
+            <p class="text-gray-300 mb-6" id="msg-desc">Description</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="restartLevel()" class="btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-xl flex-1">Retry</button>
+                <button id="next-level-btn" onclick="nextLevel()" class="btn bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl flex-1 hidden">Next Level</button>
+            </div>
+            <button onclick="showMenu()" class="btn mt-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2 px-4 rounded-xl w-full text-sm">Main Menu</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL CONSTANTS ---
+        const COLS = 12;
+        const ROWS = 12;
+
+        // Tiles for Pin Pull
+        const PP_EMPTY = '.';
+        const PP_WALL = '#';
+        const PP_PIN_H = '-';
+        const PP_PIN_V = '|';
+        const PP_HERO = 'H';
+        const PP_CASH = 'C'; // Changed from G to C for Cash 💵
+        const PP_LAVA = 'L';
+        const PP_WATER = 'W';
+        const PP_ROCK = 'R'; 
+
+        // Tiles for Push Box
+        const PB_WALL = '#';
+        const PB_EMPTY = ' ';
+        const PB_TARGET = '.';
+        const PB_BOX = '$';
+        const PB_BOX_ON_TARGET = '*';
+        const PB_PLAYER = '@';
+        const PB_PLAYER_ON_TARGET = '+';
+
+        // Variables
+        let canvas, ctx;
+        let tileSize = 0;
+        let animationId;
+        let physicsInterval;
+        let timerInterval;
+        
+        let gameState = 'menu'; // menu, playing, won, lost
+        let activeGame = 'pushbox'; // pushbox, pinpull
+        let isFrenzy = false;
+        let currentLevel = 1;
+        let timeRemaining = 0;
+
+        // Push Box State
+        let pbGrid = [];
+        let playerPos = {r: 0, c: 0};
+        
+        // Pin Pull State
+        let ppGrid = [];
+        let cashToCollect = 0;
+
+        // Input State (Swipe)
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        // --- LEVEL DATA ---
+        // PUSH BOX LEVELS (12 Levels)
+        const pushBoxLevels = [
+            [ "############", "############", "####   #####", "####.$@#####", "####   #####", "############", "############", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "###     ####", "### .$. ####", "###  $  ####", "###  @  ####", "############", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "### .   ####", "### $$$ ####", "### ..@ ####", "############", "############", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "###....#####", "###$$$$#####", "###   @#####", "############", "############", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "##  .   ####", "##  $   ####", "## .$.@ ####", "##  $   ####", "##  .   ####", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "##      ####", "## .##. ####", "## $  $ ####", "##   @  ####", "##      ####", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "##  ..  ####", "## $  $ ####", "## $  $ ####", "##  ..@ ####", "############", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "###   . ####", "###  $$ ####", "### . $@####", "###   . ####", "############", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "## . $ . ###", "##  $$$  ###", "## . @ . ###", "## . $ . ###", "############", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "##  ..   ###", "##  $$   ###", "## @     ###", "############", "############", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "## . $ . ###", "##  #@#  ###", "## $   $ ###", "## . $ . ###", "############", "############", "############", "############", "############", "############" ],
+            [ "############", "############", "## ..... ###", "## $$$$$ ###", "##   @   ###", "############", "############", "############", "############", "############", "############", "############" ]
+        ];
+
+        // PIN PULL LEVELS (12 Levels)
+        const pinPullLevels = [
+            [ "############", "#....CC....#", "#....CC....#", "#----------#", "#..........#", "#..........#", "#----------#", "#..........#", "#..........#", "#....HH....#", "#....HH....#", "############" ],
+            [ "############", "#..CC..CC..#", "#..CC..CC..#", "#---....---#", "#..|....|..#", "#..|....|..#", "#--#----#--#", "#..........#", "#..........#", "#....HH....#", "#....HH....#", "############" ],
+            [ "############", "#WW##CC##LL#", "#WW##..##LL#", "#----------#", "#..........#", "#----------#", "#.L|....|W.#", "#.L|....|W.#", "#--#----#--#", "#....HH....#", "#....HH....#", "############" ],
+            [ "############", "#C#####LL#W#", "#-###....#W#", "#...|------#", "##..|....|##", "###.|....###", "####|...####", "##---------#", "##.........#", "##...HH....#", "##...HH....#", "############" ],
+            [ "############", "#C#WW#WW#C##", "#-#--#--#-##", "#.#..#..#.##", "#.#..#..#.##", "#.L..#..L.##", "#-#######-##", "#.........##", "##........##", "###..HH..###", "####.HH.####", "############" ],
+            [ "############", "##LL....CC##", "##LL....CC##", "#----##----#", "#...|WW|...#", "#...|WW|...#", "##..----..##", "###......###", "####----####", "####.HH.####", "####.HH.####", "############" ],
+            [ "############", "#.WW##C##LL#", "#.WW##C##LL#", "##--##-##--#", "##.........#", "###------###", "##.......###", "#######--###", "##.......###", "####..HH.###", "####..HH.###", "############" ],
+            [ "############", "#...CC...LL#", "#--------..#", "#WW|..|....#", "#WW|..|....#", "#--#..#----#", "#..........#", "#####|..|###", "#####|..|###", "#####-##-###", "#####.HH.###", "############" ],
+            [ "############", "#LL#W#C#W#L#", "#-##-#-#-###", "#..........#", "#-###--###-#", "#..L#..#C..#", "##--#..#--##", "###......###", "###------###", "####.HH.####", "####.HH.####", "############" ],
+            [ "############", "#LL##CC##LL#", "#-##----##-#", "#|..|..|..|#", "#|..|..|..|#", "#-##-##-##-#", "#...W##W...#", "##--------##", "###......###", "####.HH.####", "#####HH#####", "############" ],
+            [ "############", "###WW##LL###", "###--##--###", "###C....C###", "###--##--###", "####|..|####", "####|..|####", "####----####", "##........##", "##...HH...##", "##...HH...##", "############" ],
+            [ "############", "#...CCCC...#", "#----------#", "#.L......W.#", "#--......--#", "#..|....|..#", "#..------..#", "#..........#", "#..........#", "#....HH....#", "#....HH....#", "############" ]
+        ];
+
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // Populate Dropdown
+            const dropdown = document.getElementById('level-select-dropdown');
+            for(let i=1; i<=12; i++) {
+                dropdown.innerHTML += `<option value="${i}">Level ${i}</option>`;
+            }
+            dropdown.innerHTML += `<option value="13">Random 🎲</option>`;
+
+            // Resize listener
+            window.addEventListener('resize', resizeCanvas);
+
+            // Input Listeners
+            canvas.addEventListener('mousedown', handlePointerDown);
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                handlePointerDown(e.touches[0]);
+            }, {passive: false});
+            
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                handlePointerUp(e.changedTouches[0]);
+            }, {passive: false});
+
+            window.addEventListener('keydown', handleKeyboard);
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            if (!container || container.clientWidth === 0) return;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            tileSize = canvas.width / COLS;
+            if(gameState === 'playing' && ctx) draw();
+        }
+
+        function showMenu() {
+            gameState = 'menu';
+            clearInterval(physicsInterval);
+            clearInterval(timerInterval);
+            cancelAnimationFrame(animationId);
+            document.getElementById('main-menu').classList.remove('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('game-container').classList.add('hidden');
+            document.getElementById('msg-modal').classList.remove('active');
+        }
+
+        function startGameFromMenu() {
+            activeGame = document.getElementById('game-type-select').value;
+            let selectedLvl = parseInt(document.getElementById('level-select-dropdown').value);
+            
+            // Jika memilih opsi "Random" (ID 13) di menu, pilih level acak dari 1-12
+            if (selectedLvl === 13) {
+                currentLevel = Math.floor(Math.random() * 12) + 1;
+            } else {
+                currentLevel = selectedLvl;
+            }
+            
+            isFrenzy = document.getElementById('frenzy-toggle').checked;
+            
+            startLevel(currentLevel);
+        }
+
+        function startLevel(lvl) {
+            currentLevel = lvl;
+            
+            // UI Updates
+            document.getElementById('hud-mode-label').innerText = activeGame === 'pushbox' ? 'Push Box' : 'Pin Pull';
+            document.getElementById('hud-level').innerText = 'Lv ' + lvl;
+            
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('msg-modal').classList.remove('active');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('game-container').classList.remove('hidden');
+            
+            // Show/hide swipe hint
+            if(activeGame === 'pushbox') {
+                document.getElementById('swipe-hint').classList.remove('hidden');
+            } else {
+                document.getElementById('swipe-hint').classList.add('hidden');
+            }
+
+            resizeCanvas();
+
+            // Init Engine Data
+            if (activeGame === 'pushbox') {
+                initPushBox(lvl);
+            } else {
+                initPinPull(lvl);
+            }
+
+            // Timer Setup
+            if(isFrenzy) {
+                document.getElementById('timer-container').classList.remove('hidden');
+                // 15s for Push Box, 15s for Pin Pull
+                timeRemaining = activeGame === 'pushbox' ? 15.0 : 15.0; 
+                document.getElementById('hud-time').innerText = timeRemaining.toFixed(1);
+                clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    if(gameState !== 'playing') return;
+                    timeRemaining -= 0.1;
+                    document.getElementById('hud-time').innerText = Math.max(0, timeRemaining).toFixed(1);
+                    if(timeRemaining <= 0) {
+                        endGame(false, "Time's Up!", "You didn't finish in time.");
+                    }
+                }, 100);
+            } else {
+                document.getElementById('timer-container').classList.add('hidden');
+            }
+
+            gameState = 'playing';
+            cancelAnimationFrame(animationId);
+            gameLoop();
+        }
+
+        function restartLevel() { startLevel(currentLevel); }
+        
+        function nextLevel() { 
+            // Pilih level secara acak dari 1 sampai 12
+            let next = Math.floor(Math.random() * 12) + 1;
+            // Pastikan level selanjutnya tidak sama persis dengan level barusan
+            while(next === currentLevel) {
+                next = Math.floor(Math.random() * 12) + 1;
+            }
+            startLevel(next); 
+        }
+
+        // ==========================================
+        // PUSH BOX ENGINE
+        // ==========================================
+        function initPushBox(lvl) {
+            pbGrid = [];
+            let layout = pushBoxLevels[lvl-1]; // Hanya gunakan level manual yang aman
+
+            for(let r=0; r<ROWS; r++) {
+                let rowArray = [];
+                for(let c=0; c<COLS; c++) {
+                    let tile = layout[r][c];
+                    rowArray.push(tile);
+                    if(tile === PB_PLAYER || tile === PB_PLAYER_ON_TARGET) {
+                        playerPos = {r, c};
+                    }
+                }
+                pbGrid.push(rowArray);
+            }
+        }
+
+        function tryMovePushBox(dx, dy) {
+            if(gameState !== 'playing' || activeGame !== 'pushbox') return;
+
+            let pr = playerPos.r;
+            let pc = playerPos.c;
+            let nr = pr + dx;
+            let nc = pc + dy;
+
+            if(nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) return;
+            
+            let targetTile = pbGrid[nr][nc];
+
+            if (targetTile === PB_WALL) return;
+
+            // Box Push Logic
+            if (targetTile === PB_BOX || targetTile === PB_BOX_ON_TARGET) {
+                let nnr = nr + dx;
+                let nnc = nc + dy;
+                
+                if(nnr < 0 || nnr >= ROWS || nnc < 0 || nnc >= COLS) return;
+                
+                let behindTile = pbGrid[nnr][nnc];
+                
+                if (behindTile === PB_EMPTY || behindTile === PB_TARGET) {
+                    // Push successful
+                    pbGrid[nnr][nnc] = (behindTile === PB_TARGET) ? PB_BOX_ON_TARGET : PB_BOX;
+                    pbGrid[nr][nc] = (targetTile === PB_BOX_ON_TARGET) ? PB_TARGET : PB_EMPTY;
+                } else {
+                    return; // Blocked
+                }
+            }
+
+            // Move Player
+            pbGrid[pr][pc] = (pbGrid[pr][pc] === PB_PLAYER_ON_TARGET) ? PB_TARGET : PB_EMPTY;
+            pbGrid[nr][nc] = (pbGrid[nr][nc] === PB_TARGET) ? PB_PLAYER_ON_TARGET : PB_PLAYER;
+            playerPos = {r: nr, c: nc};
+
+            checkPushBoxWin();
+        }
+
+        function checkPushBoxWin() {
+            let won = true;
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    // If there's a box not on target, not won yet
+                    if(pbGrid[r][c] === PB_BOX) {
+                        won = false;
+                        break;
+                    }
+                }
+            }
+            if(won) {
+                endGame(true, "Level Cleared!", "Great pushing!");
+            }
+        }
+
+        function drawPushBox() {
+            ctx.fillStyle = '#1e293b'; // Floor background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    let tile = pbGrid[r][c];
+                    let x = c * tileSize;
+                    let y = r * tileSize;
+
+                    if (tile === PB_WALL) {
+                        ctx.fillStyle = '#475569';
+                        ctx.fillRect(x, y, tileSize, tileSize);
+                        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                        ctx.fillRect(x, y, tileSize, 4);
+                        ctx.fillRect(x, y, 4, tileSize);
+                    } 
+                    else if (tile === PB_TARGET || tile === PB_BOX_ON_TARGET || tile === PB_PLAYER_ON_TARGET) {
+                        // Draw target spot
+                        ctx.fillStyle = '#10b981'; // Emerald 500
+                        ctx.beginPath();
+                        ctx.arc(x + tileSize/2, y + tileSize/2, tileSize/6, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+
+                    // Draw Entities
+                    ctx.fillStyle = '#ffffff'; // Mencegah ikon menjadi gelap/transparan
+                    ctx.font = `${tileSize * 0.7}px Arial`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    
+                    if (tile === PB_BOX || tile === PB_BOX_ON_TARGET) {
+                        ctx.fillText("📦", x + tileSize/2, y + tileSize/2 + 2);
+                    }
+                    else if (tile === PB_PLAYER || tile === PB_PLAYER_ON_TARGET) {
+                        ctx.fillText("😀", x + tileSize/2, y + tileSize/2 + 2);
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // PIN PULL ENGINE
+        // ==========================================
+        function initPinPull(lvl) {
+            ppGrid = [];
+            cashToCollect = 0;
+            let layoutStr = pinPullLevels[lvl-1]; // Hanya gunakan level manual yang aman
+
+            for(let r=0; r<ROWS; r++) {
+                let row = [];
+                for(let c=0; c<COLS; c++) {
+                    let tile = layoutStr[r][c];
+                    row.push(tile);
+                    if(tile === PP_CASH) cashToCollect++;
+                }
+                ppGrid.push(row);
+            }
+
+            clearInterval(physicsInterval);
+            physicsInterval = setInterval(physicsTick, 150);
+        }
+
+        function physicsTick() {
+            if(gameState !== 'playing' || activeGame !== 'pinpull') return;
+
+            let gridCopy = ppGrid.map(r => [...r]);
+            
+            for(let r = ROWS - 2; r >= 0; r--) {
+                for(let c = 0; c < COLS; c++) {
+                    let tile = gridCopy[r][c];
+                    
+                    if(tile === PP_CASH || tile === PP_LAVA || tile === PP_WATER) {
+                        let below = gridCopy[r+1][c];
+                        if(below === PP_EMPTY) {
+                            ppGrid[r+1][c] = tile; ppGrid[r][c] = PP_EMPTY;
+                            gridCopy[r+1][c] = tile; gridCopy[r][c] = PP_EMPTY;
+                        } 
+                        else if (below === PP_WALL || below === PP_ROCK || below === PP_PIN_H || below === PP_HERO) {
+                            let dirs = Math.random() > 0.5 ? [-1, 1] : [1, -1];
+                            for(let d of dirs) {
+                                if(c+d >= 0 && c+d < COLS && gridCopy[r+1][c+d] === PP_EMPTY && gridCopy[r][c+d] === PP_EMPTY) {
+                                    ppGrid[r+1][c+d] = tile; ppGrid[r][c] = PP_EMPTY;
+                                    gridCopy[r+1][c+d] = tile; gridCopy[r][c] = PP_EMPTY;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            scanPinPullInteractions();
+        }
+
+        function scanPinPullInteractions() {
+            let currentCash = 0;
+            let heroDead = false;
+
+            for(let r = 0; r < ROWS; r++) {
+                for(let c = 0; c < COLS; c++) {
+                    let tile = ppGrid[r][c];
+                    if(tile === PP_CASH) currentCash++;
+
+                    if(tile === PP_LAVA) {
+                        let dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                        let cooled = false;
+                        for(let d of dirs) {
+                            let nr = r + d[0], nc = c + d[1];
+                            if(nr>=0 && nr<ROWS && nc>=0 && nc<COLS && ppGrid[nr][nc] === PP_WATER) {
+                                ppGrid[r][c] = PP_ROCK;
+                                ppGrid[nr][nc] = PP_EMPTY; 
+                                cooled = true; break;
+                            }
+                        }
+                        if(!cooled) {
+                            for(let d of dirs) {
+                                let nr = r + d[0], nc = c + d[1];
+                                if(nr>=0 && nr<ROWS && nc>=0 && nc<COLS && ppGrid[nr][nc] === PP_HERO) heroDead = true;
+                                if(nr>=0 && nr<ROWS && nc>=0 && nc<COLS && ppGrid[nr][nc] === PP_CASH) ppGrid[nr][nc] = PP_EMPTY; // Burn cash
+                            }
+                        }
+                    }
+
+                    if(tile === PP_CASH) {
+                        let dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                        for(let d of dirs) {
+                            let nr = r + d[0], nc = c + d[1];
+                            if(nr>=0 && nr<ROWS && nc>=0 && nc<COLS && ppGrid[nr][nc] === PP_HERO) {
+                                ppGrid[r][c] = PP_EMPTY; 
+                                cashToCollect--;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (heroDead) {
+                endGame(false, "Game Over", "The Lava reached the Hero!");
+            } else if (cashToCollect <= 0) {
+                endGame(true, "Level Cleared!", "You got the cash! 💵");
+            } else if (currentCash < cashToCollect) {
+                endGame(false, "Failed!", "Some cash was destroyed by Lava.");
+            }
+        }
+
+        function drawPinPull() {
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Faint grid
+            ctx.fillStyle = '#1e293b'; 
+            for(let i=0; i<=COLS; i++) {
+                ctx.fillRect(i*tileSize, 0, 1, canvas.height);
+                ctx.fillRect(0, i*tileSize, canvas.width, 1);
+            }
+
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    let tile = ppGrid[r][c];
+                    let x = c * tileSize;
+                    let y = r * tileSize;
+                    
+                    if (tile === PP_EMPTY) continue;
+
+                    if (tile === PP_WALL || tile === PP_ROCK) {
+                        ctx.fillStyle = tile === PP_WALL ? '#475569' : '#1e293b';
+                        ctx.fillRect(x+1, y+1, tileSize-2, tileSize-2);
+                        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                        ctx.fillRect(x+1, y+1, tileSize-2, 4);
+                        if(tile === PP_ROCK) {
+                            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                            ctx.beginPath(); ctx.arc(x+tileSize/2, y+tileSize/2, tileSize/4, 0, Math.PI*2); ctx.fill();
+                        }
+                    }
+                    else if (tile === PP_WATER) {
+                        ctx.fillStyle = '#3b82f6'; ctx.fillRect(x, y, tileSize, tileSize);
+                        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(x+2, y+2, tileSize/3, tileSize/3);
+                    }
+                    else if (tile === PP_LAVA) {
+                        ctx.fillStyle = '#ef4444'; ctx.fillRect(x, y, tileSize, tileSize);
+                        ctx.fillStyle = '#f97316'; ctx.fillRect(x+tileSize/4, y+tileSize/4, tileSize/2, tileSize/2);
+                    }
+                    else if (tile === PP_HERO || tile === PP_CASH) {
+                        ctx.fillStyle = '#ffffff'; // Mencegah ikon menjadi gelap
+                        ctx.font = `${tileSize * 0.7}px Arial`;
+                        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                        ctx.fillText(tile === PP_HERO ? "😀" : "💵", x + tileSize/2, y + tileSize/2 + 2); 
+                    }
+                    else if (tile === PP_PIN_H) {
+                        ctx.fillStyle = '#facc15'; ctx.fillRect(x, y + tileSize/3, tileSize, tileSize/3);
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(x, y + tileSize/2, tileSize, tileSize/6);
+                        if(c === 0 || ppGrid[r][c-1] !== PP_PIN_H) {
+                            ctx.fillStyle = '#ca8a04'; ctx.beginPath(); ctx.arc(x+4, y+tileSize/2, tileSize/3, 0, Math.PI*2); ctx.fill();
+                        }
+                    }
+                    else if (tile === PP_PIN_V) {
+                        ctx.fillStyle = '#facc15'; ctx.fillRect(x + tileSize/3, y, tileSize/3, tileSize);
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(x + tileSize/2, y, tileSize/6, tileSize);
+                        if(r === 0 || ppGrid[r-1][c] !== PP_PIN_V) {
+                            ctx.fillStyle = '#ca8a04'; ctx.beginPath(); ctx.arc(x+tileSize/2, y+4, tileSize/3, 0, Math.PI*2); ctx.fill();
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // INPUT & UTILS
+        // ==========================================
+        function handlePointerDown(e) {
+            if(gameState !== 'playing') return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            // Menghitung titik koordinat dengan akurat menyesuaikan posisi kanvas di layar
+            const x = ((e.clientX || e.pageX) - rect.left) * scaleX;
+            const y = ((e.clientY || e.pageY) - rect.top) * scaleY;
+
+            if (activeGame === 'pinpull') {
+                const col = Math.floor(x / tileSize);
+                const row = Math.floor(y / tileSize);
+                if(col >= 0 && col < COLS && row >= 0 && row < ROWS) {
+                    const tile = ppGrid[row][col];
+                    if(tile === PP_PIN_H) pullPinH(row, col);
+                    if(tile === PP_PIN_V) pullPinV(row, col);
+                }
+            } else if (activeGame === 'pushbox') {
+                // Store touch start for swipe detection
+                touchStartX = x;
+                touchStartY = y;
+            }
+        }
+
+        function handlePointerUp(e) {
+            if(gameState !== 'playing' || activeGame !== 'pushbox') return;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = ((e.clientX || e.pageX) - rect.left) * scaleX;
+            const y = ((e.clientY || e.pageY) - rect.top) * scaleY;
+            
+            let dx = x - touchStartX;
+            let dy = y - touchStartY;
+            
+            // Require minimum swipe distance
+            if(Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+                if(Math.abs(dx) > Math.abs(dy)) {
+                    tryMovePushBox(0, dx > 0 ? 1 : -1); // Right/Left
+                } else {
+                    tryMovePushBox(dy > 0 ? 1 : -1, 0); // Down/Up
+                }
+            }
+        }
+
+        function handleKeyboard(e) {
+            if(gameState !== 'playing' || activeGame !== 'pushbox') return;
+            switch(e.key) {
+                case 'ArrowUp': case 'w': case 'W': tryMovePushBox(-1, 0); break;
+                case 'ArrowDown': case 's': case 'S': tryMovePushBox(1, 0); break;
+                case 'ArrowLeft': case 'a': case 'A': tryMovePushBox(0, -1); break;
+                case 'ArrowRight': case 'd': case 'D': tryMovePushBox(0, 1); break;
+            }
+        }
+
+        function pullPinH(r, c) {
+            let left = c, right = c;
+            while(left > 0 && ppGrid[r][left-1] === PP_PIN_H) left--;
+            while(right < COLS-1 && ppGrid[r][right+1] === PP_PIN_H) right++;
+            for(let i = left; i <= right; i++) ppGrid[r][i] = PP_EMPTY;
+        }
+
+        function pullPinV(r, c) {
+            let top = r, bottom = r;
+            while(top > 0 && ppGrid[top-1][c] === PP_PIN_V) top--;
+            while(bottom < ROWS-1 && ppGrid[bottom+1][c] === PP_PIN_V) bottom++;
+            for(let i = top; i <= bottom; i++) ppGrid[i][c] = PP_EMPTY;
+        }
+
+        function endGame(isWin, title, desc) {
+            gameState = isWin ? 'won' : 'lost';
+            clearInterval(physicsInterval);
+            clearInterval(timerInterval);
+
+            const modal = document.getElementById('msg-modal');
+            const box = document.getElementById('msg-box');
+            
+            document.getElementById('msg-title').innerText = title;
+            document.getElementById('msg-desc').innerText = desc;
+            
+            if(isWin) {
+                box.classList.remove('border-red-500'); box.classList.add('border-green-500');
+                document.getElementById('msg-title').classList.replace('text-red-500', 'text-green-400') || document.getElementById('msg-title').classList.add('text-green-400');
+                document.getElementById('next-level-btn').classList.remove('hidden');
+            } else {
+                box.classList.remove('border-green-500'); box.classList.add('border-red-500');
+                document.getElementById('msg-title').classList.replace('text-green-400', 'text-red-500') || document.getElementById('msg-title').classList.add('text-red-500');
+                document.getElementById('next-level-btn').classList.add('hidden');
+            }
+
+            modal.classList.add('active');
+        }
+
+        function draw() {
+            if (activeGame === 'pushbox') {
+                drawPushBox();
+            } else {
+                drawPinPull();
+            }
+        }
+
+        function gameLoop() {
+            if(gameState === 'playing') {
+                draw();
+            }
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize on load
+        window.onload = init;
+
+    </script>
+</body>
+</html>

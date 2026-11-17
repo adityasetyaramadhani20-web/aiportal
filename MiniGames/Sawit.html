@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SAWIT</title>
+    <!-- Tailwind CSS for modern HUD styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js Library for 3D FPS Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Teko:wght@600;700&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #090d0b;
+            color: #ecfdf5;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .font-header {
+            font-family: 'Teko', sans-serif;
+            letter-spacing: 1px;
+        }
+
+        /* Screen Flash Overlays */
+        .flash-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 50;
+            transition: opacity 0.4s ease;
+        }
+        .flash-green { background-color: rgba(16, 185, 129, 0.85); }
+        .flash-red { background-color: rgba(239, 68, 68, 0.85); }
+        .flash-black { background-color: rgba(0, 0, 0, 0.95); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #059669; border-radius: 4px; }
+
+        /* Scanning Grid Effect */
+        .scanline {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 0, 0, 0.3) 50%,
+                rgba(0, 0, 0, 0.3)
+            );
+            background-size: 100% 4px;
+        }
+
+        /* Pulse Animations */
+        @keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6)); }
+            50% { filter: drop-shadow(0 0 18px rgba(16, 185, 129, 0.9)); }
+        }
+        .glow-green { animation: pulse-glow 2s infinite; }
+    </style>
+</head>
+<body class="w-screen h-screen relative bg-slate-950 flex flex-col items-center justify-center">
+
+    <!-- Main Game Viewport Container -->
+    <div id="game-container" class="relative w-full h-full max-w-7xl max-h-[900px] aspect-video bg-black rounded-none md:rounded-2xl overflow-hidden shadow-2xl border border-emerald-900/40">
+        
+        <!-- 2D Canvas Layer (Phase 1 Maze & Phase 2 Farming) -->
+        <canvas id="gameCanvas2D" class="absolute inset-0 w-full h-full block z-0"></canvas>
+        
+        <!-- 3D Three.js Container Layer (Phase 3 FPS Engine) -->
+        <div id="fps-3d-container" class="absolute inset-0 w-full h-full block z-0 hidden"></div>
+
+        <!-- Scanline Retro Overlay -->
+        <div class="scanline absolute inset-0 pointer-events-none opacity-20 z-10"></div>
+        
+        <!-- Color Flash Transitions -->
+        <div id="flash-green" class="flash-overlay flash-green flex items-center justify-center">
+            <h2 class="font-header text-5xl md:text-6xl text-white font-bold tracking-widest animate-bounce">PANEN BENIH BERHASIL!</h2>
+        </div>
+        <div id="flash-red" class="flash-overlay flash-red flex items-center justify-center">
+            <h2 class="font-header text-5xl md:text-6xl text-white font-bold tracking-widest animate-pulse">BAHAYA! HAMA MENYERANG!</h2>
+        </div>
+        <div id="flash-black" class="flash-overlay flash-black flex items-center justify-center">
+            <h2 class="font-header text-5xl md:text-6xl text-emerald-400 font-bold tracking-widest">AREA DIBERSIHKAN - KEMBALI KE LAHAN</h2>
+        </div>
+
+        <!-- Global Heads-Up Display (HUD) -->
+        <div id="main-hud" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 md:p-6 hidden z-20">
+            <!-- Top HUD Bar -->
+            <div class="flex justify-between items-start w-full">
+                <!-- Level & Phase Info -->
+                <div class="bg-slate-900/80 backdrop-blur-md border border-emerald-500/40 rounded-xl p-3 flex items-center space-x-4 shadow-lg">
+                    <div class="w-12 h-12 rounded-lg bg-emerald-950 border border-emerald-500 flex items-center justify-center text-emerald-400 font-bold text-xl">
+                        <span id="hud-level-val">1</span>
+                    </div>
+                    <div>
+                        <div class="text-xs uppercase tracking-wider text-emerald-400/80 font-bold" id="hud-phase-title">FASE 1: NAVIGASI MAZE</div>
+                        <div class="text-base md:text-lg font-bold text-white flex items-center gap-2" id="hud-phase-desc">
+                            <i class="fa-solid fa-compass text-emerald-400"></i> Cari 3 Benih & Finish
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Bar (Energy / Timer / Gold) -->
+                <div class="flex gap-2 md:gap-3">
+                    <!-- Energy Bar -->
+                    <div class="bg-slate-900/80 backdrop-blur-md border border-emerald-500/40 rounded-xl p-3 min-w-[150px] md:min-w-[180px] shadow-lg">
+                        <div class="flex justify-between text-xs font-bold text-emerald-400 mb-1">
+                            <span><i class="fa-solid fa-bolt mr-1"></i>ENERGI</span>
+                            <span id="hud-energy-txt">100 HP</span>
+                        </div>
+                        <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-emerald-900">
+                            <div id="hud-energy-bar" class="bg-gradient-to-r from-emerald-500 to-green-400 h-full transition-all duration-300 w-full"></div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Counter (Timer / Seeds / Enemy) -->
+                    <div class="bg-slate-900/80 backdrop-blur-md border border-emerald-500/40 rounded-xl p-3 flex items-center gap-3 shadow-lg min-w-[120px]">
+                        <div class="w-10 h-10 rounded-lg bg-emerald-950 flex items-center justify-center text-emerald-400 text-lg" id="hud-stat-icon">
+                            <i class="fa-solid fa-stopwatch"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] uppercase tracking-wider text-emerald-400/80 font-bold" id="hud-stat-label">WAKTU</div>
+                            <div class="text-xl font-header font-bold text-yellow-400 leading-none" id="hud-stat-val">60s</div>
+                        </div>
+                    </div>
+
+                    <!-- Gold Counter -->
+                    <div class="bg-slate-900/80 backdrop-blur-md border border-yellow-500/40 rounded-xl p-3 flex items-center gap-3 shadow-lg">
+                        <div class="w-10 h-10 rounded-lg bg-yellow-950/60 flex items-center justify-center text-yellow-400 text-lg">
+                            <i class="fa-solid fa-coins"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] uppercase tracking-wider text-yellow-400/80 font-bold">KAPITAL</div>
+                            <div class="text-xl font-header font-bold text-white leading-none" id="hud-gold-val">RP 0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FPS Weapon Sight Overlay (Shown only in Phase 3) -->
+            <div id="fps-crosshair" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div class="w-10 h-10 relative flex items-center justify-center">
+                    <div class="absolute w-full h-[2px] bg-emerald-400/80"></div>
+                    <div class="absolute h-full w-[2px] bg-emerald-400/80"></div>
+                    <div class="w-2.5 h-2.5 rounded-full border border-emerald-300 bg-emerald-400/60"></div>
+                </div>
+            </div>
+
+            <!-- Bottom HUD Notice / Action Prompt -->
+            <div class="flex justify-between items-end w-full">
+                <!-- Control Hints -->
+                <div class="bg-slate-900/80 backdrop-blur-md border border-emerald-800/50 rounded-lg px-4 py-2 text-xs text-slate-300 flex items-center gap-4">
+                    <span class="flex items-center gap-1"><kbd class="bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-[10px]">WASD</kbd> / <kbd class="bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-[10px]">Panah</kbd> Gerak & Bidik</span>
+                    <span class="flex items-center gap-1"><kbd class="bg-slate-800 border border-slate-600 px-1.5 py-0.5 rounded text-[10px]">SPASI</kbd> Aksi / Tembak</span>
+                    <span class="flex items-center gap-1 text-emerald-400" id="hud-action-hint"><i class="fa-solid fa-circle-info mr-1"></i>Kumpulkan 3 Benih Sawit!</span>
+                </div>
+
+                <!-- Touch Control Pad for Mobile Devices -->
+                <div id="mobile-controls" class="pointer-events-auto flex gap-4 md:hidden">
+                    <div class="grid grid-cols-3 gap-1 bg-slate-900/90 p-2 rounded-2xl border border-emerald-800/40">
+                        <div></div>
+                        <button id="btn-up" class="w-12 h-12 bg-slate-800 active:bg-emerald-600 rounded-lg text-emerald-400 flex items-center justify-center text-lg"><i class="fa-solid fa-arrow-up"></i></button>
+                        <div></div>
+                        <button id="btn-left" class="w-12 h-12 bg-slate-800 active:bg-emerald-600 rounded-lg text-emerald-400 flex items-center justify-center text-lg"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button id="btn-down" class="w-12 h-12 bg-slate-800 active:bg-emerald-600 rounded-lg text-emerald-400 flex items-center justify-center text-lg"><i class="fa-solid fa-arrow-down"></i></button>
+                        <button id="btn-right" class="w-12 h-12 bg-slate-800 active:bg-emerald-600 rounded-lg text-emerald-400 flex items-center justify-center text-lg"><i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                    <button id="btn-action" class="w-20 h-20 bg-emerald-600 active:bg-emerald-500 rounded-full text-white font-bold text-sm shadow-lg flex flex-col items-center justify-center gap-1 border-2 border-emerald-300">
+                        <i class="fa-solid fa-crosshairs text-xl"></i>
+                        <span>AKSI</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Menu Overlay -->
+        <div id="start-menu" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-40">
+            <div class="max-w-xl flex flex-col items-center">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950 border border-emerald-500/40 text-emerald-400 text-xs font-bold uppercase tracking-widest mb-4">
+                    <i class="fa-solid fa-seedling"></i> Interactive 3-Phase Simulator
+                </div>
+                <h1 class="font-header text-7xl md:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-green-300 to-yellow-400 leading-none mb-2">
+                    SAWIT
+                </h1>
+                <p class="text-slate-400 text-sm md:text-base mb-8 max-w-md">
+                    Kelola perkebunan kelapa sawit pulau raksasa menggunakan <span class="text-emerald-400 font-semibold">Farming Drone canggih</span>. Jelajahi labirin, urus bercocok tanam, dan basmi hama pembakar lahan!
+                </p>
+
+                <!-- Phase Gameplay Explanation Cards -->
+                <div class="grid grid-cols-3 gap-3 w-full mb-8 text-left">
+                    <div class="bg-slate-900/80 border border-emerald-900/60 rounded-xl p-3">
+                        <div class="text-emerald-400 font-bold text-xs uppercase mb-1 flex items-center gap-1">
+                            <i class="fa-solid fa-compass"></i> 1. Maze 2D
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-tight">Cari benih di labirin sawit & capai finish sebelum waktu 60 detik habis.</p>
+                    </div>
+                    <div class="bg-slate-900/80 border border-emerald-900/60 rounded-xl p-3">
+                        <div class="text-yellow-400 font-bold text-xs uppercase mb-1 flex items-center gap-1">
+                            <i class="fa-solid fa-wheat-awn"></i> 2. Tanam 4x4
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-tight">Tanam, Siram, Pupuk, & Panen sawit secara cepat agar tidak gagal panen.</p>
+                    </div>
+                    <div class="bg-slate-900/80 border border-emerald-900/60 rounded-xl p-3">
+                        <div class="text-red-400 font-bold text-xs uppercase mb-1 flex items-center gap-1">
+                            <i class="fa-solid fa-gun"></i> 3. FPS 3D
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-tight">Tembak hama ulat & kumbang pembakar lahan dalam arena 3D FPS Doom-style!</p>
+                    </div>
+                </div>
+
+                <button id="btn-start-game" class="w-full max-w-xs py-4 px-8 bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-500 hover:to-green-400 text-slate-950 font-extrabold rounded-xl text-xl tracking-wider shadow-lg shadow-emerald-950/50 transform hover:-translate-y-0.5 transition active:translate-y-0 flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-play text-xl"></i> MULAI OPERASI
+                </button>
+            </div>
+        </div>
+
+        <!-- Upgrade Shop Overlay -->
+        <div id="shop-menu" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-40 hidden">
+            <div class="max-w-2xl w-full bg-slate-900/90 border border-emerald-800/60 rounded-2xl p-6 shadow-2xl">
+                <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+                    <div>
+                        <div class="text-xs uppercase text-emerald-400 font-bold tracking-widest text-left">BENGKEL DRONE PETANI</div>
+                        <h2 class="font-header text-4xl text-white font-bold text-left">UPGRADE DENGAN HASIL PANEN</h2>
+                    </div>
+                    <div class="bg-yellow-950/60 border border-yellow-500/40 rounded-xl px-4 py-2 text-right">
+                        <div class="text-[10px] uppercase text-yellow-400 font-bold">Saldo Modal</div>
+                        <div class="text-2xl font-header font-bold text-white leading-none" id="shop-gold-display">RP 0</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-slate-950 border border-emerald-900/60 rounded-xl p-4 flex flex-col justify-between">
+                        <div>
+                            <div class="w-10 h-10 rounded-lg bg-emerald-950 text-emerald-400 flex items-center justify-center mb-3 text-lg"><i class="fa-solid fa-battery-full"></i></div>
+                            <h3 class="font-bold text-white text-sm mb-1">Kapasitas Baterai</h3>
+                            <p class="text-xs text-slate-400 mb-3">Meningkatkan Max Energy drone di fase FPS 3D.</p>
+                        </div>
+                        <button id="buy-upgrade-energy" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold rounded-lg text-xs transition flex justify-between px-3">
+                            <span>UPGRADE</span> <span id="cost-upgrade-energy">RP 150</span>
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-950 border border-emerald-900/60 rounded-xl p-4 flex flex-col justify-between">
+                        <div>
+                            <div class="w-10 h-10 rounded-lg bg-emerald-950 text-emerald-400 flex items-center justify-center mb-3 text-lg"><i class="fa-solid fa-gauge-high"></i></div>
+                            <h3 class="font-bold text-white text-sm mb-1">Mesin Propeler</h3>
+                            <p class="text-xs text-slate-400 mb-3">Meningkatkan kecepatan jelajah drone di maze & FPS.</p>
+                        </div>
+                        <button id="buy-upgrade-speed" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold rounded-lg text-xs transition flex justify-between px-3">
+                            <span>UPGRADE</span> <span id="cost-upgrade-speed">RP 200</span>
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-950 border border-emerald-900/60 rounded-xl p-4 flex flex-col justify-between">
+                        <div>
+                            <div class="w-10 h-10 rounded-lg bg-emerald-950 text-emerald-400 flex items-center justify-center mb-3 text-lg"><i class="fa-solid fa-droplet"></i></div>
+                            <h3 class="font-bold text-white text-sm mb-1">Nosel Sprinkler</h3>
+                            <p class="text-xs text-slate-400 mb-3">Menambah toleransi waktu tahap tanam & siram sawit +2s.</p>
+                        </div>
+                        <button id="buy-upgrade-farming" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold rounded-lg text-xs transition flex justify-between px-3">
+                            <span>UPGRADE</span> <span id="cost-upgrade-farming">RP 250</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="btn-next-level" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-green-500 text-slate-950 font-extrabold rounded-xl text-lg hover:brightness-110 transition flex items-center justify-center gap-2">
+                    <span>LANJUT KE LEVEL BERIKUTNYA</span> <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Game Over Screen Overlay -->
+        <div id="gameover-menu" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-40 hidden">
+            <div class="max-w-md w-full bg-slate-900/90 border border-red-900/60 rounded-2xl p-6 shadow-2xl">
+                <div class="w-16 h-16 rounded-full bg-red-950 border border-red-500 text-red-500 flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h2 class="font-header text-5xl font-bold text-red-500 mb-1">OPERASI GAGAL</h2>
+                <p class="text-xs text-slate-400 mb-6" id="gameover-reason-txt">Drone mengalami kerusakan fatal di lahan sawit.</p>
+
+                <div class="bg-slate-950 rounded-xl p-4 border border-slate-800 mb-6 space-y-2 text-sm text-left">
+                    <div class="flex justify-between text-slate-400"><span>Level Mencapai:</span> <span class="text-white font-bold" id="stat-final-level">1</span></div>
+                    <div class="flex justify-between text-slate-400"><span>Total Hasil Panen Sawit:</span> <span class="text-emerald-400 font-bold" id="stat-final-harvests">0 Poin</span></div>
+                    <div class="flex justify-between text-slate-400"><span>Hama Pembakar Dimusnahkan:</span> <span class="text-red-400 font-bold" id="stat-final-kills">0 Ekor</span></div>
+                </div>
+
+                <button id="btn-restart-game" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-extrabold rounded-xl text-lg tracking-wider transition shadow-lg flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> COBA LAGI
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const Canvas2D = document.getElementById('gameCanvas2D');
+        const fpsContainer = document.getElementById('fps-3d-container');
+        const ctx = Canvas2D.getContext('2d');
+
+        // Main Game State Variables
+        let currentState = 'MENU'; // 'MENU', 'MAZE', 'FARMING', 'FPS', 'SHOP', 'GAMEOVER'
+        let currentLevel = 1;
+
+        // Player Global Stats
+        let playerStats = {
+            energy: 100,
+            maxEnergy: 100,
+            speed: 3.5,
+            gold: 0,
+            farmingToleranceBonus: 0,
+            totalHarvested: 0,
+            totalPestsKilled: 0
+        };
+
+        // Phase 2 Farming Tracking (for Phase 3 penalty calculation)
+        let lastFarmingResults = { success: 0, failed: 0 };
+
+        // 3D Three.js FPS State Container
+        let fpsState = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            enemies: [],
+            bullets: [],
+            playerPos: { x: 0, z: 0 },
+            playerRot: 0,
+            isInitialized: false
+        };
+
+        // Web Audio Synthesizer (No external sound files required)
+        const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSFX(type) {
+            if (AudioCtx.state === 'suspended') AudioCtx.resume();
+            const now = AudioCtx.currentTime;
+            const osc = AudioCtx.createOscillator();
+            const gain = AudioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(AudioCtx.destination);
+
+            if (type === 'pickup') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now); osc.stop(now + 0.15);
+            } else if (type === 'action') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'shoot') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(900, now);
+                osc.frequency.exponentialRampToValueAtTime(150, now + 0.12);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                osc.start(now); osc.stop(now + 0.12);
+            } else if (type === 'hit') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.linearRampToValueAtTime(40, now + 0.2);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            } else if (type === 'win') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.1);
+                osc.frequency.setValueAtTime(783.99, now + 0.2);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            } else if (type === 'fail') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(280, now);
+                osc.frequency.linearRampToValueAtTime(90, now + 0.4);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            }
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            if (!container) return;
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+
+            if (Canvas2D) {
+                Canvas2D.width = w;
+                Canvas2D.height = h;
+            }
+
+            if (fpsState && fpsState.renderer && fpsState.camera) {
+                fpsState.camera.aspect = w / h;
+                fpsState.camera.updateProjectionMatrix();
+                fpsState.renderer.setSize(w, h);
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const keys = {};
+
+        function blurActiveElement() {
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+        }
+
+        window.addEventListener('click', () => { window.focus(); });
+
+        window.addEventListener('keydown', (e) => {
+            const code = e.code;
+            const key = e.key;
+
+            keys[code] = true;
+            if (key) {
+                keys[key] = true;
+                keys[key.toLowerCase()] = true;
+            }
+
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code) || 
+                [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(key)) {
+                e.preventDefault();
+            }
+
+            if ((code === 'Space' || key === ' ' || key === 'Spacebar') && !e.repeat) {
+                handleActionInput();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const code = e.code;
+            const key = e.key;
+            keys[code] = false;
+            if (key) {
+                keys[key] = false;
+                keys[key.toLowerCase()] = false;
+            }
+        });
+
+        function isUpPressed() { return keys['KeyW'] || keys['w'] || keys['W'] || keys['ArrowUp']; }
+        function isDownPressed() { return keys['KeyS'] || keys['s'] || keys['S'] || keys['ArrowDown']; }
+        function isLeftPressed() { return keys['KeyA'] || keys['a'] || keys['A'] || keys['ArrowLeft']; }
+        function isRightPressed() { return keys['KeyD'] || keys['d'] || keys['D'] || keys['ArrowRight']; }
+
+        function setupMobileControls() {
+            const bindBtn = (id, keyCode) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyCode] = true; });
+                btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyCode] = false; });
+                btn.addEventListener('mousedown', (e) => { e.preventDefault(); keys[keyCode] = true; });
+                btn.addEventListener('mouseup', (e) => { e.preventDefault(); keys[keyCode] = false; });
+            };
+            bindBtn('btn-up', 'KeyW');
+            bindBtn('btn-left', 'KeyA');
+            bindBtn('btn-down', 'KeyS');
+            bindBtn('btn-right', 'KeyD');
+
+            const actBtn = document.getElementById('btn-action');
+            if (actBtn) {
+                actBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    handleActionInput();
+                });
+            }
+        }
+        setupMobileControls();
+
+        function handleActionInput() {
+            if (currentState === 'FARMING') {
+                interactFarmingGrid();
+            } else if (currentState === 'FPS') {
+                shootFPSPest();
+            }
+        }
+
+        let mazeState = {
+            gridSizeX: 13,
+            gridSizeY: 13,
+            grid: [],
+            dronePos: { x: 1.5, y: 1.5 },
+            seeds: [],
+            seedsCollected: 0,
+            finishPos: { x: 9, y: 9 },
+            timer: 60,
+            timerInterval: null
+        };
+
+        function initMazePhase() {
+            currentState = 'MAZE';
+            if (Canvas2D) Canvas2D.classList.remove('hidden');
+            if (fpsContainer) fpsContainer.classList.add('hidden');
+            updateHUDVisibility();
+
+            const cols = 13 + (currentLevel * 2 > 6 ? 6 : currentLevel * 2);
+            const rows = 13 + (currentLevel * 2 > 6 ? 6 : currentLevel * 2);
+            mazeState.gridSizeX = cols % 2 === 0 ? cols + 1 : cols;
+            mazeState.gridSizeY = rows % 2 === 0 ? rows + 1 : rows;
+
+            mazeState.grid = Array(mazeState.gridSizeY).fill().map(() => Array(mazeState.gridSizeX).fill(1));
+            
+            function carve(x, y) {
+                mazeState.grid[y][x] = 0;
+                const dirs = [[0, -2], [0, 2], [-2, 0], [2, 0]].sort(() => Math.random() - 0.5);
+
+                for (let [dx, dy] of dirs) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx > 0 && nx < mazeState.gridSizeX - 1 && ny > 0 && ny < mazeState.gridSizeY - 1 && mazeState.grid[ny][nx] === 1) {
+                        mazeState.grid[y + dy / 2][x + dx / 2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+            carve(1, 1);
+
+            const openCells = [];
+            for (let r = 1; r < mazeState.gridSizeY - 1; r++) {
+                for (let c = 1; c < mazeState.gridSizeX - 1; c++) {
+                    if (mazeState.grid[r][c] === 0 && !(r === 1 && c === 1)) {
+                        openCells.push({ x: c, y: r });
+                    }
+                }
+            }
+            openCells.sort(() => Math.random() - 0.5);
+
+            mazeState.dronePos = { x: 1.5, y: 1.5 };
+            mazeState.seeds = openCells.slice(0, 3).map(p => ({ ...p, collected: false }));
+            mazeState.finishPos = openCells[openCells.length - 1];
+            mazeState.seedsCollected = 0;
+            mazeState.timer = 60;
+
+            if (mazeState.timerInterval) clearInterval(mazeState.timerInterval);
+            mazeState.timerInterval = setInterval(() => {
+                if (currentState === 'MAZE') {
+                    mazeState.timer--;
+                    document.getElementById('hud-stat-val').innerText = `${mazeState.timer}s`;
+                    if (mazeState.timer <= 0) {
+                        clearInterval(mazeState.timerInterval);
+                        triggerGameOver('Kehabisan waktu di labirin kebun sawit!');
+                    }
+                }
+            }, 1000);
+        }
+
+        function canMoveTo(x, y, radius = 0.25) {
+            const points = [
+                { x: x - radius, y: y - radius },
+                { x: x + radius, y: y - radius },
+                { x: x - radius, y: y + radius },
+                { x: x + radius, y: y + radius }
+            ];
+            for (let p of points) {
+                const cx = Math.floor(p.x);
+                const cy = Math.floor(p.y);
+                if (cy < 0 || cy >= mazeState.gridSizeY || cx < 0 || cx >= mazeState.gridSizeX) return false;
+                if (mazeState.grid[cy][cx] !== 0) return false;
+            }
+            return true;
+        }
+
+        function updateMaze() {
+            const moveSpeed = playerStats.speed * 0.04;
+            let dx = 0, dy = 0;
+            if (isUpPressed()) dy -= moveSpeed;
+            if (isDownPressed()) dy += moveSpeed;
+            if (isLeftPressed()) dx -= moveSpeed;
+            if (isRightPressed()) dx += moveSpeed;
+
+            const radius = 0.25;
+            if (dx !== 0) {
+                const nextX = mazeState.dronePos.x + dx;
+                if (canMoveTo(nextX, mazeState.dronePos.y, radius)) {
+                    mazeState.dronePos.x = nextX;
+                }
+            }
+            if (dy !== 0) {
+                const nextY = mazeState.dronePos.y + dy;
+                if (canMoveTo(mazeState.dronePos.x, nextY, radius)) {
+                    mazeState.dronePos.y = nextY;
+                }
+            }
+
+            mazeState.seeds.forEach(seed => {
+                if (!seed.collected) {
+                    const dist = Math.hypot(mazeState.dronePos.x - (seed.x + 0.5), mazeState.dronePos.y - (seed.y + 0.5));
+                    if (dist < 0.55) {
+                        seed.collected = true;
+                        mazeState.seedsCollected++;
+                        playSFX('pickup');
+                    }
+                }
+            });
+
+            const distFinish = Math.hypot(mazeState.dronePos.x - (mazeState.finishPos.x + 0.5), mazeState.dronePos.y - (mazeState.finishPos.y + 0.5));
+            if (distFinish < 0.55 && mazeState.seedsCollected >= 3) {
+                clearInterval(mazeState.timerInterval);
+                triggerFlash('green', () => {
+                    initFarmingPhase();
+                });
+            }
+        }
+
+        function renderMaze() {
+            ctx.fillStyle = '#06130b';
+            ctx.fillRect(0, 0, Canvas2D.width, Canvas2D.height);
+
+            const cellW = Canvas2D.width / mazeState.gridSizeX;
+            const cellH = Canvas2D.height / mazeState.gridSizeY;
+
+            for (let r = 0; r < mazeState.gridSizeY; r++) {
+                for (let c = 0; c < mazeState.gridSizeX; c++) {
+                    const px = c * cellW;
+                    const py = r * cellH;
+                    if (mazeState.grid[r][c] === 1) {
+                        ctx.fillStyle = '#042f1a';
+                        ctx.fillRect(px, py, cellW, cellH);
+                        ctx.strokeStyle = '#064e2b';
+                        ctx.strokeRect(px + 2, py + 2, cellW - 4, cellH - 4);
+
+                        ctx.fillStyle = '#10b981';
+                        ctx.font = `${Math.min(cellW, cellH) * 0.4}px FontAwesome`;
+                        ctx.fillText('\uf06c', px + cellW * 0.3, py + cellH * 0.65);
+                    } else {
+                        ctx.fillStyle = '#122318';
+                        ctx.fillRect(px, py, cellW, cellH);
+                    }
+                }
+            }
+
+            mazeState.seeds.forEach(s => {
+                if (!s.collected) {
+                    const sx = (s.x + 0.5) * cellW;
+                    const sy = (s.y + 0.5) * cellH;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, Math.min(cellW, cellH) * 0.25, 0, Math.PI * 2);
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.shadowColor = '#fbbf24';
+                    ctx.shadowBlur = 10;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            });
+
+            const fx = (mazeState.finishPos.x + 0.5) * cellW;
+            const fy = (mazeState.finishPos.y + 0.5) * cellH;
+            ctx.fillStyle = mazeState.seedsCollected >= 3 ? '#10b981' : '#64748b';
+            ctx.fillRect(fx - cellW * 0.35, fy - cellH * 0.35, cellW * 0.7, cellH * 0.7);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(mazeState.seedsCollected >= 3 ? 'FINISH' : 'LOCK', fx, fy + 4);
+
+            const dx = mazeState.dronePos.x * cellW;
+            const dy = mazeState.dronePos.y * cellH;
+            const size = Math.min(cellW, cellH) * 0.4;
+
+            ctx.save();
+            ctx.translate(dx, dy);
+            const time = Date.now() * 0.01;
+            ctx.strokeStyle = '#34d399';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 4; i++) {
+                const angle = (Math.PI / 2) * i + time;
+                const rx = Math.cos(angle) * size * 0.8;
+                const ry = Math.sin(angle) * size * 0.8;
+                ctx.beginPath();
+                ctx.arc(rx, ry, size * 0.3, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#059669';
+            ctx.beginPath();
+            ctx.arc(0, 0, size * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        let farmingState = {
+            grid: [],
+            totalSeeds: 3,
+            seedsRemainingToPlant: 3,
+            harvestedCount: 0,
+            failedCount: 0,
+            hoverIndex: 0
+        };
+
+        function initFarmingPhase() {
+            currentState = 'FARMING';
+            if (Canvas2D) Canvas2D.classList.remove('hidden');
+            if (fpsContainer) fpsContainer.classList.add('hidden');
+            updateHUDVisibility();
+
+            const totalToPlant = 3 + (currentLevel - 1);
+            farmingState = {
+                grid: Array(16).fill().map(() => ({
+                    state: 'EMPTY',
+                    timer: 0,
+                    maxTimer: 5 + playerStats.farmingToleranceBonus
+                })),
+                totalSeeds: totalToPlant,
+                seedsRemainingToPlant: totalToPlant,
+                harvestedCount: 0,
+                failedCount: 0,
+                hoverIndex: 0
+            };
+
+            spawnSeedOnGrid();
+        }
+
+        function spawnSeedOnGrid() {
+            if (farmingState.seedsRemainingToPlant > 0) {
+                const emptyIndices = farmingState.grid
+                    .map((plot, i) => plot.state === 'EMPTY' ? i : -1)
+                    .filter(i => i !== -1);
+                if (emptyIndices.length > 0) {
+                    const idx = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+                    farmingState.grid[idx] = {
+                        state: 'NEED_PLANT',
+                        timer: 5 + playerStats.farmingToleranceBonus,
+                        maxTimer: 5 + playerStats.farmingToleranceBonus
+                    };
+                    farmingState.seedsRemainingToPlant--;
+                }
+            }
+        }
+
+        function updateFarming(dt) {
+            let activePlots = 0;
+            farmingState.grid.forEach((plot) => {
+                if (['NEED_PLANT', 'NEED_WATER', 'NEED_FERTILIZER', 'READY_HARVEST'].includes(plot.state)) {
+                    activePlots++;
+                    plot.timer -= dt;
+                    if (plot.timer <= 0) {
+                        plot.state = 'WITHERED';
+                        farmingState.failedCount++;
+                        playSFX('fail');
+                        spawnSeedOnGrid();
+                    }
+                }
+            });
+
+            const totalProcessed = farmingState.harvestedCount + farmingState.failedCount;
+            if (farmingState.seedsRemainingToPlant === 0 && activePlots === 0 && totalProcessed >= farmingState.totalSeeds) {
+                lastFarmingResults.success = farmingState.harvestedCount;
+                lastFarmingResults.failed = farmingState.failedCount;
+                playerStats.gold += farmingState.harvestedCount * 50;
+                playerStats.totalHarvested += farmingState.harvestedCount;
+
+                if (farmingState.harvestedCount === 0) {
+                    triggerGameOver('Seluruh benih sawit gagal dipanen!');
+                } else {
+                    triggerFlash('red', () => {
+                        initFPSPhase();
+                    });
+                }
+            }
+        }
+
+        function interactFarmingGrid() {
+            const plot = farmingState.grid[farmingState.hoverIndex];
+            if (!plot) return;
+
+            if (plot.state === 'NEED_PLANT') {
+                plot.state = 'NEED_WATER';
+                plot.timer = 5 + playerStats.farmingToleranceBonus;
+                playSFX('action');
+            } else if (plot.state === 'NEED_WATER') {
+                plot.state = 'NEED_FERTILIZER';
+                plot.timer = 5 + playerStats.farmingToleranceBonus;
+                playSFX('action');
+            } else if (plot.state === 'NEED_FERTILIZER') {
+                plot.state = 'READY_HARVEST';
+                plot.timer = 5 + playerStats.farmingToleranceBonus;
+                playSFX('action');
+            } else if (plot.state === 'READY_HARVEST') {
+                plot.state = 'HARVESTED';
+                farmingState.harvestedCount++;
+                playSFX('win');
+                spawnSeedOnGrid();
+            }
+        }
+
+        function renderFarming() {
+            ctx.fillStyle = '#09150e';
+            ctx.fillRect(0, 0, Canvas2D.width, Canvas2D.height);
+
+            const gridCols = 4, gridRows = 4, margin = 20;
+            const availableW = Canvas2D.width - margin * 2;
+            const availableH = Canvas2D.height - margin * 2;
+            const cellSize = Math.min(availableW / gridCols, availableH / gridRows) * 0.85;
+
+            const startX = (Canvas2D.width - cellSize * gridCols) / 2;
+            const startY = (Canvas2D.height - cellSize * gridRows) / 2;
+
+            for (let r = 0; r < gridRows; r++) {
+                for (let c = 0; c < gridCols; c++) {
+                    const idx = r * gridCols + c;
+                    const plot = farmingState.grid[idx];
+                    const px = startX + c * cellSize;
+                    const py = startY + r * cellSize;
+                    const padding = 6;
+
+                    if (idx === farmingState.hoverIndex) {
+                        ctx.fillStyle = '#047857';
+                        ctx.fillRect(px, py, cellSize, cellSize);
+                    }
+
+                    ctx.fillStyle = plot.state === 'WITHERED' ? '#3f2e21' : '#1c3628';
+                    ctx.fillRect(px + padding, py + padding, cellSize - padding * 2, cellSize - padding * 2);
+                    ctx.strokeStyle = idx === farmingState.hoverIndex ? '#34d399' : '#065f46';
+                    ctx.lineWidth = idx === farmingState.hoverIndex ? 3 : 1;
+                    ctx.strokeRect(px + padding, py + padding, cellSize - padding * 2, cellSize - padding * 2);
+
+                    ctx.textAlign = 'center';
+                    const cx = px + cellSize / 2;
+                    const cy = py + cellSize / 2;
+
+                    if (plot.state === 'NEED_PLANT') {
+                        ctx.fillStyle = '#f59e0b';
+                        ctx.font = `${cellSize * 0.3}px FontAwesome`;
+                        ctx.fillText('\uf4d8', cx, cy);
+                        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px sans-serif';
+                        ctx.fillText('TANAM!', cx, cy + cellSize * 0.3);
+                    } else if (plot.state === 'NEED_WATER') {
+                        ctx.fillStyle = '#3b82f6';
+                        ctx.font = `${cellSize * 0.3}px FontAwesome`;
+                        ctx.fillText('\uf043', cx, cy);
+                        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px sans-serif';
+                        ctx.fillText('SIRAM!', cx, cy + cellSize * 0.3);
+                    } else if (plot.state === 'NEED_FERTILIZER') {
+                        ctx.fillStyle = '#a855f7';
+                        ctx.font = `${cellSize * 0.3}px FontAwesome`;
+                        ctx.fillText('\uf468', cx, cy);
+                        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px sans-serif';
+                        ctx.fillText('PUPUK!', cx, cy + cellSize * 0.3);
+                    } else if (plot.state === 'READY_HARVEST') {
+                        ctx.fillStyle = '#eab308';
+                        ctx.font = `${cellSize * 0.35}px FontAwesome`;
+                        ctx.fillText('\uf06c', cx, cy);
+                        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px sans-serif';
+                        ctx.fillText('PANEN!', cx, cy + cellSize * 0.3);
+                    } else if (plot.state === 'HARVESTED') {
+                        ctx.fillStyle = '#10b981'; ctx.font = 'bold 12px sans-serif';
+                        ctx.fillText('BERHASIL', cx, cy);
+                    } else if (plot.state === 'WITHERED') {
+                        ctx.fillStyle = '#ef4444';
+                        ctx.font = `${cellSize * 0.3}px FontAwesome`;
+                        ctx.fillText('\uf00d', cx, cy);
+                        ctx.fillStyle = '#f87171'; ctx.font = 'bold 11px sans-serif';
+                        ctx.fillText('GAGAL', cx, cy + cellSize * 0.3);
+                    }
+
+                    if (['NEED_PLANT', 'NEED_WATER', 'NEED_FERTILIZER', 'READY_HARVEST'].includes(plot.state)) {
+                        const ratio = Math.max(0, plot.timer / plot.maxTimer);
+                        ctx.fillStyle = ratio > 0.4 ? '#10b981' : '#ef4444';
+                        ctx.fillRect(px + padding + 4, py + cellSize - padding - 8, (cellSize - padding * 2 - 8) * ratio, 4);
+                    }
+                }
+            }
+
+            if (isUpPressed()) moveHover(0, -1);
+            if (isDownPressed()) moveHover(0, 1);
+            if (isLeftPressed()) moveHover(-1, 0);
+            if (isRightPressed()) moveHover(1, 0);
+        }
+
+        let lastFarmingMove = 0;
+        function moveHover(dx, dy) {
+            const now = Date.now();
+            if (now - lastFarmingMove < 180) return;
+            lastFarmingMove = now;
+
+            let c = farmingState.hoverIndex % 4;
+            let r = Math.floor(farmingState.hoverIndex / 4);
+
+            c = Math.max(0, Math.min(3, c + dx));
+            r = Math.max(0, Math.min(3, r + dy));
+            farmingState.hoverIndex = r * 4 + c;
+        }
+
+        Canvas2D.addEventListener('click', (e) => {
+            if (currentState !== 'FARMING') return;
+            const rect = Canvas2D.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            const gridCols = 4, gridRows = 4, margin = 20;
+            const availableW = Canvas2D.width - margin * 2;
+            const availableH = Canvas2D.height - margin * 2;
+            const cellSize = Math.min(availableW / gridCols, availableH / gridRows) * 0.85;
+            const startX = (Canvas2D.width - cellSize * gridCols) / 2;
+            const startY = (Canvas2D.height - cellSize * gridRows) / 2;
+
+            for (let r = 0; r < gridRows; r++) {
+                for (let c = 0; c < gridCols; c++) {
+                    const px = startX + c * cellSize;
+                    const py = startY + r * cellSize;
+                    if (mx >= px && mx <= px + cellSize && my >= py && my <= py + cellSize) {
+                        farmingState.hoverIndex = r * gridCols + c;
+                        interactFarmingGrid();
+                        return;
+                    }
+                }
+            }
+        });
+
+        function initFPSPhase() {
+            currentState = 'FPS';
+            if (Canvas2D) Canvas2D.classList.add('hidden');
+            if (fpsContainer) fpsContainer.classList.remove('hidden');
+            updateHUDVisibility();
+
+            // Calculate enemies with 2x fail penalty rule
+            let baseEnemies = 3 + (currentLevel - 1);
+            if (lastFarmingResults.failed > lastFarmingResults.success) {
+                baseEnemies *= 2;
+            }
+
+            fpsContainer.innerHTML = ''; // Clean container
+
+            const w = fpsContainer.clientWidth || window.innerWidth;
+            const h = fpsContainer.clientHeight || window.innerHeight;
+
+            fpsState.scene = new THREE.Scene();
+            fpsState.scene.background = new THREE.Color(0x04130a);
+            fpsState.scene.fog = new THREE.FogExp2(0x04130a, 0.035);
+
+            fpsState.camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1000);
+            fpsState.camera.rotation.order = 'YXZ';
+
+            fpsState.renderer = new THREE.WebGLRenderer({ antialias: true });
+            fpsState.renderer.setSize(w, h);
+            fpsState.renderer.setClearColor(0x04130a, 1);
+            fpsContainer.appendChild(fpsState.renderer.domElement);
+
+            // Lighting Setup
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            fpsState.scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0x10b981, 0.8);
+            dirLight.position.set(10, 20, 10);
+            fpsState.scene.add(dirLight);
+
+            const redLight = new THREE.DirectionalLight(0xef4444, 0.5);
+            redLight.position.set(-10, 10, -10);
+            fpsState.scene.add(redLight);
+
+            // Ground Plantation Floor
+            const floorGeo = new THREE.PlaneGeometry(80, 80);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x0f2a1b, roughness: 0.8 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            fpsState.scene.add(floor);
+
+            const gridHelper = new THREE.GridHelper(80, 40, 0x10b981, 0x064e2b);
+            gridHelper.position.y = 0.01;
+            fpsState.scene.add(gridHelper);
+
+            // Spawn 3D Palm Trees
+            for (let i = 0; i < 24; i++) {
+                const tree = createPalmTree();
+                const tx = (Math.random() - 0.5) * 60;
+                const tz = (Math.random() - 0.5) * 60;
+                if (Math.hypot(tx, tz) > 6) {
+                    tree.position.set(tx, 0, tz);
+                    fpsState.scene.add(tree);
+                }
+            }
+
+            // Spawn Pests (3D Fire Beetles / Caterpillars)
+            fpsState.enemies = [];
+            for (let i = 0; i < baseEnemies; i++) {
+                const pestGroup = createPestMesh();
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 12 + Math.random() * 16;
+                pestGroup.position.set(Math.cos(angle) * dist, 0.2, Math.sin(angle) * dist);
+                fpsState.scene.add(pestGroup);
+
+                fpsState.enemies.push({
+                    mesh: pestGroup,
+                    hp: 2,
+                    speed: 0.035 + Math.random() * 0.02,
+                    baseY: 0.2,
+                    floatOffset: Math.random() * 100
+                });
+            }
+
+            fpsState.bullets = [];
+            fpsState.playerPos = { x: 0, z: 0 };
+            fpsState.playerRot = 0;
+            fpsState.isInitialized = true;
+        }
+
+        function createPalmTree() {
+            const group = new THREE.Group();
+            const trunkGeo = new THREE.CylinderGeometry(0.25, 0.4, 4.5, 8);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3d271d, roughness: 0.9 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 2.25;
+            group.add(trunk);
+
+            const leavesGeo = new THREE.ConeGeometry(2.5, 1.2, 6);
+            const leavesMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.5 });
+            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+            leaves.position.y = 4.2;
+            group.add(leaves);
+
+            return group;
+        }
+
+        function createPestMesh() {
+            const group = new THREE.Group();
+            const bodyGeo = new THREE.SphereGeometry(0.75, 12, 12);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.3, emissive: 0x7c2d12 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.8;
+            group.add(body);
+
+            const hornGeo = new THREE.ConeGeometry(0.25, 0.8, 6);
+            const hornMat = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xd97706 });
+            const horn = new THREE.Mesh(hornGeo, hornMat);
+            horn.rotation.x = Math.PI / 3;
+            horn.position.set(0, 1.1, 0.4);
+            group.add(horn);
+
+            const eyeGeo = new THREE.SphereGeometry(0.15, 6, 6);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+            const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeL.position.set(-0.28, 0.9, 0.5);
+            const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeR.position.set(0.28, 0.9, 0.5);
+            group.add(eyeL);
+            group.add(eyeR);
+
+            return group;
+        }
+
+        function updateFPS(dt) {
+            if (!fpsState.isInitialized) return;
+
+            // Camera Rotation (Pan Left / Right)
+            if (isLeftPressed()) fpsState.playerRot += 2.0 * dt;
+            if (isRightPressed()) fpsState.playerRot -= 2.0 * dt;
+
+            // Movement Directions (W/S Forward/Backward)
+            const forwardX = -Math.sin(fpsState.playerRot);
+            const forwardZ = -Math.cos(fpsState.playerRot);
+            let moveSpeed = playerStats.speed * 3.5 * dt;
+
+            if (isUpPressed()) {
+                fpsState.playerPos.x += forwardX * moveSpeed;
+                fpsState.playerPos.z += forwardZ * moveSpeed;
+            }
+            if (isDownPressed()) {
+                fpsState.playerPos.x -= forwardX * moveSpeed;
+                fpsState.playerPos.z -= forwardZ * moveSpeed;
+            }
+
+            // Boundary Box
+            fpsState.playerPos.x = Math.max(-35, Math.min(35, fpsState.playerPos.x));
+            fpsState.playerPos.z = Math.max(-35, Math.min(35, fpsState.playerPos.z));
+
+            fpsState.camera.position.set(fpsState.playerPos.x, 1.6, fpsState.playerPos.z);
+            fpsState.camera.rotation.set(0, fpsState.playerRot, 0, 'YXZ');
+
+            // Update Pests AI Movement & Floating Hover Effect
+            const nowTime = Date.now() * 0.003;
+            fpsState.enemies.forEach((enemy) => {
+                const dx = fpsState.playerPos.x - enemy.mesh.position.x;
+                const dz = fpsState.playerPos.z - enemy.mesh.position.z;
+                const dist = Math.hypot(dx, dz);
+
+                // Hover pests around eye-level altitude (y ≈ 0.8 - 1.2)
+                enemy.mesh.position.y = enemy.baseY + Math.sin(nowTime + enemy.floatOffset) * 0.2;
+
+                enemy.mesh.lookAt(fpsState.playerPos.x, enemy.mesh.position.y + 0.6, fpsState.playerPos.z);
+
+                if (dist > 1.2) {
+                    enemy.mesh.position.x += (dx / dist) * enemy.speed;
+                    enemy.mesh.position.z += (dz / dist) * enemy.speed;
+                } else {
+                    playerStats.energy -= 12 * dt;
+                    playSFX('hit');
+                    updateHUDStats();
+                    if (playerStats.energy <= 0) {
+                        triggerGameOver('Drone hancur akibat diserang hama sawit!');
+                    }
+                }
+            });
+
+            // Update Bullets & Hit Detection
+            for (let i = fpsState.bullets.length - 1; i >= 0; i--) {
+                const b = fpsState.bullets[i];
+                b.mesh.position.x += b.dir.x * 28 * dt;
+                b.mesh.position.z += b.dir.z * 28 * dt;
+                b.life -= dt;
+
+                for (let eIdx = fpsState.enemies.length - 1; eIdx >= 0; eIdx--) {
+                    const enemy = fpsState.enemies[eIdx];
+                    const dx = b.mesh.position.x - enemy.mesh.position.x;
+                    const dy = b.mesh.position.y - (enemy.mesh.position.y + 0.8);
+                    const dz = b.mesh.position.z - enemy.mesh.position.z;
+                    const xzDist = Math.hypot(dx, dz);
+
+                    // Check horizontal XZ proximity + vertical height allowance
+                    if (xzDist < 1.35 && Math.abs(dy) < 1.2) {
+                        enemy.hp--;
+                        b.life = 0;
+                        playSFX('hit');
+                        if (enemy.hp <= 0) {
+                            fpsState.scene.remove(enemy.mesh);
+                            fpsState.enemies.splice(eIdx, 1);
+                            playerStats.totalPestsKilled++;
+                            playerStats.gold += 30;
+                        }
+                        break;
+                    }
+                }
+
+                if (b.life <= 0) {
+                    fpsState.scene.remove(b.mesh);
+                    fpsState.bullets.splice(i, 1);
+                }
+            }
+
+            if (fpsState.enemies.length === 0) {
+                triggerFlash('black', () => {
+                    openShopMenu();
+                });
+            }
+        }
+
+        function shootFPSPest() {
+            if (currentState !== 'FPS' || !fpsState.isInitialized) return;
+            playSFX('shoot');
+
+            const bulletGeo = new THREE.SphereGeometry(0.3, 8, 8);
+            const bulletMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
+            const bulletMesh = new THREE.Mesh(bulletGeo, bulletMat);
+
+            const dir = new THREE.Vector3(
+                -Math.sin(fpsState.playerRot),
+                0,
+                -Math.cos(fpsState.playerRot)
+            ).normalize();
+
+            // Spawn bullet directly aligned with pest body height (Y = 1.0)
+            bulletMesh.position.set(fpsState.playerPos.x + dir.x * 0.5, 1.0, fpsState.playerPos.z + dir.z * 0.5);
+            fpsState.scene.add(bulletMesh);
+
+            fpsState.bullets.push({
+                mesh: bulletMesh,
+                dir: dir,
+                life: 1.5
+            });
+        }
+
+        function renderFPS() {
+            if (currentState === 'FPS' && fpsState.renderer && fpsState.scene && fpsState.camera) {
+                fpsState.renderer.render(fpsState.scene, fpsState.camera);
+            }
+        }
+
+        function updateHUDVisibility() {
+            const hud = document.getElementById('main-hud');
+            const crosshair = document.getElementById('fps-crosshair');
+            const actionHint = document.getElementById('hud-action-hint');
+            const phaseTitle = document.getElementById('hud-phase-title');
+            const phaseDesc = document.getElementById('hud-phase-desc');
+            const levelVal = document.getElementById('hud-level-val');
+            const statLabel = document.getElementById('hud-stat-label');
+            const statIcon = document.getElementById('hud-stat-icon');
+
+            if (currentState === 'MENU' || currentState === 'SHOP' || currentState === 'GAMEOVER') {
+                if (hud) hud.classList.add('hidden');
+                return;
+            }
+
+            if (hud) hud.classList.remove('hidden');
+            if (levelVal) levelVal.innerText = currentLevel;
+
+            if (currentState === 'MAZE') {
+                if (crosshair) crosshair.classList.add('hidden');
+                if (phaseTitle) phaseTitle.innerText = 'FASE 1: NAVIGASI MAZE';
+                if (phaseDesc) phaseDesc.innerHTML = '<i class="fa-solid fa-compass text-emerald-400"></i> Cari 3 Benih & Finish';
+                if (statLabel) statLabel.innerText = 'WAKTU';
+                if (statIcon) statIcon.innerHTML = '<i class="fa-solid fa-stopwatch"></i>';
+                if (actionHint) actionHint.innerText = 'Kumpulkan 3 Benih & Masuk Garis Finish!';
+            } else if (currentState === 'FARMING') {
+                if (crosshair) crosshair.classList.add('hidden');
+                if (phaseTitle) phaseTitle.innerText = 'FASE 2: SIMULASI BERTANI';
+                if (phaseDesc) phaseDesc.innerHTML = '<i class="fa-solid fa-wheat-awn text-yellow-400"></i> Tanam - Siram - Pupuk - Panen';
+                if (statLabel) statLabel.innerText = 'SISA BENIH';
+                if (statIcon) statIcon.innerHTML = '<i class="fa-solid fa-seedling text-yellow-400"></i>';
+                if (actionHint) actionHint.innerText = 'Tekan SPASI / Ketuk petak untuk Aksi Bertani!';
+            } else if (currentState === 'FPS') {
+                if (crosshair) crosshair.classList.remove('hidden');
+                if (phaseTitle) phaseTitle.innerText = 'FASE 3: BASMI HAMA (FPS 3D)';
+                if (phaseDesc) phaseDesc.innerHTML = '<i class="fa-solid fa-crosshairs text-red-400"></i> Tembak Semua Hama Sawit!';
+                if (statLabel) statLabel.innerText = 'SISA HAMA';
+                if (statIcon) statIcon.innerHTML = '<i class="fa-solid fa-bug text-red-400"></i>';
+                if (actionHint) actionHint.innerText = 'Bidik & Tekan SPASI / Klik untuk Menembak!';
+            }
+            updateHUDStats();
+        }
+
+        function updateHUDStats() {
+            const energyBar = document.getElementById('hud-energy-bar');
+            const energyTxt = document.getElementById('hud-energy-txt');
+            const goldVal = document.getElementById('hud-gold-val');
+            const statVal = document.getElementById('hud-stat-val');
+
+            const energyPct = Math.max(0, Math.min(100, Math.round((playerStats.energy / playerStats.maxEnergy) * 100)));
+            if (energyBar) energyBar.style.width = `${energyPct}%`;
+            if (energyTxt) energyTxt.innerText = `${Math.round(playerStats.energy)} / ${playerStats.maxEnergy} HP`;
+            if (goldVal) goldVal.innerText = `RP ${playerStats.gold}`;
+
+            if (currentState === 'MAZE') {
+                if (statVal) statVal.innerText = `${mazeState.timer}s`;
+            } else if (currentState === 'FARMING') {
+                const activeOrRemaining = farmingState.seedsRemainingToPlant + farmingState.grid.filter(p => ['NEED_PLANT','NEED_WATER','NEED_FERTILIZER','READY_HARVEST'].includes(p.state)).length;
+                if (statVal) statVal.innerText = `${activeOrRemaining} Benih`;
+            } else if (currentState === 'FPS') {
+                if (statVal) statVal.innerText = `${fpsState.enemies ? fpsState.enemies.length : 0} Hama`;
+            }
+        }
+
+        function triggerFlash(color, callback) {
+            const flashEl = document.getElementById(`flash-${color}`);
+            if (!flashEl) return;
+            flashEl.style.opacity = '1';
+            setTimeout(() => {
+                flashEl.style.opacity = '0';
+                if (callback) callback();
+            }, 600);
+        }
+
+        function openShopMenu() {
+            currentState = 'SHOP';
+            updateHUDVisibility();
+
+            const shopGold = document.getElementById('shop-gold-display');
+            const shopMenu = document.getElementById('shop-menu');
+            if (shopGold) shopGold.innerText = `RP ${playerStats.gold}`;
+            if (shopMenu) shopMenu.classList.remove('hidden');
+
+            const costEnergy = 150;
+            const costSpeed = 200;
+            const costFarming = 250;
+
+            const btnEnergy = document.getElementById('buy-upgrade-energy');
+            const btnSpeed = document.getElementById('buy-upgrade-speed');
+            const btnFarming = document.getElementById('buy-upgrade-farming');
+
+            if (btnEnergy) btnEnergy.disabled = playerStats.gold < costEnergy;
+            if (btnSpeed) btnSpeed.disabled = playerStats.gold < costSpeed;
+            if (btnFarming) btnFarming.disabled = playerStats.gold < costFarming;
+        }
+
+        function buyUpgrade(type) {
+            if (type === 'energy' && playerStats.gold >= 150) {
+                playerStats.gold -= 150;
+                playerStats.maxEnergy += 25;
+                playerStats.energy = playerStats.maxEnergy;
+                playSFX('win');
+            } else if (type === 'speed' && playerStats.gold >= 200) {
+                playerStats.gold -= 200;
+                playerStats.speed += 0.8;
+                playSFX('win');
+            } else if (type === 'farming' && playerStats.gold >= 250) {
+                playerStats.gold -= 250;
+                playerStats.farmingToleranceBonus += 2;
+                playSFX('win');
+            }
+            openShopMenu();
+        }
+
+        function triggerGameOver(reason) {
+            currentState = 'GAMEOVER';
+            if (mazeState.timerInterval) clearInterval(mazeState.timerInterval);
+            updateHUDVisibility();
+
+            const reasonTxt = document.getElementById('gameover-reason-txt');
+            const finalLvl = document.getElementById('stat-final-level');
+            const finalHarvests = document.getElementById('stat-final-harvests');
+            const finalKills = document.getElementById('stat-final-kills');
+            const gameoverMenu = document.getElementById('gameover-menu');
+
+            if (reasonTxt) reasonTxt.innerText = reason;
+            if (finalLvl) finalLvl.innerText = currentLevel;
+            if (finalHarvests) finalHarvests.innerText = `${playerStats.totalHarvested} Sawit`;
+            if (finalKills) finalKills.innerText = `${playerStats.totalPestsKilled} Ekor`;
+
+            if (gameoverMenu) gameoverMenu.classList.remove('hidden');
+            playSFX('fail');
+        }
+
+        function restartGame() {
+            currentLevel = 1;
+            playerStats = {
+                energy: 100,
+                maxEnergy: 100,
+                speed: 3.5,
+                gold: 0,
+                farmingToleranceBonus: 0,
+                totalHarvested: 0,
+                totalPestsKilled: 0
+            };
+            const goMenu = document.getElementById('gameover-menu');
+            const shopMenu = document.getElementById('shop-menu');
+            const startMenu = document.getElementById('start-menu');
+
+            if (goMenu) goMenu.classList.add('hidden');
+            if (shopMenu) shopMenu.classList.add('hidden');
+            if (startMenu) startMenu.classList.add('hidden');
+
+            initMazePhase();
+        }
+
+        function startNextLevel() {
+            currentLevel++;
+            playerStats.energy = playerStats.maxEnergy;
+            const shopMenu = document.getElementById('shop-menu');
+            if (shopMenu) shopMenu.classList.add('hidden');
+            initMazePhase();
+        }
+
+        const btnStart = document.getElementById('btn-start-game');
+        if (btnStart) {
+            btnStart.addEventListener('click', () => {
+                blurActiveElement();
+                const startMenu = document.getElementById('start-menu');
+                if (startMenu) startMenu.classList.add('hidden');
+                restartGame();
+            });
+        }
+
+        const btnNext = document.getElementById('btn-next-level');
+        if (btnNext) {
+            btnNext.addEventListener('click', () => {
+                blurActiveElement();
+                startNextLevel();
+            });
+        }
+
+        const btnRestart = document.getElementById('btn-restart-game');
+        if (btnRestart) {
+            btnRestart.addEventListener('click', () => {
+                blurActiveElement();
+                restartGame();
+            });
+        }
+
+        const btnUpEnergy = document.getElementById('buy-upgrade-energy');
+        if (btnUpEnergy) btnUpEnergy.addEventListener('click', () => buyUpgrade('energy'));
+
+        const btnUpSpeed = document.getElementById('buy-upgrade-speed');
+        if (btnUpSpeed) btnUpSpeed.addEventListener('click', () => buyUpgrade('speed'));
+
+        const btnUpFarming = document.getElementById('buy-upgrade-farming');
+        if (btnUpFarming) btnUpFarming.addEventListener('click', () => buyUpgrade('farming'));
+
+        let lastTime = performance.now();
+        function gameLoop(timestamp) {
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+            lastTime = timestamp;
+
+            if (currentState === 'MAZE') {
+                updateMaze();
+                renderMaze();
+            } else if (currentState === 'FARMING') {
+                updateFarming(dt);
+                renderFarming();
+            } else if (currentState === 'FPS') {
+                updateFPS(dt);
+                renderFPS();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function() {
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
